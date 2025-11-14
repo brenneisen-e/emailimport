@@ -1594,17 +1594,17 @@
                     if (nameSimplified.indexOf('hypercare') !== -1 ||
                         fullNameSimplified.indexOf('hypercare') !== -1) {
 
-                        debugInfo += "     ✓ MATCH gefunden! Versuche Worksheet 'Hypercare' zu öffnen...\n";
+                        debugInfo += "     ✓ MATCH gefunden! Versuche Worksheet 'Übersicht' zu öffnen...\n";
                         workbook = wb;
 
-                        // Suche Worksheet "Hypercare"
+                        // Suche Worksheet "Übersicht"
                         try {
-                            worksheet = workbook.Worksheets("Hypercare");
+                            worksheet = workbook.Worksheets("Übersicht");
                             found = true;
-                            debugInfo += "     ✓✓ PERFEKT! Worksheet 'Hypercare' gefunden!\n";
+                            debugInfo += "     ✓✓ PERFEKT! Worksheet 'Übersicht' gefunden!\n";
                             break;
                         } catch (e) {
-                            debugInfo += "     ⚠ Worksheet 'Hypercare' existiert nicht. Fehler: " + e.message + "\n";
+                            debugInfo += "     ⚠ Worksheet 'Übersicht' existiert nicht. Fehler: " + e.message + "\n";
                             debugInfo += "     Verfügbare Worksheets:\n";
                             try {
                                 for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
@@ -1641,14 +1641,14 @@
                         workbook = excel.Workbooks.Open(sharePointUrl);
                         debugInfo += "✓ Datei geöffnet: " + workbook.Name + "\n";
 
-                        // Suche Worksheet "Hypercare"
+                        // Suche Worksheet "Übersicht"
                         try {
-                            worksheet = workbook.Worksheets("Hypercare");
+                            worksheet = workbook.Worksheets("Übersicht");
                             found = true;
-                            debugInfo += "✓✓ Worksheet 'Hypercare' gefunden!\n";
+                            debugInfo += "✓✓ Worksheet 'Übersicht' gefunden!\n";
                             alert("✅ ERFOLG!\n\n" + debugInfo + "\n\nDie SharePoint-Datei wurde geöffnet und wird jetzt verwendet!");
                         } catch (wsError) {
-                            debugInfo += "⚠️ Worksheet 'Hypercare' nicht gefunden!\n";
+                            debugInfo += "⚠️ Worksheet 'Übersicht' nicht gefunden!\n";
                             debugInfo += "Verfügbare Worksheets:\n";
                             for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
                                 debugInfo += "  - " + workbook.Worksheets(ws).Name + "\n";
@@ -1679,7 +1679,7 @@
                         // Neue Datei erstellen als letzter Ausweg
                         workbook = excel.Workbooks.Add();
                         worksheet = workbook.Worksheets(1);
-                        worksheet.Name = "Hypercare";
+                        worksheet.Name = "Übersicht";
                         found = false; // WICHTIG: Markiere als neue Datei für Header-Erstellung
                     }
                 }
@@ -1757,11 +1757,66 @@
                     worksheet.Cells(rowNum, 16).Value = kommentar;
                 }
 
+                // EMAILTRACKER: Speichere alle Email-Informationen
+                var emailTrackerSheet = null;
+                try {
+                    emailTrackerSheet = workbook.Worksheets("Emailtracker");
+                } catch (e) {
+                    // Emailtracker existiert nicht, erstelle es
+                    emailTrackerSheet = workbook.Worksheets.Add();
+                    emailTrackerSheet.Name = "Emailtracker";
+
+                    // Header für Emailtracker
+                    var etHeaders = ['HC-ID', 'Datum', 'Von Name', 'Von Email', 'Betreff', 'Text',
+                                     'Kategorie', 'Status', 'Cluster', 'Agentur', 'Importiert am'];
+                    for (var col = 0; col < etHeaders.length; col++) {
+                        emailTrackerSheet.Cells(1, col + 1).Value = etHeaders[col];
+                        emailTrackerSheet.Cells(1, col + 1).Font.Bold = true;
+                        emailTrackerSheet.Cells(1, col + 1).Interior.Color = 15395562;
+                    }
+
+                    // Spaltenbreiten
+                    var etWidths = [10, 18, 25, 30, 40, 60, 20, 15, 20, 25, 18];
+                    for (var col = 0; col < etWidths.length; col++) {
+                        emailTrackerSheet.Columns(col + 1).ColumnWidth = etWidths[col];
+                    }
+
+                    // Auto-filter
+                    emailTrackerSheet.Range("A1:K1").AutoFilter();
+                }
+
+                // Finde nächste freie Zeile in Emailtracker
+                var etLastRow = emailTrackerSheet.Cells(emailTrackerSheet.Rows.Count, 1).End(-4162).Row;
+                var etNextRow = etLastRow + 1;
+                if (etLastRow === 1 && emailTrackerSheet.Cells(1, 1).Value === "HC-ID") {
+                    etNextRow = 2;
+                }
+
+                // Speichere Email-Daten in Emailtracker
+                for (var row = 0; row < selectedEmails.length; row++) {
+                    var email = selectedEmails[row];
+                    var etRowNum = etNextRow + row;
+                    var hcId = "HC-" + ("000" + (maxId + row + 1)).slice(-3);
+
+                    emailTrackerSheet.Cells(etRowNum, 1).Value = hcId;
+                    emailTrackerSheet.Cells(etRowNum, 2).Value = new Date(email.datum).toLocaleString('de-DE');
+                    emailTrackerSheet.Cells(etRowNum, 3).Value = email.von_name;
+                    emailTrackerSheet.Cells(etRowNum, 4).Value = email.von_email;
+                    emailTrackerSheet.Cells(etRowNum, 5).Value = email.betreff;
+                    emailTrackerSheet.Cells(etRowNum, 6).Value = email.text;
+                    emailTrackerSheet.Cells(etRowNum, 7).Value = email.kategorie;
+                    emailTrackerSheet.Cells(etRowNum, 8).Value = email.status;
+                    emailTrackerSheet.Cells(etRowNum, 9).Value = email.cluster;
+                    emailTrackerSheet.Cells(etRowNum, 10).Value = email.agentur;
+                    emailTrackerSheet.Cells(etRowNum, 11).Value = new Date().toLocaleString('de-DE');
+                }
+
                 var msg = "✅ " + selectedEmails.length + " Email(s) erfolgreich exportiert!\n\n";
                 if (found) {
-                    msg += "Die Daten wurden zur Tabelle 'Hypercare' in '" + workbook.Name + "' hinzugefügt.\n";
+                    msg += "Die Daten wurden zur Tabelle 'Übersicht' in '" + workbook.Name + "' hinzugefügt.\n";
                     msg += "Startzeile: " + nextRow + "\n";
-                    msg += "Neue IDs: HC-" + ("000" + (maxId + 1)).slice(-3) + " bis HC-" + ("000" + (maxId + selectedEmails.length)).slice(-3);
+                    msg += "Neue IDs: HC-" + ("000" + (maxId + 1)).slice(-3) + " bis HC-" + ("000" + (maxId + selectedEmails.length)).slice(-3) + "\n\n";
+                    msg += "✓ Email-Informationen wurden auch im 'Emailtracker' gespeichert!";
                 } else {
                     msg += "NEUE Datei wurde erstellt.\n\nBitte speichere sie als 'Tracking_Hypercare.xlsx'!";
                 }
@@ -1773,8 +1828,8 @@
                       "Stack: " + (e.stack || "Nicht verfügbar") + "\n\n" +
                       "Bitte stelle sicher dass:\n" +
                       "1. Microsoft Excel installiert ist\n" +
-                      "2. Die Datei 'Tracking_Hypercare.xlsx' geöffnet ist\n" +
-                      "3. Eine Tabelle namens 'Hypercare' existiert");
+                      "2. Die Datei 'Tracking_Hypercare.xlsm' ist erreichbar\n" +
+                      "3. Ein Worksheet namens 'Übersicht' existiert");
             }
         }
 
