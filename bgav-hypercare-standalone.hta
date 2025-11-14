@@ -1540,11 +1540,20 @@
             }
 
             try {
-                // Verwende ActiveXObject - GetObject funktioniert nicht zuverlässig in HTA
-                var excel = new ActiveXObject("Excel.Application");
-                excel.Visible = true;
+                var excel = null;
+                var debugInfo = "";
 
-                var debugInfo = "Excel-Instanz erstellt/verbunden\n\n";
+                // WICHTIG: Versuche ZUERST eine laufende Excel-Instanz zu finden!
+                try {
+                    excel = GetObject("", "Excel.Application");
+                    debugInfo = "✓ Verbunden mit laufender Excel-Instanz\n\n";
+                } catch (e) {
+                    debugInfo = "⚠ Keine laufende Excel-Instanz gefunden\n";
+                    debugInfo += "Erstelle neue Excel-Instanz...\n\n";
+                    excel = new ActiveXObject("Excel.Application");
+                }
+
+                excel.Visible = true;
 
                 // Suche nach offener Tracking_Hypercare Datei
                 var workbook = null;
@@ -1620,28 +1629,42 @@
                 }
 
                 if (!found) {
-                    // WICHTIG: Öffne Tracking_Hypercare.xlsm vorher in Excel!
-                    // SharePoint-Links funktionieren nicht mit Workbooks.Open()
-                    var errorMsg = "⚠️⚠️⚠️ TRACKING_HYPERCARE NICHT GEFUNDEN! ⚠️⚠️⚠️\n\n";
-                    errorMsg += debugInfo;
-                    errorMsg += "\n\n═══════════════════════════════════\n";
-                    errorMsg += "LÖSUNG:\n";
-                    errorMsg += "═══════════════════════════════════\n";
-                    errorMsg += "1. Öffne die Datei in Excel:\n";
-                    errorMsg += "   https://barmeniagroup.sharepoint.com/.../Tracking_Hypercare.xlsm\n\n";
-                    errorMsg += "2. Stelle sicher dass Excel im Vordergrund ist\n\n";
-                    errorMsg += "3. Klicke in der HTA-App erneut auf\n";
-                    errorMsg += "   'Nach Excel exportieren'\n\n";
-                    errorMsg += "═══════════════════════════════════\n\n";
-                    errorMsg += "Die App erstellt jetzt eine NEUE Datei als Fallback.\n";
-                    errorMsg += "Du musst die Daten dann manuell kopieren!";
+                    debugInfo += "\n⚠️ Tracking_Hypercare nicht in offenen Dateien gefunden!\n";
+                    debugInfo += "\n🔄 Versuche SharePoint-Datei zu öffnen...\n";
 
-                    alert(errorMsg);
+                    // Versuche die SharePoint-Datei direkt zu öffnen
+                    var sharePointUrl = "https://barmeniagroup.sharepoint.com/sites/SAPUnity-WorkstreamICM/Freigegebene%20Dokumente/40%20Team%20Simulation,%20Kalibrierung,%20Verhandlung,%20Vertrag%20&%20EFM/Tracking_Hypercare.xlsm";
 
-                    // Neue Datei erstellen
-                    workbook = excel.Workbooks.Add();
-                    worksheet = workbook.Worksheets(1);
-                    worksheet.Name = "Hypercare";
+                    try {
+                        // Versuche die URL direkt zu öffnen
+                        workbook = excel.Workbooks.Open(sharePointUrl);
+                        worksheet = workbook.Worksheets("Hypercare");
+                        found = true;
+                        debugInfo += "✓✓ SharePoint-Datei erfolgreich geöffnet!\n";
+                    } catch (openError) {
+                        debugInfo += "✗ SharePoint-URL öffnen fehlgeschlagen: " + openError.message + "\n";
+                        debugInfo += "\n═══════════════════════════════════\n";
+                        debugInfo += "PROBLEM: SharePoint-Dateien können nicht direkt\n";
+                        debugInfo += "über URLs geöffnet werden.\n\n";
+                        debugInfo += "LÖSUNG:\n";
+                        debugInfo += "═══════════════════════════════════\n";
+                        debugInfo += "1. Öffne die Datei MANUELL in Excel:\n";
+                        debugInfo += "   " + sharePointUrl + "\n\n";
+                        debugInfo += "2. Lasse Excel im Hintergrund offen\n\n";
+                        debugInfo += "3. Klicke in der HTA-App erneut auf\n";
+                        debugInfo += "   'Nach Excel exportieren'\n\n";
+                        debugInfo += "Die App wird die geöffnete Datei dann finden!\n";
+                        debugInfo += "═══════════════════════════════════\n\n";
+                        debugInfo += "\nAls FALLBACK erstelle ich jetzt eine neue Datei.\n";
+                        debugInfo += "Du musst die Daten dann manuell kopieren!";
+
+                        alert("⚠️⚠️⚠️ TRACKING_HYPERCARE NICHT GEFUNDEN! ⚠️⚠️⚠️\n\n" + debugInfo);
+
+                        // Neue Datei erstellen als letzter Ausweg
+                        workbook = excel.Workbooks.Add();
+                        worksheet = workbook.Worksheets(1);
+                        worksheet.Name = "Hypercare";
+                    }
                 }
 
                 if (!found) {
