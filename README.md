@@ -1,25 +1,70 @@
 # BGAV Hypercare - Email Review Tool
 
-Eine standalone HTML-Anwendung zur Überprüfung und Kategorisierung von Hypercare-Emails für das Barmenia/Gothaer-Projekt.
+Tool zur Überprüfung und Kategorisierung von Hypercare-Emails für das Barmenia/Gothaer-Projekt.
+
+## 🎯 Zwei Versionen verfügbar
+
+### 🚀 HTA-Version (EMPFOHLEN für Windows)
+
+**`bgav-hypercare-standalone.hta`** - Die All-in-One-Lösung!
+
+✅ **Direkter Outlook-Zugriff** - Keine Scripts, keine Exports
+✅ **Direkter Excel-Export** - Öffnet sich automatisch in Excel
+✅ **One-Click-Workflow** - Emails laden → Review → Export
+✅ **Komplett offline** - Keine Internetverbindung nötig
+
+**Quick Start:**
+1. Doppelklick auf `bgav-hypercare-standalone.hta`
+2. "📥 Ausgewählte Emails laden" oder "📂 Ordner laden"
+3. Review & Kategorisierung
+4. "💾 Nach Excel exportieren"
+5. Fertig!
+
+👉 **[Vollständige Anleitung](HTA-ANLEITUNG.md)**
+
+---
+
+### 🌐 HTML-Version (Plattformübergreifend)
+
+**`bgav-hypercare-email-review.html`** - Läuft in jedem Browser
+
+- Für Mac, Linux, Windows
+- Benötigt JSON-Export aus Outlook (via PowerShell/VBA)
+- XLSX-Download statt direktem Excel-Export
+
+**Quick Start:**
+1. Öffne `bgav-hypercare-email-review.html` im Browser
+2. JSON-Datei hochladen (siehe Outlook-Integration)
+3. Review & Kategorisierung
+4. Excel-Datei wird heruntergeladen
+
+---
 
 ## 📋 Features
 
-- **Email-Import**: Lade Emails als JSON-Datei hoch
 - **Intelligente Kategorisierung**: Automatische Erkennung von:
   - Kategorie (Incident / Fachliche Rückfrage)
   - Cluster (SHUK, LV, KV, Provisionierung, Produktzuordnung, Allgemein)
   - Agentur
 - **Filterung & Suche**: Durchsuche und filtere Emails nach verschiedenen Kriterien
 - **Batch-Bearbeitung**: Bearbeite mehrere Emails gleichzeitig
-- **Excel-Export**: Exportiere ausgewählte Emails in eine Excel-Datei für weitere Verarbeitung
+- **Excel-Export**: Exportiere im Hypercare-Template-Format
 
 ## 🚀 Verwendung
 
-### Lokale Ausführung
+### HTA-Version (Windows - EMPFOHLEN)
 
-1. Lade die Datei `bgav-hypercare-email-review.html` herunter
-2. Öffne die Datei in einem modernen Webbrowser (Chrome, Firefox, Edge, Safari)
-3. Die App funktioniert komplett offline - keine Server-Verbindung erforderlich!
+1. Doppelklick auf `bgav-hypercare-standalone.hta`
+2. Emails direkt aus Outlook laden
+3. Review & Export - Fertig!
+
+Siehe **[HTA-ANLEITUNG.md](HTA-ANLEITUNG.md)** für Details.
+
+### HTML-Version (Alle Plattformen)
+
+1. Öffne `bgav-hypercare-email-review.html` im Browser
+2. Lade eine JSON-Datei hoch
+3. Die App funktioniert komplett offline
 
 ### 📧 Outlook-Integration
 

@@ -4,21 +4,45 @@ Dieses Repository enthält alle Dateien für das BGAV Hypercare Email Review Too
 
 ## 📁 Hauptdateien
 
+### `bgav-hypercare-standalone.hta` ⭐ EMPFOHLEN
+**Die All-in-One Windows-Anwendung** - Direkter Outlook & Excel Zugriff
+
+- **Was macht sie?** Kompletter Workflow: Outlook → Review → Excel
+- **Wie verwenden?** Doppelklick (läuft als Windows-App)
+- **Abhängigkeiten:** Windows, Outlook, Excel
+- **Offline-fähig:** Ja
+- **Größe:** ~75 KB
+- **Plattform:** Nur Windows
+
+**Features:**
+- ✅ **Direkter Outlook-Zugriff** (keine separate Export-Datei nötig)
+- ✅ **Direkter Excel-Export** (öffnet sich automatisch)
+- Automatische Kategorisierung (Incident/Rückfrage, Cluster)
+- Ordner-Browser für Outlook-Ordner
+- Such- und Filterfunktionen
+- Batch-Bearbeitung
+- Läuft als native Windows-Anwendung
+
+**👉 Siehe [HTA-ANLEITUNG.md](HTA-ANLEITUNG.md) für Details**
+
+---
+
 ### `bgav-hypercare-email-review.html`
-**Die Hauptanwendung** - Standalone HTML-App für Email-Review
+**Browser-basierte Anwendung** - Plattformübergreifend
 
 - **Was macht sie?** Email-Review-Tool mit automatischer Kategorisierung und Excel-Export
-- **Wie verwenden?** Einfach im Browser öffnen (Doppelklick)
-- **Abhängigkeiten:** Keine (außer XLSX-Library via CDN)
-- **Offline-fähig:** Ja
-- **Größe:** ~45 KB
+- **Wie verwenden?** Im Browser öffnen (Chrome, Firefox, Edge, Safari)
+- **Abhängigkeiten:** Moderner Browser, XLSX-Library via CDN
+- **Offline-fähig:** Ja (nach erstem Laden)
+- **Größe:** ~49 KB
+- **Plattform:** Alle (Windows, Mac, Linux)
 
 **Features:**
 - JSON-Import von Emails
 - Automatische Kategorisierung (Incident/Rückfrage, Cluster)
 - Such- und Filterfunktionen
 - Batch-Bearbeitung
-- Excel-Export für Hypercare-Template
+- Excel-Export als Download (XLSX-Datei)
 
 ---
 
@@ -131,7 +155,8 @@ Dieses Repository enthält alle Dateien für das BGAV Hypercare Email Review Too
 ```
 emailimport/
 │
-├── bgav-hypercare-email-review.html    # Haupt-App (Standalone)
+├── bgav-hypercare-standalone.hta        # ⭐ HTA-App (Windows, empfohlen)
+├── bgav-hypercare-email-review.html    # Browser-App (alle Plattformen)
 │
 ├── Export-OutlookEmails.ps1             # PowerShell Export-Script
 ├── OutlookExportMacro.vba               # VBA Makro für Outlook
@@ -139,7 +164,8 @@ emailimport/
 ├── beispiel-emails.json                 # Test-Daten
 │
 ├── README.md                            # Haupt-Dokumentation
-├── OUTLOOK-INTEGRATION.md               # Outlook-Anleitung
+├── HTA-ANLEITUNG.md                     # HTA-Version Anleitung
+├── OUTLOOK-INTEGRATION.md               # Outlook-Anleitung (HTML-Version)
 └── DATEIEN-UEBERSICHT.md               # Diese Datei
 ```
 
@@ -147,9 +173,53 @@ emailimport/
 
 ## 🚀 Quick Start
 
+### ⭐ Empfohlen: HTA-Version (Windows)
+
+**Schnellster Weg von Outlook zu Excel:**
+
+1. **App starten:**
+   ```
+   Doppelklick auf: bgav-hypercare-standalone.hta
+   ```
+
+2. **Emails laden:**
+   - Wähle in Outlook Emails aus
+   - In HTA-App: "📥 Ausgewählte Emails laden"
+   - Oder: "📂 Ordner laden" für ganzen Ordner
+
+3. **Review & Export:**
+   - Kategorien prüfen/anpassen
+   - "💾 Nach Excel exportieren"
+   - Fertig! Excel öffnet sich automatisch
+
+**Siehe [HTA-ANLEITUNG.md](HTA-ANLEITUNG.md) für Details**
+
+---
+
+### Alternative: HTML-Version (Alle Plattformen)
+
+**Mit JSON-Export:**
+
+1. **Outlook-Export einrichten:**
+   - Methode wählen (PowerShell oder VBA)
+   - Siehe `OUTLOOK-INTEGRATION.md` für Details
+
+2. **Emails aus Outlook exportieren:**
+   ```powershell
+   .\Export-OutlookEmails.ps1
+   ```
+
+3. **In App laden und verarbeiten:**
+   - `bgav-hypercare-email-review.html` im Browser öffnen
+   - Exportierte JSON-Datei laden
+   - Review durchführen
+   - Nach Excel exportieren (Download)
+
+---
+
 ### Für Erstnutzer (Testing)
 
-1. **App öffnen:**
+1. **Browser-App öffnen:**
    ```
    Doppelklick auf: bgav-hypercare-email-review.html
    ```
@@ -164,27 +234,43 @@ emailimport/
    - Kategorien ändern
    - Excel exportieren
 
-### Für Produktivnutzung
+---
 
-1. **Outlook-Export einrichten:**
-   - Methode wählen (PowerShell oder VBA)
-   - Siehe `OUTLOOK-INTEGRATION.md` für Details
+## 💾 Workflow-Diagramme
 
-2. **Emails aus Outlook exportieren:**
-   ```powershell
-   # PowerShell-Methode
-   .\Export-OutlookEmails.ps1
-   ```
+### HTA-Version (Empfohlen)
 
-3. **In App laden und verarbeiten:**
-   - HTML-App öffnen
-   - Exportierte JSON-Datei laden
-   - Review durchführen
-   - Nach Excel exportieren
+```
+┌─────────────────┐
+│     Outlook     │
+│  (Emails/Ordner)│
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────┐
+│    HTA-App (One-Click)          │
+│                                 │
+│  1. Emails direkt laden         │
+│  2. Auto-Kategorisierung        │
+│  3. Review & Anpassung          │
+│  4. Batch-Bearbeitung           │
+└────────┬────────────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Excel (Auto)   │
+│  Tracking_HC    │
+│                 │
+│  Speichern &    │
+│  Fertig! ✅     │
+└─────────────────┘
+```
+
+**Vorteile:** Direkter Workflow, keine Zwischenschritte, alles in einer App!
 
 ---
 
-## 💾 Workflow-Diagramm
+### HTML-Version (Plattformübergreifend)
 
 ```
 ┌─────────────┐
@@ -208,6 +294,7 @@ emailimport/
                     ▼
         ┌───────────────────────┐
         │   HTML Review-App     │
+        │   (im Browser)        │
         │                       │
         │ - Kategorisierung     │
         │ - Filterung           │
@@ -215,10 +302,12 @@ emailimport/
         └───────┬───────────────┘
                 ▼
         ┌───────────────┐
-        │  Excel-Export │
-        │  (Hypercare)  │
+        │ Excel-Download│
+        │  (XLSX-Datei) │
         └───────────────┘
 ```
+
+**Vorteile:** Plattformübergreifend, mehr Kontrolle über Export-Prozess
 
 ---
 
@@ -226,23 +315,37 @@ emailimport/
 
 | Datei | Größe | Ladezeit | Performance-Hinweis |
 |-------|-------|----------|---------------------|
-| `bgav-hypercare-email-review.html` | ~45 KB | < 1s | Auch mit 10.000 Emails flüssig |
-| `Export-OutlookEmails.ps1` | ~12 KB | - | Sehr schnell, auch große Exports |
-| `OutlookExportMacro.vba` | ~11 KB | - | OK für <1.000 Emails |
-| `beispiel-emails.json` | ~3 KB | < 1s | Instant |
+| `bgav-hypercare-standalone.hta` | ~75 KB | < 1s | ⭐ Sehr schnell, native Windows-App |
+| `bgav-hypercare-email-review.html` | ~49 KB | < 1s | Auch mit 10.000 Emails flüssig |
+| `Export-OutlookEmails.ps1` | ~9 KB | - | Sehr schnell, auch große Exports |
+| `OutlookExportMacro.vba` | ~12 KB | - | OK für <1.000 Emails |
+| `beispiel-emails.json` | ~6 KB | < 1s | Instant |
 
 **Performance-Empfehlungen:**
-- PowerShell-Script: Ideal für große Mengen (>1.000 Emails)
-- VBA-Makro: Gut für kleine/mittlere Mengen (<1.000 Emails)
-- HTML-App: Performant bis ~5.000 Emails im Browser
+- **HTA-App**: Ideal für 100-5.000 Emails, direkter Outlook-Zugriff
+- **PowerShell-Script**: Ideal für sehr große Mengen (>5.000 Emails)
+- **VBA-Makro**: Gut für kleine/mittlere Mengen (<1.000 Emails)
+- **HTML-App**: Performant bis ~5.000 Emails im Browser
+
+**Outlook-Zugriff:**
+- **HTA**: Direkt, kein Export nötig
+- **PowerShell/VBA**: Separater Export-Schritt erforderlich
 
 ---
 
 ## 🔄 Versions-Historie
 
+### Version 2.0 (2025-11-14)
+- ✨ **NEU: HTA-Version** - Direkter Outlook & Excel Zugriff
+- ✅ All-in-One Windows-Anwendung
+- ✅ Ordner-Browser für Outlook
+- ✅ Direkter Excel-Export (öffnet sich automatisch)
+- ✅ Umfassende HTA-Anleitung
+- ✅ Aktualisierte Dokumentation
+
 ### Version 1.0 (2025-11-14)
 - ✨ Initiale Version
-- ✅ Standalone HTML-App
+- ✅ Standalone HTML-App (Browser)
 - ✅ PowerShell Export-Script
 - ✅ VBA-Makro
 - ✅ Vollständige Dokumentation

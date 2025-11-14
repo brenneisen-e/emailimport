@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>BGAV Hypercare - Email Review Tool</title>
+
+    <!-- HTA Configuration -->
+    <HTA:APPLICATION
+        ID="BGAV_Hypercare"
+        APPLICATIONNAME="BGAV Hypercare Email Review"
+        BORDER="thick"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        ICON=""
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="maximize"
+    />
+
+    <style>
+        /* ============================================================================
+           VARIABLES & RESET
+           ============================================================================ */
+        :root {
+            --primary: #366092;
+            --primary-dark: #2a4a70;
+            --primary-light: #4a7bb8;
+            --secondary: #00a3e0;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-light: #ffffff;
+
+            --border: #dee2e6;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --shadow-lg: rgba(0, 0, 0, 0.15);
+
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+
+            --radius-sm: 0.25rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 1rem;
+
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: var(--spacing-lg);
+        }
+
+        /* ============================================================================
+           CONTAINER & LAYOUT
+           ============================================================================ */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 20px 60px var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        /* ============================================================================
+           HEADER
+           ============================================================================ */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--text-light);
+            padding: var(--spacing-xl);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--spacing-md);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .header-title h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: var(--text-light);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: var(--spacing-md);
+            flex-wrap: wrap;
+        }
+
+        /* ============================================================================
+           STATS BAR
+           ============================================================================ */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            padding: var(--spacing-xl);
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .stat-card {
+            background: var(--bg-primary);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-md);
+            box-shadow: 0 2px 8px var(--shadow);
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow-lg);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: block;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: var(--spacing-xs);
+        }
+
+        /* ============================================================================
+           TOOLBAR
+           ============================================================================ */
+        .toolbar {
+            padding: var(--spacing-lg) var(--spacing-xl);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: var(--spacing-md);
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) 2.5rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: var(--spacing-md);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        .filter-group {
+            display: flex;
+            gap: var(--spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        /* ============================================================================
+           BUTTONS
+           ============================================================================ */
+        .btn {
+            padding: var(--spacing-md) var(--spacing-lg);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow-lg);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--text-light);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: var(--text-light);
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: var(--text-primary);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: var(--text-light);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-size: 0.875rem;
+        }
+
+        .btn-lg {
+            padding: var(--spacing-lg) var(--spacing-xl);
+            font-size: 1.125rem;
+        }
+
+        /* ============================================================================
+           EMAIL LIST
+           ============================================================================ */
+        .email-list {
+            padding: var(--spacing-xl);
+            display: grid;
+            gap: var(--spacing-lg);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .email-card {
+            background: var(--bg-primary);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: var(--transition);
+            display: grid;
+            gap: var(--spacing-md);
+        }
+
+        .email-card:hover {
+            border-color: var(--primary-light);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .email-card.selected {
+            border-color: var(--primary);
+            background: rgba(54, 96, 146, 0.05);
+        }
+
+        .email-header {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--spacing-md);
+        }
+
+        .email-checkbox {
+            margin-top: var(--spacing-xs);
+        }
+
+        .email-checkbox input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .email-meta {
+            flex: 1;
+        }
+
+        .email-subject {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .email-from {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .email-date {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .email-body-preview {
+            background: var(--bg-secondary);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            max-height: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .email-body-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, var(--bg-secondary));
+        }
+
+        /* ============================================================================
+           EDIT FIELDS
+           ============================================================================ */
+        .edit-fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .field-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .field-label input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .field-input {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
+        }
+
+        .field-input:disabled {
+            background: var(--bg-tertiary);
+            cursor: not-allowed;
+        }
+
+        select.field-input {
+            cursor: pointer;
+        }
+
+        /* ============================================================================
+           BADGES
+           ============================================================================ */
+        .badge {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-incident {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+
+        .badge-rueckfrage {
+            background: rgba(0, 163, 224, 0.1);
+            color: var(--secondary);
+        }
+
+        /* ============================================================================
+           MODAL
+           ============================================================================ */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-lg);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px var(--shadow-lg);
+        }
+
+        .modal-header {
+            padding: var(--spacing-lg);
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: var(--spacing-lg);
+        }
+
+        .modal-footer {
+            padding: var(--spacing-lg);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: var(--spacing-md);
+            justify-content: flex-end;
+        }
+
+        /* ============================================================================
+           EMPTY STATE
+           ============================================================================ */
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-xl) * 2;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: var(--spacing-lg);
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .empty-description {
+            max-width: 500px;
+            margin: 0 auto var(--spacing-xl);
+        }
+
+        /* ============================================================================
+           LOADING
+           ============================================================================ */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: var(--spacing-xl);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid var(--bg-tertiary);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto var(--spacing-md);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ============================================================================
+           UTILITIES
+           ============================================================================ */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-md {
+            margin-top: var(--spacing-md);
+        }
+
+        .mb-md {
+            margin-bottom: var(--spacing-md);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-title">
+                <div class="logo">📧</div>
+                <div>
+                    <h1>BGAV Hypercare Email Review</h1>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Barmenia • Gothaer • Standalone Edition</div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-warning" onclick="loadFromOutlookSelection()">
+                    📥 Ausgewählte Emails laden
+                </button>
+                <button class="btn btn-primary" onclick="showFolderSelectModal()">
+                    📂 Ordner laden
+                </button>
+                <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
+                    💾 Nach Excel exportieren
+                </button>
+            </div>
+        </div>
+
+        <!-- STATS BAR -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <span class="stat-value" id="totalCount">0</span>
+                <span class="stat-label">Emails geladen</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="selectedCount">0</span>
+                <span class="stat-label">Ausgewählt</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="incidentCount">0</span>
+                <span class="stat-label">Incidents</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="rueckfrageCount">0</span>
+                <span class="stat-label">Rückfragen</span>
+            </div>
+        </div>
+
+        <!-- TOOLBAR -->
+        <div class="toolbar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Suche in Betreff oder Text..."
+                       oninput="filterEmails()">
+            </div>
+
+            <div class="filter-group">
+                <select class="field-input" id="filterKategorie" onchange="filterEmails()">
+                    <option value="">Alle Kategorien</option>
+                    <option value="Incident">Incident</option>
+                    <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                </select>
+
+                <select class="field-input" id="filterCluster" onchange="filterEmails()">
+                    <option value="">Alle Cluster</option>
+                    <option value="SHUK">SHUK</option>
+                    <option value="LV">LV</option>
+                    <option value="KV">KV</option>
+                    <option value="Provisionierung">Provisionierung</option>
+                    <option value="Produktzuordnung">Produktzuordnung</option>
+                    <option value="Allgemein">Allgemein</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <button class="btn btn-secondary btn-sm" onclick="selectAll()">✓ Alle auswählen</button>
+                <button class="btn btn-secondary btn-sm" onclick="deselectAll()">✗ Alle abwählen</button>
+                <button class="btn btn-warning btn-sm" onclick="showBatchEditModal()">
+                    ✏️ Mehrere bearbeiten
+                </button>
+            </div>
+        </div>
+
+        <!-- EMAIL LIST -->
+        <div id="emailList" class="email-list">
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <div class="empty-title">Keine Emails geladen</div>
+                <div class="empty-description">
+                    Wähle in Outlook Emails aus und klicke auf "Ausgewählte Emails laden"<br>
+                    oder lade einen ganzen Outlook-Ordner.
+                </div>
+                <button class="btn btn-primary btn-lg mt-md" onclick="loadFromOutlookSelection()">
+                    📥 Emails aus Outlook laden
+                </button>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div id="loadingText">Lade Emails aus Outlook...</div>
+        </div>
+    </div>
+
+    <!-- FOLDER SELECT MODAL -->
+    <div class="modal" id="folderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Outlook-Ordner auswählen</h2>
+                <button class="modal-close" onclick="closeModal('folderModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Wähle den Outlook-Ordner aus dem du Emails laden möchtest:</p>
+                <select id="folderSelect" class="field-input" style="width: 100%; margin-bottom: 1rem;" size="10">
+                    <option value="">Lädt Ordner...</option>
+                </select>
+                <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                    Alle Emails aus dem ausgewählten Ordner werden geladen.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('folderModal')">Abbrechen</button>
+                <button class="btn btn-primary" onclick="loadFromOutlookFolder()">Ordner laden</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BATCH EDIT MODAL -->
+    <div class="modal" id="batchEditModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Mehrere Emails bearbeiten</h2>
+                <button class="modal-close" onclick="closeModal('batchEditModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: var(--spacing-lg);">
+                    Änderungen werden auf <strong><span id="batchCount">0</span> ausgewählte Emails</strong> angewendet.
+                </p>
+
+                <div class="field-group mb-md">
+                    <label class="field-label">
+                        <input type="checkbox" id="batchKategorieCheck"> Kategorie ändern
+                    </label>
+                    <select class="field-input" id="batchKategorie" disabled>
+                        <option value="Incident">Incident</option>
+                        <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                    </select>
+                </div>
+
+                <div class="field-group mb-md">
+                    <label class="field-label">
+                        <input type="checkbox" id="batchClusterCheck"> Cluster ändern
+                    </label>
+                    <select class="field-input" id="batchCluster" disabled>
+                        <option value="SHUK">SHUK</option>
+                        <option value="LV">LV</option>
+                        <option value="KV">KV</option>
+                        <option value="Provisionierung">Provisionierung</option>
+                        <option value="Produktzuordnung">Produktzuordnung</option>
+                        <option value="Allgemein">Allgemein</option>
+                    </select>
+                </div>
+
+                <div class="field-group mb-md">
+                    <label class="field-label">
+                        <input type="checkbox" id="batchStatusCheck"> Status ändern
+                    </label>
+                    <select class="field-input" id="batchStatus" disabled>
+                        <option value="Neu">Neu</option>
+                        <option value="In Bearbeitung">In Bearbeitung</option>
+                        <option value="Gelöst">Gelöst</option>
+                        <option value="Geschlossen">Geschlossen</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('batchEditModal')">Abbrechen</button>
+                <button class="btn btn-primary" onclick="applyBatchEdit()">Änderungen übernehmen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script type="text/javascript">
+        // ============================================================================
+        // GLOBAL STATE
+        // ============================================================================
+        var emails = [];
+        var filteredEmails = [];
+        var nextId = 1;
+        var outlookApp = null;
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+        window.onload = function() {
+            setupBatchEditCheckboxes();
+            initializeOutlook();
+        };
+
+        function initializeOutlook() {
+            try {
+                outlookApp = new ActiveXObject("Outlook.Application");
+            } catch (e) {
+                alert("Outlook konnte nicht gestartet werden.\n\nBitte stelle sicher dass:\n1. Microsoft Outlook installiert ist\n2. Outlook mindestens einmal gestartet wurde\n\nFehler: " + e.message);
+            }
+        }
+
+        // ============================================================================
+        // OUTLOOK INTEGRATION
+        // ============================================================================
+        function loadFromOutlookSelection() {
+            if (!outlookApp) {
+                initializeOutlook();
+                if (!outlookApp) return;
+            }
+
+            try {
+                showLoading(true, "Lade ausgewählte Emails aus Outlook...");
+
+                var explorer = outlookApp.ActiveExplorer();
+                var selection = explorer.Selection;
+
+                if (selection.Count === 0) {
+                    alert("Keine Emails ausgewählt!\n\nBitte wähle in Outlook eine oder mehrere Emails aus und versuche es erneut.");
+                    showLoading(false);
+                    return;
+                }
+
+                var newEmails = [];
+                for (var i = 1; i <= selection.Count; i++) {
+                    var mailItem = selection.Item(i);
+                    if (mailItem.Class === 43) { // olMail
+                        newEmails.push(extractEmailData(mailItem));
+                    }
+                }
+
+                if (newEmails.length === 0) {
+                    alert("Keine Email-Nachrichten gefunden in der Auswahl!");
+                    showLoading(false);
+                    return;
+                }
+
+                processEmails(newEmails);
+                showLoading(false);
+
+            } catch (e) {
+                showLoading(false);
+                alert("Fehler beim Laden der Emails:\n\n" + e.message);
+            }
+        }
+
+        function showFolderSelectModal() {
+            if (!outlookApp) {
+                initializeOutlook();
+                if (!outlookApp) return;
+            }
+
+            try {
+                var folderSelect = document.getElementById('folderSelect');
+                folderSelect.innerHTML = '';
+
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var folders = namespace.Folders;
+
+                for (var i = 1; i <= folders.Count; i++) {
+                    var rootFolder = folders.Item(i);
+                    addFolderOptions(folderSelect, rootFolder, "");
+                }
+
+                openModal('folderModal');
+            } catch (e) {
+                alert("Fehler beim Laden der Ordner:\n\n" + e.message);
+            }
+        }
+
+        function addFolderOptions(selectElement, folder, prefix) {
+            try {
+                var option = document.createElement('option');
+                option.value = folder.EntryID;
+                option.text = prefix + folder.Name + " (" + folder.Items.Count + ")";
+                selectElement.appendChild(option);
+
+                if (folder.Folders.Count > 0) {
+                    for (var i = 1; i <= folder.Folders.Count; i++) {
+                        addFolderOptions(selectElement, folder.Folders.Item(i), prefix + "  ");
+                    }
+                }
+            } catch (e) {
+                // Manche Ordner haben keinen Zugriff - ignorieren
+            }
+        }
+
+        function loadFromOutlookFolder() {
+            var folderSelect = document.getElementById('folderSelect');
+            var entryID = folderSelect.value;
+
+            if (!entryID) {
+                alert("Bitte wähle einen Ordner aus!");
+                return;
+            }
+
+            try {
+                closeModal('folderModal');
+                showLoading(true, "Lade Emails aus Ordner...");
+
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var folder = namespace.GetFolderFromID(entryID);
+
+                if (folder.Items.Count === 0) {
+                    alert("Der Ordner enthält keine Emails!");
+                    showLoading(false);
+                    return;
+                }
+
+                if (folder.Items.Count > 1000) {
+                    if (!confirm("Der Ordner enthält " + folder.Items.Count + " Emails.\n\nDas Laden kann einige Minuten dauern.\n\nFortfahren?")) {
+                        showLoading(false);
+                        return;
+                    }
+                }
+
+                var newEmails = [];
+                var items = folder.Items;
+                for (var i = 1; i <= items.Count; i++) {
+                    if (i % 100 === 0) {
+                        document.getElementById('loadingText').innerText = "Lade Email " + i + " von " + items.Count + "...";
+                    }
+
+                    var item = items.Item(i);
+                    if (item.Class === 43) { // olMail
+                        newEmails.push(extractEmailData(item));
+                    }
+                }
+
+                processEmails(newEmails);
+                showLoading(false);
+
+            } catch (e) {
+                showLoading(false);
+                alert("Fehler beim Laden des Ordners:\n\n" + e.message);
+            }
+        }
+
+        function extractEmailData(mailItem) {
+            try {
+                var senderEmail = getSenderEmail(mailItem);
+                var senderName = mailItem.SenderName || "Unbekannt";
+                var subject = mailItem.Subject || "(Kein Betreff)";
+                var body = getEmailBody(mailItem);
+                var receivedTime = mailItem.ReceivedTime;
+
+                var attachments = [];
+                for (var i = 1; i <= mailItem.Attachments.Count; i++) {
+                    attachments.push(mailItem.Attachments.Item(i).FileName);
+                }
+
+                return {
+                    datum: formatDate(receivedTime),
+                    von_email: senderEmail,
+                    von_name: senderName,
+                    betreff: subject,
+                    text: body,
+                    anhänge: attachments
+                };
+            } catch (e) {
+                return {
+                    datum: formatDate(new Date()),
+                    von_email: "error@error.com",
+                    von_name: "Fehler beim Laden",
+                    betreff: "Fehler: " + e.message,
+                    text: "",
+                    anhänge: []
+                };
+            }
+        }
+
+        function getSenderEmail(mailItem) {
+            try {
+                if (mailItem.SenderEmailType === "EX") {
+                    var sender = mailItem.Sender;
+                    if (sender) {
+                        var exUser = sender.GetExchangeUser();
+                        if (exUser) {
+                            return exUser.PrimarySmtpAddress;
+                        }
+                    }
+                }
+                return mailItem.SenderEmailAddress || "unknown@unknown.com";
+            } catch (e) {
+                return mailItem.SenderEmailAddress || "unknown@unknown.com";
+            }
+        }
+
+        function getEmailBody(mailItem) {
+            try {
+                if (mailItem.Body) {
+                    var body = mailItem.Body;
+                    if (body.length > 50000) {
+                        body = body.substring(0, 50000) + "... (gekürzt)";
+                    }
+                    return body;
+                }
+                return stripHTML(mailItem.HTMLBody);
+            } catch (e) {
+                return "";
+            }
+        }
+
+        function stripHTML(html) {
+            if (!html) return "";
+            var text = html.replace(/<br\s*\/?>/gi, "\n");
+            text = text.replace(/<[^>]+>/g, '');
+            text = text.replace(/&nbsp;/g, ' ');
+            text = text.replace(/&amp;/g, '&');
+            text = text.replace(/&lt;/g, '<');
+            text = text.replace(/&gt;/g, '>');
+            text = text.replace(/&quot;/g, '"');
+            return text;
+        }
+
+        function formatDate(date) {
+            var year = date.getFullYear();
+            var month = ("0" + (date.getMonth() + 1)).slice(-2);
+            var day = ("0" + date.getDate()).slice(-2);
+            var hours = ("0" + date.getHours()).slice(-2);
+            var minutes = ("0" + date.getMinutes()).slice(-2);
+            var seconds = ("0" + date.getSeconds()).slice(-2);
+            return year + "-" + month + "-" + day + "T" + hours + ":" + minutes + ":" + seconds;
+        }
+
+        function processEmails(data) {
+            emails = [];
+            for (var i = 0; i < data.length; i++) {
+                var email = data[i];
+                emails.push({
+                    id: nextId++,
+                    selected: true,
+                    datum: email.datum,
+                    von_email: email.von_email,
+                    von_name: email.von_name,
+                    betreff: email.betreff,
+                    text: email.text,
+                    anhänge: email.anhänge,
+
+                    kategorie: categorizeEmail(email.betreff, email.text),
+                    agentur: extractAgentur(email.von_name, email.betreff),
+                    cluster: identifyCluster(email.betreff, email.text),
+                    status: 'Neu',
+
+                    editKategorie: false,
+                    editAgentur: false,
+                    editCluster: false,
+                    editStatus: false
+                });
+            }
+
+            filteredEmails = emails.slice(0);
+            renderEmails();
+            updateStats();
+            document.getElementById('exportBtn').disabled = false;
+        }
+
+        // ============================================================================
+        // INTELLIGENT EXTRACTION
+        // ============================================================================
+        function categorizeEmail(subject, body) {
+            var text = (subject + ' ' + body).toLowerCase();
+
+            var incidentKeywords = ['fehler', 'problem', 'funktioniert nicht', 'falsch',
+                'bug', 'störung', 'ausfall', 'dringend', 'kritisch', 'keine zahlung',
+                'fehlerhaft', 'nicht erhalten', 'verspätet'];
+
+            for (var i = 0; i < incidentKeywords.length; i++) {
+                if (text.indexOf(incidentKeywords[i]) !== -1) {
+                    return 'Incident';
+                }
+            }
+
+            return 'Fachliche Rückfrage';
+        }
+
+        function extractAgentur(name, subject) {
+            if (name && name !== 'Unbekannt') {
+                return name;
+            }
+
+            if (subject.indexOf('Agentur') !== -1) {
+                var parts = subject.split('-');
+                if (parts.length > 0) {
+                    return parts[0].trim();
+                }
+            }
+
+            return 'Unbekannt';
+        }
+
+        function identifyCluster(subject, body) {
+            var text = (subject + ' ' + body).toLowerCase();
+
+            if (text.indexOf('shuk') !== -1 || text.indexOf('sachversicherung') !== -1 || text.indexOf('hausrat') !== -1) {
+                return 'SHUK';
+            }
+            if (text.indexOf('lebensversicherung') !== -1 || text.indexOf(' lv ') !== -1) {
+                return 'LV';
+            }
+            if (text.indexOf('krankenversicherung') !== -1 || text.indexOf(' kv ') !== -1) {
+                return 'KV';
+            }
+            if (text.indexOf('provision') !== -1 || text.indexOf('vergütung') !== -1 || text.indexOf('zahlung') !== -1) {
+                return 'Provisionierung';
+            }
+            if (text.indexOf('produkt') !== -1 || text.indexOf('herkunft') !== -1 || text.indexOf('zuordnung') !== -1) {
+                return 'Produktzuordnung';
+            }
+
+            return 'Allgemein';
+        }
+
+        // ============================================================================
+        // RENDERING
+        // ============================================================================
+        function renderEmails() {
+            var listContainer = document.getElementById('emailList');
+
+            if (filteredEmails.length === 0 && emails.length > 0) {
+                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Keine Emails gefunden</div><div class="empty-description">Versuche die Filtereinstellungen zu ändern.</div></div>';
+                return;
+            }
+
+            if (filteredEmails.length === 0) {
+                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Keine Emails geladen</div><div class="empty-description">Wähle in Outlook Emails aus und klicke auf "Ausgewählte Emails laden"<br>oder lade einen ganzen Outlook-Ordner.</div><button class="btn btn-primary btn-lg mt-md" onclick="loadFromOutlookSelection()">📥 Emails aus Outlook laden</button></div>';
+                return;
+            }
+
+            var html = '';
+            for (var i = 0; i < filteredEmails.length; i++) {
+                var email = filteredEmails[i];
+                html += renderEmailCard(email);
+            }
+            listContainer.innerHTML = html;
+        }
+
+        function renderEmailCard(email) {
+            var receivedDate = new Date(email.datum);
+            var dateStr = receivedDate.toLocaleString('de-DE');
+
+            var html = '<div class="email-card ' + (email.selected ? 'selected' : '') + '" id="email-' + email.id + '">';
+            html += '<div class="email-header">';
+            html += '<div class="email-checkbox"><input type="checkbox" ' + (email.selected ? 'checked' : '') + ' onchange="toggleEmail(' + email.id + ')"></div>';
+            html += '<div class="email-meta">';
+            html += '<div class="email-subject">' + escapeHtml(email.betreff) + '</div>';
+            html += '<div class="email-from"><span>📧</span><strong>' + escapeHtml(email.von_name) + '</strong><span style="color: var(--text-secondary);">&lt;' + escapeHtml(email.von_email) + '&gt;</span></div>';
+            html += '<div class="email-date">📅 ' + dateStr;
+            if (email.anhänge.length > 0) {
+                html += '<span style="margin-left: 1rem;">📎 ' + email.anhänge.length + ' Anhang(e)</span>';
+            }
+            html += '</div></div></div>';
+
+            var preview = email.text.substring(0, 300);
+            if (email.text.length > 300) preview += '...';
+            html += '<div class="email-body-preview">' + escapeHtml(preview) + '</div>';
+
+            html += '<div class="edit-fields">';
+            html += renderFieldGroup(email, 'kategorie', 'Kategorie', ['Incident', 'Fachliche Rückfrage'], true);
+            html += renderFieldGroup(email, 'agentur', 'Agentur', null, false);
+            html += renderFieldGroup(email, 'cluster', 'Cluster', ['SHUK', 'LV', 'KV', 'Provisionierung', 'Produktzuordnung', 'Allgemein'], true);
+            html += renderFieldGroup(email, 'status', 'Status', ['Neu', 'In Bearbeitung', 'Gelöst', 'Geschlossen'], true);
+            html += '</div></div>';
+
+            return html;
+        }
+
+        function renderFieldGroup(email, field, label, options, isSelect) {
+            var fieldCapital = field.charAt(0).toUpperCase() + field.slice(1);
+            var isEditing = email['edit' + fieldCapital];
+
+            var html = '<div class="field-group">';
+            html += '<label class="field-label">';
+            html += '<input type="checkbox" onchange="toggleEdit(' + email.id + ', \'' + field + '\')" ' + (isEditing ? 'checked' : '') + '> ' + label;
+            html += '</label>';
+
+            if (isEditing) {
+                if (isSelect) {
+                    html += '<select class="field-input" onchange="updateField(' + email.id + ', \'' + field + '\', this.value)">';
+                    for (var i = 0; i < options.length; i++) {
+                        var selected = (email[field] === options[i]) ? 'selected' : '';
+                        html += '<option value="' + options[i] + '" ' + selected + '>' + options[i] + '</option>';
+                    }
+                    html += '</select>';
+                } else {
+                    html += '<input type="text" class="field-input" value="' + escapeHtml(email[field]) + '" onchange="updateField(' + email.id + ', \'' + field + '\', this.value)">';
+                }
+            } else {
+                if (field === 'kategorie') {
+                    var badgeClass = email[field] === 'Incident' ? 'badge-incident' : 'badge-rueckfrage';
+                    html += '<div class="badge ' + badgeClass + '">' + escapeHtml(email[field]) + '</div>';
+                } else {
+                    html += '<input type="text" class="field-input" value="' + escapeHtml(email[field]) + '" disabled>';
+                }
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+
+        // ============================================================================
+        // EMAIL INTERACTIONS
+        // ============================================================================
+        function toggleEmail(id) {
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].id === id) {
+                    emails[i].selected = !emails[i].selected;
+                    break;
+                }
+            }
+            updateStats();
+            renderEmails();
+        }
+
+        function toggleEdit(id, field) {
+            var fieldCapital = field.charAt(0).toUpperCase() + field.slice(1);
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].id === id) {
+                    emails[i]['edit' + fieldCapital] = !emails[i]['edit' + fieldCapital];
+                    break;
+                }
+            }
+            renderEmails();
+        }
+
+        function updateField(id, field, value) {
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].id === id) {
+                    emails[i][field] = value;
+                    break;
+                }
+            }
+            updateStats();
+        }
+
+        function selectAll() {
+            for (var i = 0; i < filteredEmails.length; i++) {
+                filteredEmails[i].selected = true;
+            }
+            updateStats();
+            renderEmails();
+        }
+
+        function deselectAll() {
+            for (var i = 0; i < filteredEmails.length; i++) {
+                filteredEmails[i].selected = false;
+            }
+            updateStats();
+            renderEmails();
+        }
+
+        // ============================================================================
+        // FILTERING
+        // ============================================================================
+        function filterEmails() {
+            var searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            var kategorieFilter = document.getElementById('filterKategorie').value;
+            var clusterFilter = document.getElementById('filterCluster').value;
+
+            filteredEmails = [];
+            for (var i = 0; i < emails.length; i++) {
+                var email = emails[i];
+                var matchesSearch = !searchTerm ||
+                    email.betreff.toLowerCase().indexOf(searchTerm) !== -1 ||
+                    email.text.toLowerCase().indexOf(searchTerm) !== -1 ||
+                    email.von_name.toLowerCase().indexOf(searchTerm) !== -1;
+
+                var matchesKategorie = !kategorieFilter || email.kategorie === kategorieFilter;
+                var matchesCluster = !clusterFilter || email.cluster === clusterFilter;
+
+                if (matchesSearch && matchesKategorie && matchesCluster) {
+                    filteredEmails.push(email);
+                }
+            }
+
+            renderEmails();
+            updateStats();
+        }
+
+        // ============================================================================
+        // BATCH EDIT
+        // ============================================================================
+        function setupBatchEditCheckboxes() {
+            var fields = ['Kategorie', 'Cluster', 'Status'];
+            for (var i = 0; i < fields.length; i++) {
+                var field = fields[i];
+                var checkbox = document.getElementById('batch' + field + 'Check');
+                var select = document.getElementById('batch' + field);
+
+                (function(cb, sel) {
+                    cb.onchange = function() {
+                        sel.disabled = !cb.checked;
+                    };
+                })(checkbox, select);
+            }
+        }
+
+        function showBatchEditModal() {
+            var selectedEmails = [];
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].selected) {
+                    selectedEmails.push(emails[i]);
+                }
+            }
+
+            if (selectedEmails.length === 0) {
+                alert('Bitte wähle mindestens eine Email aus!');
+                return;
+            }
+
+            document.getElementById('batchCount').innerText = selectedEmails.length;
+            openModal('batchEditModal');
+        }
+
+        function applyBatchEdit() {
+            var selectedEmails = [];
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].selected) {
+                    selectedEmails.push(emails[i]);
+                }
+            }
+
+            if (document.getElementById('batchKategorieCheck').checked) {
+                var value = document.getElementById('batchKategorie').value;
+                for (var i = 0; i < selectedEmails.length; i++) {
+                    selectedEmails[i].kategorie = value;
+                }
+            }
+
+            if (document.getElementById('batchClusterCheck').checked) {
+                var value = document.getElementById('batchCluster').value;
+                for (var i = 0; i < selectedEmails.length; i++) {
+                    selectedEmails[i].cluster = value;
+                }
+            }
+
+            if (document.getElementById('batchStatusCheck').checked) {
+                var value = document.getElementById('batchStatus').value;
+                for (var i = 0; i < selectedEmails.length; i++) {
+                    selectedEmails[i].status = value;
+                }
+            }
+
+            closeModal('batchEditModal');
+            renderEmails();
+            updateStats();
+        }
+
+        // ============================================================================
+        // STATISTICS
+        // ============================================================================
+        function updateStats() {
+            var selected = [];
+            var incidents = [];
+            var rueckfragen = [];
+
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].selected) {
+                    selected.push(emails[i]);
+                    if (emails[i].kategorie === 'Incident') {
+                        incidents.push(emails[i]);
+                    } else if (emails[i].kategorie === 'Fachliche Rückfrage') {
+                        rueckfragen.push(emails[i]);
+                    }
+                }
+            }
+
+            document.getElementById('totalCount').innerText = emails.length;
+            document.getElementById('selectedCount').innerText = selected.length;
+            document.getElementById('incidentCount').innerText = incidents.length;
+            document.getElementById('rueckfrageCount').innerText = rueckfragen.length;
+        }
+
+        // ============================================================================
+        // EXCEL EXPORT
+        // ============================================================================
+        function exportToExcel() {
+            var selectedEmails = [];
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].selected) {
+                    selectedEmails.push(emails[i]);
+                }
+            }
+
+            if (selectedEmails.length === 0) {
+                alert('Bitte wähle mindestens eine Email aus!');
+                return;
+            }
+
+            try {
+                var excel = new ActiveXObject("Excel.Application");
+                excel.Visible = true;
+
+                var workbook = excel.Workbooks.Add();
+                var worksheet = workbook.Worksheets(1);
+                worksheet.Name = "Übersicht";
+
+                // Header
+                var headers = ['ID', 'Datum', 'Kanal', 'Agentur', 'Kategorie', 'Status',
+                              'In Bearbeitung von', 'Cluster', 'Anfrage', 'Diagnose',
+                              'Nächste Schritte', 'Lösung', 'JIRA', 'Kommunikation', 'Kommentar'];
+
+                for (var col = 0; col < headers.length; col++) {
+                    worksheet.Cells(1, col + 1).Value = headers[col];
+                    worksheet.Cells(1, col + 1).Font.Bold = true;
+                }
+
+                // Data
+                for (var row = 0; row < selectedEmails.length; row++) {
+                    var email = selectedEmails[row];
+                    var rowNum = row + 2;
+
+                    var id = "HC-" + ("000" + (row + 1)).slice(-3);
+                    var datum = new Date(email.datum).toLocaleString('de-DE');
+                    var anfrage = email.betreff + "\n\n" + email.text.substring(0, 500);
+                    var kommentar = "Importiert aus Email am " + new Date().toLocaleString('de-DE') + "\nVon: " + email.von_name + " <" + email.von_email + ">";
+
+                    worksheet.Cells(rowNum, 1).Value = id;
+                    worksheet.Cells(rowNum, 2).Value = datum;
+                    worksheet.Cells(rowNum, 3).Value = "Email";
+                    worksheet.Cells(rowNum, 4).Value = email.agentur;
+                    worksheet.Cells(rowNum, 5).Value = email.kategorie;
+                    worksheet.Cells(rowNum, 6).Value = email.status;
+                    worksheet.Cells(rowNum, 7).Value = "";
+                    worksheet.Cells(rowNum, 8).Value = email.cluster;
+                    worksheet.Cells(rowNum, 9).Value = anfrage;
+                    worksheet.Cells(rowNum, 10).Value = "";
+                    worksheet.Cells(rowNum, 11).Value = "";
+                    worksheet.Cells(rowNum, 12).Value = "";
+                    worksheet.Cells(rowNum, 13).Value = "";
+                    worksheet.Cells(rowNum, 14).Value = "";
+                    worksheet.Cells(rowNum, 15).Value = kommentar;
+                }
+
+                // Column widths
+                var widths = [10, 18, 10, 25, 20, 15, 20, 20, 50, 30, 30, 30, 15, 30, 40];
+                for (var col = 0; col < widths.length; col++) {
+                    worksheet.Columns(col + 1).ColumnWidth = widths[col];
+                }
+
+                // Auto-filter
+                worksheet.Range("A1:O1").AutoFilter();
+
+                alert("✅ " + selectedEmails.length + " Email(s) erfolgreich nach Excel exportiert!\n\nDie Excel-Datei ist jetzt geöffnet.\nSpeichere sie als 'Tracking_Hypercare.xlsx'");
+
+            } catch (e) {
+                alert("Fehler beim Excel-Export:\n\n" + e.message + "\n\nBitte stelle sicher dass Microsoft Excel installiert ist.");
+            }
+        }
+
+        // ============================================================================
+        // MODALS
+        // ============================================================================
+        function openModal(id) {
+            document.getElementById(id).className = 'modal active';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).className = 'modal';
+        }
+
+        // ============================================================================
+        // LOADING
+        // ============================================================================
+        function showLoading(show, text) {
+            var loading = document.getElementById('loading');
+            var emailList = document.getElementById('emailList');
+
+            if (show) {
+                loading.className = 'loading active';
+                emailList.className = 'email-list hidden';
+                if (text) {
+                    document.getElementById('loadingText').innerText = text;
+                }
+            } else {
+                loading.className = 'loading';
+                emailList.className = 'email-list';
+            }
+        }
+    </script>
+</body>
+</html>
