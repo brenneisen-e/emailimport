@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
     <title>BGAV Hypercare - Email Review Tool</title>
 
     <!-- HTA Configuration -->
@@ -18,49 +18,14 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.0"
+        VERSION="2.0"
         WINDOWSTATE="maximize"
     />
 
     <style>
         /* ============================================================================
-           VARIABLES & RESET
+           IE11-kompatibles CSS (ohne CSS-Variablen)
            ============================================================================ */
-        :root {
-            --primary: #366092;
-            --primary-dark: #2a4a70;
-            --primary-light: #4a7bb8;
-            --secondary: #00a3e0;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-
-            --bg-primary: #ffffff;
-            --bg-secondary: #f8f9fa;
-            --bg-tertiary: #e9ecef;
-
-            --text-primary: #212529;
-            --text-secondary: #6c757d;
-            --text-light: #ffffff;
-
-            --border: #dee2e6;
-            --shadow: rgba(0, 0, 0, 0.1);
-            --shadow-lg: rgba(0, 0, 0, 0.15);
-
-            --spacing-xs: 0.25rem;
-            --spacing-sm: 0.5rem;
-            --spacing-md: 1rem;
-            --spacing-lg: 1.5rem;
-            --spacing-xl: 2rem;
-
-            --radius-sm: 0.25rem;
-            --radius-md: 0.5rem;
-            --radius-lg: 1rem;
-
-            --transition: all 0.3s ease;
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -68,12 +33,13 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
             min-height: 100vh;
-            color: var(--text-primary);
+            color: #212529;
             line-height: 1.6;
-            padding: var(--spacing-lg);
+            padding: 1.5rem;
         }
 
         /* ============================================================================
@@ -82,9 +48,9 @@
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background: var(--bg-primary);
-            border-radius: var(--radius-lg);
-            box-shadow: 0 20px 60px var(--shadow-lg);
+            background: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
             overflow: hidden;
         }
 
@@ -92,20 +58,20 @@
            HEADER
            ============================================================================ */
         .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: var(--text-light);
-            padding: var(--spacing-xl);
+            background: linear-gradient(135deg, #366092 0%, #2a4a70 100%);
+            color: #ffffff;
+            padding: 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: var(--spacing-md);
+            gap: 1rem;
         }
 
         .header-title {
             display: flex;
             align-items: center;
-            gap: var(--spacing-md);
+            gap: 1rem;
         }
 
         .header-title h1 {
@@ -117,8 +83,8 @@
         .logo {
             width: 50px;
             height: 50px;
-            background: var(--text-light);
-            border-radius: var(--radius-md);
+            background: #ffffff;
+            border-radius: 0.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -127,7 +93,7 @@
 
         .header-actions {
             display: flex;
-            gap: var(--spacing-md);
+            gap: 1rem;
             flex-wrap: wrap;
         }
 
@@ -137,50 +103,50 @@
         .stats-bar {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: var(--spacing-md);
-            padding: var(--spacing-xl);
-            background: var(--bg-secondary);
-            border-bottom: 2px solid var(--border);
+            gap: 1rem;
+            padding: 2rem;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
         }
 
         .stat-card {
-            background: var(--bg-primary);
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-md);
-            box-shadow: 0 2px 8px var(--shadow);
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             text-align: center;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .stat-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px var(--shadow-lg);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .stat-value {
             font-size: 2.5rem;
             font-weight: 700;
-            color: var(--primary);
+            color: #366092;
             display: block;
         }
 
         .stat-label {
-            color: var(--text-secondary);
+            color: #6c757d;
             font-size: 0.875rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-top: var(--spacing-xs);
+            margin-top: 0.25rem;
         }
 
         /* ============================================================================
            TOOLBAR
            ============================================================================ */
         .toolbar {
-            padding: var(--spacing-lg) var(--spacing-xl);
-            background: var(--bg-primary);
-            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            background: #ffffff;
+            border-bottom: 1px solid #dee2e6;
             display: flex;
-            gap: var(--spacing-md);
+            gap: 1rem;
             flex-wrap: wrap;
             align-items: center;
         }
@@ -193,30 +159,30 @@
 
         .search-box input {
             width: 100%;
-            padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) 2.5rem;
-            border: 2px solid var(--border);
-            border-radius: var(--radius-md);
+            padding: 1rem 1rem 1rem 2.5rem;
+            border: 2px solid #dee2e6;
+            border-radius: 0.5rem;
             font-size: 1rem;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .search-box input:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: #366092;
             box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
         }
 
         .search-icon {
             position: absolute;
-            left: var(--spacing-md);
+            left: 1rem;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--text-secondary);
+            color: #6c757d;
         }
 
         .filter-group {
             display: flex;
-            gap: var(--spacing-sm);
+            gap: 0.5rem;
             flex-wrap: wrap;
         }
 
@@ -224,23 +190,23 @@
            BUTTONS
            ============================================================================ */
         .btn {
-            padding: var(--spacing-md) var(--spacing-lg);
+            padding: 1rem 1.5rem;
             border: none;
-            border-radius: var(--radius-md);
+            border-radius: 0.5rem;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             display: inline-flex;
             align-items: center;
-            gap: var(--spacing-sm);
+            gap: 0.5rem;
             text-decoration: none;
             white-space: nowrap;
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px var(--shadow-lg);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .btn:active {
@@ -248,41 +214,41 @@
         }
 
         .btn-primary {
-            background: var(--primary);
-            color: var(--text-light);
+            background: #366092;
+            color: #ffffff;
         }
 
         .btn-primary:hover {
-            background: var(--primary-dark);
+            background: #2a4a70;
         }
 
         .btn-success {
-            background: var(--success);
-            color: var(--text-light);
+            background: #28a745;
+            color: #ffffff;
         }
 
         .btn-warning {
-            background: var(--warning);
-            color: var(--text-primary);
+            background: #ffc107;
+            color: #212529;
         }
 
         .btn-danger {
-            background: var(--danger);
-            color: var(--text-light);
+            background: #dc3545;
+            color: #ffffff;
         }
 
         .btn-secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
+            background: #e9ecef;
+            color: #212529;
         }
 
         .btn-sm {
-            padding: var(--spacing-sm) var(--spacing-md);
+            padding: 0.5rem 1rem;
             font-size: 0.875rem;
         }
 
         .btn-lg {
-            padding: var(--spacing-lg) var(--spacing-xl);
+            padding: 1.5rem 2rem;
             font-size: 1.125rem;
         }
 
@@ -290,41 +256,41 @@
            EMAIL LIST
            ============================================================================ */
         .email-list {
-            padding: var(--spacing-xl);
+            padding: 2rem;
             display: grid;
-            gap: var(--spacing-lg);
+            gap: 1.5rem;
             max-height: 600px;
             overflow-y: auto;
         }
 
         .email-card {
-            background: var(--bg-primary);
-            border: 2px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
-            transition: var(--transition);
+            background: #ffffff;
+            border: 2px solid #dee2e6;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
             display: grid;
-            gap: var(--spacing-md);
+            gap: 1rem;
         }
 
         .email-card:hover {
-            border-color: var(--primary-light);
-            box-shadow: 0 4px 12px var(--shadow);
+            border-color: #4a7bb8;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
         .email-card.selected {
-            border-color: var(--primary);
+            border-color: #366092;
             background: rgba(54, 96, 146, 0.05);
         }
 
         .email-header {
             display: flex;
             align-items: flex-start;
-            gap: var(--spacing-md);
+            gap: 1rem;
         }
 
         .email-checkbox {
-            margin-top: var(--spacing-xs);
+            margin-top: 0.25rem;
         }
 
         .email-checkbox input[type="checkbox"] {
@@ -340,30 +306,30 @@
         .email-subject {
             font-size: 1.25rem;
             font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: var(--spacing-xs);
+            color: #212529;
+            margin-bottom: 0.25rem;
         }
 
         .email-from {
-            color: var(--text-secondary);
+            color: #6c757d;
             font-size: 0.875rem;
             display: flex;
             align-items: center;
-            gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-xs);
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
         }
 
         .email-date {
-            color: var(--text-secondary);
+            color: #6c757d;
             font-size: 0.875rem;
         }
 
         .email-body-preview {
-            background: var(--bg-secondary);
-            padding: var(--spacing-md);
-            border-radius: var(--radius-sm);
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.25rem;
             font-size: 0.875rem;
-            color: var(--text-secondary);
+            color: #6c757d;
             max-height: 100px;
             overflow: hidden;
             position: relative;
@@ -376,7 +342,7 @@
             left: 0;
             right: 0;
             height: 30px;
-            background: linear-gradient(transparent, var(--bg-secondary));
+            background: linear-gradient(transparent, #f8f9fa);
         }
 
         /* ============================================================================
@@ -385,25 +351,25 @@
         .edit-fields {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: var(--spacing-md);
-            padding: var(--spacing-md);
-            background: var(--bg-secondary);
-            border-radius: var(--radius-md);
+            gap: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 0.5rem;
         }
 
         .field-group {
             display: flex;
             flex-direction: column;
-            gap: var(--spacing-xs);
+            gap: 0.25rem;
         }
 
         .field-label {
             font-size: 0.875rem;
             font-weight: 600;
-            color: var(--text-secondary);
+            color: #6c757d;
             display: flex;
             align-items: center;
-            gap: var(--spacing-xs);
+            gap: 0.25rem;
         }
 
         .field-label input[type="checkbox"] {
@@ -411,21 +377,21 @@
         }
 
         .field-input {
-            padding: var(--spacing-sm) var(--spacing-md);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
+            padding: 0.5rem 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
             font-size: 0.875rem;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .field-input:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: #366092;
             box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
         }
 
         .field-input:disabled {
-            background: var(--bg-tertiary);
+            background: #e9ecef;
             cursor: not-allowed;
         }
 
@@ -438,8 +404,8 @@
            ============================================================================ */
         .badge {
             display: inline-block;
-            padding: var(--spacing-xs) var(--spacing-md);
-            border-radius: var(--radius-sm);
+            padding: 0.25rem 1rem;
+            border-radius: 0.25rem;
             font-size: 0.75rem;
             font-weight: 600;
             text-transform: uppercase;
@@ -448,12 +414,12 @@
 
         .badge-incident {
             background: rgba(220, 53, 69, 0.1);
-            color: var(--danger);
+            color: #dc3545;
         }
 
         .badge-rueckfrage {
             background: rgba(0, 163, 224, 0.1);
-            color: var(--secondary);
+            color: #00a3e0;
         }
 
         /* ============================================================================
@@ -470,7 +436,7 @@
             z-index: 1000;
             align-items: center;
             justify-content: center;
-            padding: var(--spacing-lg);
+            padding: 1.5rem;
         }
 
         .modal.active {
@@ -478,18 +444,18 @@
         }
 
         .modal-content {
-            background: var(--bg-primary);
-            border-radius: var(--radius-lg);
+            background: #ffffff;
+            border-radius: 1rem;
             max-width: 600px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
-            box-shadow: 0 20px 60px var(--shadow-lg);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
 
         .modal-header {
-            padding: var(--spacing-lg);
-            border-bottom: 2px solid var(--border);
+            padding: 1.5rem;
+            border-bottom: 2px solid #dee2e6;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -505,23 +471,23 @@
             border: none;
             font-size: 1.5rem;
             cursor: pointer;
-            color: var(--text-secondary);
-            transition: var(--transition);
+            color: #6c757d;
+            transition: all 0.3s ease;
         }
 
         .modal-close:hover {
-            color: var(--text-primary);
+            color: #212529;
         }
 
         .modal-body {
-            padding: var(--spacing-lg);
+            padding: 1.5rem;
         }
 
         .modal-footer {
-            padding: var(--spacing-lg);
-            border-top: 1px solid var(--border);
+            padding: 1.5rem;
+            border-top: 1px solid #dee2e6;
             display: flex;
-            gap: var(--spacing-md);
+            gap: 1rem;
             justify-content: flex-end;
         }
 
@@ -530,25 +496,25 @@
            ============================================================================ */
         .empty-state {
             text-align: center;
-            padding: var(--spacing-xl) * 2;
-            color: var(--text-secondary);
+            padding: 2rem * 2;
+            color: #6c757d;
         }
 
         .empty-icon {
             font-size: 4rem;
-            margin-bottom: var(--spacing-lg);
+            margin-bottom: 1.5rem;
             opacity: 0.5;
         }
 
         .empty-title {
             font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: var(--spacing-md);
+            margin-bottom: 1rem;
         }
 
         .empty-description {
             max-width: 500px;
-            margin: 0 auto var(--spacing-xl);
+            margin: 0 auto 2rem;
         }
 
         /* ============================================================================
@@ -557,7 +523,7 @@
         .loading {
             display: none;
             text-align: center;
-            padding: var(--spacing-xl);
+            padding: 2rem;
         }
 
         .loading.active {
@@ -565,13 +531,13 @@
         }
 
         .spinner {
-            border: 4px solid var(--bg-tertiary);
-            border-top: 4px solid var(--primary);
+            border: 4px solid #e9ecef;
+            border-top: 4px solid #366092;
             border-radius: 50%;
             width: 50px;
             height: 50px;
             animation: spin 1s linear infinite;
-            margin: 0 auto var(--spacing-md);
+            margin: 0 auto 1rem;
         }
 
         @keyframes spin {
@@ -591,11 +557,11 @@
         }
 
         .mt-md {
-            margin-top: var(--spacing-md);
+            margin-top: 1rem;
         }
 
         .mb-md {
-            margin-bottom: var(--spacing-md);
+            margin-bottom: 1rem;
         }
     </style>
 </head>
@@ -712,7 +678,7 @@
                 <select id="folderSelect" class="field-input" style="width: 100%; margin-bottom: 1rem;" size="10">
                     <option value="">Lädt Ordner...</option>
                 </select>
-                <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                <p style="color: #6c757d; font-size: 0.875rem;">
                     Alle Emails aus dem ausgewählten Ordner werden geladen.
                 </p>
             </div>
@@ -731,7 +697,7 @@
                 <button class="modal-close" onclick="closeModal('batchEditModal')">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text-secondary); margin-bottom: var(--spacing-lg);">
+                <p style="color: #6c757d; margin-bottom: 1.5rem;">
                     Änderungen werden auf <strong><span id="batchCount">0</span> ausgewählte Emails</strong> angewendet.
                 </p>
 
@@ -1150,7 +1116,7 @@
             html += '<div class="email-checkbox"><input type="checkbox" ' + (email.selected ? 'checked' : '') + ' onchange="toggleEmail(' + email.id + ')"></div>';
             html += '<div class="email-meta">';
             html += '<div class="email-subject">' + escapeHtml(email.betreff) + '</div>';
-            html += '<div class="email-from"><span>📧</span><strong>' + escapeHtml(email.von_name) + '</strong><span style="color: var(--text-secondary);">&lt;' + escapeHtml(email.von_email) + '&gt;</span></div>';
+            html += '<div class="email-from"><span>📧</span><strong>' + escapeHtml(email.von_name) + '</strong><span style="color: #6c757d;">&lt;' + escapeHtml(email.von_email) + '&gt;</span></div>';
             html += '<div class="email-date">📅 ' + dateStr;
             if (email.anhänge.length > 0) {
                 html += '<span style="margin-left: 1rem;">📎 ' + email.anhänge.length + ' Anhang(e)</span>';
@@ -1403,26 +1369,102 @@
                 var excel = new ActiveXObject("Excel.Application");
                 excel.Visible = true;
 
-                var workbook = excel.Workbooks.Add();
-                var worksheet = workbook.Worksheets(1);
-                worksheet.Name = "Übersicht";
+                // Suche nach offener Tracking_Hypercare Datei
+                var workbook = null;
+                var worksheet = null;
+                var found = false;
 
-                // Header
-                var headers = ['ID', 'Datum', 'Kanal', 'Agentur', 'Kategorie', 'Status',
-                              'In Bearbeitung von', 'Cluster', 'Anfrage', 'Diagnose',
-                              'Nächste Schritte', 'Lösung', 'JIRA', 'Kommunikation', 'Kommentar'];
+                // Durchsuche alle offenen Workbooks
+                for (var i = 1; i <= excel.Workbooks.Count; i++) {
+                    var wb = excel.Workbooks(i);
+                    var wbName = wb.Name.toLowerCase();
 
-                for (var col = 0; col < headers.length; col++) {
-                    worksheet.Cells(1, col + 1).Value = headers[col];
-                    worksheet.Cells(1, col + 1).Font.Bold = true;
+                    // Prüfe ob Dateiname "tracking_hypercare" enthält
+                    if (wbName.indexOf('tracking_hypercare') !== -1 || wbName.indexOf('tracking hypercare') !== -1) {
+                        workbook = wb;
+
+                        // Suche Worksheet "Hypercare"
+                        try {
+                            worksheet = workbook.Worksheets("Hypercare");
+                            found = true;
+                            break;
+                        } catch (e) {
+                            // Worksheet nicht gefunden, versuche erstes Worksheet
+                            try {
+                                worksheet = workbook.Worksheets(1);
+                                found = true;
+                                break;
+                            } catch (e2) {
+                                // Nächstes Workbook versuchen
+                            }
+                        }
+                    }
                 }
 
-                // Data
+                if (!found) {
+                    var response = confirm("Die Datei 'Tracking_Hypercare.xlsx' ist nicht geöffnet!\n\n" +
+                        "Bitte öffne die Datei in Excel und versuche es erneut.\n\n" +
+                        "Möchtest du stattdessen eine NEUE Excel-Datei erstellen?\n" +
+                        "(Du musst sie dann manuell in Tracking_Hypercare.xlsx kopieren)");
+
+                    if (!response) {
+                        return;
+                    }
+
+                    // Neue Datei erstellen
+                    workbook = excel.Workbooks.Add();
+                    worksheet = workbook.Worksheets(1);
+                    worksheet.Name = "Hypercare";
+
+                    // Header erstellen
+                    var headers = ['ID', 'Datum', 'Kanal', 'Agentur', 'Kategorie', 'Status',
+                                  'In Bearbeitung von', 'Cluster', 'Anfrage', 'Diagnose',
+                                  'Workaround', 'Nächste Schritte', 'Lösung', 'JIRA',
+                                  'Kommunikation', 'Kommentar'];
+
+                    for (var col = 0; col < headers.length; col++) {
+                        worksheet.Cells(1, col + 1).Value = headers[col];
+                        worksheet.Cells(1, col + 1).Font.Bold = true;
+                        worksheet.Cells(1, col + 1).Interior.Color = 15395562; // Hellblau
+                    }
+
+                    // Spaltenbreiten
+                    var widths = [10, 18, 10, 25, 20, 15, 20, 20, 50, 30, 30, 30, 30, 15, 30, 40];
+                    for (var col = 0; col < widths.length; col++) {
+                        worksheet.Columns(col + 1).ColumnWidth = widths[col];
+                    }
+
+                    // Auto-filter
+                    worksheet.Range("A1:P1").AutoFilter();
+                }
+
+                // Finde nächste freie Zeile in der Tabelle
+                var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row; // xlUp = -4162
+                var nextRow = lastRow + 1;
+
+                // Wenn nur Header existiert, ist lastRow = 1
+                if (lastRow === 1 && worksheet.Cells(1, 1).Value === "ID") {
+                    nextRow = 2;
+                }
+
+                // Finde die höchste vorhandene ID
+                var maxId = 0;
+                for (var r = 2; r <= lastRow; r++) {
+                    var cellValue = worksheet.Cells(r, 1).Value;
+                    if (cellValue && cellValue.toString().indexOf('HC-') === 0) {
+                        var idNum = parseInt(cellValue.toString().substring(3));
+                        if (idNum > maxId) {
+                            maxId = idNum;
+                        }
+                    }
+                }
+
+                // Daten einfügen
                 for (var row = 0; row < selectedEmails.length; row++) {
                     var email = selectedEmails[row];
-                    var rowNum = row + 2;
+                    var rowNum = nextRow + row;
 
-                    var id = "HC-" + ("000" + (row + 1)).slice(-3);
+                    var id = "HC-" + ("000" + (maxId + row + 1)).slice(-3);
                     var datum = new Date(email.datum).toLocaleString('de-DE');
                     var anfrage = email.betreff + "\n\n" + email.text.substring(0, 500);
                     var kommentar = "Importiert aus Email am " + new Date().toLocaleString('de-DE') + "\nVon: " + email.von_name + " <" + email.von_email + ">";
@@ -1436,27 +1478,33 @@
                     worksheet.Cells(rowNum, 7).Value = "";
                     worksheet.Cells(rowNum, 8).Value = email.cluster;
                     worksheet.Cells(rowNum, 9).Value = anfrage;
-                    worksheet.Cells(rowNum, 10).Value = "";
-                    worksheet.Cells(rowNum, 11).Value = "";
-                    worksheet.Cells(rowNum, 12).Value = "";
-                    worksheet.Cells(rowNum, 13).Value = "";
-                    worksheet.Cells(rowNum, 14).Value = "";
-                    worksheet.Cells(rowNum, 15).Value = kommentar;
+                    worksheet.Cells(rowNum, 10).Value = ""; // Diagnose
+                    worksheet.Cells(rowNum, 11).Value = ""; // Workaround
+                    worksheet.Cells(rowNum, 12).Value = ""; // Nächste Schritte
+                    worksheet.Cells(rowNum, 13).Value = ""; // Lösung
+                    worksheet.Cells(rowNum, 14).Value = ""; // JIRA
+                    worksheet.Cells(rowNum, 15).Value = ""; // Kommunikation
+                    worksheet.Cells(rowNum, 16).Value = kommentar;
                 }
 
-                // Column widths
-                var widths = [10, 18, 10, 25, 20, 15, 20, 20, 50, 30, 30, 30, 15, 30, 40];
-                for (var col = 0; col < widths.length; col++) {
-                    worksheet.Columns(col + 1).ColumnWidth = widths[col];
+                var msg = "✅ " + selectedEmails.length + " Email(s) erfolgreich exportiert!\n\n";
+                if (found) {
+                    msg += "Die Daten wurden zur Tabelle 'Hypercare' in '" + workbook.Name + "' hinzugefügt.\n";
+                    msg += "Startzeile: " + nextRow + "\n";
+                    msg += "Neue IDs: HC-" + ("000" + (maxId + 1)).slice(-3) + " bis HC-" + ("000" + (maxId + selectedEmails.length)).slice(-3);
+                } else {
+                    msg += "NEUE Datei wurde erstellt.\n\nBitte speichere sie als 'Tracking_Hypercare.xlsx'!";
                 }
 
-                // Auto-filter
-                worksheet.Range("A1:O1").AutoFilter();
-
-                alert("✅ " + selectedEmails.length + " Email(s) erfolgreich nach Excel exportiert!\n\nDie Excel-Datei ist jetzt geöffnet.\nSpeichere sie als 'Tracking_Hypercare.xlsx'");
+                alert(msg);
 
             } catch (e) {
-                alert("Fehler beim Excel-Export:\n\n" + e.message + "\n\nBitte stelle sicher dass Microsoft Excel installiert ist.");
+                alert("Fehler beim Excel-Export:\n\n" + e.message + "\n\n" +
+                      "Stack: " + (e.stack || "Nicht verfügbar") + "\n\n" +
+                      "Bitte stelle sicher dass:\n" +
+                      "1. Microsoft Excel installiert ist\n" +
+                      "2. Die Datei 'Tracking_Hypercare.xlsx' geöffnet ist\n" +
+                      "3. Eine Tabelle namens 'Hypercare' existiert");
             }
         }
 
