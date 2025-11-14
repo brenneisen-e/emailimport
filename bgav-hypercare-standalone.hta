@@ -705,24 +705,11 @@
                 </div>
             </div>
             <div class="header-actions">
-                <button class="btn btn-primary" onclick="loadLastWeekFromInbox()">
-                    ⚡ Letzte Woche (schnell)
+                <button class="btn btn-primary btn-lg" onclick="loadEmails()">
+                    📧 Emails laden
                 </button>
-                <button class="btn btn-warning" onclick="loadFromOutlookSelection()">
-                    📥 Ausgewählte Emails
-                </button>
-                <button class="btn btn-secondary" onclick="showFolderSelectModal()">
-                    📂 Ordner wählen
-                </button>
-                <button class="btn btn-info" onclick="loadFromJSON()">
-                    📄 JSON aus Downloads laden
-                </button>
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; margin-left: 1rem; font-size: 0.875rem;">
-                    <input type="checkbox" id="searchRepliesCheck" style="cursor: pointer;">
-                    <span>Antworten im Postausgang suchen (langsam)</span>
-                </label>
-                <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
-                    💾 Nach Excel exportieren
+                <button class="btn btn-success btn-lg" onclick="exportToExcel()" id="exportBtn" disabled>
+                    💾 Excel Export
                 </button>
             </div>
         </div>
@@ -1076,6 +1063,12 @@
         // ============================================================================
         // OUTLOOK INTEGRATION
         // ============================================================================
+
+        // NEUE HAUPT-FUNKTION: Lädt Emails aus Posteingang + Postausgang
+        function loadEmails() {
+            loadLastWeekFromInbox();
+        }
+
         function loadLastWeekFromInbox() {
             if (!outlookApp) {
                 initializeOutlook();
