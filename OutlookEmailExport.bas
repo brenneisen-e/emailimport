@@ -113,20 +113,35 @@ Public Sub ExportOutlookToJSON()
     Dim downloadsPath As String
     downloadsPath = Environ("USERPROFILE") & "\Downloads"
 
-    ' Falls Downloads nicht existiert, verwende Desktop
+    ' Prüfe ob Downloads existiert
     If Not fso.FolderExists(downloadsPath) Then
-        downloadsPath = Environ("USERPROFILE") & "\Desktop"
+        MsgBox "Downloads-Ordner nicht gefunden!" & vbCrLf & vbCrLf & _
+               "Erwarteter Pfad: " & downloadsPath & vbCrLf & vbCrLf & _
+               "Bitte prüfe ob der Ordner existiert.", _
+               vbCritical, "Fehler"
+        Application.StatusBar = False
+        Exit Sub
     End If
 
     jsonPath = downloadsPath & "\outlook_emails_" & _
                Format(Now, "yyyymmdd_hhnnss") & ".json"
 
-    ' Schreibe Datei
+    ' Schreibe Datei mit Fehlerbehandlung
+    On Error GoTo WriteError
     Set jsonFile = fso.CreateTextFile(jsonPath, True, True) ' Unicode
     jsonFile.Write jsonContent
     jsonFile.Close
+    On Error GoTo ErrorHandler
 
     Application.StatusBar = False
+
+    ' Prüfe ob Datei wirklich existiert
+    If Not fso.FileExists(jsonPath) Then
+        MsgBox "FEHLER: Datei wurde nicht erstellt!" & vbCrLf & vbCrLf & _
+               "Pfad: " & jsonPath, _
+               vbCritical, "Export fehlgeschlagen"
+        Exit Sub
+    End If
 
     ' Öffne Downloads-Ordner
     On Error Resume Next
@@ -135,9 +150,9 @@ Public Sub ExportOutlookToJSON()
 
     ' Erfolgsmeldung
     MsgBox "✓ Export erfolgreich!" & vbCrLf & vbCrLf & _
-           "Emails exportiert: " & emailCount & vbCrLf & _
-           "Ordner: " & downloadsPath & vbCrLf & _
-           "Datei: " & fso.GetFileName(jsonPath) & vbCrLf & vbCrLf & _
+           "Emails exportiert: " & emailCount & vbCrLf & vbCrLf & _
+           "PFAD:" & vbCrLf & _
+           jsonPath & vbCrLf & vbCrLf & _
            "Der Downloads-Ordner wurde geöffnet." & vbCrLf & vbCrLf & _
            "Jetzt kannst du im HTA Tool auf 'JSON aus Downloads laden' klicken.", _
            vbInformation, "Outlook JSON Export"
@@ -151,6 +166,18 @@ Public Sub ExportOutlookToJSON()
     Set fso = Nothing
     Set jsonFile = Nothing
 
+    Exit Sub
+
+WriteError:
+    Application.StatusBar = False
+    MsgBox "Fehler beim Schreiben der JSON-Datei:" & vbCrLf & vbCrLf & _
+           "Pfad: " & jsonPath & vbCrLf & vbCrLf & _
+           "Fehler: " & Err.Description & vbCrLf & vbCrLf & _
+           "Stelle sicher, dass:" & vbCrLf & _
+           "- Der Downloads-Ordner existiert" & vbCrLf & _
+           "- Du Schreibrechte hast" & vbCrLf & _
+           "- Die Datei nicht bereits geöffnet ist", _
+           vbCritical, "Schreibfehler"
     Exit Sub
 
 ErrorHandler:
