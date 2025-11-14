@@ -19,17 +19,14 @@ Public Sub ExportOutlookToJSON()
 
     Dim outlookApp As Object
     Dim namespace As Object
-    Dim folder As Object
-    Dim items As Object
-    Dim item As Object
     Dim fso As Object
     Dim jsonFile As Object
     Dim jsonPath As String
     Dim jsonContent As String
-    Dim emailCount As Long
-    Dim i As Long
     Dim cutoffDate As Date
-    Dim selectedFolder As Object
+    Dim allEmails As Collection
+    Dim emailItem As Variant
+    Dim i As Long
 
     ' Progress anzeigen
     Application.StatusBar = "Initialisiere Outlook..."
@@ -49,56 +46,53 @@ Public Sub ExportOutlookToJSON()
 
     Set namespace = outlookApp.GetNamespace("MAPI")
 
-    ' Ordner-Auswahl
-    Set selectedFolder = namespace.PickFolder
-    If selectedFolder Is Nothing Then
-        MsgBox "Kein Ordner ausgewählt. Export abgebrochen.", vbInformation
-        Application.StatusBar = False
-        Exit Sub
-    End If
-
-    Set folder = selectedFolder
-    Set items = folder.items
-
-    ' Sortiere nach Empfangsdatum
-    items.Sort "[ReceivedTime]", True
-
     ' Datum: Letzte 7 Tage
     cutoffDate = DateAdd("d", -7, Date)
 
-    Application.StatusBar = "Lade Emails aus Outlook..."
+    Application.StatusBar = "Durchsuche alle Ordner..."
+
+    ' Sammle alle Emails aus allen Ordnern
+    Set allEmails = New Collection
+
+    ' Durchsuche alle Stores (Postfächer)
+    Dim stores As Object
+    Dim store As Object
+    Dim rootFolder As Object
+
+    Set stores = namespace.stores
+
+    For i = 1 To stores.Count
+        On Error Resume Next
+        Set store = stores.item(i)
+        Set rootFolder = store.GetRootFolder
+
+        If Not rootFolder Is Nothing Then
+            Application.StatusBar = "Durchsuche: " & store.DisplayName & "..."
+            CollectEmailsFromFolder rootFolder, cutoffDate, allEmails
+        End If
+        On Error GoTo ErrorHandler
+    Next i
+
+    Application.StatusBar = "Erstelle JSON..."
 
     ' JSON Header
     jsonContent = "[" & vbCrLf
-    emailCount = 0
 
-    ' Durchlaufe Emails (max 100)
-    For i = 1 To items.Count
-        If emailCount >= 100 Then Exit For
-
-        Set item = items.item(i)
-
-        ' Nur Emails
-        If item.Class = 43 Then ' olMail
-            ' Nur letzte 7 Tage
-            If item.ReceivedTime >= cutoffDate Then
-                ' Progress
-                If emailCount Mod 10 = 0 Then
-                    Application.StatusBar = "Verarbeite Email " & (emailCount + 1) & "..."
-                End If
-
-                ' Email zu JSON hinzufügen
-                If emailCount > 0 Then jsonContent = jsonContent & "," & vbCrLf
-                jsonContent = jsonContent & EmailToJSON(item)
-                emailCount = emailCount + 1
-            End If
+    ' Durchlaufe gesammelte Emails
+    For i = 1 To allEmails.Count
+        If i Mod 10 = 0 Then
+            Application.StatusBar = "Verarbeite Email " & i & " von " & allEmails.Count & "..."
         End If
+
+        ' Email zu JSON hinzufügen
+        If i > 1 Then jsonContent = jsonContent & "," & vbCrLf
+        jsonContent = jsonContent & EmailToJSON(allEmails.item(i))
     Next i
 
     ' JSON Footer
     jsonContent = jsonContent & vbCrLf & "]"
 
-    If emailCount = 0 Then
+    If allEmails.Count = 0 Then
         MsgBox "Keine Emails der letzten 7 Tage gefunden!", vbInformation
         Application.StatusBar = False
         Exit Sub
@@ -150,7 +144,9 @@ Public Sub ExportOutlookToJSON()
 
     ' Erfolgsmeldung
     MsgBox "✓ Export erfolgreich!" & vbCrLf & vbCrLf & _
-           "Emails exportiert: " & emailCount & vbCrLf & vbCrLf & _
+           "Emails exportiert: " & allEmails.Count & vbCrLf & _
+           "Zeitraum: Letzte 7 Tage" & vbCrLf & _
+           "Quelle: Alle Outlook-Ordner" & vbCrLf & vbCrLf & _
            "PFAD:" & vbCrLf & _
            jsonPath & vbCrLf & vbCrLf & _
            "Der Downloads-Ordner wurde geöffnet." & vbCrLf & vbCrLf & _
@@ -158,9 +154,7 @@ Public Sub ExportOutlookToJSON()
            vbInformation, "Outlook JSON Export"
 
     ' Cleanup
-    Set item = Nothing
-    Set items = Nothing
-    Set folder = Nothing
+    Set allEmails = Nothing
     Set namespace = Nothing
     Set outlookApp = Nothing
     Set fso = Nothing
@@ -186,6 +180,44 @@ ErrorHandler:
            "Nummer: " & Err.Number & vbCrLf & _
            "Beschreibung: " & Err.Description, _
            vbCritical, "Export Fehler"
+End Sub
+
+' Rekursive Hilfsfunktion: Sammelt Emails aus einem Ordner und allen Unterordnern
+Private Sub CollectEmailsFromFolder(folder As Object, cutoffDate As Date, ByRef collection As Collection)
+    On Error Resume Next
+
+    Dim items As Object
+    Dim item As Object
+    Dim subFolder As Object
+    Dim i As Long
+
+    ' Prüfe ob Ordner gültig ist
+    If folder Is Nothing Then Exit Sub
+
+    ' Durchsuche Emails in diesem Ordner
+    Set items = folder.items
+
+    If Not items Is Nothing Then
+        For i = 1 To items.Count
+            Set item = items.item(i)
+
+            ' Nur Emails (Class 43 = olMail)
+            If item.Class = 43 Then
+                ' Nur Emails der letzten 7 Tage
+                If item.ReceivedTime >= cutoffDate Then
+                    collection.Add item
+                End If
+            End If
+        Next i
+    End If
+
+    ' Rekursiv durch Unterordner
+    If Not folder.Folders Is Nothing Then
+        For i = 1 To folder.Folders.Count
+            Set subFolder = folder.Folders.item(i)
+            CollectEmailsFromFolder subFolder, cutoffDate, collection
+        Next i
+    End If
 End Sub
 
 ' Konvertiert eine Email zu JSON
