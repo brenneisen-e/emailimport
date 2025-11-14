@@ -1018,12 +1018,14 @@
         }
 
         function formatDate(date) {
-            var year = date.getFullYear();
-            var month = ("0" + (date.getMonth() + 1)).slice(-2);
-            var day = ("0" + date.getDate()).slice(-2);
-            var hours = ("0" + date.getHours()).slice(-2);
-            var minutes = ("0" + date.getMinutes()).slice(-2);
-            var seconds = ("0" + date.getSeconds()).slice(-2);
+            // VarDate von Outlook zu JavaScript Date konvertieren
+            var jsDate = new Date(date);
+            var year = jsDate.getFullYear();
+            var month = ("0" + (jsDate.getMonth() + 1)).slice(-2);
+            var day = ("0" + jsDate.getDate()).slice(-2);
+            var hours = ("0" + jsDate.getHours()).slice(-2);
+            var minutes = ("0" + jsDate.getMinutes()).slice(-2);
+            var seconds = ("0" + jsDate.getSeconds()).slice(-2);
             return year + "-" + month + "-" + day + "T" + hours + ":" + minutes + ":" + seconds;
         }
 
