@@ -754,8 +754,10 @@
             <div class="filter-group">
                 <select class="field-input" id="filterKategorie" onchange="filterEmails()">
                     <option value="">Alle Kategorien</option>
-                    <option value="Incident">Incident</option>
                     <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                    <option value="Incident (Leicht)">Incident (Leicht)</option>
+                    <option value="Incident (Mittel)">Incident (Mittel)</option>
+                    <option value="Incident (Schwer)">Incident (Schwer)</option>
                 </select>
 
                 <select class="field-input" id="filterCluster" onchange="filterEmails()">
@@ -863,8 +865,10 @@
                         <input type="checkbox" id="batchKategorieCheck"> Kategorie ändern
                     </label>
                     <select class="field-input" id="batchKategorie" disabled>
-                        <option value="Incident">Incident</option>
                         <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                        <option value="Incident (Leicht)">Incident (Leicht)</option>
+                        <option value="Incident (Mittel)">Incident (Mittel)</option>
+                        <option value="Incident (Schwer)">Incident (Schwer)</option>
                     </select>
                 </div>
 
@@ -991,6 +995,15 @@
                         excelApp = new ActiveXObject("Excel.Application");
                     }
                     excelApp.Visible = true;
+
+                    // WICHTIG: Bringe HTA wieder in den Vordergrund nach kurzer Verzögerung
+                    setTimeout(function() {
+                        try {
+                            window.focus();
+                        } catch (e) {
+                            // Focus fehlgeschlagen, ignorieren
+                        }
+                    }, 100);
                 }
 
                 // Suche Tracking_Hypercare
@@ -2184,16 +2197,21 @@
 
                 debugLog("Durchsucht: " + checkedCount + " / Matches: " + matchedCount + " / Replies: " + allReplies.length);
 
-                // WICHTIG: Verbinde alle Antworten mit Trennlinie
+                // WICHTIG: Formatiere Antworten mit Nummerierung
                 if (allReplies.length === 0) {
                     debugLog("Keine Antworten gefunden.");
                     return null;
                 } else if (allReplies.length === 1) {
                     debugLog("1 Antwort gefunden!");
-                    return allReplies[0];
+                    return "Antwort 1:\n" + allReplies[0];
                 } else {
                     debugLog(allReplies.length + " Antworten gefunden!");
-                    return allReplies.join("\n__________________________\n");
+                    // Formatiere jede Antwort mit Nummerierung
+                    var formattedReplies = [];
+                    for (var r = 0; r < allReplies.length; r++) {
+                        formattedReplies.push("Antwort " + (r + 1) + ":\n" + allReplies[r]);
+                    }
+                    return formattedReplies.join("\n\n");
                 }
             } catch (e) {
                 debugLog("Fehler beim Suchen der Antwort: " + e.message);
@@ -2270,7 +2288,7 @@
 
             for (var i = 0; i < incidentKeywords.length; i++) {
                 if (text.indexOf(incidentKeywords[i]) !== -1) {
-                    return 'Incident';
+                    return 'Incident (Mittel)'; // Default: Mittel-Schwere Incidents
                 }
             }
 
@@ -2359,7 +2377,7 @@
             html += '<div class="email-body-preview">' + escapeHtml(preview) + '</div>';
 
             html += '<div class="edit-fields">';
-            html += renderFieldGroup(email, 'kategorie', 'Kategorie', ['Incident', 'Fachliche Rückfrage'], true);
+            html += renderFieldGroup(email, 'kategorie', 'Kategorie', ['Fachliche Rückfrage', 'Incident (Leicht)', 'Incident (Mittel)', 'Incident (Schwer)'], true);
             html += renderFieldGroup(email, 'agentur', 'Agentur', null, false);
             html += renderFieldGroup(email, 'cluster', 'Cluster', ['SHUK', 'LV', 'KV', 'Provisionierung', 'Produktzuordnung', 'Allgemein'], true);
             html += renderFieldGroup(email, 'status', 'Status', ['Neu', 'In Bearbeitung', 'Gelöst', 'Geschlossen'], true);
@@ -2566,7 +2584,8 @@
             for (var i = 0; i < emails.length; i++) {
                 if (emails[i].selected) {
                     selected.push(emails[i]);
-                    if (emails[i].kategorie === 'Incident') {
+                    // Prüfe ob Kategorie mit "Incident" beginnt (Incident (Leicht/Mittel/Schwer))
+                    if (emails[i].kategorie && emails[i].kategorie.indexOf('Incident') === 0) {
                         incidents.push(emails[i]);
                     } else if (emails[i].kategorie === 'Fachliche Rückfrage') {
                         rueckfragen.push(emails[i]);
