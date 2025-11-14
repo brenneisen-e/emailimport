@@ -522,22 +522,48 @@
            ============================================================================ */
         .loading {
             display: none;
-            text-align: center;
-            padding: 2rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
         }
 
         .loading.active {
-            display: block;
+            display: flex;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 2rem 3rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            min-width: 350px;
         }
 
         .spinner {
-            border: 4px solid #e9ecef;
-            border-top: 4px solid #366092;
+            border: 5px solid #e9ecef;
+            border-top: 5px solid #366092;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 60px;
+            height: 60px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
+            margin: 0 auto 1.5rem;
+        }
+
+        #loadingText {
+            font-size: 1rem;
+            color: #212529;
+            font-weight: 600;
+            margin-top: 0.5rem;
+            line-height: 1.6;
+            white-space: pre-line;
         }
 
         @keyframes spin {
@@ -664,8 +690,10 @@
 
         <!-- LOADING -->
         <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <div id="loadingText">Lade Emails aus Outlook...</div>
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <div id="loadingText">Lade Emails aus Outlook...</div>
+            </div>
         </div>
     </div>
 
@@ -1174,20 +1202,38 @@
         // Lade Bodies für alle ausgewählten Emails (für Export)
         function loadBodiesForSelectedEmails(selectedEmails) {
             if (!outlookApp) {
+                alert("⚠️ Outlook nicht verfügbar!\n\nEmail-Texte können nicht geladen werden.\nDie Emails werden ohne vollständigen Text exportiert.");
                 return; // Outlook nicht verfügbar
             }
+
+            var toLoad = 0;
+            // Zähle wie viele Bodies geladen werden müssen
+            for (var i = 0; i < selectedEmails.length; i++) {
+                if (!selectedEmails[i].bodyLoaded) {
+                    toLoad++;
+                }
+            }
+
+            if (toLoad === 0) {
+                return; // Alle Bodies bereits geladen
+            }
+
+            // Zeige Loading
+            showLoading(true, "Lade Email-Texte...\n\n0 von " + toLoad + " geladen");
 
             var loaded = 0;
             for (var i = 0; i < selectedEmails.length; i++) {
                 if (!selectedEmails[i].bodyLoaded) {
+                    // Update Progress
+                    document.getElementById('loadingText').innerText =
+                        "Lade Email-Texte...\n\n" + (loaded + 1) + " von " + toLoad + " geladen";
+
                     loadEmailBody(selectedEmails[i]);
                     loaded++;
                 }
             }
 
-            if (loaded > 0) {
-                alert("📥 " + loaded + " Email-Text(e) wurden nachgeladen.");
-            }
+            showLoading(false);
         }
 
         function getSenderEmail(mailItem) {
