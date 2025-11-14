@@ -1056,44 +1056,25 @@
         // OUTLOOK INTEGRATION
         // ============================================================================
 
-        // HAUPT-FUNKTION: Zeige Ordner-Auswahl
+        // HAUPT-FUNKTION: Lädt BEIDE Ordner automatisch
         function loadEmails() {
             if (!outlookApp) {
                 initializeOutlook();
                 if (!outlookApp) return;
             }
 
-            // Zeige Ordner-Auswahl Dialog
-            showFolderPickerDialog();
+            loadFromBothFolders();
         }
 
-        // Zeigt Dialog zur Ordner-Auswahl (NUR Posteingang oder Postausgang - keine Unterordner)
-        function showFolderPickerDialog() {
-            var choice = confirm(
-                "Welchen Ordner möchtest du durchsuchen?\n\n" +
-                "OK = Posteingang (letzte 7 Tage)\n" +
-                "Abbrechen = Postausgang (letzte 7 Tage)"
-            );
-
-            if (choice) {
-                // Posteingang
-                loadFromSingleFolder(6, "Posteingang");
-            } else {
-                // Postausgang
-                loadFromSingleFolder(5, "Postausgang");
-            }
-        }
-
-        // ULTRA-SCHNELL mit TABLE API: Lädt Emails BLITZSCHNELL
-        function loadFromSingleFolder(folderType, folderName) {
+        // ULTRA-SCHNELL: Durchsucht Posteingang UND Postausgang
+        function loadFromBothFolders() {
             try {
                 showLoading(true, "Lade Emailtracker...");
                 loadExistingEmailsFromTracker();
 
-                showLoading(true, "Durchsuche " + folderName + " mit Table API...");
-
                 var namespace = outlookApp.GetNamespace("MAPI");
-                var folder = namespace.GetDefaultFolder(folderType);
+                var inbox = namespace.GetDefaultFolder(6);
+                var sentItems = namespace.GetDefaultFolder(5);
 
                 // Datum: Letzte 7 Tage
                 var sevenDaysAgo = new Date();
@@ -1103,74 +1084,86 @@
                 var year = sevenDaysAgo.getFullYear();
                 var filterDate = month + "/" + day + "/" + year + " 00:00";
 
-                // TABLE API: Nur benötigte Felder laden = ULTRA-SCHNELL!
-                var filter = "[ReceivedTime] >= '" + filterDate + "' AND [MessageClass] = 'IPM.Note'";
-
-                var table = folder.GetTable(filter);
-
-                // Sortiere nach ReceivedTime absteigend (neueste zuerst)
-                table.Sort("[ReceivedTime]", true);
-
-                // Begrenze auf erste 200 Zeilen (schneller!)
-                var newEmails = [];
+                var allNewEmails = [];
+                var totalProcessed = 0;
                 var skippedDuplicate = 0;
-                var rowCount = 0;
 
-                showLoading(true, "Lade Emails mit Table API...");
+                // Durchsuche beide Ordner
+                var folders = [
+                    {folder: inbox, name: "Posteingang"},
+                    {folder: sentItems, name: "Postausgang"}
+                ];
 
-                // SUPER-SCHNELL: Zeile für Zeile durchgehen
-                while (!table.EndOfTable && newEmails.length < 150) {
-                    var row = table.GetNextRow();
-                    rowCount++;
+                for (var f = 0; f < folders.length; f++) {
+                    var currentFolder = folders[f].folder;
+                    var folderName = folders[f].name;
+
+                    showLoading(true, "Durchsuche " + folderName + "...");
 
                     try {
-                        // Extrahiere Felder direkt aus Tabelle (SCHNELL!)
-                        var subject = row("Subject") || "(Kein Betreff)";
-                        var senderName = row("SenderName") || "Unbekannt";
-                        var senderEmail = row("SenderEmailAddress") || "unknown@unknown.com";
-                        var receivedTime = new Date(row("ReceivedTime"));
-                        var entryID = row("EntryID");
+                        var items = currentFolder.Items;
+                        items.Sort("[ReceivedTime]", true);
 
-                        // Erstelle Email-Objekt OHNE Body (wird später geladen)
-                        var emailData = {
-                            datum: formatDate(receivedTime),
-                            von_email: senderEmail,
-                            von_name: senderName,
-                            betreff: subject,
-                            text: "", // Wird später geladen
-                            anfrage: "",
-                            antwort: "",
-                            anhänge: [],
-                            bodyLoaded: false,
-                            entryID: entryID // Speichere EntryID für später
-                        };
+                        var filter = "[ReceivedTime] >= '" + filterDate + "'";
+                        var filtered = items.Restrict(filter);
 
-                        // Duplikat-Check
-                        var identifier = getEmailIdentifier(emailData);
-                        if (existingEmailsInTracker.has(identifier)) {
-                            skippedDuplicate++;
-                            continue;
+                        showLoading(true, folderName + ": " + filtered.Count + " Emails gefunden...");
+
+                        // Verarbeite gefilterte Emails
+                        for (var i = 1; i <= filtered.Count && allNewEmails.length < 150; i++) {
+                            try {
+                                var item = filtered.Item(i);
+                                if (item.Class !== 43) continue;
+
+                                totalProcessed++;
+
+                                // Extrahiere Daten MIT korrekter Email-Adresse
+                                var senderEmail = getSenderEmail(item);
+                                var senderName = item.SenderName || "Unbekannt";
+                                var subject = item.Subject || "(Kein Betreff)";
+                                var receivedTime = item.ReceivedTime;
+
+                                // Erstelle Email-Objekt OHNE Body erstmal
+                                var emailData = {
+                                    datum: formatDate(new Date(receivedTime)),
+                                    von_email: senderEmail,
+                                    von_name: senderName,
+                                    betreff: subject,
+                                    text: "", // Wird später geladen
+                                    anfrage: "",
+                                    antwort: "",
+                                    anhänge: [],
+                                    bodyLoaded: false,
+                                    mailItem: item // Speichere Item für später
+                                };
+
+                                // Duplikat-Check
+                                var identifier = getEmailIdentifier(emailData);
+                                if (existingEmailsInTracker.has(identifier)) {
+                                    skippedDuplicate++;
+                                    continue;
+                                }
+
+                                allNewEmails.push(emailData);
+
+                                if (i % 20 === 0) {
+                                    showLoading(true, folderName + ": " + i + "/" + filtered.Count + " verarbeitet...");
+                                }
+                            } catch (e) {
+                                // Skip fehlerhafte Email
+                            }
                         }
-
-                        newEmails.push(emailData);
-
-                        // Fortschritt
-                        if (rowCount % 20 === 0) {
-                            showLoading(true, rowCount + " Emails verarbeitet...");
-                        }
-
                     } catch (e) {
-                        // Skip fehlerhafte Zeile
+                        alert("Fehler in " + folderName + ": " + e.message);
                     }
                 }
 
                 showLoading(false);
 
-                if (newEmails.length === 0) {
+                if (allNewEmails.length === 0) {
                     showNotification(
                         'Keine neuen Emails!\n\n' +
-                        'Ordner: ' + folderName + '\n' +
-                        'Verarbeitet: ' + rowCount + '\n' +
+                        'Verarbeitet: ' + totalProcessed + '\n' +
                         'Bereits in Excel: ' + skippedDuplicate,
                         'info',
                         'Keine neuen Emails',
@@ -1179,15 +1172,14 @@
                     return;
                 }
 
-                // Jetzt BODIES nachladen (nur für neue Emails)
+                // Jetzt BODIES + ANHÄNGE nachladen
                 showLoading(true, "Lade Email-Inhalte...");
 
-                for (var i = 0; i < newEmails.length; i++) {
+                for (var i = 0; i < allNewEmails.length; i++) {
                     try {
-                        var email = newEmails[i];
-                        if (email.entryID) {
-                            var item = namespace.GetItemFromID(email.entryID);
-                            email.text = getEmailBody(item);
+                        var email = allNewEmails[i];
+                        if (email.mailItem) {
+                            email.text = getEmailBody(email.mailItem);
 
                             // Begrenze Länge
                             if (email.text && email.text.length > 30000) {
@@ -1197,15 +1189,18 @@
                             email.bodyLoaded = true;
 
                             // Anhänge
-                            if (item.Attachments && item.Attachments.Count > 0) {
-                                for (var a = 1; a <= item.Attachments.Count; a++) {
-                                    email.anhänge.push(item.Attachments.Item(a).FileName);
+                            if (email.mailItem.Attachments && email.mailItem.Attachments.Count > 0) {
+                                for (var a = 1; a <= email.mailItem.Attachments.Count; a++) {
+                                    email.anhänge.push(email.mailItem.Attachments.Item(a).FileName);
                                 }
                             }
+
+                            // Lösche Referenz zum Item (Speicher freigeben)
+                            delete email.mailItem;
                         }
 
                         if (i % 10 === 0) {
-                            showLoading(true, "Lade Inhalt " + (i + 1) + " / " + newEmails.length + "...");
+                            showLoading(true, "Lade Inhalt " + (i + 1) + "/" + allNewEmails.length + "...");
                         }
                     } catch (e) {
                         // Skip
@@ -1215,15 +1210,15 @@
                 showLoading(false);
 
                 // Statistik
-                var stats = 'Ordner: ' + folderName + '\n' +
-                           'Verarbeitet: ' + rowCount + '\n' +
-                           'Neu: ' + newEmails.length + '\n' +
+                var stats = 'Ordner: Posteingang + Postausgang\n' +
+                           'Verarbeitet: ' + totalProcessed + '\n' +
+                           'Neu: ' + allNewEmails.length + '\n' +
                            'Bereits in Excel: ' + skippedDuplicate;
 
                 showNotification(stats, 'success', 'Emails geladen', 5000);
 
                 // Verarbeite Emails
-                processEmails(newEmails);
+                processEmails(allNewEmails);
 
             } catch (e) {
                 showLoading(false);
