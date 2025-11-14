@@ -1494,24 +1494,13 @@
         // Lade Bodies für alle ausgewählten Emails (für Export)
         function loadBodiesForSelectedEmails(selectedEmails) {
             // NICHT MEHR NÖTIG: Bodies werden jetzt sofort beim Laden aus Outlook geladen
-            // Diese Funktion bleibt nur für Abwärtskompatibilität
+            // Diese Funktion macht NICHTS mehr - Bodies sind bereits da!
 
-            // Prüfe ob alle Bodies geladen sind
-            var missing = 0;
-            for (var i = 0; i < selectedEmails.length; i++) {
-                if (!selectedEmails[i].bodyLoaded || !selectedEmails[i].text || selectedEmails[i].text === "[Noch nicht geladen]") {
-                    missing++;
-                    // Setze Fallback-Text
-                    selectedEmails[i].text = "[Email-Text war nicht verfügbar]";
-                    selectedEmails[i].bodyLoaded = true;
-                }
+            // Debug: Zeige ersten Email-Text
+            if (selectedEmails.length > 0) {
+                console.log("✓ Erste Email Text-Länge: " + (selectedEmails[0].text ? selectedEmails[0].text.length : 0) + " Zeichen");
+                console.log("✓ bodyLoaded: " + selectedEmails[0].bodyLoaded);
             }
-
-            if (missing > 0) {
-                console.log("⚠️ WARNUNG: " + missing + " Email(s) hatten keinen Body-Text");
-            }
-
-            // Keine Notification mehr nötig, da Bodies bereits beim Laden geladen werden
         }
 
         function getSenderEmail(mailItem) {
