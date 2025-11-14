@@ -705,7 +705,19 @@
                 <button class="btn btn-success btn-lg" onclick="exportToExcel()" id="exportBtn" disabled>
                     Excel Export
                 </button>
+                <button class="btn btn-secondary btn-lg" onclick="toggleDebugLog()">
+                    Debug Log
+                </button>
             </div>
+        </div>
+
+        <!-- DEBUG LOG PANEL -->
+        <div id="debugLogPanel" style="display: none; background: #1e1e1e; color: #d4d4d4; padding: 1rem; max-height: 400px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; border-bottom: 1px solid #444; padding-bottom: 0.5rem;">
+                <strong style="color: #4ec9b0;">Debug Log</strong>
+                <button onclick="clearDebugLog()" style="background: #444; color: #fff; border: none; padding: 0.25rem 0.5rem; cursor: pointer; border-radius: 3px;">Clear</button>
+            </div>
+            <div id="debugLogContent" style="white-space: pre-wrap; word-wrap: break-word;"></div>
         </div>
 
         <!-- STATS BAR -->
@@ -904,6 +916,37 @@
         var sentItemsCache = null; // Cache für Sent Items (für schnelle Reply-Suche)
 
         // ============================================================================
+        // DEBUG LOG FUNCTIONS
+        // ============================================================================
+        function debugLog(message) {
+            var content = document.getElementById('debugLogContent');
+            if (content) {
+                var timestamp = new Date().toLocaleTimeString('de-DE', { hour12: false });
+                var logLine = '[' + timestamp + '] ' + message + '\n';
+                content.textContent += logLine;
+                // Auto-scroll to bottom
+                var panel = document.getElementById('debugLogPanel');
+                if (panel) {
+                    panel.scrollTop = panel.scrollHeight;
+                }
+            }
+        }
+
+        function toggleDebugLog() {
+            var panel = document.getElementById('debugLogPanel');
+            if (panel) {
+                panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
+            }
+        }
+
+        function clearDebugLog() {
+            var content = document.getElementById('debugLogContent');
+            if (content) {
+                content.textContent = '';
+            }
+        }
+
+        // ============================================================================
         // INITIALIZATION
         // ============================================================================
         window.onload = function() {
@@ -1036,7 +1079,7 @@
 
                             // Debug: Zeige ersten Identifier
                             if (count === 1) {
-                                console.log("Erster Tracker-Identifier: " + identifier);
+                                debugLog("Erster Tracker-Identifier: " + identifier);
                             }
                         }
                     } catch (e) {
@@ -1359,9 +1402,9 @@
                     // WICHTIG: Restrict filtert Items - VIEL schneller!
                     itemsToProcess = items.Restrict(filter);
 
-                    console.log("Ordner: " + folder.Name + " - Gefilterte Items: " + itemsToProcess.Count);
+                    debugLog("Ordner: " + folder.Name + " - Gefilterte Items: " + itemsToProcess.Count);
                 } else {
-                    console.log("Ordner: " + folder.Name + " - ALLE Items: " + items.Count);
+                    debugLog("Ordner: " + folder.Name + " - ALLE Items: " + items.Count);
                 }
 
                 // Durchlaufe Items
@@ -1400,7 +1443,7 @@
                     }
                 }
             } catch (e) {
-                console.log("Fehler beim Durchsuchen von Ordner: " + e.message);
+                debugLog("Fehler beim Durchsuchen von Ordner: " + e.message);
             }
         }
 
@@ -1498,15 +1541,15 @@
 
                             // Debug: Zeige ersten generierten Identifier
                             if (newEmails.length === 0 && skippedDuplicate === 0) {
-                                console.log("Erster Outlook-Identifier: " + identifier);
-                                console.log("Tracker hat " + existingEmailsInTracker.size + " Einträge");
+                                debugLog("Erster Outlook-Identifier: " + identifier);
+                                debugLog("Tracker hat " + existingEmailsInTracker.size + " Einträge");
                             }
 
                             if (existingEmailsInTracker.has(identifier)) {
                                 skippedDuplicate++;
                                 // Debug: Zeige erstes Duplikat
                                 if (skippedDuplicate === 1) {
-                                    console.log("Erstes Duplikat gefunden: " + identifier);
+                                    debugLog("Erstes Duplikat gefunden: " + identifier);
                                 }
                                 continue; // Überspringen, bereits vorhanden
                             }
@@ -1912,7 +1955,7 @@
                     bodyLoaded: true
                 };
             } catch (e) {
-                console.log("❌ FEHLER in extractEmailData: " + e.message + " für Email");
+                debugLog("❌ FEHLER in extractEmailData: " + e.message + " für Email");
                 return {
                     datum: formatDate(new Date()),
                     von_email: "error@error.com",
@@ -1935,7 +1978,7 @@
             }
 
             if (!email.entryID) {
-                console.log("FEHLER: Keine EntryID für Email: " + email.betreff);
+                debugLog("FEHLER: Keine EntryID für Email: " + email.betreff);
                 email.text = "[Keine EntryID vorhanden]";
                 email.bodyLoaded = true;
                 return;
@@ -1946,7 +1989,7 @@
                 var mailItem = namespace.GetItemFromID(email.entryID);
 
                 if (!mailItem) {
-                    console.log("FEHLER: GetItemFromID returned null für: " + email.betreff);
+                    debugLog("FEHLER: GetItemFromID returned null für: " + email.betreff);
                     email.text = "[Email konnte nicht gefunden werden]";
                     email.bodyLoaded = true;
                     return;
@@ -1954,9 +1997,9 @@
 
                 email.text = getEmailBody(mailItem);
                 email.bodyLoaded = true;
-                console.log("✓ Body geladen für: " + email.betreff.substring(0, 30) + "...");
+                debugLog("✓ Body geladen für: " + email.betreff.substring(0, 30) + "...");
             } catch (e) {
-                console.log("FEHLER beim Laden: " + e.message + " für: " + email.betreff);
+                debugLog("FEHLER beim Laden: " + e.message + " für: " + email.betreff);
                 email.text = "[Fehler beim Laden: " + e.message + "]";
                 email.bodyLoaded = true;
             }
@@ -2182,8 +2225,8 @@
                 var sentFolder = namespace.GetDefaultFolder(5); // olFolderSentMail = 5
                 var items = sentFolder.Items;
 
-                console.log("Sent Items Ordner hat " + items.Count + " Emails");
-                console.log("Cutoff-Datum: " + (cutoffDate ? cutoffDate.toISOString() : "KEIN CUTOFF"));
+                debugLog("Sent Items Ordner hat " + items.Count + " Emails");
+                debugLog("Cutoff-Datum: " + (cutoffDate ? cutoffDate.toISOString() : "KEIN CUTOFF"));
 
                 // Sortiere nach Datum (NEUESTE zuerst, damit wir die relevanten finden!)
                 try {
@@ -2199,7 +2242,7 @@
                 var skippedOld = 0;
                 var skippedNoClass = 0;
 
-                console.log("Durchsuche max. " + maxCheck + " Emails...");
+                debugLog("Durchsuche max. " + maxCheck + " Emails...");
 
                 for (var i = 1; i <= maxCheck; i++) {
                     try {
@@ -2232,7 +2275,7 @@
 
                         // Log erste paar Einträge
                         if (sentItemsCache.length <= 3) {
-                            console.log("  Cache-Eintrag #" + sentItemsCache.length + ": " + subject + " (Datum: " + sentDate.toISOString() + ")");
+                            debugLog("  Cache-Eintrag #" + sentItemsCache.length + ": " + subject + " (Datum: " + sentDate.toISOString() + ")");
                         }
                     } catch (e) {
                         // Fehler bei diesem Item, weiter
@@ -2240,25 +2283,25 @@
                 }
 
                 showLoading(false);
-                console.log("=== CACHE LADEN ABGESCHLOSSEN ===");
-                console.log("Sent Items Cache geladen: " + sentItemsCache.length + " Emails");
-                console.log("Übersprungen (zu alt): " + skippedOld);
-                console.log("Übersprungen (keine Email): " + skippedNoClass);
+                debugLog("=== CACHE LADEN ABGESCHLOSSEN ===");
+                debugLog("Sent Items Cache geladen: " + sentItemsCache.length + " Emails");
+                debugLog("Übersprungen (zu alt): " + skippedOld);
+                debugLog("Übersprungen (keine Email): " + skippedNoClass);
             } catch (e) {
                 showLoading(false);
-                console.log("Fehler beim Laden des Sent Items Cache: " + e.message);
+                debugLog("Fehler beim Laden des Sent Items Cache: " + e.message);
             }
         }
 
         // Suche ALLE Antworten zu einer Email im Postausgang (nutzt Cache!)
         function findReplyInSentItems(originalEmail) {
             // DEBUG: Log Cache-Status
-            console.log("=== Reply-Suche für: " + originalEmail.betreff);
-            console.log("Cache Größe: " + (sentItemsCache ? sentItemsCache.length : "NULL"));
+            debugLog("=== Reply-Suche für: " + originalEmail.betreff);
+            debugLog("Cache Größe: " + (sentItemsCache ? sentItemsCache.length : "NULL"));
 
             // PERFORMANCE: Nutze Cache statt jedes Mal Outlook zu durchsuchen
             if (!sentItemsCache || sentItemsCache.length === 0) {
-                console.log("WARNUNG: Cache ist leer!");
+                debugLog("WARNUNG: Cache ist leer!");
                 return null;
             }
 
@@ -2266,10 +2309,10 @@
                 var originalSubject = originalEmail.betreff.toLowerCase().trim();
                 // Entferne "RE:", "AW:", "FWD:" etc.
                 originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
-                console.log("Normalisierter Betreff: " + originalSubject);
+                debugLog("Normalisierter Betreff: " + originalSubject);
 
                 var originalDate = new Date(originalEmail.datum);
-                console.log("Original Datum: " + originalDate.toISOString());
+                debugLog("Original Datum: " + originalDate.toISOString());
 
                 // WICHTIG: Sammle ALLE Antworten (nicht nur die erste!)
                 var allReplies = [];
@@ -2294,35 +2337,35 @@
                         originalSubject.indexOf(cachedItem.normalizedSubject) !== -1) {
 
                         matchedCount++;
-                        console.log("  MATCH gefunden: " + cachedItem.subject + " (Datum: " + cachedItem.sentDate.toISOString() + ")");
+                        debugLog("  MATCH gefunden: " + cachedItem.subject + " (Datum: " + cachedItem.sentDate.toISOString() + ")");
 
                         // Gefunden! Extrahiere Antwort-Text
                         var replyText = extractReplyText(cachedItem.body);
 
                         if (replyText && replyText.trim() !== "") {
                             allReplies.push(replyText.trim());
-                            console.log("  -> Reply-Text extrahiert: " + replyText.substring(0, 50) + "...");
+                            debugLog("  -> Reply-Text extrahiert: " + replyText.substring(0, 50) + "...");
                         } else {
-                            console.log("  -> Reply-Text leer nach Bereinigung");
+                            debugLog("  -> Reply-Text leer nach Bereinigung");
                         }
                     }
                 }
 
-                console.log("Durchsucht: " + checkedCount + " / Matches: " + matchedCount + " / Replies: " + allReplies.length);
+                debugLog("Durchsucht: " + checkedCount + " / Matches: " + matchedCount + " / Replies: " + allReplies.length);
 
                 // WICHTIG: Verbinde alle Antworten mit Trennlinie
                 if (allReplies.length === 0) {
-                    console.log("Keine Antworten gefunden.");
+                    debugLog("Keine Antworten gefunden.");
                     return null;
                 } else if (allReplies.length === 1) {
-                    console.log("1 Antwort gefunden!");
+                    debugLog("1 Antwort gefunden!");
                     return allReplies[0];
                 } else {
-                    console.log(allReplies.length + " Antworten gefunden!");
+                    debugLog(allReplies.length + " Antworten gefunden!");
                     return allReplies.join("\n__________________________\n");
                 }
             } catch (e) {
-                console.log("Fehler beim Suchen der Antwort: " + e.message);
+                debugLog("Fehler beim Suchen der Antwort: " + e.message);
                 return null;
             }
         }
@@ -2823,7 +2866,7 @@
         // WICHTIG: Update Antwort in Excel für bereits existierende Emails (Duplikate)
         function updateReplyInExcel(email, replyText) {
             if (!trackingWorkbook) {
-                console.log("updateReplyInExcel: Workbook nicht verfügbar");
+                debugLog("updateReplyInExcel: Workbook nicht verfügbar");
                 return false;
             }
 
@@ -2854,7 +2897,7 @@
                 }
 
                 if (!hcId) {
-                    console.log("updateReplyInExcel: Email nicht im Tracker gefunden");
+                    debugLog("updateReplyInExcel: Email nicht im Tracker gefunden");
                     return false;
                 }
 
@@ -2872,7 +2915,7 @@
                         // Wenn bereits eine Antwort existiert, überschreibe sie nur wenn die neue anders ist
                         if (existingReply.toString().trim() === "" || existingReply.toString().trim() !== replyText.trim()) {
                             worksheet.Cells(r, 12).Value = replyText;
-                            console.log("✓ Antwort aktualisiert für HC-ID: " + hcId);
+                            debugLog("✓ Antwort aktualisiert für HC-ID: " + hcId);
                             return true;
                         }
                         break;
@@ -2881,7 +2924,7 @@
 
                 return false;
             } catch (e) {
-                console.log("Fehler in updateReplyInExcel: " + e.message);
+                debugLog("Fehler in updateReplyInExcel: " + e.message);
                 return false;
             }
         }
