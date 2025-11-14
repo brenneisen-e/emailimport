@@ -808,6 +808,8 @@
         var nextId = 1;
         var outlookApp = null;
         var existingEmailsInTracker = new Set(); // Set für schnelle Duplikat-Prüfung
+        var excelApp = null; // Globale Excel-Instanz (wird beim Tracker-Laden initialisiert)
+        var trackingWorkbook = null; // Globales Tracking_Hypercare Workbook
 
         // ============================================================================
         // INITIALIZATION
@@ -843,24 +845,26 @@
             try {
                 showLoading(true, "Öffne Excel und lade Emailtracker...");
 
-                var excel = null;
-                try {
-                    excel = GetObject("", "Excel.Application");
-                } catch (e) {
-                    excel = new ActiveXObject("Excel.Application");
+                // Verwende/erstelle globale Excel-Instanz
+                if (!excelApp) {
+                    try {
+                        excelApp = GetObject("", "Excel.Application");
+                    } catch (e) {
+                        excelApp = new ActiveXObject("Excel.Application");
+                    }
+                    excelApp.Visible = true;
                 }
-                excel.Visible = true;
 
                 // Suche Tracking_Hypercare
-                var workbook = null;
+                trackingWorkbook = null;
                 var found = false;
 
                 // Prüfe offene Workbooks
-                for (var i = 1; i <= excel.Workbooks.Count; i++) {
-                    var wb = excel.Workbooks(i);
+                for (var i = 1; i <= excelApp.Workbooks.Count; i++) {
+                    var wb = excelApp.Workbooks(i);
                     var wbName = wb.Name.toLowerCase().replace(/[_\-\s]/g, '');
                     if (wbName.indexOf('hypercare') !== -1) {
-                        workbook = wb;
+                        trackingWorkbook = wb;
                         found = true;
                         break;
                     }
@@ -870,7 +874,7 @@
                 if (!found) {
                     var sharePointUrl = "https://barmeniagroup.sharepoint.com/sites/SAPUnity-WorkstreamICM/Freigegebene%20Dokumente/40%20Team%20Simulation,%20Kalibrierung,%20Verhandlung,%20Vertrag%20&%20EFM/Tracking_Hypercare.xlsm";
                     try {
-                        workbook = excel.Workbooks.Open(sharePointUrl);
+                        trackingWorkbook = excelApp.Workbooks.Open(sharePointUrl);
                         found = true;
                     } catch (e) {
                         showLoading(false);
@@ -884,7 +888,7 @@
                 // Suche Emailtracker Worksheet
                 var trackerSheet = null;
                 try {
-                    trackerSheet = workbook.Worksheets("Emailtracker");
+                    trackerSheet = trackingWorkbook.Worksheets("Emailtracker");
                 } catch (e) {
                     showLoading(false);
                     alert("ℹ️ Worksheet 'Emailtracker' nicht gefunden.\n\nFortfahren ohne Duplikat-Prüfung.");
@@ -1835,151 +1839,59 @@
             loadBodiesForSelectedEmails(selectedEmails);
 
             try {
-                var excel = null;
                 var debugInfo = "";
 
-                // WICHTIG: Versuche ZUERST eine laufende Excel-Instanz zu finden!
-                try {
-                    excel = GetObject("", "Excel.Application");
-                    debugInfo = "✓ Verbunden mit laufender Excel-Instanz\n\n";
-                } catch (e) {
-                    debugInfo = "⚠ Keine laufende Excel-Instanz gefunden\n";
-                    debugInfo += "Erstelle neue Excel-Instanz...\n\n";
-                    excel = new ActiveXObject("Excel.Application");
+                // WICHTIG: Verwende bereits geöffnete Excel-Instanz und Workbook!
+                if (!excelApp || !trackingWorkbook) {
+                    alert("⚠️ Excel oder Workbook nicht gefunden!\n\n" +
+                          "Bitte lade zuerst Emails über 'Letzte Woche laden',\n" +
+                          "damit Excel und das Tracking_Hypercare Workbook geöffnet werden.");
+                    return;
                 }
 
-                excel.Visible = true;
+                debugInfo = "✓ Verwende bereits geöffnetes Excel und Workbook\n\n";
 
-                // Suche nach offener Tracking_Hypercare Datei
-                var workbook = null;
+                // Verwende das bereits geöffnete Workbook
+                var workbook = trackingWorkbook;
                 var worksheet = null;
                 var found = false;
 
-                // DEBUG: Liste alle offenen Workbooks
-                debugInfo += "Gefundene Excel-Dateien (" + excel.Workbooks.Count + "):\n\n";
-                for (var i = 1; i <= excel.Workbooks.Count; i++) {
-                    var wb = excel.Workbooks(i);
-                    debugInfo += i + ". Name: " + wb.Name + "\n";
+                // Suche Worksheet "Übersicht"
+                try {
+                    worksheet = workbook.Worksheets("Übersicht");
+                    found = true;
+                    debugInfo += "✓✓ Worksheet 'Übersicht' gefunden!\n";
+                } catch (e) {
+                    debugInfo += "⚠ Worksheet 'Übersicht' existiert nicht. Fehler: " + e.message + "\n";
+                    debugInfo += "Verfügbare Worksheets:\n";
                     try {
-                        debugInfo += "   Pfad: " + wb.FullName + "\n";
-                    } catch (e) {
-                        debugInfo += "   Pfad: (nicht verfügbar)\n";
-                    }
-                }
-
-                // Durchsuche alle offenen Workbooks
-                for (var i = 1; i <= excel.Workbooks.Count; i++) {
-                    var wb = excel.Workbooks(i);
-                    var wbName = wb.Name.toLowerCase();
-                    var wbFullName = "";
-
-                    try {
-                        wbFullName = wb.FullName.toLowerCase();
-                    } catch (e) {
-                        wbFullName = wbName;
-                    }
-
-                    // SEHR FLEXIBLE SUCHE: Alles was "hypercare" enthält
-                    // Ignoriere alle Sonderzeichen, Unterstriche, Bindestriche, etc.
-                    var nameSimplified = wbName.replace(/[_\-\s]/g, '');
-                    var fullNameSimplified = wbFullName.replace(/[_\-\s]/g, '');
-
-                    debugInfo += "\n  → Prüfe: " + wbName + "\n     Vereinfacht: " + nameSimplified + "\n";
-
-                    if (nameSimplified.indexOf('hypercare') !== -1 ||
-                        fullNameSimplified.indexOf('hypercare') !== -1) {
-
-                        debugInfo += "     ✓ MATCH gefunden! Versuche Worksheet 'Übersicht' zu öffnen...\n";
-                        workbook = wb;
-
-                        // Suche Worksheet "Übersicht"
-                        try {
-                            worksheet = workbook.Worksheets("Übersicht");
-                            found = true;
-                            debugInfo += "     ✓✓ PERFEKT! Worksheet 'Übersicht' gefunden!\n";
-                            break;
-                        } catch (e) {
-                            debugInfo += "     ⚠ Worksheet 'Übersicht' existiert nicht. Fehler: " + e.message + "\n";
-                            debugInfo += "     Verfügbare Worksheets:\n";
-                            try {
-                                for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
-                                    debugInfo += "       - " + workbook.Worksheets(ws).Name + "\n";
-                                }
-                            } catch (e3) {
-                                debugInfo += "       (kann Worksheets nicht auflisten)\n";
-                            }
-
-                            // Worksheet nicht gefunden, versuche erstes Worksheet
-                            try {
-                                worksheet = workbook.Worksheets(1);
-                                found = true;
-                                debugInfo += "     → Verwende stattdessen erstes Worksheet: '" + worksheet.Name + "'\n";
-                                break;
-                            } catch (e2) {
-                                debugInfo += "     ✗ Kann kein Worksheet öffnen: " + e2.message + "\n";
-                                // Nächstes Workbook versuchen
-                            }
+                        for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
+                            debugInfo += "  - " + workbook.Worksheets(ws).Name + "\n";
                         }
+                    } catch (e3) {
+                        debugInfo += "  (kann Worksheets nicht auflisten)\n";
                     }
-                }
 
-                if (!found) {
-                    debugInfo += "\n⚠️ Tracking_Hypercare nicht in offenen Dateien gefunden!\n";
-                    debugInfo += "\n🔄 Versuche SharePoint-Datei zu öffnen...\n";
-
-                    // Versuche die SharePoint-Datei direkt zu öffnen
-                    var sharePointUrl = "https://barmeniagroup.sharepoint.com/sites/SAPUnity-WorkstreamICM/Freigegebene%20Dokumente/40%20Team%20Simulation,%20Kalibrierung,%20Verhandlung,%20Vertrag%20&%20EFM/Tracking_Hypercare.xlsm";
-
+                    // Worksheet nicht gefunden, versuche erstes Worksheet
                     try {
-                        // Versuche die URL direkt zu öffnen
-                        debugInfo += "Öffne: " + sharePointUrl + "\n";
-                        workbook = excel.Workbooks.Open(sharePointUrl);
-                        debugInfo += "✓ Datei geöffnet: " + workbook.Name + "\n";
-
-                        // Suche Worksheet "Übersicht"
-                        try {
-                            worksheet = workbook.Worksheets("Übersicht");
-                            found = true;
-                            debugInfo += "✓✓ Worksheet 'Übersicht' gefunden!\n";
-                            alert("✅ ERFOLG!\n\n" + debugInfo + "\n\nDie SharePoint-Datei wurde geöffnet und wird jetzt verwendet!");
-                        } catch (wsError) {
-                            debugInfo += "⚠️ Worksheet 'Übersicht' nicht gefunden!\n";
-                            debugInfo += "Verfügbare Worksheets:\n";
-                            for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
-                                debugInfo += "  - " + workbook.Worksheets(ws).Name + "\n";
-                            }
-                            // Verwende erstes Worksheet
-                            worksheet = workbook.Worksheets(1);
-                            found = true;
-                            debugInfo += "\n→ Verwende stattdessen: '" + worksheet.Name + "'\n";
-                            alert("⚠️ Worksheet 'Hypercare' nicht gefunden!\n\n" + debugInfo + "\n\nVerwende erstes Worksheet.");
-                        }
-                    } catch (openError) {
-                        debugInfo += "✗ SharePoint-Datei öffnen fehlgeschlagen!\n";
-                        debugInfo += "Fehler: " + openError.message + "\n";
-                        debugInfo += "\n═══════════════════════════════════\n";
-                        debugInfo += "LÖSUNG:\n";
-                        debugInfo += "═══════════════════════════════════\n";
-                        debugInfo += "1. Öffne die Datei MANUELL in Excel über:\n";
-                        debugInfo += "   SharePoint → Tracking_Hypercare.xlsm\n\n";
-                        debugInfo += "2. Lasse Excel im Hintergrund offen\n\n";
-                        debugInfo += "3. Klicke in der HTA-App erneut auf\n";
-                        debugInfo += "   'Nach Excel exportieren'\n\n";
-                        debugInfo += "═══════════════════════════════════\n\n";
-                        debugInfo += "Als FALLBACK erstelle ich jetzt eine NEUE Datei.\n";
-                        debugInfo += "Du musst die Daten dann manuell kopieren!";
-
-                        alert("⚠️⚠️⚠️ FEHLER BEIM ÖFFNEN! ⚠️⚠️⚠️\n\n" + debugInfo);
-
-                        // Neue Datei erstellen als letzter Ausweg
-                        workbook = excel.Workbooks.Add();
                         worksheet = workbook.Worksheets(1);
-                        worksheet.Name = "Übersicht";
-                        found = false; // WICHTIG: Markiere als neue Datei für Header-Erstellung
+                        found = true;
+                        debugInfo += "  → Verwende stattdessen erstes Worksheet: '" + worksheet.Name + "'\n";
+                    } catch (e2) {
+                        debugInfo += "  ✗ Kann kein Worksheet öffnen: " + e2.message + "\n";
+                        alert("❌ Fehler: Kein Worksheet gefunden!\n\n" + debugInfo);
+                        return;
                     }
                 }
 
-                if (!found) {
+                // Worksheet sollte jetzt vorhanden sein
+                if (!found || !worksheet) {
+                    alert("❌ Fehler: Worksheet konnte nicht gefunden werden!\n\n" + debugInfo);
+                    return;
+                }
+
+                // Ab hier mit dem Worksheet arbeiten
+                if (false) { // Placeholder für Header-Erstellung (wird nie ausgeführt, da found=true)
 
                     // Header erstellen
                     var headers = ['ID', 'Datum', 'Kanal', 'Agentur', 'Kategorie', 'Status',
