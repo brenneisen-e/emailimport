@@ -783,12 +783,27 @@
             }
 
             try {
-                showLoading(true, "Lade Emails der letzten Woche aus Posteingang...");
+                showLoading(true, "Ermittle aktuellen Outlook-Ordner...");
 
-                var namespace = outlookApp.GetNamespace("MAPI");
+                // Hole den aktuell in Outlook geöffneten Ordner
+                var explorer = outlookApp.ActiveExplorer();
+                var currentFolder = explorer.CurrentFolder;
 
-                // Posteingang holen (standardmäßig erstes Postfach)
-                var inbox = namespace.GetDefaultFolder(6); // olFolderInbox = 6
+                var folderInfo = "Ordner: " + currentFolder.Name + "\n";
+                folderInfo += "Postfach: " + currentFolder.Store.DisplayName + "\n";
+                folderInfo += "Pfad: " + currentFolder.FolderPath + "\n\n";
+                folderInfo += "Zeitraum: Letzte 7 Tage\n\n";
+
+                var response = confirm(folderInfo +
+                    "Möchtest du Emails aus diesem Ordner laden?\n\n" +
+                    "(Wenn nein, navigiere in Outlook zum gewünschten Ordner und klicke erneut auf 'Letzte Woche laden')");
+
+                if (!response) {
+                    showLoading(false);
+                    return;
+                }
+
+                showLoading(true, "Lade Emails der letzten Woche aus '" + currentFolder.Name + "'...");
 
                 // Datum: 7 Tage zurück
                 var sevenDaysAgo = new Date();
@@ -798,14 +813,28 @@
                 var filterDate = formatDateForFilter(sevenDaysAgo);
                 var filter = "[ReceivedTime] >= '" + filterDate + "'";
 
-                var items = inbox.Items;
+                var items = currentFolder.Items;
                 items.Sort("[ReceivedTime]", true); // Neueste zuerst
+
+                document.getElementById('loadingText').innerText = "Wende Filter an (kann bei vielen Emails dauern)...";
                 var filteredItems = items.Restrict(filter);
 
                 if (filteredItems.Count === 0) {
-                    alert("Keine Emails der letzten 7 Tage im Posteingang gefunden!");
+                    alert("Keine Emails der letzten 7 Tage in '" + currentFolder.Name + "' gefunden!\n\n" +
+                          "Postfach: " + currentFolder.Store.DisplayName);
                     showLoading(false);
                     return;
+                }
+
+                // Sicherheitsabfrage bei vielen Emails
+                if (filteredItems.Count > 500) {
+                    var confirmLoad = confirm(filteredItems.Count + " Emails gefunden!\n\n" +
+                        "Das Laden kann einige Minuten dauern.\n\n" +
+                        "Fortfahren?");
+                    if (!confirmLoad) {
+                        showLoading(false);
+                        return;
+                    }
                 }
 
                 var newEmails = [];
@@ -831,11 +860,17 @@
                 processEmails(newEmails);
                 showLoading(false);
 
-                alert("✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!");
+                alert("✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!\n\n" +
+                      "Ordner: " + currentFolder.Name + "\n" +
+                      "Postfach: " + currentFolder.Store.DisplayName);
 
             } catch (e) {
                 showLoading(false);
-                alert("Fehler beim Laden der Emails:\n\n" + e.message + "\n\nBitte stelle sicher dass Outlook geöffnet ist.");
+                alert("Fehler beim Laden der Emails:\n\n" + e.message + "\n\n" +
+                      "Details: " + (e.description || "Keine Details verfügbar") + "\n\n" +
+                      "Bitte stelle sicher dass:\n" +
+                      "1. Outlook geöffnet ist\n" +
+                      "2. Du in einem Email-Ordner bist (nicht Kalender/Kontakte)");
             }
         }
 
