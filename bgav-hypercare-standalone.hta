@@ -819,12 +819,12 @@
                 <button class="modal-close" onclick="closeModal('mailboxModal')">×</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 1rem;">Wähle das Postfach aus dem du Emails der letzten Woche laden möchtest:</p>
+                <p style="margin-bottom: 1rem;">Wähle das Postfach aus dem du Emails laden möchtest:</p>
                 <select id="mailboxSelect" class="field-input" style="width: 100%; margin-bottom: 1rem;" size="6">
                     <option value="">Lädt Postfächer...</option>
                 </select>
                 <p style="color: #6c757d; font-size: 0.875rem;">
-                    📅 Es werden alle Emails der letzten 7 Tage aus dem Posteingang geladen (max. 100).
+                    Es werden Emails der letzten 7 Tage aus Posteingang UND Postausgang geladen.
                 </p>
             </div>
             <div class="modal-footer">
@@ -1056,70 +1056,76 @@
         // OUTLOOK INTEGRATION
         // ============================================================================
 
-        // HAUPT-FUNKTION: Zeige Postfach-Auswahl
+        // HAUPT-FUNKTION: Zeige Postfach-Auswahl Modal
         function loadEmails() {
             if (!outlookApp) {
                 initializeOutlook();
                 if (!outlookApp) return;
             }
 
-            showMailboxPicker();
-        }
-
-        // Zeigt Dialog zur Postfach-Auswahl (Store-Auswahl)
-        function showMailboxPicker() {
             try {
+                // Öffne Modal
+                openModal('mailboxModal');
+
+                // Lade Postfächer in Dropdown
+                var mailboxSelect = document.getElementById('mailboxSelect');
+                mailboxSelect.innerHTML = '<option value="">Lädt Postfächer...</option>';
+
                 var namespace = outlookApp.GetNamespace("MAPI");
                 var stores = namespace.Stores;
 
                 if (stores.Count === 0) {
-                    alert("Keine Postfächer gefunden!");
+                    mailboxSelect.innerHTML = '<option value="">Keine Postfächer gefunden</option>';
+                    alert('Keine Postfächer gefunden!');
                     return;
                 }
 
-                // Erstelle Auswahl-Liste
-                var msg = "Wähle ein Postfach:\n\n";
-                var storeList = [];
-
+                // Fülle Dropdown mit Stores
+                mailboxSelect.innerHTML = '';
                 for (var i = 1; i <= stores.Count; i++) {
                     try {
                         var store = stores.Item(i);
-                        storeList.push(store);
-                        msg += i + ") " + store.DisplayName + "\n";
+                        var option = document.createElement('option');
+                        option.value = i;
+                        option.text = store.DisplayName;
+                        mailboxSelect.appendChild(option);
                     } catch (e) {
                         // Skip fehlerhafte Stores
                     }
                 }
 
-                // Zeige Auswahl
-                var choice = prompt(msg + "\nGib die Nummer ein (1-" + storeList.length + "):", "1");
-
-                if (choice === null) return; // Abgebrochen
-
-                var choiceNum = parseInt(choice);
-                if (isNaN(choiceNum) || choiceNum < 1 || choiceNum > storeList.length) {
-                    alert("Ungültige Auswahl!");
-                    return;
+                if (mailboxSelect.options.length === 0) {
+                    mailboxSelect.innerHTML = '<option value="">Keine Postfächer gefunden</option>';
+                    alert('Keine Postfächer gefunden!');
                 }
-
-                // Lade von ausgewähltem Store
-                var selectedStore = storeList[choiceNum - 1];
-                loadFromStore(selectedStore);
 
             } catch (e) {
                 alert("Fehler beim Laden der Postfächer:\n\n" + e.message);
             }
         }
 
-        // ULTRA-SCHNELL: Durchsucht Posteingang UND Postausgang vom ausgewählten Store
-        function loadFromStore(store) {
+        // ULTRA-SCHNELL: Lädt Emails aus ausgewähltem Postfach
+        function loadLastWeekFromSelectedMailbox() {
+            var mailboxSelect = document.getElementById('mailboxSelect');
+            var storeIndex = mailboxSelect.value;
+
+            if (!storeIndex) {
+                alert('Bitte wähle ein Postfach aus!');
+                return;
+            }
+
             try {
+                closeModal('mailboxModal');
+
                 showLoading(true, "Lade Emailtracker...");
                 loadExistingEmailsFromTracker();
 
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var store = namespace.Stores.Item(parseInt(storeIndex));
+
                 showLoading(true, "Durchsuche " + store.DisplayName + "...");
 
-                // Hole Posteingang und Postausgang vom Store
+                // Hole beide Ordner vom Store
                 var inbox = store.GetDefaultFolder(6);
                 var sentItems = store.GetDefaultFolder(5);
 
