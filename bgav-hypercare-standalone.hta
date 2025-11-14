@@ -1910,72 +1910,8 @@
             }
         }
 
-        // Bereite Emails für Export vor (Signatur entfernen, Antworten laden)
-        function prepareEmailsForExport(selectedEmails) {
-            // IMMER Signatur entfernen, IMMER Antworten suchen (wenn Outlook verfügbar)
-            if (!outlookApp) {
-                // Ohne Outlook: nur Signatur entfernen
-                for (var i = 0; i < selectedEmails.length; i++) {
-                    selectedEmails[i].anfrage = removeSignature(selectedEmails[i].text);
-                    selectedEmails[i].antwort = "";
-                }
-                return;
-            }
-
-            showLoading(true, "Bereite Emails für Export vor...\n\n0 von " + selectedEmails.length + " bearbeitet");
-
-            for (var i = 0; i < selectedEmails.length; i++) {
-                // Update Progress
-                if (i % 5 === 0 || i === selectedEmails.length - 1) {
-                    document.getElementById('loadingText').innerText =
-                        "Bereite Emails für Export vor...\n\n" +
-                        (i + 1) + " von " + selectedEmails.length + " bearbeitet\n" +
-                        "Suche Antworten im Postausgang...";
-                }
-
-                var email = selectedEmails[i];
-
-                // Entferne Signatur für "Anfrage" und begrenze Länge
-                email.anfrage = removeSignature(email.text);
-                if (email.anfrage && email.anfrage.length > 30000) {
-                    email.anfrage = email.anfrage.substring(0, 30000) + "\n\n... (Text gekürzt)";
-                }
-
-                // Suche Antwort im Postausgang (nur wenn aktiviert)
-                try {
-                    var reply = findReplyInSentItems(email);
-                    email.antwort = reply || "";
-
-                    // Begrenze auch Antwort-Länge
-                    if (email.antwort && email.antwort.length > 30000) {
-                        email.antwort = email.antwort.substring(0, 30000) + "\n\n... (Text gekürzt)";
-                    }
-
-                    if (reply) {
-                        console.log("✓ Antwort gefunden für: " + email.betreff.substring(0, 30) + "...");
-                    }
-                } catch (e) {
-                    console.log("⚠️ Fehler beim Suchen der Antwort: " + e.message);
-                    email.antwort = "";
-                }
-            }
-
-            showLoading(false);
-
-            var repliesFound = 0;
-            for (var i = 0; i < selectedEmails.length; i++) {
-                if (selectedEmails[i].antwort) {
-                    repliesFound++;
-                }
-            }
-
-            showNotification(
-                selectedEmails.length + " Emails vorbereitet.\n" +
-                repliesFound + " Antworten im Postausgang gefunden.",
-                repliesFound > 0 ? 'success' : 'info',
-                'Export vorbereitet'
-            );
-        }
+        // ALTE FUNKTION - ERSETZT durch prepareEmailsStep1 und Step2 mit Live-Tracking
+        // (wird nicht mehr verwendet)
 
         function getSenderEmail(mailItem) {
             try {
@@ -2593,19 +2529,99 @@
             // Zeige Loading-Animation SOFORT
             showLoading(true, "Bereite Export vor...\n" + selectedEmails.length + " Emails");
 
-            // Verwende setTimeout damit UI Zeit hat zu rendern
+            // Schritt 1: Signatur entfernen (mit Verzögerung für UI)
             setTimeout(function() {
-                try {
-                    // WICHTIG: Bereite Emails für Export vor (Signatur entfernen, Antworten suchen)
-                    prepareEmailsForExport(selectedEmails);
+                showLoading(true, "Schritt 1/3: Entferne Signaturen...\n0 / " + selectedEmails.length);
 
-                    // Starte Excel-Export
-                    performExcelExport(selectedEmails);
-                } catch (e) {
-                    showLoading(false);
-                    alert("Fehler beim Export:\n\n" + e.message + "\n\nStack: " + (e.stack || "N/A"));
+                setTimeout(function() {
+                    prepareEmailsStep1_RemoveSignatures(selectedEmails, function() {
+                        // Schritt 2: Antworten suchen (mit Verzögerung für UI)
+                        showLoading(true, "Schritt 2/3: Suche Antworten...\n0 / " + selectedEmails.length);
+
+                        setTimeout(function() {
+                            prepareEmailsStep2_FindReplies(selectedEmails, function() {
+                                // Schritt 3: Excel Export (mit Verzögerung für UI)
+                                showLoading(true, "Schritt 3/3: Schreibe in Excel...");
+
+                                setTimeout(function() {
+                                    performExcelExport(selectedEmails);
+                                }, 100);
+                            });
+                        }, 100);
+                    });
+                }, 100);
+            }, 100);
+        }
+
+        // Schritt 1: Signaturen entfernen (mit Live-Updates)
+        function prepareEmailsStep1_RemoveSignatures(selectedEmails, callback) {
+            var index = 0;
+
+            function processNext() {
+                if (index >= selectedEmails.length) {
+                    callback();
+                    return;
                 }
-            }, 100); // 100ms delay damit UI rendern kann
+
+                // Verarbeite 5 Emails auf einmal
+                var batchSize = Math.min(5, selectedEmails.length - index);
+                for (var i = 0; i < batchSize; i++) {
+                    if (index + i < selectedEmails.length) {
+                        var email = selectedEmails[index + i];
+                        email.anfrage = removeSignature(email.text);
+                    }
+                }
+
+                index += batchSize;
+                showLoading(true, "Schritt 1/3: Entferne Signaturen...\n" + index + " / " + selectedEmails.length);
+
+                // Nächster Batch nach kurzer Pause (UI kann rendern)
+                setTimeout(processNext, 10);
+            }
+
+            processNext();
+        }
+
+        // Schritt 2: Antworten suchen (mit Live-Updates)
+        function prepareEmailsStep2_FindReplies(selectedEmails, callback) {
+            if (!outlookApp) {
+                // Ohne Outlook: Antworten leer lassen
+                for (var i = 0; i < selectedEmails.length; i++) {
+                    selectedEmails[i].antwort = "";
+                }
+                callback();
+                return;
+            }
+
+            var index = 0;
+
+            function processNext() {
+                if (index >= selectedEmails.length) {
+                    callback();
+                    return;
+                }
+
+                // Verarbeite 1 Email (Antwort-Suche ist langsam)
+                var email = selectedEmails[index];
+                try {
+                    var reply = findReplyInSentItems(email);
+                    email.antwort = reply || "";
+
+                    if (email.antwort && email.antwort.length > 30000) {
+                        email.antwort = email.antwort.substring(0, 30000) + "\n\n... (gekürzt)";
+                    }
+                } catch (e) {
+                    email.antwort = "";
+                }
+
+                index++;
+                showLoading(true, "Schritt 2/3: Suche Antworten...\n" + index + " / " + selectedEmails.length);
+
+                // Nächste Email nach kurzer Pause (UI kann rendern)
+                setTimeout(processNext, 10);
+            }
+
+            processNext();
         }
 
         // Eigentlicher Excel-Export (ausgelagert für setTimeout)
