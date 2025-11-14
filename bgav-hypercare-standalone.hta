@@ -1056,113 +1056,91 @@
         // OUTLOOK INTEGRATION
         // ============================================================================
 
-        // HAUPT-FUNKTION: Lädt Emails der letzten Woche aus Posteingang UND Postausgang
+        // HAUPT-FUNKTION: Zeige Ordner-Auswahl
         function loadEmails() {
             if (!outlookApp) {
                 initializeOutlook();
                 if (!outlookApp) return;
             }
 
+            // Zeige Ordner-Auswahl Dialog
+            showFolderPickerDialog();
+        }
+
+        // Zeigt Dialog zur Ordner-Auswahl (NUR Posteingang oder Postausgang - keine Unterordner)
+        function showFolderPickerDialog() {
+            var choice = confirm(
+                "Welchen Ordner möchtest du durchsuchen?\n\n" +
+                "OK = Posteingang (letzte 7 Tage)\n" +
+                "Abbrechen = Postausgang (letzte 7 Tage)"
+            );
+
+            if (choice) {
+                // Posteingang
+                loadFromSingleFolder(6, "Posteingang");
+            } else {
+                // Postausgang
+                loadFromSingleFolder(5, "Postausgang");
+            }
+        }
+
+        // ULTRA-SCHNELL: Lädt Emails aus einem EINZELNEN Ordner
+        function loadFromSingleFolder(folderType, folderName) {
             try {
-                showLoading(true, "Lade Emailtracker für Duplikat-Erkennung...");
+                showLoading(true, "Lade Emailtracker...");
                 loadExistingEmailsFromTracker();
 
-                var namespace = outlookApp.GetNamespace("MAPI");
-                var inbox = namespace.GetDefaultFolder(6); // olFolderInbox
-                var sentItems = namespace.GetDefaultFolder(5); // olFolderSentMail
+                showLoading(true, "Durchsuche " + folderName + "...");
 
-                // Berechne Datum vor 7 Tagen
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var folder = namespace.GetDefaultFolder(folderType);
+
+                // Datum: Letzte 7 Tage
                 var sevenDaysAgo = new Date();
                 sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-                // Formatiere Datum für Outlook Restrict (MM/DD/YYYY HH:MM)
                 var month = sevenDaysAgo.getMonth() + 1;
                 var day = sevenDaysAgo.getDate();
                 var year = sevenDaysAgo.getFullYear();
                 var filterDate = month + "/" + day + "/" + year + " 00:00";
 
-                showLoading(true, "Durchsuche Posteingang...");
+                var items = folder.Items;
+                items.Sort("[ReceivedTime]", true); // Neueste zuerst
 
+                // RESTRICT = BLITZSCHNELL!
+                var filter = "[ReceivedTime] >= '" + filterDate + "'";
+                var filtered = items.Restrict(filter);
+
+                var totalFound = filtered.Count;
                 var newEmails = [];
                 var skippedDuplicate = 0;
-                var totalFound = 0;
 
-                // 1. Durchsuche POSTEINGANG
-                try {
-                    var inboxItems = inbox.Items;
-                    inboxItems.Sort("[ReceivedTime]", true); // Neueste zuerst
+                showLoading(true, totalFound + " Emails gefunden in " + folderName + "...");
 
-                    // Restrict auf letzte 7 Tage (SCHNELL!)
-                    var filter = "[ReceivedTime] >= '" + filterDate + "'";
-                    var restrictedInbox = inboxItems.Restrict(filter);
+                // Verarbeite gefilterte Emails
+                for (var i = 1; i <= filtered.Count; i++) {
+                    try {
+                        var item = filtered.Item(i);
+                        if (item.Class !== 43) continue; // Nur Emails
 
-                    totalFound += restrictedInbox.Count;
+                        var emailData = extractEmailData(item);
+                        var identifier = getEmailIdentifier(emailData);
 
-                    for (var i = 1; i <= restrictedInbox.Count; i++) {
-                        try {
-                            var item = restrictedInbox.Item(i);
-                            if (item.Class !== 43) continue; // Nur Emails
-
-                            var emailData = extractEmailData(item);
-                            var identifier = getEmailIdentifier(emailData);
-
-                            if (existingEmailsInTracker.has(identifier)) {
-                                skippedDuplicate++;
-                                continue;
-                            }
-
-                            newEmails.push(emailData);
-
-                            if (i % 10 === 0) {
-                                showLoading(true, "Posteingang: " + i + " von " + restrictedInbox.Count + " verarbeitet...");
-                            }
-
-                            if (newEmails.length >= 200) break;
-                        } catch (e) {
+                        if (existingEmailsInTracker.has(identifier)) {
+                            skippedDuplicate++;
                             continue;
                         }
-                    }
-                } catch (e) {
-                    alert("Fehler beim Durchsuchen des Posteingangs:\n\n" + e.message);
-                }
 
-                // 2. Durchsuche POSTAUSGANG (Gesendete Elemente)
-                if (newEmails.length < 200) {
-                    showLoading(true, "Durchsuche Postausgang...");
+                        newEmails.push(emailData);
 
-                    try {
-                        var sentItemsItems = sentItems.Items;
-                        sentItemsItems.Sort("[ReceivedTime]", true); // Neueste zuerst
-
-                        var restrictedSent = sentItemsItems.Restrict(filter);
-                        totalFound += restrictedSent.Count;
-
-                        for (var j = 1; j <= restrictedSent.Count; j++) {
-                            try {
-                                var sentItem = restrictedSent.Item(j);
-                                if (sentItem.Class !== 43) continue;
-
-                                var sentEmailData = extractEmailData(sentItem);
-                                var sentIdentifier = getEmailIdentifier(sentEmailData);
-
-                                if (existingEmailsInTracker.has(sentIdentifier)) {
-                                    skippedDuplicate++;
-                                    continue;
-                                }
-
-                                newEmails.push(sentEmailData);
-
-                                if (j % 10 === 0) {
-                                    showLoading(true, "Postausgang: " + j + " von " + restrictedSent.Count + " verarbeitet...");
-                                }
-
-                                if (newEmails.length >= 200) break;
-                            } catch (e) {
-                                continue;
-                            }
+                        // Fortschritt
+                        if (i % 20 === 0) {
+                            showLoading(true, i + " / " + totalFound + " verarbeitet...");
                         }
+
+                        // Limit 150 Emails
+                        if (newEmails.length >= 150) break;
                     } catch (e) {
-                        alert("Fehler beim Durchsuchen des Postausgangs:\n\n" + e.message);
+                        // Skip fehlerhafte Email
                     }
                 }
 
@@ -1170,7 +1148,8 @@
 
                 if (newEmails.length === 0) {
                     showNotification(
-                        'Keine neuen Emails gefunden!\n\n' +
+                        'Keine neuen Emails!\n\n' +
+                        'Ordner: ' + folderName + '\n' +
                         'Gefunden: ' + totalFound + '\n' +
                         'Bereits in Excel: ' + skippedDuplicate,
                         'info',
@@ -1180,20 +1159,20 @@
                     return;
                 }
 
-                // Zeige Statistik
-                var stats = 'Gefunden: ' + totalFound + '\n' +
+                // Statistik
+                var stats = 'Ordner: ' + folderName + '\n' +
+                           'Gefunden: ' + totalFound + '\n' +
                            'Neu: ' + newEmails.length + '\n' +
-                           'Bereits in Excel: ' + skippedDuplicate + '\n\n' +
-                           'Quelle: Posteingang + Postausgang (letzte 7 Tage)';
+                           'Bereits in Excel: ' + skippedDuplicate;
 
                 showNotification(stats, 'success', 'Emails geladen', 5000);
 
-                // Verarbeite neue Emails
+                // Verarbeite Emails
                 processEmails(newEmails);
 
             } catch (e) {
                 showLoading(false);
-                alert("Fehler beim Laden der Emails:\n\n" + e.message + "\n\nStack: " + (e.stack || "N/A"));
+                alert("Fehler:\n\n" + e.message);
             }
         }
 
