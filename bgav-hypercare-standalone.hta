@@ -1423,6 +1423,15 @@
                         msg += "\n\n✅ Antworten aktualisiert: " + updatedReplies;
                     }
 
+                    // WICHTIG: Bringe HTA wieder in den Vordergrund
+                    setTimeout(function() {
+                        try {
+                            window.focus();
+                        } catch (e) {
+                            // Focus fehlgeschlagen, ignorieren
+                        }
+                    }, 100);
+
                     showNotification(
                         msg,
                         updatedReplies > 0 ? 'success' : 'info',
@@ -1432,6 +1441,15 @@
                 }
 
                 processEmails(newEmails);
+
+                // WICHTIG: Bringe HTA wieder in den Vordergrund
+                setTimeout(function() {
+                    try {
+                        window.focus();
+                    } catch (e) {
+                        // Focus fehlgeschlagen, ignorieren
+                    }
+                }, 100);
 
                 var msg = newEmails.length + " NEUE Email(s) geladen!\n\n";
                 msg += "Ordner: " + inbox.Name + "\n";
@@ -2765,6 +2783,30 @@
                         // Wenn bereits eine Antwort existiert, überschreibe sie nur wenn die neue anders ist
                         if (existingReply.toString().trim() === "" || existingReply.toString().trim() !== replyText.trim()) {
                             worksheet.Cells(r, 12).Value = replyText;
+
+                            // WICHTIG: Mache "Antwort 1:", "Antwort 2:" etc. FETT
+                            if (replyText) {
+                                try {
+                                    var cell = worksheet.Cells(r, 12);
+                                    var searchPos = 0;
+                                    var antwortNum = 1;
+
+                                    while (true) {
+                                        var searchText = "Antwort " + antwortNum + ":";
+                                        var pos = replyText.indexOf(searchText, searchPos);
+                                        if (pos === -1) break;
+
+                                        // Mache "Antwort X:" fett (Excel verwendet 1-basierte Indizes!)
+                                        cell.Characters(pos + 1, searchText.length).Font.Bold = true;
+
+                                        searchPos = pos + searchText.length;
+                                        antwortNum++;
+                                    }
+                                } catch (e) {
+                                    // Formatierung fehlgeschlagen, ignorieren
+                                }
+                            }
+
                             debugLog("✓ Antwort aktualisiert für HC-ID: " + hcId);
                             return true;
                         }
@@ -2902,7 +2944,34 @@
                     worksheet.Cells(rowNum, 9).Value = email.cluster;               // Cluster
                     worksheet.Cells(rowNum, 10).Value = email.betreff;              // Betreff
                     worksheet.Cells(rowNum, 11).Value = email.anfrage || "";        // Anfrage (ohne Signatur)
-                    worksheet.Cells(rowNum, 12).Value = email.antwort || "";        // Antwort (aus Postausgang)
+
+                    // Antwort (aus Postausgang) - mit FETTER Nummerierung
+                    var antwortText = email.antwort || "";
+                    worksheet.Cells(rowNum, 12).Value = antwortText;
+
+                    // WICHTIG: Mache "Antwort 1:", "Antwort 2:" etc. FETT
+                    if (antwortText) {
+                        try {
+                            var cell = worksheet.Cells(rowNum, 12);
+                            var searchPos = 0;
+                            var antwortNum = 1;
+
+                            while (true) {
+                                var searchText = "Antwort " + antwortNum + ":";
+                                var pos = antwortText.indexOf(searchText, searchPos);
+                                if (pos === -1) break;
+
+                                // Mache "Antwort X:" fett (Excel verwendet 1-basierte Indizes!)
+                                cell.Characters(pos + 1, searchText.length).Font.Bold = true;
+
+                                searchPos = pos + searchText.length;
+                                antwortNum++;
+                            }
+                        } catch (e) {
+                            // Formatierung fehlgeschlagen, ignorieren
+                        }
+                    }
+
                     worksheet.Cells(rowNum, 13).Value = "";                         // Diagnose
                     worksheet.Cells(rowNum, 14).Value = "";                         // Workaround
                     worksheet.Cells(rowNum, 15).Value = "";                         // Nächste Schritte
@@ -2910,6 +2979,22 @@
                     worksheet.Cells(rowNum, 17).Value = "";                         // JIRA
                     worksheet.Cells(rowNum, 18).Value = "";                         // Kommunikation
                     worksheet.Cells(rowNum, 19).Value = kommentar;                  // Kommentar
+
+                    // WICHTIG: Kopiere Zellenformatierung von Zeile darüber (für einheitliches Aussehen)
+                    if (rowNum > 2) {
+                        try {
+                            var sourceRow = rowNum - 1;
+                            for (var col = 1; col <= 19; col++) {
+                                // Kopiere nur Zahlenformat und Ausrichtung, nicht Werte
+                                worksheet.Cells(rowNum, col).NumberFormat = worksheet.Cells(sourceRow, col).NumberFormat;
+                                worksheet.Cells(rowNum, col).HorizontalAlignment = worksheet.Cells(sourceRow, col).HorizontalAlignment;
+                                worksheet.Cells(rowNum, col).VerticalAlignment = worksheet.Cells(sourceRow, col).VerticalAlignment;
+                                worksheet.Cells(rowNum, col).WrapText = worksheet.Cells(sourceRow, col).WrapText;
+                            }
+                        } catch (e) {
+                            // Formatierung fehlgeschlagen, ignorieren
+                        }
+                    }
                 }
 
                 // EMAILTRACKER: Speichere alle Email-Informationen
@@ -2971,6 +3056,15 @@
                 }
 
                 showLoading(false);
+
+                // WICHTIG: Bringe HTA wieder in den Vordergrund
+                setTimeout(function() {
+                    try {
+                        window.focus();
+                    } catch (e) {
+                        // Focus fehlgeschlagen, ignorieren
+                    }
+                }, 100);
 
                 var msg = selectedEmails.length + " Email(s) erfolgreich exportiert!\n\n";
                 if (found) {
