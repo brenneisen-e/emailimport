@@ -1418,10 +1418,11 @@
                 var senderEmail = getSenderEmail(mailItem);
                 var senderName = mailItem.SenderName || "Unbekannt";
                 var subject = mailItem.Subject || "(Kein Betreff)";
-                // WICHTIG: Body NICHT sofort laden - das ist langsam!
-                // Speichere EntryID um Body später zu laden
-                var entryID = mailItem.EntryID;
                 var receivedTime = mailItem.ReceivedTime;
+
+                // WICHTIG: Lade Body SOFORT für Zuverlässigkeit
+                // EntryID-basiertes Lazy-Loading funktioniert nicht zuverlässig
+                var body = getEmailBody(mailItem);
 
                 var attachments = [];
                 try {
@@ -1437,20 +1438,19 @@
                     von_email: senderEmail,
                     von_name: senderName,
                     betreff: subject,
-                    text: "[Noch nicht geladen]", // Platzhalter - wird später geladen
+                    text: body, // Body wird sofort geladen
                     anhänge: attachments,
-                    entryID: entryID, // Speichere EntryID für späteren Body-Zugriff
-                    bodyLoaded: false // Flag ob Body schon geladen wurde
+                    bodyLoaded: true // Body ist bereits geladen
                 };
             } catch (e) {
+                console.log("❌ FEHLER in extractEmailData: " + e.message + " für Email");
                 return {
                     datum: formatDate(new Date()),
                     von_email: "error@error.com",
                     von_name: "Fehler beim Laden",
                     betreff: "Fehler: " + e.message,
-                    text: "",
+                    text: "[Fehler beim Extrahieren der Email]",
                     anhänge: [],
-                    entryID: null,
                     bodyLoaded: true
                 };
             }
@@ -1493,67 +1493,25 @@
 
         // Lade Bodies für alle ausgewählten Emails (für Export)
         function loadBodiesForSelectedEmails(selectedEmails) {
-            if (!outlookApp) {
-                showNotification("Email-Texte können nicht geladen werden.\nDie Emails werden ohne vollständigen Text exportiert.", 'warning', 'Outlook nicht verfügbar');
-                return; // Outlook nicht verfügbar
-            }
+            // NICHT MEHR NÖTIG: Bodies werden jetzt sofort beim Laden aus Outlook geladen
+            // Diese Funktion bleibt nur für Abwärtskompatibilität
 
-            var toLoad = 0;
-            // Zähle wie viele Bodies geladen werden müssen
+            // Prüfe ob alle Bodies geladen sind
+            var missing = 0;
             for (var i = 0; i < selectedEmails.length; i++) {
-                if (!selectedEmails[i].bodyLoaded) {
-                    toLoad++;
+                if (!selectedEmails[i].bodyLoaded || !selectedEmails[i].text || selectedEmails[i].text === "[Noch nicht geladen]") {
+                    missing++;
+                    // Setze Fallback-Text
+                    selectedEmails[i].text = "[Email-Text war nicht verfügbar]";
+                    selectedEmails[i].bodyLoaded = true;
                 }
             }
 
-            if (toLoad === 0) {
-                return; // Alle Bodies bereits geladen
+            if (missing > 0) {
+                console.log("⚠️ WARNUNG: " + missing + " Email(s) hatten keinen Body-Text");
             }
 
-            // Zeige Loading
-            showLoading(true, "Lade Email-Texte...\n\n0 von " + toLoad + " geladen");
-
-            var loaded = 0;
-            var errors = 0;
-            for (var i = 0; i < selectedEmails.length; i++) {
-                if (!selectedEmails[i].bodyLoaded) {
-                    // Update Progress
-                    document.getElementById('loadingText').innerText =
-                        "Lade Email-Texte...\n\n" + (loaded + 1) + " von " + toLoad + " geladen";
-
-                    // Lade Body
-                    try {
-                        loadEmailBody(selectedEmails[i]);
-                        // Verifiziere dass Body geladen wurde
-                        if (!selectedEmails[i].bodyLoaded || selectedEmails[i].text === "[Noch nicht geladen]") {
-                            selectedEmails[i].text = "[Body konnte nicht geladen werden]";
-                            selectedEmails[i].bodyLoaded = true;
-                            errors++;
-                        }
-                    } catch (e) {
-                        selectedEmails[i].text = "[Fehler: " + e.message + "]";
-                        selectedEmails[i].bodyLoaded = true;
-                        errors++;
-                    }
-                    loaded++;
-                }
-            }
-
-            showLoading(false);
-
-            if (errors > 0) {
-                showNotification(
-                    loaded + " Email-Texte geladen.\n" + errors + " Fehler beim Laden.",
-                    'warning',
-                    'Email-Texte teilweise geladen'
-                );
-            } else {
-                showNotification(
-                    loaded + " Email-Texte erfolgreich geladen!",
-                    'success',
-                    'Email-Texte geladen'
-                );
-            }
+            // Keine Notification mehr nötig, da Bodies bereits beim Laden geladen werden
         }
 
         function getSenderEmail(mailItem) {
