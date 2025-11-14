@@ -1475,8 +1475,15 @@
             }
 
             try {
-                var excel = new ActiveXObject("Excel.Application");
-                excel.Visible = true;
+                // Versuche ZUERST die bereits laufende Excel-Instanz zu verwenden
+                var excel = null;
+                try {
+                    excel = GetObject("", "Excel.Application");
+                } catch (e) {
+                    // Keine laufende Instanz, erstelle neue
+                    excel = new ActiveXObject("Excel.Application");
+                    excel.Visible = true;
+                }
 
                 // Suche nach offener Tracking_Hypercare Datei
                 var workbook = null;
