@@ -2182,9 +2182,9 @@
                 var sentFolder = namespace.GetDefaultFolder(5); // olFolderSentMail = 5
                 var items = sentFolder.Items;
 
-                // Sortiere nach Datum (älteste zuerst)
+                // Sortiere nach Datum (NEUESTE zuerst, damit wir die relevanten finden!)
                 try {
-                    items.Sort("[SentOn]", false);
+                    items.Sort("[SentOn]", true); // true = descending = neueste zuerst
                 } catch (e) {
                     // Sortieren fehlgeschlagen, weitermachen
                 }
@@ -2222,6 +2222,7 @@
                 }
 
                 showLoading(false);
+                console.log("Sent Items Cache geladen: " + sentItemsCache.length + " Emails");
             } catch (e) {
                 showLoading(false);
                 console.log("Fehler beim Laden des Sent Items Cache: " + e.message);
