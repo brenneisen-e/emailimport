@@ -2182,6 +2182,9 @@
                 var sentFolder = namespace.GetDefaultFolder(5); // olFolderSentMail = 5
                 var items = sentFolder.Items;
 
+                console.log("Sent Items Ordner hat " + items.Count + " Emails");
+                console.log("Cutoff-Datum: " + (cutoffDate ? cutoffDate.toISOString() : "KEIN CUTOFF"));
+
                 // Sortiere nach Datum (NEUESTE zuerst, damit wir die relevanten finden!)
                 try {
                     items.Sort("[SentOn]", true); // true = descending = neueste zuerst
@@ -2193,17 +2196,27 @@
 
                 // Lade nur Sent Items ab Cutoff-Datum (max 200)
                 var maxCheck = Math.min(items.Count, 200);
+                var skippedOld = 0;
+                var skippedNoClass = 0;
+
+                console.log("Durchsuche max. " + maxCheck + " Emails...");
 
                 for (var i = 1; i <= maxCheck; i++) {
                     try {
                         var item = items.Item(i);
 
-                        if (item.Class !== 43) continue; // Nur Emails
+                        if (item.Class !== 43) {
+                            skippedNoClass++;
+                            continue; // Nur Emails
+                        }
 
                         var sentDate = new Date(item.SentOn || item.ReceivedTime);
 
                         // Nur Emails ab Cutoff-Datum
-                        if (cutoffDate && sentDate < cutoffDate) continue;
+                        if (cutoffDate && sentDate < cutoffDate) {
+                            skippedOld++;
+                            continue;
+                        }
 
                         var subject = (item.Subject || "").toLowerCase().trim();
                         // Normalisiere Betreff (entferne RE:/AW:/FWD:)
@@ -2216,13 +2229,21 @@
                             sentDate: sentDate,
                             body: getEmailBody(item) // Lade Body direkt
                         });
+
+                        // Log erste paar Einträge
+                        if (sentItemsCache.length <= 3) {
+                            console.log("  Cache-Eintrag #" + sentItemsCache.length + ": " + subject + " (Datum: " + sentDate.toISOString() + ")");
+                        }
                     } catch (e) {
                         // Fehler bei diesem Item, weiter
                     }
                 }
 
                 showLoading(false);
+                console.log("=== CACHE LADEN ABGESCHLOSSEN ===");
                 console.log("Sent Items Cache geladen: " + sentItemsCache.length + " Emails");
+                console.log("Übersprungen (zu alt): " + skippedOld);
+                console.log("Übersprungen (keine Email): " + skippedNoClass);
             } catch (e) {
                 showLoading(false);
                 console.log("Fehler beim Laden des Sent Items Cache: " + e.message);
@@ -2231,8 +2252,13 @@
 
         // Suche ALLE Antworten zu einer Email im Postausgang (nutzt Cache!)
         function findReplyInSentItems(originalEmail) {
+            // DEBUG: Log Cache-Status
+            console.log("=== Reply-Suche für: " + originalEmail.betreff);
+            console.log("Cache Größe: " + (sentItemsCache ? sentItemsCache.length : "NULL"));
+
             // PERFORMANCE: Nutze Cache statt jedes Mal Outlook zu durchsuchen
             if (!sentItemsCache || sentItemsCache.length === 0) {
+                console.log("WARNUNG: Cache ist leer!");
                 return null;
             }
 
@@ -2240,15 +2266,20 @@
                 var originalSubject = originalEmail.betreff.toLowerCase().trim();
                 // Entferne "RE:", "AW:", "FWD:" etc.
                 originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
+                console.log("Normalisierter Betreff: " + originalSubject);
 
                 var originalDate = new Date(originalEmail.datum);
+                console.log("Original Datum: " + originalDate.toISOString());
 
                 // WICHTIG: Sammle ALLE Antworten (nicht nur die erste!)
                 var allReplies = [];
+                var checkedCount = 0;
+                var matchedCount = 0;
 
                 // Durchsuche Cache (viel schneller!)
                 for (var i = 0; i < sentItemsCache.length; i++) {
                     var cachedItem = sentItemsCache[i];
+                    checkedCount++;
 
                     // Antwort muss NACH der Original-Email sein
                     if (cachedItem.sentDate < originalDate) continue;
@@ -2262,21 +2293,32 @@
                         cachedItem.normalizedSubject.indexOf(originalSubject) !== -1 ||
                         originalSubject.indexOf(cachedItem.normalizedSubject) !== -1) {
 
+                        matchedCount++;
+                        console.log("  MATCH gefunden: " + cachedItem.subject + " (Datum: " + cachedItem.sentDate.toISOString() + ")");
+
                         // Gefunden! Extrahiere Antwort-Text
                         var replyText = extractReplyText(cachedItem.body);
 
                         if (replyText && replyText.trim() !== "") {
                             allReplies.push(replyText.trim());
+                            console.log("  -> Reply-Text extrahiert: " + replyText.substring(0, 50) + "...");
+                        } else {
+                            console.log("  -> Reply-Text leer nach Bereinigung");
                         }
                     }
                 }
 
+                console.log("Durchsucht: " + checkedCount + " / Matches: " + matchedCount + " / Replies: " + allReplies.length);
+
                 // WICHTIG: Verbinde alle Antworten mit Trennlinie
                 if (allReplies.length === 0) {
+                    console.log("Keine Antworten gefunden.");
                     return null;
                 } else if (allReplies.length === 1) {
+                    console.log("1 Antwort gefunden!");
                     return allReplies[0];
                 } else {
+                    console.log(allReplies.length + " Antworten gefunden!");
                     return allReplies.join("\n__________________________\n");
                 }
             } catch (e) {
