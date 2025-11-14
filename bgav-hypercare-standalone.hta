@@ -2177,8 +2177,9 @@
                 var items = sentFolder.Items;
 
                 // Sortiere nach Datum (älteste zuerst für chronologische Reihenfolge)
+                // WICHTIG: Im Sent Items Ordner verwenden wir SentOn, nicht ReceivedTime!
                 try {
-                    items.Sort("[ReceivedTime]", false);
+                    items.Sort("[SentOn]", false);
                 } catch (e) {
                     // Sortieren fehlgeschlagen, weitermachen
                 }
@@ -2192,8 +2193,9 @@
                 // WICHTIG: Sammle ALLE Antworten (nicht nur die erste!)
                 var allReplies = [];
 
-                // Durchsuche max. 50 gesendete Emails (mehr als vorher, da wir alle Antworten wollen)
-                var maxCheck = Math.min(items.Count, 50);
+                // Durchsuche max. 200 gesendete Emails (deutlich erhöht für bessere Abdeckung)
+                var maxCheck = Math.min(items.Count, 200);
+                var tooOldCount = 0; // Zähle aufeinanderfolgende zu alte Emails
 
                 for (var i = 1; i <= maxCheck; i++) {
                     try {
@@ -2208,7 +2210,13 @@
 
                         // Antwort sollte max. 30 Tage nach Original sein
                         var daysDiff = (sentDate - originalDate) / (1000 * 60 * 60 * 24);
-                        if (daysDiff > 30) break; // Zu alt
+                        if (daysDiff > 30) {
+                            tooOldCount++;
+                            // Breche nur ab wenn 10 aufeinanderfolgende Emails zu alt sind
+                            if (tooOldCount > 10) break;
+                            continue;
+                        }
+                        tooOldCount = 0; // Reset counter
 
                         var sentSubject = (item.Subject || "").toLowerCase().trim();
                         sentSubject = sentSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
