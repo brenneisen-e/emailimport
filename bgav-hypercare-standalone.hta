@@ -242,6 +242,15 @@
             color: #212529;
         }
 
+        .btn-info {
+            background: #17a2b8;
+            color: #ffffff;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
         .btn-sm {
             padding: 0.5rem 1rem;
             font-size: 0.875rem;
@@ -704,6 +713,9 @@
                 </button>
                 <button class="btn btn-secondary" onclick="showFolderSelectModal()">
                     📂 Ordner wählen
+                </button>
+                <button class="btn btn-info" onclick="loadFromJSON()">
+                    📄 JSON aus Downloads laden
                 </button>
                 <label style="display: inline-flex; align-items: center; gap: 0.5rem; margin-left: 1rem; font-size: 0.875rem;">
                     <input type="checkbox" id="searchRepliesCheck" style="cursor: pointer;">
@@ -1322,6 +1334,115 @@
             } catch (e) {
                 showLoading(false);
                 alert("Fehler beim Laden der Emails:\n\n" + e.message);
+            }
+        }
+
+        // Lade Emails aus JSON-Datei (aus Downloads-Ordner)
+        function loadFromJSON() {
+            try {
+                showLoading(true, "Suche JSON-Dateien im Downloads-Ordner...");
+
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var shell = new ActiveXObject("WScript.Shell");
+
+                // Downloads-Pfad
+                var downloadsPath = shell.SpecialFolders("MyDocuments").replace("Documents", "Downloads");
+
+                if (!fso.FolderExists(downloadsPath)) {
+                    // Fallback: Verwende USERPROFILE\Downloads
+                    downloadsPath = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+                }
+
+                if (!fso.FolderExists(downloadsPath)) {
+                    alert("Downloads-Ordner nicht gefunden!\n\nPfad: " + downloadsPath);
+                    showLoading(false);
+                    return;
+                }
+
+                // Suche neueste outlook_emails_*.json Datei
+                var folder = fso.GetFolder(downloadsPath);
+                var files = folder.Files;
+                var jsonFiles = [];
+
+                var enumerator = new Enumerator(files);
+                for (; !enumerator.atEnd(); enumerator.moveNext()) {
+                    var file = enumerator.item();
+                    var fileName = file.Name.toLowerCase();
+
+                    if (fileName.indexOf("outlook_emails_") === 0 && fileName.indexOf(".json") !== -1) {
+                        jsonFiles.push({
+                            name: file.Name,
+                            path: file.Path,
+                            date: file.DateLastModified
+                        });
+                    }
+                }
+
+                if (jsonFiles.length === 0) {
+                    alert("Keine JSON-Dateien gefunden!\n\nBitte führe zuerst das Excel-Makro 'ExportOutlookToJSON' aus.\n\nErwartetes Format: outlook_emails_*.json");
+                    showLoading(false);
+                    return;
+                }
+
+                // Sortiere nach Datum (neueste zuerst)
+                jsonFiles.sort(function(a, b) {
+                    return b.date - a.date;
+                });
+
+                var newestFile = jsonFiles[0];
+
+                showLoading(true, "Lade JSON-Datei:\n" + newestFile.name);
+
+                // Lade JSON-Datei
+                var file = fso.OpenTextFile(newestFile.path, 1, false, -1); // -1 = Unicode
+                var jsonContent = file.ReadAll();
+                file.Close();
+
+                // Parse JSON
+                var emailsData = JSON.parse(jsonContent);
+
+                if (!emailsData || emailsData.length === 0) {
+                    alert("JSON-Datei ist leer!");
+                    showLoading(false);
+                    return;
+                }
+
+                // Konvertiere zu Email-Objekten
+                var newEmails = [];
+                for (var i = 0; i < emailsData.length; i++) {
+                    var data = emailsData[i];
+
+                    // Konvertiere zu unserem Email-Format
+                    newEmails.push({
+                        datum: data.datum || formatDate(new Date()),
+                        von_email: data.von_email || "unknown@unknown.com",
+                        von_name: data.von_name || "Unbekannt",
+                        betreff: data.betreff || "(Kein Betreff)",
+                        text: data.text || "",
+                        anfrage: "",  // Wird beim Export gefüllt
+                        antwort: "",  // Wird beim Export gefüllt
+                        anhänge: data.anhänge ? (typeof data.anhänge === 'string' ? [data.anhänge] : data.anhänge) : [],
+                        kategorie: data.kategorie || "Incident",
+                        status: data.status || "Offen",
+                        cluster: data.cluster || "Allgemein",
+                        agentur: data.agentur || "Unbekannt",
+                        selected: false,
+                        bodyLoaded: true
+                    });
+                }
+
+                processEmails(newEmails);
+                showLoading(false);
+
+                showNotification(
+                    newEmails.length + " Emails aus JSON geladen:\n" + newestFile.name,
+                    'success',
+                    'JSON Import'
+                );
+
+            } catch (e) {
+                showLoading(false);
+                alert("Fehler beim Laden der JSON:\n\n" + e.message + "\n\nStelle sicher, dass die JSON-Datei vom Excel-Makro erstellt wurde.");
             }
         }
 
