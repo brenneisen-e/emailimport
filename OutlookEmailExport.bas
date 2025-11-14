@@ -104,13 +104,21 @@ Public Sub ExportOutlookToJSON()
         Exit Sub
     End If
 
-    ' Speichere JSON in Downloads
+    ' Speichere JSON im Downloads-Ordner
     Application.StatusBar = "Speichere JSON..."
 
     Set fso = CreateObject("Scripting.FileSystemObject")
 
-    ' Downloads-Pfad
-    jsonPath = Environ("USERPROFILE") & "\Downloads\outlook_emails_" & _
+    ' Downloads-Pfad (fest)
+    Dim downloadsPath As String
+    downloadsPath = Environ("USERPROFILE") & "\Downloads"
+
+    ' Falls Downloads nicht existiert, verwende Desktop
+    If Not fso.FolderExists(downloadsPath) Then
+        downloadsPath = Environ("USERPROFILE") & "\Desktop"
+    End If
+
+    jsonPath = downloadsPath & "\outlook_emails_" & _
                Format(Now, "yyyymmdd_hhnnss") & ".json"
 
     ' Schreibe Datei
@@ -120,10 +128,17 @@ Public Sub ExportOutlookToJSON()
 
     Application.StatusBar = False
 
+    ' Öffne Downloads-Ordner
+    On Error Resume Next
+    CreateObject("Shell.Application").Explore downloadsPath
+    On Error GoTo ErrorHandler
+
     ' Erfolgsmeldung
     MsgBox "✓ Export erfolgreich!" & vbCrLf & vbCrLf & _
            "Emails exportiert: " & emailCount & vbCrLf & _
-           "Datei: " & jsonPath & vbCrLf & vbCrLf & _
+           "Ordner: " & downloadsPath & vbCrLf & _
+           "Datei: " & fso.GetFileName(jsonPath) & vbCrLf & vbCrLf & _
+           "Der Downloads-Ordner wurde geöffnet." & vbCrLf & vbCrLf & _
            "Jetzt kannst du im HTA Tool auf 'JSON aus Downloads laden' klicken.", _
            vbInformation, "Outlook JSON Export"
 

@@ -1337,49 +1337,60 @@
             }
         }
 
-        // Lade Emails aus JSON-Datei (aus Downloads-Ordner)
+        // Lade Emails aus JSON-Datei (aus Downloads, Desktop, Dokumente)
         function loadFromJSON() {
             try {
-                showLoading(true, "Suche JSON-Dateien im Downloads-Ordner...");
+                showLoading(true, "Suche JSON-Dateien...");
 
                 var fso = new ActiveXObject("Scripting.FileSystemObject");
                 var shell = new ActiveXObject("WScript.Shell");
 
-                // Downloads-Pfad
-                var downloadsPath = shell.SpecialFolders("MyDocuments").replace("Documents", "Downloads");
+                // Suche in mehreren Ordnern
+                var searchPaths = [
+                    shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads",
+                    shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Desktop",
+                    shell.SpecialFolders("MyDocuments")
+                ];
 
-                if (!fso.FolderExists(downloadsPath)) {
-                    // Fallback: Verwende USERPROFILE\Downloads
-                    downloadsPath = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
-                }
-
-                if (!fso.FolderExists(downloadsPath)) {
-                    alert("Downloads-Ordner nicht gefunden!\n\nPfad: " + downloadsPath);
-                    showLoading(false);
-                    return;
-                }
-
-                // Suche neueste outlook_emails_*.json Datei
-                var folder = fso.GetFolder(downloadsPath);
-                var files = folder.Files;
                 var jsonFiles = [];
 
-                var enumerator = new Enumerator(files);
-                for (; !enumerator.atEnd(); enumerator.moveNext()) {
-                    var file = enumerator.item();
-                    var fileName = file.Name.toLowerCase();
+                // Durchsuche alle Pfade
+                for (var p = 0; p < searchPaths.length; p++) {
+                    var searchPath = searchPaths[p];
 
-                    if (fileName.indexOf("outlook_emails_") === 0 && fileName.indexOf(".json") !== -1) {
-                        jsonFiles.push({
-                            name: file.Name,
-                            path: file.Path,
-                            date: file.DateLastModified
-                        });
+                    if (!fso.FolderExists(searchPath)) continue;
+
+                    try {
+                        var folder = fso.GetFolder(searchPath);
+                        var files = folder.Files;
+
+                        var enumerator = new Enumerator(files);
+                        for (; !enumerator.atEnd(); enumerator.moveNext()) {
+                            var file = enumerator.item();
+                            var fileName = file.Name.toLowerCase();
+
+                            if (fileName.indexOf("outlook_emails_") === 0 && fileName.indexOf(".json") !== -1) {
+                                jsonFiles.push({
+                                    name: file.Name,
+                                    path: file.Path,
+                                    date: file.DateLastModified,
+                                    folder: searchPath
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        // Ordner-Zugriff fehlgeschlagen, weiter
                     }
                 }
 
                 if (jsonFiles.length === 0) {
-                    alert("Keine JSON-Dateien gefunden!\n\nBitte führe zuerst das Excel-Makro 'ExportOutlookToJSON' aus.\n\nErwartetes Format: outlook_emails_*.json");
+                    alert("Keine JSON-Dateien gefunden!\n\n" +
+                          "Durchsuchte Ordner:\n" +
+                          "- Downloads\n" +
+                          "- Desktop\n" +
+                          "- Dokumente\n\n" +
+                          "Bitte führe zuerst das Excel-Makro 'ExportOutlookToJSON' aus.\n\n" +
+                          "Die JSON-Datei sollte im Ordner sein, den du im Speichern-Dialog gewählt hast.");
                     showLoading(false);
                     return;
                 }
