@@ -1137,33 +1137,45 @@
             }
         }
 
-        // Rekursive Hilfsfunktion: Sammelt Emails aus Ordner und allen Unterordnern
+        // SCHNELLE Hilfsfunktion: Nutzt Outlook's eingebaute Suche (Restrict)
         function collectEmailsFromFolderRecursive(folder, cutoffDate, emailArray) {
             if (!folder) return;
 
             try {
-                // Durchsuche Emails in diesem Ordner
+                // Formatiere Datum für Outlook Filter (MM/DD/YYYY HH:MM)
+                var month = cutoffDate.getMonth() + 1;
+                var day = cutoffDate.getDate();
+                var year = cutoffDate.getFullYear();
+                var filterDate = month + "/" + day + "/" + year + " 00:00";
+
+                // Outlook Filter: Nur Emails ab cutoffDate
+                // Viel schneller als alle Items durchzugehen!
+                var filter = "[ReceivedTime] >= '" + filterDate + "'";
+
                 var items = folder.Items;
 
-                for (var i = 1; i <= items.Count; i++) {
+                // WICHTIG: Restrict filtert Items - VIEL schneller!
+                var filteredItems = items.Restrict(filter);
+
+                console.log("Ordner: " + folder.Name + " - Gefilterte Items: " + filteredItems.Count);
+
+                // Durchlaufe nur gefilterte Items (viel weniger!)
+                for (var i = 1; i <= filteredItems.Count; i++) {
                     try {
-                        var item = items.Item(i);
+                        var item = filteredItems.Item(i);
 
                         // Nur Emails
                         if (item.Class === 43) { // olMail
                             var receivedTime = new Date(item.ReceivedTime);
 
-                            // Nur letzte 7 Tage
-                            if (receivedTime >= cutoffDate) {
-                                // Prüfe Duplikat
-                                var senderEmail = getSenderEmail(item);
-                                var emailKey = senderEmail + "|" +
-                                             (item.Subject || "") + "|" +
-                                             formatDate(receivedTime);
+                            // Prüfe Duplikat
+                            var senderEmail = getSenderEmail(item);
+                            var emailKey = senderEmail + "|" +
+                                         (item.Subject || "") + "|" +
+                                         formatDate(receivedTime);
 
-                                if (!existingEmailKeys.has(emailKey)) {
-                                    emailArray.push(extractEmailData(item));
-                                }
+                            if (!existingEmailKeys.has(emailKey)) {
+                                emailArray.push(extractEmailData(item));
                             }
                         }
                     } catch (e) {
