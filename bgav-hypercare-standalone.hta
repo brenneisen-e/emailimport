@@ -860,16 +860,21 @@
                 var sevenDaysAgo = new Date();
                 sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-                document.getElementById('loadingText').innerText = "Hole alle Emails aus Posteingang...";
+                document.getElementById('loadingText').innerText = "Sortiere Emails nach Datum...";
                 var items = inbox.Items;
+
+                // KRITISCH: Items nach ReceivedTime sortieren (Descending = neueste zuerst)
+                // Das macht die Suche VIEL schneller!
+                try {
+                    items.Sort("[ReceivedTime]", true); // true = descending
+                } catch (e) {
+                    // Falls Sortieren fehlschlägt, weitermachen ohne Sortierung
+                }
 
                 var newEmails = [];
                 var count = 0;
                 var errors = 0;
                 var skippedOld = 0;
-
-                // KEIN Filter.Restrict verwenden (kann hängen!)
-                // Stattdessen: Alle Items durchgehen und manuell filtern
                 var totalItems = items.Count;
 
                 if (totalItems > 1000) {
@@ -882,36 +887,37 @@
                     }
                 }
 
-                document.getElementById('loadingText').innerText = "Verarbeite " + totalItems + " Items...";
+                document.getElementById('loadingText').innerText = "Durchsuche Items...";
 
-                // Gehe durch alle Items (von neu nach alt)
-                for (var i = totalItems; i >= 1; i--) {
+                // Gehe durch Items VON NEU NACH ALT (1 -> Count)
+                // Weil Items jetzt sortiert sind (neueste zuerst)
+                for (var i = 1; i <= totalItems; i++) {
                     try {
                         // Update Fortschritt alle 5 Items
-                        if ((totalItems - i + 1) % 5 === 0 || newEmails.length % 5 === 0) {
-                            document.getElementById('loadingText').innerText = "⏳ " + (totalItems - i + 1) + " / " + totalItems + " durchsucht... ✅ " + newEmails.length + " Emails gefunden";
+                        if (i % 5 === 0 || newEmails.length % 5 === 0) {
+                            document.getElementById('loadingText').innerText = "⏳ " + i + " / " + totalItems + " durchsucht... ✅ " + newEmails.length + " Emails gefunden";
                         }
 
                         var item = items.Item(i);
 
-                        // Prüfe ob es eine Email ist
+                        // Prüfe ob es eine Email ist (schnell!)
                         if (item.Class !== 43) {
-                            continue; // Keine Email, überspringen
+                            continue;
                         }
 
-                        // Prüfe Datum
+                        // Prüfe NUR das Datum (schnell!)
                         var receivedTime = new Date(item.ReceivedTime);
                         if (receivedTime < sevenDaysAgo) {
                             skippedOld++;
-                            // Wenn wir schon genug alte Mails gefunden haben, breche ab
-                            // (Emails sind chronologisch sortiert)
-                            if (skippedOld > 50 && newEmails.length > 0) {
-                                break; // Wir sind zu weit in der Vergangenheit
+                            // WICHTIG: Weil sortiert, sind alle folgenden Items auch zu alt!
+                            // Breche sofort ab nach 10 alten Items
+                            if (skippedOld >= 10) {
+                                break; // Alle weiteren sind auch zu alt!
                             }
-                            continue; // Zu alt, überspringen
+                            continue;
                         }
 
-                        // Email verarbeiten (OHNE Body zu laden!)
+                        // NUR wenn Datum passt: Lade Metadaten (OHNE Body!)
                         var emailData = extractEmailData(item);
                         if (emailData) {
                             newEmails.push(emailData);
