@@ -809,26 +809,20 @@
                 var sevenDaysAgo = new Date();
                 sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-                // Filter für Emails der letzten 7 Tage
-                var filterDate = formatDateForFilter(sevenDaysAgo);
-                var filter = "[ReceivedTime] >= '" + filterDate + "'";
-
+                document.getElementById('loadingText').innerText = "Hole alle Emails aus Ordner...";
                 var items = currentFolder.Items;
-                items.Sort("[ReceivedTime]", true); // Neueste zuerst
 
-                document.getElementById('loadingText').innerText = "Wende Filter an (kann bei vielen Emails dauern)...";
-                var filteredItems = items.Restrict(filter);
+                var newEmails = [];
+                var count = 0;
+                var errors = 0;
+                var skippedOld = 0;
 
-                if (filteredItems.Count === 0) {
-                    alert("Keine Emails der letzten 7 Tage in '" + currentFolder.Name + "' gefunden!\n\n" +
-                          "Postfach: " + currentFolder.Store.DisplayName);
-                    showLoading(false);
-                    return;
-                }
+                // KEIN Filter.Restrict verwenden (kann hängen!)
+                // Stattdessen: Alle Items durchgehen und manuell filtern
+                var totalItems = items.Count;
 
-                // Sicherheitsabfrage bei vielen Emails
-                if (filteredItems.Count > 500) {
-                    var confirmLoad = confirm(filteredItems.Count + " Emails gefunden!\n\n" +
+                if (totalItems > 1000) {
+                    var confirmLoad = confirm("Der Ordner enthält " + totalItems + " Items.\n\n" +
                         "Das Laden kann einige Minuten dauern.\n\n" +
                         "Fortfahren?");
                     if (!confirmLoad) {
@@ -837,22 +831,42 @@
                     }
                 }
 
-                var newEmails = [];
-                var count = 0;
-                var errors = 0;
+                document.getElementById('loadingText').innerText = "Verarbeite " + totalItems + " Items...";
 
-                for (var i = 1; i <= filteredItems.Count; i++) {
+                // Gehe durch alle Items (von neu nach alt)
+                for (var i = totalItems; i >= 1; i--) {
                     try {
-                        document.getElementById('loadingText').innerText = "Verarbeite Email " + i + " von " + filteredItems.Count + "...";
-
-                        var mailItem = filteredItems.Item(i);
-                        if (mailItem.Class === 43) { // olMail
-                            var emailData = extractEmailData(mailItem);
-                            if (emailData) {
-                                newEmails.push(emailData);
-                                count++;
-                            }
+                        if ((totalItems - i + 1) % 10 === 0) {
+                            document.getElementById('loadingText').innerText = "Verarbeite Item " + (totalItems - i + 1) + " von " + totalItems + "... (" + newEmails.length + " Emails gefunden)";
                         }
+
+                        var item = items.Item(i);
+
+                        // Prüfe ob es eine Email ist
+                        if (item.Class !== 43) {
+                            continue; // Keine Email, überspringen
+                        }
+
+                        // Prüfe Datum
+                        var receivedTime = new Date(item.ReceivedTime);
+                        if (receivedTime < sevenDaysAgo) {
+                            skippedOld++;
+                            continue; // Zu alt, überspringen
+                        }
+
+                        // Email verarbeiten
+                        var emailData = extractEmailData(item);
+                        if (emailData) {
+                            newEmails.push(emailData);
+                            count++;
+                        }
+
+                        // Nach 500 Emails aufhören (Performance)
+                        if (newEmails.length >= 500) {
+                            alert("⚠️ Limit erreicht: 500 Emails geladen.\n\nWeitere Emails im Ordner werden übersprungen.");
+                            break;
+                        }
+
                     } catch (e) {
                         errors++;
                         // Fehlerhafte Email überspringen, nicht abbrechen
@@ -863,7 +877,8 @@
 
                 if (newEmails.length === 0) {
                     alert("Keine Email-Nachrichten gefunden!\n\n" +
-                          "Gefilterte Items: " + filteredItems.Count + "\n" +
+                          "Gesamte Items im Ordner: " + totalItems + "\n" +
+                          "Zu alte Emails (>7 Tage): " + skippedOld + "\n" +
                           "Fehler beim Laden: " + errors);
                     return;
                 }
@@ -872,9 +887,12 @@
 
                 var msg = "✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!\n\n";
                 msg += "Ordner: " + currentFolder.Name + "\n";
-                msg += "Postfach: " + currentFolder.Store.DisplayName;
+                msg += "Postfach: " + currentFolder.Store.DisplayName + "\n\n";
+                msg += "Statistik:\n";
+                msg += "- Items durchsucht: " + totalItems + "\n";
+                msg += "- Zu alt (übersprungen): " + skippedOld;
                 if (errors > 0) {
-                    msg += "\n\n⚠ " + errors + " Email(s) konnten nicht geladen werden (übersprungen)";
+                    msg += "\n- Fehler: " + errors;
                 }
                 alert(msg);
 
@@ -1522,22 +1540,11 @@
             }
 
             try {
-                // Versuche ZUERST die bereits laufende Excel-Instanz zu verwenden
-                var excel = null;
-                var excelConnected = false;
-                var debugInfo = "";
+                // Verwende ActiveXObject - GetObject funktioniert nicht zuverlässig in HTA
+                var excel = new ActiveXObject("Excel.Application");
+                excel.Visible = true;
 
-                try {
-                    excel = GetObject("", "Excel.Application");
-                    excelConnected = true;
-                    debugInfo += "✓ Verbunden mit laufender Excel-Instanz\n\n";
-                } catch (e) {
-                    debugInfo += "⚠ Keine laufende Excel-Instanz gefunden: " + e.message + "\n";
-                    debugInfo += "Erstelle neue Excel-Instanz...\n\n";
-                    // Keine laufende Instanz, erstelle neue
-                    excel = new ActiveXObject("Excel.Application");
-                    excel.Visible = true;
-                }
+                var debugInfo = "Excel-Instanz erstellt/verbunden\n\n";
 
                 // Suche nach offener Tracking_Hypercare Datei
                 var workbook = null;
@@ -1601,20 +1608,48 @@
                 }
 
                 if (!found) {
-                    var response = confirm(debugInfo + "\n\n" +
+                    // Versuche die Datei zu öffnen
+                    var filePath = prompt(debugInfo + "\n\n" +
                         "Die Datei 'Tracking_Hypercare.xlsx' ist nicht geöffnet!\n\n" +
-                        "Bitte öffne die Datei in Excel und versuche es erneut.\n\n" +
-                        "Möchtest du stattdessen eine NEUE Excel-Datei erstellen?\n" +
-                        "(Du musst sie dann manuell in Tracking_Hypercare.xlsx kopieren)");
+                        "Optionen:\n" +
+                        "1. Gib den LOKALEN Dateipfad ein (z.B. C:\\Users\\...\\Tracking_Hypercare.xlsm)\n" +
+                        "2. Klicke Abbrechen um eine NEUE Datei zu erstellen\n\n" +
+                        "HINWEIS: SharePoint-Links funktionieren nicht direkt.\n" +
+                        "Öffne die Datei in Excel und kopiere den Pfad aus der Titelleiste.\n\n" +
+                        "Dateipfad eingeben:",
+                        "");
 
-                    if (!response) {
-                        return;
+                    if (filePath && filePath.trim() !== "") {
+                        // Versuche Datei zu öffnen
+                        try {
+                            workbook = excel.Workbooks.Open(filePath.trim());
+                            try {
+                                worksheet = workbook.Worksheets("Hypercare");
+                                found = true;
+                            } catch (e) {
+                                worksheet = workbook.Worksheets(1);
+                                found = true;
+                            }
+                        } catch (e) {
+                            alert("Fehler beim Öffnen der Datei:\n\n" + e.message + "\n\n" +
+                                  "Bitte stelle sicher dass:\n" +
+                                  "1. Der Pfad korrekt ist\n" +
+                                  "2. Du die Datei nicht bereits in Excel geöffnet hast\n" +
+                                  "3. Du Schreibrechte auf die Datei hast\n\n" +
+                                  "Erstelle stattdessen eine neue Datei...");
+                            found = false;
+                        }
                     }
 
-                    // Neue Datei erstellen
-                    workbook = excel.Workbooks.Add();
-                    worksheet = workbook.Worksheets(1);
-                    worksheet.Name = "Hypercare";
+                    if (!found) {
+                        // Neue Datei erstellen
+                        workbook = excel.Workbooks.Add();
+                        worksheet = workbook.Worksheets(1);
+                        worksheet.Name = "Hypercare";
+                    }
+                }
+
+                if (!found) {
 
                     // Header erstellen
                     var headers = ['ID', 'Datum', 'Kanal', 'Agentur', 'Kategorie', 'Status',
