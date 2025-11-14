@@ -1056,25 +1056,72 @@
         // OUTLOOK INTEGRATION
         // ============================================================================
 
-        // HAUPT-FUNKTION: Lädt BEIDE Ordner automatisch
+        // HAUPT-FUNKTION: Zeige Postfach-Auswahl
         function loadEmails() {
             if (!outlookApp) {
                 initializeOutlook();
                 if (!outlookApp) return;
             }
 
-            loadFromBothFolders();
+            showMailboxPicker();
         }
 
-        // ULTRA-SCHNELL: Durchsucht Posteingang UND Postausgang
-        function loadFromBothFolders() {
+        // Zeigt Dialog zur Postfach-Auswahl (Store-Auswahl)
+        function showMailboxPicker() {
+            try {
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var stores = namespace.Stores;
+
+                if (stores.Count === 0) {
+                    alert("Keine Postfächer gefunden!");
+                    return;
+                }
+
+                // Erstelle Auswahl-Liste
+                var msg = "Wähle ein Postfach:\n\n";
+                var storeList = [];
+
+                for (var i = 1; i <= stores.Count; i++) {
+                    try {
+                        var store = stores.Item(i);
+                        storeList.push(store);
+                        msg += i + ") " + store.DisplayName + "\n";
+                    } catch (e) {
+                        // Skip fehlerhafte Stores
+                    }
+                }
+
+                // Zeige Auswahl
+                var choice = prompt(msg + "\nGib die Nummer ein (1-" + storeList.length + "):", "1");
+
+                if (choice === null) return; // Abgebrochen
+
+                var choiceNum = parseInt(choice);
+                if (isNaN(choiceNum) || choiceNum < 1 || choiceNum > storeList.length) {
+                    alert("Ungültige Auswahl!");
+                    return;
+                }
+
+                // Lade von ausgewähltem Store
+                var selectedStore = storeList[choiceNum - 1];
+                loadFromStore(selectedStore);
+
+            } catch (e) {
+                alert("Fehler beim Laden der Postfächer:\n\n" + e.message);
+            }
+        }
+
+        // ULTRA-SCHNELL: Durchsucht Posteingang UND Postausgang vom ausgewählten Store
+        function loadFromStore(store) {
             try {
                 showLoading(true, "Lade Emailtracker...");
                 loadExistingEmailsFromTracker();
 
-                var namespace = outlookApp.GetNamespace("MAPI");
-                var inbox = namespace.GetDefaultFolder(6);
-                var sentItems = namespace.GetDefaultFolder(5);
+                showLoading(true, "Durchsuche " + store.DisplayName + "...");
+
+                // Hole Posteingang und Postausgang vom Store
+                var inbox = store.GetDefaultFolder(6);
+                var sentItems = store.GetDefaultFolder(5);
 
                 // Datum: Letzte 7 Tage
                 var sevenDaysAgo = new Date();
@@ -1210,7 +1257,8 @@
                 showLoading(false);
 
                 // Statistik
-                var stats = 'Ordner: Posteingang + Postausgang\n' +
+                var stats = 'Postfach: ' + store.DisplayName + '\n' +
+                           'Ordner: Posteingang + Postausgang\n' +
                            'Verarbeitet: ' + totalProcessed + '\n' +
                            'Neu: ' + allNewEmails.length + '\n' +
                            'Bereits in Excel: ' + skippedDuplicate;
