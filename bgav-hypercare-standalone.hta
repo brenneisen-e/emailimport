@@ -1187,7 +1187,7 @@
                 var skippedDuplicate = 0;
 
                 // PERFORMANCE: Lade Sent Items Cache EINMAL für schnelle Reply-Suche
-                loadSentItemsCache(sevenDaysAgo);
+                loadSentItemsCache(sentItems, sevenDaysAgo);
 
                 // Durchsuche beide Ordner
                 var folders = [
@@ -2213,18 +2213,19 @@
         }
 
         // PERFORMANCE: Lade Sent Items nur EINMAL und cache sie
-        function loadSentItemsCache(cutoffDate) {
-            if (!outlookApp) {
+        function loadSentItemsCache(sentItemsFolder, cutoffDate) {
+            if (!outlookApp || !sentItemsFolder) {
+                debugLog("FEHLER: outlookApp oder sentItemsFolder fehlt!");
                 return;
             }
 
             try {
                 showLoading(true, "Lade Sent Items für schnelle Antwort-Suche...");
 
-                var namespace = outlookApp.GetNamespace("MAPI");
-                var sentFolder = namespace.GetDefaultFolder(5); // olFolderSentMail = 5
-                var items = sentFolder.Items;
+                var items = sentItemsFolder.Items;
 
+                debugLog("=== CACHE LADEN GESTARTET ===");
+                debugLog("Sent Items Ordner: " + sentItemsFolder.Name);
                 debugLog("Sent Items Ordner hat " + items.Count + " Emails");
                 debugLog("Cutoff-Datum: " + (cutoffDate ? cutoffDate.toISOString() : "KEIN CUTOFF"));
 
