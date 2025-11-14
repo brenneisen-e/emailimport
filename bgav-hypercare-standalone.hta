@@ -1575,32 +1575,44 @@
                         wbFullName = wbName;
                     }
 
-                    // Prüfe ob Dateiname "tracking_hypercare" oder "tracking hypercare" enthält
-                    // Prüfe sowohl Name als auch FullName
-                    if (wbName.indexOf('tracking_hypercare') !== -1 ||
-                        wbName.indexOf('tracking hypercare') !== -1 ||
-                        wbName.indexOf('tracking-hypercare') !== -1 ||
-                        wbFullName.indexOf('tracking_hypercare') !== -1 ||
-                        wbFullName.indexOf('tracking hypercare') !== -1 ||
-                        wbFullName.indexOf('tracking-hypercare') !== -1) {
+                    // SEHR FLEXIBLE SUCHE: Alles was "hypercare" enthält
+                    // Ignoriere alle Sonderzeichen, Unterstriche, Bindestriche, etc.
+                    var nameSimplified = wbName.replace(/[_\-\s]/g, '');
+                    var fullNameSimplified = wbFullName.replace(/[_\-\s]/g, '');
 
+                    debugInfo += "\n  → Prüfe: " + wbName + "\n     Vereinfacht: " + nameSimplified + "\n";
+
+                    if (nameSimplified.indexOf('hypercare') !== -1 ||
+                        fullNameSimplified.indexOf('hypercare') !== -1) {
+
+                        debugInfo += "     ✓ MATCH gefunden! Versuche Worksheet 'Hypercare' zu öffnen...\n";
                         workbook = wb;
 
                         // Suche Worksheet "Hypercare"
                         try {
                             worksheet = workbook.Worksheets("Hypercare");
                             found = true;
-                            debugInfo += "\n✓ GEFUNDEN: " + wb.Name + "\n✓ Worksheet 'Hypercare' existiert!";
+                            debugInfo += "     ✓✓ PERFEKT! Worksheet 'Hypercare' gefunden!\n";
                             break;
                         } catch (e) {
-                            debugInfo += "\n⚠ Datei gefunden, aber Worksheet 'Hypercare' fehlt!\n";
+                            debugInfo += "     ⚠ Worksheet 'Hypercare' existiert nicht. Fehler: " + e.message + "\n";
+                            debugInfo += "     Verfügbare Worksheets:\n";
+                            try {
+                                for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
+                                    debugInfo += "       - " + workbook.Worksheets(ws).Name + "\n";
+                                }
+                            } catch (e3) {
+                                debugInfo += "       (kann Worksheets nicht auflisten)\n";
+                            }
+
                             // Worksheet nicht gefunden, versuche erstes Worksheet
                             try {
                                 worksheet = workbook.Worksheets(1);
                                 found = true;
-                                debugInfo += "⚠ Verwende stattdessen erstes Worksheet: " + worksheet.Name;
+                                debugInfo += "     → Verwende stattdessen erstes Worksheet: '" + worksheet.Name + "'\n";
                                 break;
                             } catch (e2) {
+                                debugInfo += "     ✗ Kann kein Worksheet öffnen: " + e2.message + "\n";
                                 // Nächstes Workbook versuchen
                             }
                         }
@@ -1610,14 +1622,21 @@
                 if (!found) {
                     // WICHTIG: Öffne Tracking_Hypercare.xlsm vorher in Excel!
                     // SharePoint-Links funktionieren nicht mit Workbooks.Open()
-                    alert(debugInfo + "\n\n" +
-                          "⚠️ WICHTIG: Tracking_Hypercare.xlsm wurde nicht gefunden!\n\n" +
-                          "LÖSUNG:\n" +
-                          "1. Öffne die Datei in Excel (über deinen SharePoint-Link)\n" +
-                          "2. Lass Excel geöffnet\n" +
-                          "3. Klicke in der HTA-App erneut auf 'Nach Excel exportieren'\n\n" +
-                          "Die App erstellt jetzt eine NEUE Datei.\n" +
-                          "Du musst die Daten dann manuell in Tracking_Hypercare.xlsm kopieren.");
+                    var errorMsg = "⚠️⚠️⚠️ TRACKING_HYPERCARE NICHT GEFUNDEN! ⚠️⚠️⚠️\n\n";
+                    errorMsg += debugInfo;
+                    errorMsg += "\n\n═══════════════════════════════════\n";
+                    errorMsg += "LÖSUNG:\n";
+                    errorMsg += "═══════════════════════════════════\n";
+                    errorMsg += "1. Öffne die Datei in Excel:\n";
+                    errorMsg += "   https://barmeniagroup.sharepoint.com/.../Tracking_Hypercare.xlsm\n\n";
+                    errorMsg += "2. Stelle sicher dass Excel im Vordergrund ist\n\n";
+                    errorMsg += "3. Klicke in der HTA-App erneut auf\n";
+                    errorMsg += "   'Nach Excel exportieren'\n\n";
+                    errorMsg += "═══════════════════════════════════\n\n";
+                    errorMsg += "Die App erstellt jetzt eine NEUE Datei als Fallback.\n";
+                    errorMsg += "Du musst die Daten dann manuell kopieren!";
+
+                    alert(errorMsg);
 
                     // Neue Datei erstellen
                     workbook = excel.Workbooks.Add();
