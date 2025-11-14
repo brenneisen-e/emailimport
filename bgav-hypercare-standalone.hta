@@ -631,11 +631,6 @@
             border-left-color: #17a2b8;
         }
 
-        .notification-icon {
-            font-size: 1.25rem;
-            line-height: 1;
-        }
-
         .notification-content {
             flex: 1;
         }
@@ -698,7 +693,6 @@
         <!-- HEADER -->
         <div class="header">
             <div class="header-title">
-                <div class="logo">📧</div>
                 <div>
                     <h1>BGAV Hypercare Email Review</h1>
                     <div style="font-size: 0.875rem; opacity: 0.9;">Barmenia • Gothaer • Standalone Edition</div>
@@ -706,10 +700,10 @@
             </div>
             <div class="header-actions">
                 <button class="btn btn-primary btn-lg" onclick="loadEmails()">
-                    📧 Emails laden
+                    Emails laden
                 </button>
                 <button class="btn btn-success btn-lg" onclick="exportToExcel()" id="exportBtn" disabled>
-                    💾 Excel Export
+                    Excel Export
                 </button>
             </div>
         </div>
@@ -764,10 +758,10 @@
             </div>
 
             <div class="filter-group">
-                <button class="btn btn-secondary btn-sm" onclick="selectAll()">✓ Alle auswählen</button>
-                <button class="btn btn-secondary btn-sm" onclick="deselectAll()">✗ Alle abwählen</button>
+                <button class="btn btn-secondary btn-sm" onclick="selectAll()">Alle auswählen</button>
+                <button class="btn btn-secondary btn-sm" onclick="deselectAll()">Alle abwählen</button>
                 <button class="btn btn-warning btn-sm" onclick="showBatchEditModal()">
-                    ✏️ Mehrere bearbeiten
+                    Mehrere bearbeiten
                 </button>
             </div>
         </div>
@@ -775,14 +769,12 @@
         <!-- EMAIL LIST -->
         <div id="emailList" class="email-list">
             <div class="empty-state">
-                <div class="empty-icon">📭</div>
                 <div class="empty-title">Keine Emails geladen</div>
                 <div class="empty-description">
-                    Wähle in Outlook Emails aus und klicke auf "Ausgewählte Emails laden"<br>
-                    oder lade einen ganzen Outlook-Ordner.
+                    Klicke oben auf "Emails laden" um mit der Outlook-Suche "empfangen:diese woche" Emails zu laden.
                 </div>
-                <button class="btn btn-primary btn-lg mt-md" onclick="loadFromOutlookSelection()">
-                    📥 Emails aus Outlook laden
+                <button class="btn btn-primary btn-lg mt-md" onclick="loadEmails()">
+                    Emails laden
                 </button>
             </div>
         </div>
@@ -1064,47 +1056,91 @@
         // OUTLOOK INTEGRATION
         // ============================================================================
 
-        // NEUE HAUPT-FUNKTION: Lädt Emails aus Posteingang + Postausgang
+        // HAUPT-FUNKTION: Lädt Emails mit Outlook-Suche "empfangen:diese woche"
+        // Findet automatisch Emails aus Posteingang UND Postausgang!
         function loadEmails() {
-            loadLastWeekFromInbox();
-        }
-
-        function loadLastWeekFromInbox() {
             if (!outlookApp) {
                 initializeOutlook();
                 if (!outlookApp) return;
             }
 
             try {
-                // Zeige Postfach-Auswahl Modal
-                openModal('mailboxModal');
+                showLoading(true, "Lade Emailtracker für Duplikat-Erkennung...");
+                loadExistingEmailsFromTracker();
 
-                // Lade alle verfügbaren Postfächer
-                var mailboxSelect = document.getElementById('mailboxSelect');
-                mailboxSelect.innerHTML = '';
+                showLoading(true, "Suche Emails mit 'empfangen:diese woche'...");
 
                 var namespace = outlookApp.GetNamespace("MAPI");
-                var stores = namespace.Stores;
+                var inbox = namespace.GetDefaultFolder(6); // olFolderInbox
 
-                for (var i = 1; i <= stores.Count; i++) {
+                // Outlook-Suche: "empfangen:diese woche" findet Posteingang + Postausgang!
+                var searchResults = inbox.Search("empfangen:diese woche");
+
+                var newEmails = [];
+                var skippedDuplicate = 0;
+                var totalItems = searchResults.Count;
+
+                showLoading(true, "Verarbeite " + totalItems + " gefundene Emails...");
+
+                for (var i = 1; i <= totalItems; i++) {
                     try {
-                        var store = stores.Item(i);
-                        var option = document.createElement('option');
-                        option.value = i;
-                        option.text = store.DisplayName;
-                        mailboxSelect.appendChild(option);
+                        var item = searchResults.Item(i);
+
+                        // Nur Email-Objekte (Class 43 = olMail)
+                        if (item.Class !== 43) continue;
+
+                        var emailData = extractEmailData(item);
+
+                        // Duplikat-Check gegen Tracker
+                        var identifier = getEmailIdentifier(emailData);
+                        if (existingEmailsInTracker.has(identifier)) {
+                            skippedDuplicate++;
+                            continue;
+                        }
+
+                        newEmails.push(emailData);
+
+                        // Fortschritt anzeigen
+                        if (i % 10 === 0) {
+                            showLoading(true, "Verarbeite Email " + i + " von " + totalItems + "...");
+                        }
+
+                        // Limit 200 Emails
+                        if (newEmails.length >= 200) break;
+
                     } catch (e) {
-                        // Manche Stores können nicht geladen werden - ignorieren
+                        // Einzelne fehlerhafte Email überspringen
+                        continue;
                     }
                 }
 
-                if (mailboxSelect.options.length === 0) {
-                    mailboxSelect.innerHTML = '<option value="">Keine Postfächer gefunden</option>';
-                    alert('Keine Postfächer gefunden!');
+                showLoading(false);
+
+                if (newEmails.length === 0) {
+                    showNotification(
+                        'Keine neuen Emails gefunden!\n\n' +
+                        'Gefunden: ' + totalItems + '\n' +
+                        'Bereits in Excel: ' + skippedDuplicate,
+                        'info',
+                        'Keine neuen Emails',
+                        5000
+                    );
+                    return;
                 }
 
+                // Zeige Statistik
+                var stats = 'Gefunden: ' + totalItems + '\n' +
+                           'Neu: ' + newEmails.length + '\n' +
+                           'Bereits in Excel: ' + skippedDuplicate;
+
+                showNotification(stats, 'success', 'Emails geladen', 5000);
+
+                // Verarbeite neue Emails
+                processEmails(newEmails);
+
             } catch (e) {
-                alert("Fehler beim Laden der Postfächer:\n\n" + e.message);
+                showLoading(false);
+                alert("Fehler beim Laden der Emails:\n\n" + e.message + "\n\nStack: " + (e.stack || "N/A"));
             }
         }
 
@@ -1656,6 +1692,12 @@
                 // WICHTIG: Lade Body SOFORT für Zuverlässigkeit
                 var body = getEmailBody(mailItem);
 
+                // WICHTIG: Begrenze Text-Länge um Stack-Fehler zu vermeiden
+                // Excel-Zellen haben max. 32.767 Zeichen, wir limitieren auf 30.000
+                if (body && body.length > 30000) {
+                    body = body.substring(0, 30000) + "\n\n... (Text gekürzt)";
+                }
+
                 var attachments = [];
                 try {
                     for (var i = 1; i <= mailItem.Attachments.Count; i++) {
@@ -1671,7 +1713,7 @@
                     von_email: senderEmail,
                     von_name: senderName,
                     betreff: subject,
-                    text: body, // Vollständiger Body (mit Signatur)
+                    text: body, // Vollständiger Body (mit Signatur) - max 30.000 Zeichen
                     anfrage: "", // Wird beim Export befüllt (Body ohne Signatur)
                     antwort: "", // Wird beim Export befüllt (aus Postausgang)
                     anhänge: attachments,
@@ -1730,11 +1772,9 @@
 
         // Bereite Emails für Export vor (Signatur entfernen, Antworten laden)
         function prepareEmailsForExport(selectedEmails) {
-            // Prüfe ob Antwort-Suche aktiviert ist
-            var searchReplies = document.getElementById('searchRepliesCheck').checked;
-
-            if (!outlookApp || !searchReplies) {
-                // Ohne Outlook oder wenn deaktiviert: nur Signatur entfernen
+            // IMMER Signatur entfernen, IMMER Antworten suchen (wenn Outlook verfügbar)
+            if (!outlookApp) {
+                // Ohne Outlook: nur Signatur entfernen
                 for (var i = 0; i < selectedEmails.length; i++) {
                     selectedEmails[i].anfrage = removeSignature(selectedEmails[i].text);
                     selectedEmails[i].antwort = "";
@@ -1755,13 +1795,21 @@
 
                 var email = selectedEmails[i];
 
-                // Entferne Signatur für "Anfrage"
+                // Entferne Signatur für "Anfrage" und begrenze Länge
                 email.anfrage = removeSignature(email.text);
+                if (email.anfrage && email.anfrage.length > 30000) {
+                    email.anfrage = email.anfrage.substring(0, 30000) + "\n\n... (Text gekürzt)";
+                }
 
                 // Suche Antwort im Postausgang (nur wenn aktiviert)
                 try {
                     var reply = findReplyInSentItems(email);
                     email.antwort = reply || "";
+
+                    // Begrenze auch Antwort-Länge
+                    if (email.antwort && email.antwort.length > 30000) {
+                        email.antwort = email.antwort.substring(0, 30000) + "\n\n... (Text gekürzt)";
+                    }
 
                     if (reply) {
                         console.log("✓ Antwort gefunden für: " + email.betreff.substring(0, 30) + "...");
@@ -2157,10 +2205,10 @@
             html += '<div class="email-checkbox"><input type="checkbox" ' + (email.selected ? 'checked' : '') + ' onchange="toggleEmail(' + email.id + ')"></div>';
             html += '<div class="email-meta">';
             html += '<div class="email-subject">' + escapeHtml(email.betreff) + '</div>';
-            html += '<div class="email-from"><span>📧</span><strong>' + escapeHtml(email.von_name) + '</strong><span style="color: #6c757d;">&lt;' + escapeHtml(email.von_email) + '&gt;</span></div>';
-            html += '<div class="email-date">📅 ' + dateStr;
+            html += '<div class="email-from"><strong>' + escapeHtml(email.von_name) + '</strong><span style="color: #6c757d;"> &lt;' + escapeHtml(email.von_email) + '&gt;</span></div>';
+            html += '<div class="email-date">' + dateStr;
             if (email.anhänge.length > 0) {
-                html += '<span style="margin-left: 1rem;">📎 ' + email.anhänge.length + ' Anhang(e)</span>';
+                html += '<span style="margin-left: 1rem;">' + email.anhänge.length + ' Anhang(e)</span>';
             }
             html += '</div></div></div>';
 
@@ -2653,13 +2701,6 @@
             type = type || 'info'; // success, error, warning, info
             // duration wird nicht mehr verwendet - Notifications bleiben permanent
 
-            var icons = {
-                success: '✅',
-                error: '❌',
-                warning: '⚠️',
-                info: 'ℹ️'
-            };
-
             var titles = {
                 success: title || 'Erfolg',
                 error: title || 'Fehler',
@@ -2672,7 +2713,6 @@
             notification.className = 'notification ' + type;
 
             notification.innerHTML =
-                '<div class="notification-icon">' + icons[type] + '</div>' +
                 '<div class="notification-content">' +
                     '<div class="notification-title">' + titles[type] + '</div>' +
                     '<div class="notification-message">' + message + '</div>' +
