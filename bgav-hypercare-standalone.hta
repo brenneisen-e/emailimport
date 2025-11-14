@@ -577,11 +577,14 @@
                 </div>
             </div>
             <div class="header-actions">
-                <button class="btn btn-warning" onclick="loadFromOutlookSelection()">
-                    📥 Ausgewählte Emails laden
+                <button class="btn btn-primary" onclick="loadLastWeekFromInbox()">
+                    📆 Letzte Woche laden
                 </button>
-                <button class="btn btn-primary" onclick="showFolderSelectModal()">
-                    📂 Ordner laden
+                <button class="btn btn-warning" onclick="loadFromOutlookSelection()">
+                    📥 Ausgewählte Emails
+                </button>
+                <button class="btn btn-secondary" onclick="showFolderSelectModal()">
+                    📂 Ordner wählen
                 </button>
                 <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
                     💾 Nach Excel exportieren
@@ -773,6 +776,77 @@
         // ============================================================================
         // OUTLOOK INTEGRATION
         // ============================================================================
+        function loadLastWeekFromInbox() {
+            if (!outlookApp) {
+                initializeOutlook();
+                if (!outlookApp) return;
+            }
+
+            try {
+                showLoading(true, "Lade Emails der letzten Woche aus Posteingang...");
+
+                var namespace = outlookApp.GetNamespace("MAPI");
+
+                // Posteingang holen (standardmäßig erstes Postfach)
+                var inbox = namespace.GetDefaultFolder(6); // olFolderInbox = 6
+
+                // Datum: 7 Tage zurück
+                var sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                // Filter für Emails der letzten 7 Tage
+                var filterDate = formatDateForFilter(sevenDaysAgo);
+                var filter = "[ReceivedTime] >= '" + filterDate + "'";
+
+                var items = inbox.Items;
+                items.Sort("[ReceivedTime]", true); // Neueste zuerst
+                var filteredItems = items.Restrict(filter);
+
+                if (filteredItems.Count === 0) {
+                    alert("Keine Emails der letzten 7 Tage im Posteingang gefunden!");
+                    showLoading(false);
+                    return;
+                }
+
+                var newEmails = [];
+                var count = 0;
+                for (var i = 1; i <= filteredItems.Count; i++) {
+                    var mailItem = filteredItems.Item(i);
+                    if (mailItem.Class === 43) { // olMail
+                        newEmails.push(extractEmailData(mailItem));
+                        count++;
+
+                        if (count % 10 === 0) {
+                            document.getElementById('loadingText').innerText = "Lade Email " + count + " von " + filteredItems.Count + "...";
+                        }
+                    }
+                }
+
+                if (newEmails.length === 0) {
+                    alert("Keine Email-Nachrichten gefunden!");
+                    showLoading(false);
+                    return;
+                }
+
+                processEmails(newEmails);
+                showLoading(false);
+
+                alert("✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!");
+
+            } catch (e) {
+                showLoading(false);
+                alert("Fehler beim Laden der Emails:\n\n" + e.message + "\n\nBitte stelle sicher dass Outlook geöffnet ist.");
+            }
+        }
+
+        function formatDateForFilter(date) {
+            // Format für Outlook-Filter: "MM/DD/YYYY HH:MM AM/PM"
+            var month = date.getMonth() + 1;
+            var day = date.getDate();
+            var year = date.getFullYear();
+            return month + "/" + day + "/" + year + " 12:00 AM";
+        }
+
         function loadFromOutlookSelection() {
             if (!outlookApp) {
                 initializeOutlook();
