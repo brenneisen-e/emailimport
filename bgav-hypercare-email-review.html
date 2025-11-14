@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BGAV Hypercare - Email Review Tool</title>
+    <style>
+        /* ============================================================================
+           VARIABLES & RESET
+           ============================================================================ */
+        :root {
+            --primary: #366092;
+            --primary-dark: #2a4a70;
+            --primary-light: #4a7bb8;
+            --secondary: #00a3e0;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-light: #ffffff;
+
+            --border: #dee2e6;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --shadow-lg: rgba(0, 0, 0, 0.15);
+
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+
+            --radius-sm: 0.25rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 1rem;
+
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: var(--spacing-lg);
+        }
+
+        /* ============================================================================
+           CONTAINER & LAYOUT
+           ============================================================================ */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 20px 60px var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        /* ============================================================================
+           HEADER
+           ============================================================================ */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--text-light);
+            padding: var(--spacing-xl);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--spacing-md);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .header-title h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: var(--text-light);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: var(--spacing-md);
+            flex-wrap: wrap;
+        }
+
+        /* ============================================================================
+           STATS BAR
+           ============================================================================ */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            padding: var(--spacing-xl);
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .stat-card {
+            background: var(--bg-primary);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-md);
+            box-shadow: 0 2px 8px var(--shadow);
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow-lg);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: block;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: var(--spacing-xs);
+        }
+
+        /* ============================================================================
+           TOOLBAR
+           ============================================================================ */
+        .toolbar {
+            padding: var(--spacing-lg) var(--spacing-xl);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: var(--spacing-md);
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) 2.5rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: var(--spacing-md);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        .filter-group {
+            display: flex;
+            gap: var(--spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        /* ============================================================================
+           BUTTONS
+           ============================================================================ */
+        .btn {
+            padding: var(--spacing-md) var(--spacing-lg);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow-lg);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--text-light);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: var(--text-light);
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: var(--text-primary);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: var(--text-light);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-size: 0.875rem;
+        }
+
+        .btn-lg {
+            padding: var(--spacing-lg) var(--spacing-xl);
+            font-size: 1.125rem;
+        }
+
+        /* ============================================================================
+           EMAIL LIST
+           ============================================================================ */
+        .email-list {
+            padding: var(--spacing-xl);
+            display: grid;
+            gap: var(--spacing-lg);
+        }
+
+        .email-card {
+            background: var(--bg-primary);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: var(--transition);
+            display: grid;
+            gap: var(--spacing-md);
+        }
+
+        .email-card:hover {
+            border-color: var(--primary-light);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .email-card.selected {
+            border-color: var(--primary);
+            background: rgba(54, 96, 146, 0.05);
+        }
+
+        .email-header {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--spacing-md);
+        }
+
+        .email-checkbox {
+            margin-top: var(--spacing-xs);
+        }
+
+        .email-checkbox input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .email-meta {
+            flex: 1;
+        }
+
+        .email-subject {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .email-from {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .email-date {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .email-body-preview {
+            background: var(--bg-secondary);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            max-height: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .email-body-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, var(--bg-secondary));
+        }
+
+        /* ============================================================================
+           EDIT FIELDS
+           ============================================================================ */
+        .edit-fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .field-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .field-label input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .field-input {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
+        }
+
+        .field-input:disabled {
+            background: var(--bg-tertiary);
+            cursor: not-allowed;
+        }
+
+        select.field-input {
+            cursor: pointer;
+        }
+
+        /* ============================================================================
+           BADGES
+           ============================================================================ */
+        .badge {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-incident {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+
+        .badge-rueckfrage {
+            background: rgba(0, 163, 224, 0.1);
+            color: var(--secondary);
+        }
+
+        .badge-shuk {
+            background: rgba(255, 193, 7, 0.2);
+            color: #856404;
+        }
+
+        .badge-lv {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--success);
+        }
+
+        .badge-kv {
+            background: rgba(23, 162, 184, 0.1);
+            color: var(--info);
+        }
+
+        .badge-provision {
+            background: rgba(111, 66, 193, 0.1);
+            color: #6f42c1;
+        }
+
+        /* ============================================================================
+           MODAL
+           ============================================================================ */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-lg);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px var(--shadow-lg);
+        }
+
+        .modal-header {
+            padding: var(--spacing-lg);
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: var(--spacing-lg);
+        }
+
+        .modal-footer {
+            padding: var(--spacing-lg);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: var(--spacing-md);
+            justify-content: flex-end;
+        }
+
+        /* ============================================================================
+           UPLOAD ZONE
+           ============================================================================ */
+        .upload-zone {
+            border: 3px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            text-align: center;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+            border-color: var(--primary);
+            background: rgba(54, 96, 146, 0.05);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .upload-text {
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .upload-text strong {
+            color: var(--primary);
+        }
+
+        /* ============================================================================
+           EMPTY STATE
+           ============================================================================ */
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-xl) * 2;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: var(--spacing-lg);
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .empty-description {
+            max-width: 500px;
+            margin: 0 auto var(--spacing-xl);
+        }
+
+        /* ============================================================================
+           LOADING
+           ============================================================================ */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: var(--spacing-xl);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid var(--bg-tertiary);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto var(--spacing-md);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ============================================================================
+           RESPONSIVE
+           ============================================================================ */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .header-title h1 {
+                font-size: 1.5rem;
+            }
+
+            .stats-bar {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+            .edit-fields {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ============================================================================
+           UTILITIES
+           ============================================================================ */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-md {
+            margin-top: var(--spacing-md);
+        }
+
+        .mb-md {
+            margin-bottom: var(--spacing-md);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-title">
+                <div class="logo">📧</div>
+                <div>
+                    <h1>BGAV Hypercare Email Review</h1>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Barmenia • Gothaer</div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-warning" onclick="showUploadModal()">
+                    📤 Emails laden
+                </button>
+                <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
+                    💾 Nach Excel exportieren
+                </button>
+            </div>
+        </div>
+
+        <!-- STATS BAR -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <span class="stat-value" id="totalCount">0</span>
+                <span class="stat-label">Emails geladen</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="selectedCount">0</span>
+                <span class="stat-label">Ausgewählt</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="incidentCount">0</span>
+                <span class="stat-label">Incidents</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="rueckfrageCount">0</span>
+                <span class="stat-label">Rückfragen</span>
+            </div>
+        </div>
+
+        <!-- TOOLBAR -->
+        <div class="toolbar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Suche in Betreff oder Text..."
+                       oninput="filterEmails()">
+            </div>
+
+            <div class="filter-group">
+                <select class="field-input" id="filterKategorie" onchange="filterEmails()">
+                    <option value="">Alle Kategorien</option>
+                    <option value="Incident">Incident</option>
+                    <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                </select>
+
+                <select class="field-input" id="filterCluster" onchange="filterEmails()">
+                    <option value="">Alle Cluster</option>
+                    <option value="SHUK">SHUK</option>
+                    <option value="LV">LV</option>
+                    <option value="KV">KV</option>
+                    <option value="Provisionierung">Provisionierung</option>
+                    <option value="Produktzuordnung">Produktzuordnung</option>
+                    <option value="Allgemein">Allgemein</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <button class="btn btn-secondary btn-sm" onclick="selectAll()">✓ Alle auswählen</button>
+                <button class="btn btn-secondary btn-sm" onclick="deselectAll()">✗ Alle abwählen</button>
+                <button class="btn btn-warning btn-sm" onclick="showBatchEditModal()">
+                    ✏️ Mehrere bearbeiten
+                </button>
+            </div>
+        </div>
+
+        <!-- EMAIL LIST -->
+        <div id="emailList" class="email-list">
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <div class="empty-title">Keine Emails geladen</div>
+                <div class="empty-description">
+                    Klicke auf "Emails laden" um zu beginnen. Du kannst Emails als JSON-Datei
+                    hochladen oder aus Outlook exportieren.
+                </div>
+                <button class="btn btn-primary btn-lg mt-md" onclick="showUploadModal()">
+                    📤 Emails laden
+                </button>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Lade Emails...</div>
+        </div>
+    </div>
+
+    <!-- UPLOAD MODAL -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Emails laden</h2>
+                <button class="modal-close" onclick="closeModal('uploadModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">
+                        <strong>Klicke hier</strong> oder ziehe eine JSON-Datei hierher
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                        Unterstützte Formate: .json
+                    </div>
+                </div>
+                <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="handleFileUpload(event)">
+
+                <div style="margin-top: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 1px solid var(--border);">
+                    <h3 style="margin-bottom: var(--spacing-md);">📝 Beispiel JSON-Format:</h3>
+                    <pre style="background: var(--bg-secondary); padding: var(--spacing-md); border-radius: var(--radius-sm); overflow-x: auto; font-size: 0.875rem;">
+[
+  {
+    "datum": "2025-11-14T10:30:00",
+    "von_email": "max.mueller@agentur.de",
+    "von_name": "Max Müller",
+    "betreff": "Frage zur SHUK Provision",
+    "text": "Email Text hier...",
+    "anhänge": ["dokument.pdf"]
+  }
+]</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BATCH EDIT MODAL -->
+    <div class="modal" id="batchEditModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Mehrere Emails bearbeiten</h2>
+                <button class="modal-close" onclick="closeModal('batchEditModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: var(--spacing-lg);">
+                    Änderungen werden auf <strong><span id="batchCount">0</span> ausgewählte Emails</strong> angewendet.
+                </p>
+
+                <div class="field-group mb-md">
+                    <label class="field-label">
+                        <input type="checkbox" id="batchKategorieCheck"> Kategorie ändern
+                    </label>
+                    <select class="field-input" id="batchKategorie" disabled>
+                        <option value="Incident">Incident</option>
+                        <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                    </select>
+                </div>
+
+                <div class="field-group mb-md">
+                    <label class="field-label">
+                        <input type="checkbox" id="batchClusterCheck"> Cluster ändern
+                    </label>
+                    <select class="field-input" id="batchCluster" disabled>
+                        <option value="SHUK">SHUK</option>
+                        <option value="LV">LV</option>
+                        <option value="KV">KV</option>
+                        <option value="Provisionierung">Provisionierung</option>
+                        <option value="Produktzuordnung">Produktzuordnung</option>
+                        <option value="Allgemein">Allgemein</option>
+                    </select>
+                </div>
+
+                <div class="field-group mb-md">
+                    <label class="field-label">
+                        <input type="checkbox" id="batchStatusCheck"> Status ändern
+                    </label>
+                    <select class="field-input" id="batchStatus" disabled>
+                        <option value="Neu">Neu</option>
+                        <option value="In Bearbeitung">In Bearbeitung</option>
+                        <option value="Gelöst">Gelöst</option>
+                        <option value="Geschlossen">Geschlossen</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('batchEditModal')">Abbrechen</button>
+                <button class="btn btn-primary" onclick="applyBatchEdit()">Änderungen übernehmen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // ============================================================================
+        // GLOBAL STATE
+        // ============================================================================
+        let emails = [];
+        let filteredEmails = [];
+        let nextId = 1;
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            setupDragAndDrop();
+            setupBatchEditCheckboxes();
+        });
+
+        // ============================================================================
+        // FILE UPLOAD
+        // ============================================================================
+        function setupDragAndDrop() {
+            const uploadZone = document.getElementById('uploadZone');
+
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('drag-over');
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('drag-over');
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('drag-over');
+                const file = e.dataTransfer.files[0];
+                if (file && file.name.endsWith('.json')) {
+                    loadJSONFile(file);
+                } else {
+                    alert('Bitte nur JSON-Dateien hochladen!');
+                }
+            });
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                loadJSONFile(file);
+            }
+        }
+
+        function loadJSONFile(file) {
+            showLoading(true);
+            closeModal('uploadModal');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    processEmails(data);
+                    showLoading(false);
+                } catch (error) {
+                    alert('Fehler beim Laden der JSON-Datei: ' + error.message);
+                    showLoading(false);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function processEmails(data) {
+            emails = data.map((email, index) => ({
+                id: nextId++,
+                selected: true,
+                datum: email.datum || new Date().toISOString(),
+                von_email: email.von_email || '',
+                von_name: email.von_name || 'Unbekannt',
+                betreff: email.betreff || '',
+                text: email.text || '',
+                anhänge: email.anhänge || [],
+
+                // Automatisch befüllt
+                kategorie: categorizeEmail(email.betreff, email.text),
+                agentur: extractAgentur(email.von_name, email.betreff),
+                cluster: identifyCluster(email.betreff, email.text),
+                status: 'Neu',
+
+                // Editierbar
+                editKategorie: false,
+                editAgentur: false,
+                editCluster: false,
+                editStatus: false
+            }));
+
+            filteredEmails = [...emails];
+            renderEmails();
+            updateStats();
+            document.getElementById('exportBtn').disabled = false;
+        }
+
+        // ============================================================================
+        // INTELLIGENT EXTRACTION
+        // ============================================================================
+        function categorizeEmail(subject, body) {
+            const text = (subject + ' ' + body).toLowerCase();
+
+            const incidentKeywords = ['fehler', 'problem', 'funktioniert nicht', 'falsch',
+                'bug', 'störung', 'ausfall', 'dringend', 'kritisch', 'keine zahlung',
+                'fehlerhaft', 'nicht erhalten', 'verspätet'];
+
+            for (let keyword of incidentKeywords) {
+                if (text.includes(keyword)) {
+                    return 'Incident';
+                }
+            }
+
+            return 'Fachliche Rückfrage';
+        }
+
+        function extractAgentur(name, subject) {
+            if (name && name !== 'Unbekannt') {
+                return name;
+            }
+
+            if (subject.includes('Agentur')) {
+                const parts = subject.split('-');
+                if (parts.length > 0) {
+                    return parts[0].trim();
+                }
+            }
+
+            return 'Unbekannt';
+        }
+
+        function identifyCluster(subject, body) {
+            const text = (subject + ' ' + body).toLowerCase();
+
+            if (text.includes('shuk') || text.includes('sachversicherung') || text.includes('hausrat')) {
+                return 'SHUK';
+            }
+            if (text.includes('lebensversicherung') || text.includes(' lv ')) {
+                return 'LV';
+            }
+            if (text.includes('krankenversicherung') || text.includes(' kv ')) {
+                return 'KV';
+            }
+            if (text.includes('provision') || text.includes('vergütung') || text.includes('zahlung')) {
+                return 'Provisionierung';
+            }
+            if (text.includes('produkt') || text.includes('herkunft') || text.includes('zuordnung')) {
+                return 'Produktzuordnung';
+            }
+
+            return 'Allgemein';
+        }
+
+        // ============================================================================
+        // RENDERING
+        // ============================================================================
+        function renderEmails() {
+            const listContainer = document.getElementById('emailList');
+
+            if (filteredEmails.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔍</div>
+                        <div class="empty-title">Keine Emails gefunden</div>
+                        <div class="empty-description">
+                            Versuche die Filtereinstellungen zu ändern.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            listContainer.innerHTML = filteredEmails.map(email => `
+                <div class="email-card ${email.selected ? 'selected' : ''}" id="email-${email.id}">
+                    <div class="email-header">
+                        <div class="email-checkbox">
+                            <input type="checkbox" ${email.selected ? 'checked' : ''}
+                                   onchange="toggleEmail(${email.id})">
+                        </div>
+                        <div class="email-meta">
+                            <div class="email-subject">${email.betreff}</div>
+                            <div class="email-from">
+                                <span>📧</span>
+                                <strong>${email.von_name}</strong>
+                                <span style="color: var(--text-secondary);">&lt;${email.von_email}&gt;</span>
+                            </div>
+                            <div class="email-date">
+                                📅 ${new Date(email.datum).toLocaleString('de-DE')}
+                                ${email.anhänge.length > 0 ? `<span style="margin-left: 1rem;">📎 ${email.anhänge.length} Anhang(e)</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="email-body-preview">
+                        ${email.text.substring(0, 300)}${email.text.length > 300 ? '...' : ''}
+                    </div>
+
+                    <div class="edit-fields">
+                        <div class="field-group">
+                            <label class="field-label">
+                                <input type="checkbox" onchange="toggleEdit(${email.id}, 'kategorie')"
+                                       ${email.editKategorie ? 'checked' : ''}>
+                                Kategorie
+                            </label>
+                            ${email.editKategorie ? `
+                                <select class="field-input" onchange="updateField(${email.id}, 'kategorie', this.value)">
+                                    <option value="Incident" ${email.kategorie === 'Incident' ? 'selected' : ''}>Incident</option>
+                                    <option value="Fachliche Rückfrage" ${email.kategorie === 'Fachliche Rückfrage' ? 'selected' : ''}>Fachliche Rückfrage</option>
+                                </select>
+                            ` : `
+                                <div class="badge ${email.kategorie === 'Incident' ? 'badge-incident' : 'badge-rueckfrage'}">
+                                    ${email.kategorie}
+                                </div>
+                            `}
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">
+                                <input type="checkbox" onchange="toggleEdit(${email.id}, 'agentur')"
+                                       ${email.editAgentur ? 'checked' : ''}>
+                                Agentur
+                            </label>
+                            <input type="text" class="field-input" value="${email.agentur}"
+                                   ${!email.editAgentur ? 'disabled' : ''}
+                                   onchange="updateField(${email.id}, 'agentur', this.value)">
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">
+                                <input type="checkbox" onchange="toggleEdit(${email.id}, 'cluster')"
+                                       ${email.editCluster ? 'checked' : ''}>
+                                Cluster
+                            </label>
+                            ${email.editCluster ? `
+                                <select class="field-input" onchange="updateField(${email.id}, 'cluster', this.value)">
+                                    <option value="SHUK" ${email.cluster === 'SHUK' ? 'selected' : ''}>SHUK</option>
+                                    <option value="LV" ${email.cluster === 'LV' ? 'selected' : ''}>LV</option>
+                                    <option value="KV" ${email.cluster === 'KV' ? 'selected' : ''}>KV</option>
+                                    <option value="Provisionierung" ${email.cluster === 'Provisionierung' ? 'selected' : ''}>Provisionierung</option>
+                                    <option value="Produktzuordnung" ${email.cluster === 'Produktzuordnung' ? 'selected' : ''}>Produktzuordnung</option>
+                                    <option value="Allgemein" ${email.cluster === 'Allgemein' ? 'selected' : ''}>Allgemein</option>
+                                </select>
+                            ` : `
+                                <div class="badge badge-${email.cluster.toLowerCase()}">
+                                    ${email.cluster}
+                                </div>
+                            `}
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">
+                                <input type="checkbox" onchange="toggleEdit(${email.id}, 'status')"
+                                       ${email.editStatus ? 'checked' : ''}>
+                                Status
+                            </label>
+                            ${email.editStatus ? `
+                                <select class="field-input" onchange="updateField(${email.id}, 'status', this.value)">
+                                    <option value="Neu" ${email.status === 'Neu' ? 'selected' : ''}>Neu</option>
+                                    <option value="In Bearbeitung" ${email.status === 'In Bearbeitung' ? 'selected' : ''}>In Bearbeitung</option>
+                                    <option value="Gelöst" ${email.status === 'Gelöst' ? 'selected' : ''}>Gelöst</option>
+                                    <option value="Geschlossen" ${email.status === 'Geschlossen' ? 'selected' : ''}>Geschlossen</option>
+                                </select>
+                            ` : `
+                                <div class="field-input" style="background: var(--bg-tertiary);">
+                                    ${email.status}
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ============================================================================
+        // EMAIL INTERACTIONS
+        // ============================================================================
+        function toggleEmail(id) {
+            const email = emails.find(e => e.id === id);
+            if (email) {
+                email.selected = !email.selected;
+                updateStats();
+                renderEmails();
+            }
+        }
+
+        function toggleEdit(id, field) {
+            const email = emails.find(e => e.id === id);
+            if (email) {
+                email[`edit${field.charAt(0).toUpperCase() + field.slice(1)}`] =
+                    !email[`edit${field.charAt(0).toUpperCase() + field.slice(1)}`];
+                renderEmails();
+            }
+        }
+
+        function updateField(id, field, value) {
+            const email = emails.find(e => e.id === id);
+            if (email) {
+                email[field] = value;
+                updateStats();
+            }
+        }
+
+        function selectAll() {
+            filteredEmails.forEach(email => email.selected = true);
+            updateStats();
+            renderEmails();
+        }
+
+        function deselectAll() {
+            filteredEmails.forEach(email => email.selected = false);
+            updateStats();
+            renderEmails();
+        }
+
+        // ============================================================================
+        // FILTERING
+        // ============================================================================
+        function filterEmails() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const kategorieFilter = document.getElementById('filterKategorie').value;
+            const clusterFilter = document.getElementById('filterCluster').value;
+
+            filteredEmails = emails.filter(email => {
+                const matchesSearch = !searchTerm ||
+                    email.betreff.toLowerCase().includes(searchTerm) ||
+                    email.text.toLowerCase().includes(searchTerm) ||
+                    email.von_name.toLowerCase().includes(searchTerm);
+
+                const matchesKategorie = !kategorieFilter || email.kategorie === kategorieFilter;
+                const matchesCluster = !clusterFilter || email.cluster === clusterFilter;
+
+                return matchesSearch && matchesKategorie && matchesCluster;
+            });
+
+            renderEmails();
+            updateStats();
+        }
+
+        // ============================================================================
+        // BATCH EDIT
+        // ============================================================================
+        function setupBatchEditCheckboxes() {
+            ['Kategorie', 'Cluster', 'Status'].forEach(field => {
+                const checkbox = document.getElementById(`batch${field}Check`);
+                const select = document.getElementById(`batch${field}`);
+
+                checkbox.addEventListener('change', () => {
+                    select.disabled = !checkbox.checked;
+                });
+            });
+        }
+
+        function showBatchEditModal() {
+            const selectedEmails = emails.filter(e => e.selected);
+            if (selectedEmails.length === 0) {
+                alert('Bitte wähle mindestens eine Email aus!');
+                return;
+            }
+
+            document.getElementById('batchCount').textContent = selectedEmails.length;
+            openModal('batchEditModal');
+        }
+
+        function applyBatchEdit() {
+            const selectedEmails = emails.filter(e => e.selected);
+
+            if (document.getElementById('batchKategorieCheck').checked) {
+                const value = document.getElementById('batchKategorie').value;
+                selectedEmails.forEach(email => email.kategorie = value);
+            }
+
+            if (document.getElementById('batchClusterCheck').checked) {
+                const value = document.getElementById('batchCluster').value;
+                selectedEmails.forEach(email => email.cluster = value);
+            }
+
+            if (document.getElementById('batchStatusCheck').checked) {
+                const value = document.getElementById('batchStatus').value;
+                selectedEmails.forEach(email => email.status = value);
+            }
+
+            closeModal('batchEditModal');
+            renderEmails();
+            updateStats();
+        }
+
+        // ============================================================================
+        // STATISTICS
+        // ============================================================================
+        function updateStats() {
+            const selected = emails.filter(e => e.selected);
+            const incidents = selected.filter(e => e.kategorie === 'Incident');
+            const rueckfragen = selected.filter(e => e.kategorie === 'Fachliche Rückfrage');
+
+            document.getElementById('totalCount').textContent = emails.length;
+            document.getElementById('selectedCount').textContent = selected.length;
+            document.getElementById('incidentCount').textContent = incidents.length;
+            document.getElementById('rueckfrageCount').textContent = rueckfragen.length;
+        }
+
+        // ============================================================================
+        // EXCEL EXPORT
+        // ============================================================================
+        function exportToExcel() {
+            const selectedEmails = emails.filter(e => e.selected);
+
+            if (selectedEmails.length === 0) {
+                alert('Bitte wähle mindestens eine Email aus!');
+                return;
+            }
+
+            // Daten für Excel vorbereiten
+            const excelData = selectedEmails.map((email, index) => ({
+                'ID': `HC-${String(index + 1).padStart(3, '0')}`,
+                'Datum': new Date(email.datum).toLocaleString('de-DE'),
+                'Kanal': 'Email',
+                'Agentur': email.agentur,
+                'Kategorie': email.kategorie,
+                'Status': email.status,
+                'In Bearbeitung von': '',
+                'Cluster': email.cluster,
+                'Anfrage': `${email.betreff}\n\n${email.text.substring(0, 500)}`,
+                'Diagnose': '',
+                'Nächste Schritte': '',
+                'Lösung': '',
+                'JIRA': '',
+                'Kommunikation': '',
+                'Kommentar': `Importiert aus Email am ${new Date().toLocaleString('de-DE')}\nVon: ${email.von_name} <${email.von_email}>`
+            }));
+
+            // Excel erstellen
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Übersicht');
+
+            // Spaltenbreiten
+            ws['!cols'] = [
+                {wch: 10}, {wch: 18}, {wch: 10}, {wch: 25}, {wch: 20},
+                {wch: 15}, {wch: 20}, {wch: 20}, {wch: 50}, {wch: 30},
+                {wch: 30}, {wch: 30}, {wch: 15}, {wch: 30}, {wch: 40}
+            ];
+
+            // Dateiname mit Zeitstempel
+            const filename = `Hypercare_Import_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+            // Download
+            XLSX.writeFile(wb, filename);
+
+            alert(`✅ ${selectedEmails.length} Email(s) erfolgreich nach Excel exportiert!\n\nDatei: ${filename}`);
+        }
+
+        // ============================================================================
+        // MODALS
+        // ============================================================================
+        function showUploadModal() {
+            openModal('uploadModal');
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // ============================================================================
+        // LOADING
+        // ============================================================================
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            const emailList = document.getElementById('emailList');
+
+            if (show) {
+                loading.classList.add('active');
+                emailList.classList.add('hidden');
+            } else {
+                loading.classList.remove('active');
+                emailList.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
