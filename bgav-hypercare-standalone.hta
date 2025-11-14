@@ -1142,27 +1142,33 @@
             if (!folder) return;
 
             try {
-                // Formatiere Datum für Outlook Filter (MM/DD/YYYY HH:MM)
-                var month = cutoffDate.getMonth() + 1;
-                var day = cutoffDate.getDate();
-                var year = cutoffDate.getFullYear();
-                var filterDate = month + "/" + day + "/" + year + " 00:00";
-
-                // Outlook Filter: Nur Emails ab cutoffDate
-                // Viel schneller als alle Items durchzugehen!
-                var filter = "[ReceivedTime] >= '" + filterDate + "'";
-
                 var items = folder.Items;
+                var itemsToProcess = items;
 
-                // WICHTIG: Restrict filtert Items - VIEL schneller!
-                var filteredItems = items.Restrict(filter);
+                // Wenn cutoffDate angegeben: Nutze Restrict für Performance
+                if (cutoffDate) {
+                    // Formatiere Datum für Outlook Filter (MM/DD/YYYY HH:MM)
+                    var month = cutoffDate.getMonth() + 1;
+                    var day = cutoffDate.getDate();
+                    var year = cutoffDate.getFullYear();
+                    var filterDate = month + "/" + day + "/" + year + " 00:00";
 
-                console.log("Ordner: " + folder.Name + " - Gefilterte Items: " + filteredItems.Count);
+                    // Outlook Filter: Nur Emails ab cutoffDate
+                    // Viel schneller als alle Items durchzugehen!
+                    var filter = "[ReceivedTime] >= '" + filterDate + "'";
 
-                // Durchlaufe nur gefilterte Items (viel weniger!)
-                for (var i = 1; i <= filteredItems.Count; i++) {
+                    // WICHTIG: Restrict filtert Items - VIEL schneller!
+                    itemsToProcess = items.Restrict(filter);
+
+                    console.log("Ordner: " + folder.Name + " - Gefilterte Items: " + itemsToProcess.Count);
+                } else {
+                    console.log("Ordner: " + folder.Name + " - ALLE Items: " + items.Count);
+                }
+
+                // Durchlaufe Items
+                for (var i = 1; i <= itemsToProcess.Count; i++) {
                     try {
-                        var item = filteredItems.Item(i);
+                        var item = itemsToProcess.Item(i);
 
                         // Nur Emails
                         if (item.Class === 43) { // olMail
@@ -1593,39 +1599,52 @@
 
             try {
                 closeModal('folderModal');
-                showLoading(true, "Lade Emails aus Ordner...");
+
+                // Frage nach Zeitraum
+                var timeframe = confirm(
+                    "Welchen Zeitraum möchtest du laden?\n\n" +
+                    "OK = Nur letzte 7 Tage (schnell)\n" +
+                    "Abbrechen = Alle Emails (langsam)"
+                );
+
+                // WICHTIG: Zuerst den Emailtracker laden!
+                loadExistingEmailsFromTracker();
 
                 var namespace = outlookApp.GetNamespace("MAPI");
                 var folder = namespace.GetFolderFromID(entryID);
 
-                if (folder.Items.Count === 0) {
-                    alert("Der Ordner enthält keine Emails!");
-                    showLoading(false);
+                var cutoffDate = null;
+                if (timeframe) {
+                    // Nur letzte 7 Tage
+                    cutoffDate = new Date();
+                    cutoffDate.setDate(cutoffDate.getDate() - 7);
+                    showLoading(true, "Lade Emails der letzten 7 Tage aus '" + folder.Name + "' (inkl. Unterordner)...");
+                } else {
+                    // Alle Emails
+                    showLoading(true, "Lade ALLE Emails aus '" + folder.Name + "' (inkl. Unterordner)...");
+                }
+
+                var allEmails = [];
+
+                // Durchsuche Ordner inkl. Unterordner
+                collectEmailsFromFolderRecursive(folder, cutoffDate, allEmails);
+
+                showLoading(false);
+
+                if (allEmails.length === 0) {
+                    showNotification("Keine Emails gefunden.", 'info', 'Keine Emails');
                     return;
                 }
 
-                if (folder.Items.Count > 1000) {
-                    if (!confirm("Der Ordner enthält " + folder.Items.Count + " Emails.\n\nDas Laden kann einige Minuten dauern.\n\nFortfahren?")) {
-                        showLoading(false);
-                        return;
-                    }
+                processEmails(allEmails);
+
+                var message = allEmails.length + " Emails geladen\n" +
+                             "Quelle: " + folder.Name + " (inkl. Unterordner)";
+                if (cutoffDate) {
+                    message += "\nZeitraum: Letzte 7 Tage";
                 }
 
-                var newEmails = [];
-                var items = folder.Items;
-                for (var i = 1; i <= items.Count; i++) {
-                    if (i % 100 === 0) {
-                        document.getElementById('loadingText').innerText = "Lade Email " + i + " von " + items.Count + "...";
-                    }
-
-                    var item = items.Item(i);
-                    if (item.Class === 43) { // olMail
-                        newEmails.push(extractEmailData(item));
-                    }
-                }
-
-                processEmails(newEmails);
-                showLoading(false);
+                showNotification(message, 'success', 'Emails geladen');
 
             } catch (e) {
                 showLoading(false);
