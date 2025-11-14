@@ -836,8 +836,9 @@
                 // Gehe durch alle Items (von neu nach alt)
                 for (var i = totalItems; i >= 1; i--) {
                     try {
-                        if ((totalItems - i + 1) % 10 === 0) {
-                            document.getElementById('loadingText').innerText = "Verarbeite Item " + (totalItems - i + 1) + " von " + totalItems + "... (" + newEmails.length + " Emails gefunden)";
+                        // Update Fortschritt alle 5 Items
+                        if ((totalItems - i + 1) % 5 === 0 || newEmails.length % 5 === 0) {
+                            document.getElementById('loadingText').innerText = "⏳ " + (totalItems - i + 1) + " / " + totalItems + " durchsucht... ✅ " + newEmails.length + " Emails gefunden";
                         }
 
                         var item = items.Item(i);
@@ -851,19 +852,24 @@
                         var receivedTime = new Date(item.ReceivedTime);
                         if (receivedTime < sevenDaysAgo) {
                             skippedOld++;
+                            // Wenn wir schon genug alte Mails gefunden haben, breche ab
+                            // (Emails sind chronologisch sortiert)
+                            if (skippedOld > 50 && newEmails.length > 0) {
+                                break; // Wir sind zu weit in der Vergangenheit
+                            }
                             continue; // Zu alt, überspringen
                         }
 
-                        // Email verarbeiten
+                        // Email verarbeiten (OHNE Body zu laden!)
                         var emailData = extractEmailData(item);
                         if (emailData) {
                             newEmails.push(emailData);
                             count++;
                         }
 
-                        // Nach 500 Emails aufhören (Performance)
-                        if (newEmails.length >= 500) {
-                            alert("⚠️ Limit erreicht: 500 Emails geladen.\n\nWeitere Emails im Ordner werden übersprungen.");
+                        // Nach 100 Emails aufhören (Performance)
+                        if (newEmails.length >= 100) {
+                            alert("⚠️ Limit erreicht: 100 Emails geladen.\n\nWeitere Emails im Ordner werden übersprungen.\n\nTipp: Navigiere zu einem spezifischeren Ordner für weniger Emails.");
                             break;
                         }
 
@@ -1052,12 +1058,18 @@
                 var senderEmail = getSenderEmail(mailItem);
                 var senderName = mailItem.SenderName || "Unbekannt";
                 var subject = mailItem.Subject || "(Kein Betreff)";
-                var body = getEmailBody(mailItem);
+                // WICHTIG: Body NICHT sofort laden - das ist langsam!
+                // Speichere EntryID um Body später zu laden
+                var entryID = mailItem.EntryID;
                 var receivedTime = mailItem.ReceivedTime;
 
                 var attachments = [];
-                for (var i = 1; i <= mailItem.Attachments.Count; i++) {
-                    attachments.push(mailItem.Attachments.Item(i).FileName);
+                try {
+                    for (var i = 1; i <= mailItem.Attachments.Count; i++) {
+                        attachments.push(mailItem.Attachments.Item(i).FileName);
+                    }
+                } catch (e) {
+                    // Attachments können manchmal nicht geladen werden
                 }
 
                 return {
@@ -1065,8 +1077,10 @@
                     von_email: senderEmail,
                     von_name: senderName,
                     betreff: subject,
-                    text: body,
-                    anhänge: attachments
+                    text: "[Noch nicht geladen]", // Platzhalter - wird später geladen
+                    anhänge: attachments,
+                    entryID: entryID, // Speichere EntryID für späteren Body-Zugriff
+                    bodyLoaded: false // Flag ob Body schon geladen wurde
                 };
             } catch (e) {
                 return {
@@ -1075,8 +1089,47 @@
                     von_name: "Fehler beim Laden",
                     betreff: "Fehler: " + e.message,
                     text: "",
-                    anhänge: []
+                    anhänge: [],
+                    entryID: null,
+                    bodyLoaded: true
                 };
+            }
+        }
+
+        // Lade Email-Body on-demand (erst wenn benötigt)
+        function loadEmailBody(email) {
+            // Body schon geladen?
+            if (email.bodyLoaded || !email.entryID) {
+                return;
+            }
+
+            try {
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var mailItem = namespace.GetItemFromID(email.entryID);
+                email.text = getEmailBody(mailItem);
+                email.bodyLoaded = true;
+            } catch (e) {
+                email.text = "[Fehler beim Laden: " + e.message + "]";
+                email.bodyLoaded = true;
+            }
+        }
+
+        // Lade Bodies für alle ausgewählten Emails (für Export)
+        function loadBodiesForSelectedEmails(selectedEmails) {
+            if (!outlookApp) {
+                return; // Outlook nicht verfügbar
+            }
+
+            var loaded = 0;
+            for (var i = 0; i < selectedEmails.length; i++) {
+                if (!selectedEmails[i].bodyLoaded) {
+                    loadEmailBody(selectedEmails[i]);
+                    loaded++;
+                }
+            }
+
+            if (loaded > 0) {
+                alert("📥 " + loaded + " Email-Text(e) wurden nachgeladen.");
             }
         }
 
@@ -1538,6 +1591,9 @@
                 alert('Bitte wähle mindestens eine Email aus!');
                 return;
             }
+
+            // WICHTIG: Lade Bodies für alle ausgewählten Emails VOR dem Export
+            loadBodiesForSelectedEmails(selectedEmails);
 
             try {
                 var excel = null;
