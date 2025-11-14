@@ -1637,33 +1637,50 @@
 
                     try {
                         // Versuche die URL direkt zu öffnen
+                        debugInfo += "Öffne: " + sharePointUrl + "\n";
                         workbook = excel.Workbooks.Open(sharePointUrl);
-                        worksheet = workbook.Worksheets("Hypercare");
-                        found = true;
-                        debugInfo += "✓✓ SharePoint-Datei erfolgreich geöffnet!\n";
+                        debugInfo += "✓ Datei geöffnet: " + workbook.Name + "\n";
+
+                        // Suche Worksheet "Hypercare"
+                        try {
+                            worksheet = workbook.Worksheets("Hypercare");
+                            found = true;
+                            debugInfo += "✓✓ Worksheet 'Hypercare' gefunden!\n";
+                            alert("✅ ERFOLG!\n\n" + debugInfo + "\n\nDie SharePoint-Datei wurde geöffnet und wird jetzt verwendet!");
+                        } catch (wsError) {
+                            debugInfo += "⚠️ Worksheet 'Hypercare' nicht gefunden!\n";
+                            debugInfo += "Verfügbare Worksheets:\n";
+                            for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
+                                debugInfo += "  - " + workbook.Worksheets(ws).Name + "\n";
+                            }
+                            // Verwende erstes Worksheet
+                            worksheet = workbook.Worksheets(1);
+                            found = true;
+                            debugInfo += "\n→ Verwende stattdessen: '" + worksheet.Name + "'\n";
+                            alert("⚠️ Worksheet 'Hypercare' nicht gefunden!\n\n" + debugInfo + "\n\nVerwende erstes Worksheet.");
+                        }
                     } catch (openError) {
-                        debugInfo += "✗ SharePoint-URL öffnen fehlgeschlagen: " + openError.message + "\n";
+                        debugInfo += "✗ SharePoint-Datei öffnen fehlgeschlagen!\n";
+                        debugInfo += "Fehler: " + openError.message + "\n";
                         debugInfo += "\n═══════════════════════════════════\n";
-                        debugInfo += "PROBLEM: SharePoint-Dateien können nicht direkt\n";
-                        debugInfo += "über URLs geöffnet werden.\n\n";
                         debugInfo += "LÖSUNG:\n";
                         debugInfo += "═══════════════════════════════════\n";
-                        debugInfo += "1. Öffne die Datei MANUELL in Excel:\n";
-                        debugInfo += "   " + sharePointUrl + "\n\n";
+                        debugInfo += "1. Öffne die Datei MANUELL in Excel über:\n";
+                        debugInfo += "   SharePoint → Tracking_Hypercare.xlsm\n\n";
                         debugInfo += "2. Lasse Excel im Hintergrund offen\n\n";
                         debugInfo += "3. Klicke in der HTA-App erneut auf\n";
                         debugInfo += "   'Nach Excel exportieren'\n\n";
-                        debugInfo += "Die App wird die geöffnete Datei dann finden!\n";
                         debugInfo += "═══════════════════════════════════\n\n";
-                        debugInfo += "\nAls FALLBACK erstelle ich jetzt eine neue Datei.\n";
+                        debugInfo += "Als FALLBACK erstelle ich jetzt eine NEUE Datei.\n";
                         debugInfo += "Du musst die Daten dann manuell kopieren!";
 
-                        alert("⚠️⚠️⚠️ TRACKING_HYPERCARE NICHT GEFUNDEN! ⚠️⚠️⚠️\n\n" + debugInfo);
+                        alert("⚠️⚠️⚠️ FEHLER BEIM ÖFFNEN! ⚠️⚠️⚠️\n\n" + debugInfo);
 
                         // Neue Datei erstellen als letzter Ausweg
                         workbook = excel.Workbooks.Add();
                         worksheet = workbook.Worksheets(1);
                         worksheet.Name = "Hypercare";
+                        found = false; // WICHTIG: Markiere als neue Datei für Header-Erstellung
                     }
                 }
 
