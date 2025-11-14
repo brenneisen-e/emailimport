@@ -1262,6 +1262,7 @@
                 }
 
                 var newEmails = [];
+                var duplicateEmails = []; // WICHTIG: Duplikate tracken für Reply-Update!
                 var count = 0;
                 var errors = 0;
                 var skippedOld = 0;
@@ -1329,6 +1330,9 @@
                                 if (skippedDuplicate === 1) {
                                     debugLog("Erstes Duplikat gefunden: " + identifier);
                                 }
+                                // WICHTIG: Speichere Duplikat mit mailItem für Reply-Update!
+                                emailData.mailItem = item;
+                                duplicateEmails.push(emailData);
                                 continue; // Überspringen, bereits vorhanden
                             }
 
@@ -1350,6 +1354,40 @@
 
                 showLoading(false);
 
+                // WICHTIG: Prüfe Duplikate auf neue Antworten und update Excel
+                var updatedReplies = 0;
+                if (duplicateEmails.length > 0) {
+                    showLoading(true, "Prüfe " + duplicateEmails.length + " Duplikate auf neue Antworten...");
+                    debugLog(">>> Prüfe " + duplicateEmails.length + " Duplikate auf neue Antworten...");
+
+                    for (var d = 0; d < duplicateEmails.length; d++) {
+                        try {
+                            var dupEmail = duplicateEmails[d];
+
+                            // Lade Body für Duplikat
+                            if (dupEmail.mailItem) {
+                                dupEmail.text = getEmailBody(dupEmail.mailItem);
+                                dupEmail.anfrage = removeSignature(dupEmail.text);
+
+                                // Suche Antwort
+                                var reply = findReplyInSentItems(dupEmail);
+                                if (reply && reply.trim() !== "") {
+                                    // Antwort gefunden! Update in Excel
+                                    updateReplyInExcel(dupEmail, reply);
+                                    updatedReplies++;
+                                    debugLog("  Antwort aktualisiert für: " + dupEmail.betreff);
+                                }
+                                delete dupEmail.mailItem;
+                            }
+                        } catch (e) {
+                            debugLog("  Fehler beim Duplikat-Update: " + e.message);
+                        }
+                    }
+
+                    showLoading(false);
+                    debugLog(">>> " + updatedReplies + " Antworten aktualisiert");
+                }
+
                 if (newEmails.length === 0 && skippedDuplicate === 0) {
                     showNotification(
                         "Keine Email-Nachrichten gefunden!\n\n" +
@@ -1363,13 +1401,19 @@
                 }
 
                 if (newEmails.length === 0 && skippedDuplicate > 0) {
-                    showNotification(
-                        "Alle Emails bereits in Excel vorhanden!\n\n" +
+                    var msg = "Alle Emails bereits in Excel vorhanden!\n\n" +
                         "Items durchsucht: " + totalItems + "\n" +
                         "Bereits in Excel: " + skippedDuplicate + "\n" +
-                        "Zu alt (>7 Tage): " + skippedOld,
-                        'info',
-                        'Keine neuen Emails'
+                        "Zu alt (>7 Tage): " + skippedOld;
+
+                    if (updatedReplies > 0) {
+                        msg += "\n\n✅ Antworten aktualisiert: " + updatedReplies;
+                    }
+
+                    showNotification(
+                        msg,
+                        updatedReplies > 0 ? 'success' : 'info',
+                        updatedReplies > 0 ? 'Antworten aktualisiert' : 'Keine neuen Emails'
                     );
                     return;
                 }
@@ -1382,6 +1426,9 @@
                 msg += "📊 Statistik:\n";
                 msg += "✅ NEU: " + newEmails.length + "\n";
                 msg += "⚠️ Bereits in Excel: " + skippedDuplicate + "\n";
+                if (updatedReplies > 0) {
+                    msg += "🔄 Antworten aktualisiert: " + updatedReplies + "\n";
+                }
                 msg += "📅 Zu alt (>7 Tage): " + skippedOld;
                 if (errors > 0) {
                     msg += "\n❌ Fehler: " + errors;
