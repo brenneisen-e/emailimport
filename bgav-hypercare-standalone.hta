@@ -1448,25 +1448,54 @@
                 var worksheet = null;
                 var found = false;
 
+                // DEBUG: Liste alle offenen Workbooks
+                var debugInfo = "Gefundene Excel-Dateien (" + excel.Workbooks.Count + "):\n\n";
+                for (var i = 1; i <= excel.Workbooks.Count; i++) {
+                    var wb = excel.Workbooks(i);
+                    debugInfo += i + ". Name: " + wb.Name + "\n";
+                    try {
+                        debugInfo += "   Pfad: " + wb.FullName + "\n";
+                    } catch (e) {
+                        debugInfo += "   Pfad: (nicht verfügbar)\n";
+                    }
+                }
+
                 // Durchsuche alle offenen Workbooks
                 for (var i = 1; i <= excel.Workbooks.Count; i++) {
                     var wb = excel.Workbooks(i);
                     var wbName = wb.Name.toLowerCase();
+                    var wbFullName = "";
 
-                    // Prüfe ob Dateiname "tracking_hypercare" enthält
-                    if (wbName.indexOf('tracking_hypercare') !== -1 || wbName.indexOf('tracking hypercare') !== -1) {
+                    try {
+                        wbFullName = wb.FullName.toLowerCase();
+                    } catch (e) {
+                        wbFullName = wbName;
+                    }
+
+                    // Prüfe ob Dateiname "tracking_hypercare" oder "tracking hypercare" enthält
+                    // Prüfe sowohl Name als auch FullName
+                    if (wbName.indexOf('tracking_hypercare') !== -1 ||
+                        wbName.indexOf('tracking hypercare') !== -1 ||
+                        wbName.indexOf('tracking-hypercare') !== -1 ||
+                        wbFullName.indexOf('tracking_hypercare') !== -1 ||
+                        wbFullName.indexOf('tracking hypercare') !== -1 ||
+                        wbFullName.indexOf('tracking-hypercare') !== -1) {
+
                         workbook = wb;
 
                         // Suche Worksheet "Hypercare"
                         try {
                             worksheet = workbook.Worksheets("Hypercare");
                             found = true;
+                            debugInfo += "\n✓ GEFUNDEN: " + wb.Name + "\n✓ Worksheet 'Hypercare' existiert!";
                             break;
                         } catch (e) {
+                            debugInfo += "\n⚠ Datei gefunden, aber Worksheet 'Hypercare' fehlt!\n";
                             // Worksheet nicht gefunden, versuche erstes Worksheet
                             try {
                                 worksheet = workbook.Worksheets(1);
                                 found = true;
+                                debugInfo += "⚠ Verwende stattdessen erstes Worksheet: " + worksheet.Name;
                                 break;
                             } catch (e2) {
                                 // Nächstes Workbook versuchen
@@ -1476,7 +1505,8 @@
                 }
 
                 if (!found) {
-                    var response = confirm("Die Datei 'Tracking_Hypercare.xlsx' ist nicht geöffnet!\n\n" +
+                    var response = confirm(debugInfo + "\n\n" +
+                        "Die Datei 'Tracking_Hypercare.xlsx' ist nicht geöffnet!\n\n" +
                         "Bitte öffne die Datei in Excel und versuche es erneut.\n\n" +
                         "Möchtest du stattdessen eine NEUE Excel-Datei erstellen?\n" +
                         "(Du musst sie dann manuell in Tracking_Hypercare.xlsx kopieren)");
