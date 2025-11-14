@@ -2590,9 +2590,26 @@
                 return;
             }
 
-            // WICHTIG: Bereite Emails für Export vor (Signatur entfernen, Antworten suchen)
-            prepareEmailsForExport(selectedEmails);
+            // Zeige Loading-Animation SOFORT
+            showLoading(true, "Bereite Export vor...\n" + selectedEmails.length + " Emails");
 
+            // Verwende setTimeout damit UI Zeit hat zu rendern
+            setTimeout(function() {
+                try {
+                    // WICHTIG: Bereite Emails für Export vor (Signatur entfernen, Antworten suchen)
+                    prepareEmailsForExport(selectedEmails);
+
+                    // Starte Excel-Export
+                    performExcelExport(selectedEmails);
+                } catch (e) {
+                    showLoading(false);
+                    alert("Fehler beim Export:\n\n" + e.message + "\n\nStack: " + (e.stack || "N/A"));
+                }
+            }, 100); // 100ms delay damit UI rendern kann
+        }
+
+        // Eigentlicher Excel-Export (ausgelagert für setTimeout)
+        function performExcelExport(selectedEmails) {
             try {
                 var debugInfo = "";
 
@@ -2692,6 +2709,8 @@
                     }
                 }
 
+                showLoading(true, "Schreibe in Excel...\nTabelle 'Übersicht'");
+
                 // Daten einfügen (19 Spalten)
                 for (var row = 0; row < selectedEmails.length; row++) {
                     var email = selectedEmails[row];
@@ -2757,6 +2776,8 @@
                     etNextRow = 2;
                 }
 
+                showLoading(true, "Schreibe in Excel...\nTabelle 'Emailtracker'");
+
                 // Speichere Email-Daten in Emailtracker
                 for (var row = 0; row < selectedEmails.length; row++) {
                     var email = selectedEmails[row];
@@ -2778,12 +2799,14 @@
                     emailTrackerSheet.Cells(etRowNum, 11).Value = new Date();
                 }
 
+                showLoading(false);
+
                 var msg = selectedEmails.length + " Email(s) erfolgreich exportiert!\n\n";
                 if (found) {
                     msg += "Tabelle 'Übersicht' in '" + workbook.Name + "'\n";
                     msg += "Startzeile: " + nextRow + "\n";
                     msg += "Neue IDs: HC-" + ("000" + (maxId + 1)).slice(-3) + " bis HC-" + ("000" + (maxId + selectedEmails.length)).slice(-3) + "\n\n";
-                    msg += "✓ Email-Informationen wurden auch im 'Emailtracker' gespeichert!";
+                    msg += "Email-Informationen wurden auch im 'Emailtracker' gespeichert!";
                 } else {
                     msg += "NEUE Datei wurde erstellt.\n\nBitte speichere sie als 'Tracking_Hypercare.xlsx'!";
                 }
@@ -2791,6 +2814,7 @@
                 showNotification(msg, 'success', 'Export erfolgreich', 8000);
 
             } catch (e) {
+                showLoading(false);
                 alert("Fehler beim Excel-Export:\n\n" + e.message + "\n\n" +
                       "Stack: " + (e.stack || "Nicht verfügbar") + "\n\n" +
                       "Bitte stelle sicher dass:\n" +
