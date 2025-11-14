@@ -2308,7 +2308,10 @@
             var notification = button.parentElement;
             notification.classList.add('removing');
             setTimeout(function() {
-                notification.remove();
+                // IE11 unterstützt .remove() nicht - verwende removeChild
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
             }, 300); // Match animation duration
         }
     </script>
