@@ -836,7 +836,10 @@
             var dateStr = date.getFullYear() + "-" +
                          ("0" + (date.getMonth() + 1)).slice(-2) + "-" +
                          ("0" + date.getDate()).slice(-2);
-            return email.von_email.toLowerCase() + "|" + email.betreff.toLowerCase() + "|" + dateStr;
+            var identifier = email.von_email.toString().toLowerCase().trim() + "|" +
+                           email.betreff.toString().toLowerCase().trim() + "|" +
+                           dateStr;
+            return identifier;
         }
 
         function loadExistingEmailsFromTracker() {
@@ -916,12 +919,33 @@
                         if (vonEmail && betreff && datum) {
                             // Erstelle Identifier
                             var dateObj = new Date(datum);
+
+                            // Debug: Prüfe ob Datum gültig ist
+                            if (isNaN(dateObj.getTime())) {
+                                // Datum ist ungültig, versuche String-Parsing
+                                // Format: "14.11.2025, 10:30:45" oder ähnlich
+                                var parts = datum.toString().split(/[,\s]+/);
+                                if (parts.length > 0) {
+                                    var dateParts = parts[0].split('.');
+                                    if (dateParts.length === 3) {
+                                        dateObj = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+                                    }
+                                }
+                            }
+
                             var dateStr = dateObj.getFullYear() + "-" +
                                          ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
                                          ("0" + dateObj.getDate()).slice(-2);
-                            var identifier = vonEmail.toLowerCase() + "|" + betreff.toLowerCase() + "|" + dateStr;
+                            var identifier = vonEmail.toString().toLowerCase().trim() + "|" +
+                                           betreff.toString().toLowerCase().trim() + "|" +
+                                           dateStr;
                             existingEmailsInTracker.add(identifier);
                             count++;
+
+                            // Debug: Zeige ersten Identifier
+                            if (count === 1) {
+                                console.log("Erster Tracker-Identifier: " + identifier);
+                            }
                         }
                     } catch (e) {
                         // Zeile überspringen bei Fehler
@@ -1070,8 +1094,19 @@
                         if (emailData) {
                             // Prüfe ob Email bereits im Tracker existiert
                             var identifier = getEmailIdentifier(emailData);
+
+                            // Debug: Zeige ersten generierten Identifier
+                            if (newEmails.length === 0 && skippedDuplicate === 0) {
+                                console.log("Erster Outlook-Identifier: " + identifier);
+                                console.log("Tracker hat " + existingEmailsInTracker.size + " Einträge");
+                            }
+
                             if (existingEmailsInTracker.has(identifier)) {
                                 skippedDuplicate++;
+                                // Debug: Zeige erstes Duplikat
+                                if (skippedDuplicate === 1) {
+                                    console.log("Erstes Duplikat gefunden: " + identifier);
+                                }
                                 continue; // Überspringen, bereits vorhanden
                             }
 
@@ -2006,7 +2041,8 @@
                     var hcId = "HC-" + ("000" + (maxId + row + 1)).slice(-3);
 
                     emailTrackerSheet.Cells(etRowNum, 1).Value = hcId;
-                    emailTrackerSheet.Cells(etRowNum, 2).Value = new Date(email.datum).toLocaleString('de-DE');
+                    // WICHTIG: Datum als echtes Datum speichern, nicht als String!
+                    emailTrackerSheet.Cells(etRowNum, 2).Value = new Date(email.datum);
                     emailTrackerSheet.Cells(etRowNum, 3).Value = email.von_name;
                     emailTrackerSheet.Cells(etRowNum, 4).Value = email.von_email;
                     emailTrackerSheet.Cells(etRowNum, 5).Value = email.betreff;
@@ -2015,7 +2051,8 @@
                     emailTrackerSheet.Cells(etRowNum, 8).Value = email.status;
                     emailTrackerSheet.Cells(etRowNum, 9).Value = email.cluster;
                     emailTrackerSheet.Cells(etRowNum, 10).Value = email.agentur;
-                    emailTrackerSheet.Cells(etRowNum, 11).Value = new Date().toLocaleString('de-DE');
+                    // Importiert am als echtes Datum
+                    emailTrackerSheet.Cells(etRowNum, 11).Value = new Date();
                 }
 
                 var msg = "✅ " + selectedEmails.length + " Email(s) erfolgreich exportiert!\n\n";
