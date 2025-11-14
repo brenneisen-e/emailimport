@@ -705,6 +705,10 @@
                 <button class="btn btn-secondary" onclick="showFolderSelectModal()">
                     📂 Ordner wählen
                 </button>
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; margin-left: 1rem; font-size: 0.875rem;">
+                    <input type="checkbox" id="searchRepliesCheck" style="cursor: pointer;">
+                    <span>Antworten im Postausgang suchen (langsam)</span>
+                </label>
                 <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
                     💾 Nach Excel exportieren
                 </button>
@@ -1497,8 +1501,11 @@
 
         // Bereite Emails für Export vor (Signatur entfernen, Antworten laden)
         function prepareEmailsForExport(selectedEmails) {
-            if (!outlookApp) {
-                // Ohne Outlook können wir keine Antworten suchen
+            // Prüfe ob Antwort-Suche aktiviert ist
+            var searchReplies = document.getElementById('searchRepliesCheck').checked;
+
+            if (!outlookApp || !searchReplies) {
+                // Ohne Outlook oder wenn deaktiviert: nur Signatur entfernen
                 for (var i = 0; i < selectedEmails.length; i++) {
                     selectedEmails[i].anfrage = removeSignature(selectedEmails[i].text);
                     selectedEmails[i].antwort = "";
@@ -1522,7 +1529,7 @@
                 // Entferne Signatur für "Anfrage"
                 email.anfrage = removeSignature(email.text);
 
-                // Suche Antwort im Postausgang
+                // Suche Antwort im Postausgang (nur wenn aktiviert)
                 try {
                     var reply = findReplyInSentItems(email);
                     email.antwort = reply || "";
@@ -1697,8 +1704,8 @@
 
                 var originalDate = new Date(originalEmail.datum);
 
-                // Durchsuche max. 200 gesendete Emails
-                var maxCheck = Math.min(items.Count, 200);
+                // Durchsuche max. 30 gesendete Emails (Performance-Optimierung)
+                var maxCheck = Math.min(items.Count, 30);
 
                 for (var i = 1; i <= maxCheck; i++) {
                     try {
