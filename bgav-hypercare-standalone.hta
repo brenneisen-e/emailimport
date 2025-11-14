@@ -1421,7 +1421,6 @@
                 var receivedTime = mailItem.ReceivedTime;
 
                 // WICHTIG: Lade Body SOFORT für Zuverlässigkeit
-                // EntryID-basiertes Lazy-Loading funktioniert nicht zuverlässig
                 var body = getEmailBody(mailItem);
 
                 var attachments = [];
@@ -1433,14 +1432,17 @@
                     // Attachments können manchmal nicht geladen werden
                 }
 
+                // Erstelle vorläufiges Email-Objekt (Antwort wird später geladen)
                 return {
                     datum: formatDate(receivedTime),
                     von_email: senderEmail,
                     von_name: senderName,
                     betreff: subject,
-                    text: body, // Body wird sofort geladen
+                    text: body, // Vollständiger Body (mit Signatur)
+                    anfrage: "", // Wird beim Export befüllt (Body ohne Signatur)
+                    antwort: "", // Wird beim Export befüllt (aus Postausgang)
                     anhänge: attachments,
-                    bodyLoaded: true // Body ist bereits geladen
+                    bodyLoaded: true
                 };
             } catch (e) {
                 console.log("❌ FEHLER in extractEmailData: " + e.message + " für Email");
@@ -1450,6 +1452,8 @@
                     von_name: "Fehler beim Laden",
                     betreff: "Fehler: " + e.message,
                     text: "[Fehler beim Extrahieren der Email]",
+                    anfrage: "",
+                    antwort: "",
                     anhänge: [],
                     bodyLoaded: true
                 };
@@ -1491,16 +1495,62 @@
             }
         }
 
-        // Lade Bodies für alle ausgewählten Emails (für Export)
-        function loadBodiesForSelectedEmails(selectedEmails) {
-            // NICHT MEHR NÖTIG: Bodies werden jetzt sofort beim Laden aus Outlook geladen
-            // Diese Funktion macht NICHTS mehr - Bodies sind bereits da!
-
-            // Debug: Zeige ersten Email-Text
-            if (selectedEmails.length > 0) {
-                console.log("✓ Erste Email Text-Länge: " + (selectedEmails[0].text ? selectedEmails[0].text.length : 0) + " Zeichen");
-                console.log("✓ bodyLoaded: " + selectedEmails[0].bodyLoaded);
+        // Bereite Emails für Export vor (Signatur entfernen, Antworten laden)
+        function prepareEmailsForExport(selectedEmails) {
+            if (!outlookApp) {
+                // Ohne Outlook können wir keine Antworten suchen
+                for (var i = 0; i < selectedEmails.length; i++) {
+                    selectedEmails[i].anfrage = removeSignature(selectedEmails[i].text);
+                    selectedEmails[i].antwort = "";
+                }
+                return;
             }
+
+            showLoading(true, "Bereite Emails für Export vor...\n\n0 von " + selectedEmails.length + " bearbeitet");
+
+            for (var i = 0; i < selectedEmails.length; i++) {
+                // Update Progress
+                if (i % 5 === 0 || i === selectedEmails.length - 1) {
+                    document.getElementById('loadingText').innerText =
+                        "Bereite Emails für Export vor...\n\n" +
+                        (i + 1) + " von " + selectedEmails.length + " bearbeitet\n" +
+                        "Suche Antworten im Postausgang...";
+                }
+
+                var email = selectedEmails[i];
+
+                // Entferne Signatur für "Anfrage"
+                email.anfrage = removeSignature(email.text);
+
+                // Suche Antwort im Postausgang
+                try {
+                    var reply = findReplyInSentItems(email);
+                    email.antwort = reply || "";
+
+                    if (reply) {
+                        console.log("✓ Antwort gefunden für: " + email.betreff.substring(0, 30) + "...");
+                    }
+                } catch (e) {
+                    console.log("⚠️ Fehler beim Suchen der Antwort: " + e.message);
+                    email.antwort = "";
+                }
+            }
+
+            showLoading(false);
+
+            var repliesFound = 0;
+            for (var i = 0; i < selectedEmails.length; i++) {
+                if (selectedEmails[i].antwort) {
+                    repliesFound++;
+                }
+            }
+
+            showNotification(
+                selectedEmails.length + " Emails vorbereitet.\n" +
+                repliesFound + " Antworten im Postausgang gefunden.",
+                repliesFound > 0 ? 'success' : 'info',
+                'Export vorbereitet'
+            );
         }
 
         function getSenderEmail(mailItem) {
@@ -1578,6 +1628,164 @@
             } catch (e) {
                 return "(Fehler beim Verarbeiten des Inhalts)";
             }
+        }
+
+        // Entferne Signatur aus Email-Text
+        function removeSignature(text) {
+            if (!text) return "";
+
+            var lines = text.split('\n');
+            var resultLines = [];
+            var foundSignature = false;
+
+            // Signatur-Marker
+            var signatureMarkers = [
+                /mit\s+freundlichen?\s+gr(ü|ue)(ß|ss)en/i,
+                /viele\s+gr(ü|ue)(ß|ss)e/i,
+                /beste\s+gr(ü|ue)(ß|ss)e/i,
+                /freundliche\s+gr(ü|ue)(ß|ss)e/i,
+                /datenschutzhinweis/i,
+                /art\.\s*13.*dsgvo/i,
+                /vertraulichkeitshinweis/i,
+                /confidential/i,
+                /disclaimer/i
+            ];
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+
+                // Prüfe ob Signatur beginnt
+                if (!foundSignature) {
+                    for (var j = 0; j < signatureMarkers.length; j++) {
+                        if (signatureMarkers[j].test(line)) {
+                            foundSignature = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Wenn noch keine Signatur gefunden, füge Zeile hinzu
+                if (!foundSignature) {
+                    resultLines.push(lines[i]);
+                }
+            }
+
+            return resultLines.join('\n').trim();
+        }
+
+        // Suche Antwort zu einer Email im Postausgang
+        function findReplyInSentItems(originalEmail) {
+            if (!outlookApp) {
+                return null;
+            }
+
+            try {
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var sentFolder = namespace.GetDefaultFolder(5); // olFolderSentMail = 5
+                var items = sentFolder.Items;
+
+                // Sortiere nach Datum (neueste zuerst)
+                try {
+                    items.Sort("[ReceivedTime]", true);
+                } catch (e) {
+                    // Sortieren fehlgeschlagen, weitermachen
+                }
+
+                var originalSubject = originalEmail.betreff.toLowerCase().trim();
+                // Entferne "RE:", "AW:", "FWD:" etc.
+                originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
+
+                var originalDate = new Date(originalEmail.datum);
+
+                // Durchsuche max. 200 gesendete Emails
+                var maxCheck = Math.min(items.Count, 200);
+
+                for (var i = 1; i <= maxCheck; i++) {
+                    try {
+                        var item = items.Item(i);
+
+                        if (item.Class !== 43) continue; // Nur Emails
+
+                        var sentDate = new Date(item.SentOn || item.ReceivedTime);
+
+                        // Antwort muss NACH der Original-Email sein
+                        if (sentDate < originalDate) continue;
+
+                        // Antwort sollte max. 30 Tage nach Original sein
+                        var daysDiff = (sentDate - originalDate) / (1000 * 60 * 60 * 24);
+                        if (daysDiff > 30) break; // Zu alt
+
+                        var sentSubject = (item.Subject || "").toLowerCase().trim();
+                        sentSubject = sentSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
+
+                        // Prüfe ob Betreff übereinstimmt
+                        if (sentSubject === originalSubject ||
+                            sentSubject.indexOf(originalSubject) !== -1 ||
+                            originalSubject.indexOf(sentSubject) !== -1) {
+
+                            // Gefunden! Extrahiere Antwort-Text
+                            var replyText = getEmailBody(item);
+                            replyText = extractReplyText(replyText);
+
+                            return replyText;
+                        }
+                    } catch (e) {
+                        // Fehler bei diesem Item, weiter
+                    }
+                }
+
+                return null; // Keine Antwort gefunden
+            } catch (e) {
+                console.log("Fehler beim Suchen der Antwort: " + e.message);
+                return null;
+            }
+        }
+
+        // Extrahiere nur den Antwort-Text (ohne zitierte Original-Mail)
+        function extractReplyText(fullText) {
+            if (!fullText) return "";
+
+            var lines = fullText.split('\n');
+            var replyLines = [];
+            var foundQuote = false;
+
+            // Quote-Marker
+            var quoteMarkers = [
+                /^>/,                           // > am Anfang
+                /^-----\s*original/i,           // ----- Original Message -----
+                /^von:.*gesendet:/i,            // Von: ... Gesendet:
+                /^from:.*sent:/i,               // From: ... Sent:
+                /^am.*schrieb.*:/i,             // Am ... schrieb ...:
+                /^on.*wrote:/i,                 // On ... wrote:
+                /^\s*\*{3,}/,                   // ***********
+                /^\s*_{3,}/                     // ___________
+            ];
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+
+                // Prüfe ob Zitat beginnt
+                if (!foundQuote) {
+                    for (var j = 0; j < quoteMarkers.length; j++) {
+                        if (quoteMarkers[j].test(line)) {
+                            foundQuote = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Wenn noch kein Zitat gefunden, füge Zeile hinzu
+                if (!foundQuote) {
+                    replyLines.push(line);
+                }
+            }
+
+            var reply = replyLines.join('\n').trim();
+
+            // Entferne Signatur aus Antwort
+            reply = removeSignature(reply);
+
+            return reply;
         }
 
         function formatDate(date) {
@@ -1962,8 +2170,8 @@
                 return;
             }
 
-            // WICHTIG: Lade Bodies für alle ausgewählten Emails VOR dem Export
-            loadBodiesForSelectedEmails(selectedEmails);
+            // WICHTIG: Bereite Emails für Export vor (Signatur entfernen, Antworten suchen)
+            prepareEmailsForExport(selectedEmails);
 
             try {
                 var debugInfo = "";
@@ -2020,10 +2228,10 @@
                 // Ab hier mit dem Worksheet arbeiten
                 if (false) { // Placeholder für Header-Erstellung (wird nie ausgeführt, da found=true)
 
-                    // Header erstellen
-                    var headers = ['ID', 'Datum', 'Kanal', 'Agentur', 'Kategorie', 'Status',
-                                  'In Bearbeitung von', 'Cluster', 'Anfrage', 'Diagnose',
-                                  'Workaround', 'Nächste Schritte', 'Lösung', 'JIRA',
+                    // Header erstellen (19 Spalten)
+                    var headers = ['ID', 'Datum', 'Kanal', 'BD-Nummer', 'Agentur', 'Kategorie', 'Status',
+                                  'In Bearbeitung von', 'Cluster', 'Betreff', 'Anfrage', 'Antwort',
+                                  'Diagnose', 'Workaround', 'Nächste Schritte', 'Lösung', 'JIRA',
                                   'Kommunikation', 'Kommentar'];
 
                     for (var col = 0; col < headers.length; col++) {
@@ -2032,14 +2240,15 @@
                         worksheet.Cells(1, col + 1).Interior.Color = 15395562; // Hellblau
                     }
 
-                    // Spaltenbreiten
-                    var widths = [10, 18, 10, 25, 20, 15, 20, 20, 50, 30, 30, 30, 30, 15, 30, 40];
+                    // Spaltenbreiten (19 Spalten)
+                    // ID, Datum, Kanal, BD-Nr, Agentur, Kategorie, Status, In Bearb., Cluster, Betreff, Anfrage, Antwort, Diagnose, Workaround, Nächste, Lösung, JIRA, Komm., Kommentar
+                    var widths = [10, 18, 10, 15, 25, 20, 15, 20, 20, 40, 50, 50, 30, 30, 30, 30, 15, 30, 40];
                     for (var col = 0; col < widths.length; col++) {
                         worksheet.Columns(col + 1).ColumnWidth = widths[col];
                     }
 
-                    // Auto-filter
-                    worksheet.Range("A1:P1").AutoFilter();
+                    // Auto-filter (A1:S1 für 19 Spalten)
+                    worksheet.Range("A1:S1").AutoFilter();
                 }
 
                 // Finde nächste freie Zeile in der Tabelle
@@ -2063,32 +2272,34 @@
                     }
                 }
 
-                // Daten einfügen
+                // Daten einfügen (19 Spalten)
                 for (var row = 0; row < selectedEmails.length; row++) {
                     var email = selectedEmails[row];
                     var rowNum = nextRow + row;
 
                     var id = "HC-" + ("000" + (maxId + row + 1)).slice(-3);
                     var datum = new Date(email.datum).toLocaleString('de-DE');
-                    var anfrage = email.betreff + "\n\n" + email.text.substring(0, 500);
                     var kommentar = "Importiert aus Email am " + new Date().toLocaleString('de-DE') + "\nVon: " + email.von_name + " <" + email.von_email + ">";
 
-                    worksheet.Cells(rowNum, 1).Value = id;
-                    worksheet.Cells(rowNum, 2).Value = datum;
-                    worksheet.Cells(rowNum, 3).Value = "Email";
-                    worksheet.Cells(rowNum, 4).Value = email.agentur;
-                    worksheet.Cells(rowNum, 5).Value = email.kategorie;
-                    worksheet.Cells(rowNum, 6).Value = email.status;
-                    worksheet.Cells(rowNum, 7).Value = "";
-                    worksheet.Cells(rowNum, 8).Value = email.cluster;
-                    worksheet.Cells(rowNum, 9).Value = anfrage;
-                    worksheet.Cells(rowNum, 10).Value = ""; // Diagnose
-                    worksheet.Cells(rowNum, 11).Value = ""; // Workaround
-                    worksheet.Cells(rowNum, 12).Value = ""; // Nächste Schritte
-                    worksheet.Cells(rowNum, 13).Value = ""; // Lösung
-                    worksheet.Cells(rowNum, 14).Value = ""; // JIRA
-                    worksheet.Cells(rowNum, 15).Value = ""; // Kommunikation
-                    worksheet.Cells(rowNum, 16).Value = kommentar;
+                    worksheet.Cells(rowNum, 1).Value = id;                          // ID
+                    worksheet.Cells(rowNum, 2).Value = datum;                       // Datum
+                    worksheet.Cells(rowNum, 3).Value = "Email";                     // Kanal
+                    worksheet.Cells(rowNum, 4).Value = "";                          // BD-Nummer (leer)
+                    worksheet.Cells(rowNum, 5).Value = email.agentur;               // Agentur
+                    worksheet.Cells(rowNum, 6).Value = email.kategorie;             // Kategorie
+                    worksheet.Cells(rowNum, 7).Value = email.status;                // Status
+                    worksheet.Cells(rowNum, 8).Value = "";                          // In Bearbeitung von
+                    worksheet.Cells(rowNum, 9).Value = email.cluster;               // Cluster
+                    worksheet.Cells(rowNum, 10).Value = email.betreff;              // Betreff
+                    worksheet.Cells(rowNum, 11).Value = email.anfrage || "";        // Anfrage (ohne Signatur)
+                    worksheet.Cells(rowNum, 12).Value = email.antwort || "";        // Antwort (aus Postausgang)
+                    worksheet.Cells(rowNum, 13).Value = "";                         // Diagnose
+                    worksheet.Cells(rowNum, 14).Value = "";                         // Workaround
+                    worksheet.Cells(rowNum, 15).Value = "";                         // Nächste Schritte
+                    worksheet.Cells(rowNum, 16).Value = "";                         // Lösung
+                    worksheet.Cells(rowNum, 17).Value = "";                         // JIRA
+                    worksheet.Cells(rowNum, 18).Value = "";                         // Kommunikation
+                    worksheet.Cells(rowNum, 19).Value = kommentar;                  // Kommentar
                 }
 
                 // EMAILTRACKER: Speichere alle Email-Informationen
