@@ -21,6 +21,16 @@ Eine standalone HTML-Anwendung zur Überprüfung und Kategorisierung von Hyperca
 2. Öffne die Datei in einem modernen Webbrowser (Chrome, Firefox, Edge, Safari)
 3. Die App funktioniert komplett offline - keine Server-Verbindung erforderlich!
 
+### 📧 Outlook-Integration
+
+**NEU:** Du kannst Emails jetzt direkt aus Outlook exportieren!
+
+Siehe **[OUTLOOK-INTEGRATION.md](OUTLOOK-INTEGRATION.md)** für eine detaillierte Anleitung zu:
+- **PowerShell-Script** (empfohlen) - Einfacher Export ausgewählter Emails oder ganzer Ordner
+- **VBA-Makro** - Direkte Integration in Outlook mit Button im Ribbon
+
+Beide Methoden exportieren Emails im korrekten JSON-Format für diese App.
+
 ### Email-Daten importieren
 
 Die App erwartet JSON-Dateien mit folgendem Format:
@@ -44,6 +54,14 @@ Die App erwartet JSON-Dateien mit folgendem Format:
 2. **Überprüfen**: Die App kategorisiert die Emails automatisch
 3. **Anpassen**: Korrigiere bei Bedarf die automatische Kategorisierung
 4. **Exportieren**: Exportiere die kategorisierten Emails nach Excel
+
+### 🧪 Testen mit Beispiel-Daten
+
+Möchtest du die App erst einmal ausprobieren? Nutze die Datei **`beispiel-emails.json`**:
+- Enthält 10 realistische Test-Emails
+- Verschiedene Kategorien (Incidents, Rückfragen)
+- Verschiedene Cluster (SHUK, LV, KV, Provisionierung, etc.)
+- Perfekt zum Testen aller Features der App
 
 ## 🛠️ Technische Details
 

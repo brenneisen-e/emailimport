@@ -1,0 +1,82 @@
+[
+  {
+    "datum": "2025-11-14T10:30:00",
+    "von_email": "max.mueller@agentur-nord.de",
+    "von_name": "Max Müller",
+    "betreff": "Dringend: SHUK Provision nicht erhalten",
+    "text": "Guten Tag,\n\nwir haben für den Monat Oktober noch keine Provisionsabrechnung für unsere SHUK-Verträge erhalten. Normalerweise kommt diese bis zum 10. des Folgemonats.\n\nKönnen Sie bitte prüfen, wo das Problem liegt?\n\nMit freundlichen Grüßen\nMax Müller\nAgentur Nord GmbH",
+    "anhänge": []
+  },
+  {
+    "datum": "2025-11-14T11:15:00",
+    "von_email": "sabine.schmidt@makler-sued.de",
+    "von_name": "Sabine Schmidt",
+    "betreff": "Frage zur Produktzuordnung LV",
+    "text": "Hallo liebes Team,\n\nich habe eine Frage zur korrekten Zuordnung von Lebensversicherungs-Produkten im neuen System.\n\nBei Vertrag Nr. LV-2025-1234 bin ich mir unsicher, ob das als Risikolebensversicherung oder als Kapitallebensversicherung erfasst werden muss.\n\nKönnen Sie mir hier weiterhelfen?\n\nVielen Dank und beste Grüße\nSabine Schmidt",
+    "anhänge": ["Vertrag_LV-2025-1234.pdf"]
+  },
+  {
+    "datum": "2025-11-14T14:22:00",
+    "von_email": "thomas.weber@versicherung-west.de",
+    "von_name": "Thomas Weber",
+    "betreff": "Fehler: KV Portal funktioniert nicht",
+    "text": "Sehr geehrte Damen und Herren,\n\nseit heute Morgen kann ich mich nicht mehr im KV-Portal anmelden. Ich erhalte immer die Fehlermeldung 'Authentifizierung fehlgeschlagen', obwohl ich das richtige Passwort eingebe.\n\nIch habe es bereits mit verschiedenen Browsern versucht - gleiches Problem.\n\nDas ist sehr dringend, da ich heute noch mehrere Anträge einreichen muss!\n\nBitte um schnelle Hilfe.\n\nMit freundlichen Grüßen\nThomas Weber\nVersicherungsbüro West",
+    "anhänge": []
+  },
+  {
+    "datum": "2025-11-14T15:45:00",
+    "von_email": "anna.becker@finanzberatung.de",
+    "von_name": "Anna Becker",
+    "betreff": "Rückfrage: Provisionsstaffel bei Großkunden",
+    "text": "Guten Tag,\n\nich habe eine Frage zur Provisionsstaffel bei Großkunden mit mehr als 50 Mitarbeitern.\n\nLaut den Unterlagen sollte hier eine erhöhte Provision von 15% gelten, in meiner letzten Abrechnung wurden aber nur 12% berechnet.\n\nKönnen Sie mir erklären, wie die Staffelung genau funktioniert?\n\nDanke und Grüße\nAnna Becker",
+    "anhänge": ["Abrechnung_Oktober.xlsx"]
+  },
+  {
+    "datum": "2025-11-14T16:30:00",
+    "von_email": "michael.hoffmann@agentur-ost.de",
+    "von_name": "Michael Hoffmann",
+    "betreff": "Problem: Zahlung verspätet",
+    "text": "Hallo,\n\ndie Provisionsauszahlung für September ist immer noch nicht auf unserem Konto eingegangen. Normalerweise erfolgt die Zahlung bis zum 15. des Monats.\n\nEs geht um einen Betrag von ca. 8.500 EUR.\n\nBitte prüfen Sie das dringend!\n\nBeste Grüße\nMichael Hoffmann",
+    "anhänge": []
+  },
+  {
+    "datum": "2025-11-15T09:10:00",
+    "von_email": "julia.klein@maklerbuero-nord.de",
+    "von_name": "Julia Klein",
+    "betreff": "Allgemeine Frage zum neuen System",
+    "text": "Guten Morgen,\n\nich habe eine allgemeine Frage zum neuen BGAV-System.\n\nWo finde ich die Übersicht über alle meine aktiven Verträge? Ich habe im Menü gesucht, aber nichts Entsprechendes gefunden.\n\nGibt es dafür ein Tutorial oder eine Anleitung?\n\nVielen Dank!\nJulia Klein",
+    "anhänge": []
+  },
+  {
+    "datum": "2025-11-15T10:55:00",
+    "von_email": "peter.schulz@versicherungsagentur.de",
+    "von_name": "Peter Schulz",
+    "betreff": "SHUK: Falsche Schadensquote angezeigt",
+    "text": "Sehr geehrte Damen und Herren,\n\nim Dashboard wird für unsere SHUK-Verträge eine Schadensquote von 85% angezeigt. Das kann nicht stimmen!\n\nLaut unseren Unterlagen liegt die tatsächliche Quote bei etwa 45%.\n\nIch glaube, hier ist ein Fehler im System. Bitte prüfen Sie das, da diese Zahl auch meine Provision beeinflusst.\n\nFreundliche Grüße\nPeter Schulz",
+    "anhänge": ["Schadensstatistik_2025.pdf"]
+  },
+  {
+    "datum": "2025-11-15T13:20:00",
+    "von_email": "lisa.wagner@finanzgruppe.de",
+    "von_name": "Lisa Wagner",
+    "betreff": "Frage zur Herkunft von Altverträgen",
+    "text": "Hallo zusammen,\n\nich habe eine Frage zur Produktherkunft bei Altverträgen, die aus dem alten System migriert wurden.\n\nBei einigen Verträgen aus 2019 und 2020 ist die Herkunft als 'Unbekannt' gekennzeichnet. Können diese nachträglich noch zugeordnet werden?\n\nOder sollten wir diese manuell recherchieren und nachtragen?\n\nDanke für Ihre Hilfe!\nLisa Wagner",
+    "anhänge": []
+  },
+  {
+    "datum": "2025-11-15T14:40:00",
+    "von_email": "markus.richter@makler-zentral.de",
+    "von_name": "Markus Richter",
+    "betreff": "Kritisch: Export-Funktion liefert leere Datei",
+    "text": "DRINGEND!\n\nIch versuche seit einer Stunde, einen Vertragsexport zu erstellen, aber die Excel-Datei ist jedes Mal leer (0 KB).\n\nIch habe es mit verschiedenen Filtern versucht:\n- Alle Verträge\n- Nur aktive Verträge\n- Nur SHUK\n\nÜberall das gleiche Problem. Ich brauche diesen Export heute noch für eine Präsentation!\n\nBitte um sofortige Hilfe!\n\nMarkus Richter\nMakler Zentral AG",
+    "anhänge": []
+  },
+  {
+    "datum": "2025-11-15T16:00:00",
+    "von_email": "claudia.meyer@agentur-sued.de",
+    "von_name": "Claudia Meyer",
+    "betreff": "KV: Wie funktioniert die Beitragsanpassung?",
+    "text": "Guten Tag,\n\nich habe eine fachliche Frage zur Beitragsanpassung bei Krankenversicherungen.\n\nEin Kunde hat eine Beitragserhöhung erhalten und fragt nach, ob diese automatisch im System erfasst wird oder ob wir etwas manuell nachtragen müssen.\n\nWie ist hier der korrekte Prozess?\n\nVielen Dank und beste Grüße\nClaudia Meyer",
+    "anhänge": ["Beitragsanpassung_Kunde_XY.pdf"]
+  }
+]
