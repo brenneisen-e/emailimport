@@ -1056,8 +1056,7 @@
         // OUTLOOK INTEGRATION
         // ============================================================================
 
-        // HAUPT-FUNKTION: Lädt Emails mit Outlook-Suche "empfangen:diese woche"
-        // Findet automatisch Emails aus Posteingang UND Postausgang!
+        // HAUPT-FUNKTION: Lädt Emails der letzten Woche aus Posteingang UND Postausgang
         function loadEmails() {
             if (!outlookApp) {
                 initializeOutlook();
@@ -1068,49 +1067,102 @@
                 showLoading(true, "Lade Emailtracker für Duplikat-Erkennung...");
                 loadExistingEmailsFromTracker();
 
-                showLoading(true, "Suche Emails mit 'empfangen:diese woche'...");
-
                 var namespace = outlookApp.GetNamespace("MAPI");
                 var inbox = namespace.GetDefaultFolder(6); // olFolderInbox
+                var sentItems = namespace.GetDefaultFolder(5); // olFolderSentMail
 
-                // Outlook-Suche: "empfangen:diese woche" findet Posteingang + Postausgang!
-                var searchResults = inbox.Search("empfangen:diese woche");
+                // Berechne Datum vor 7 Tagen
+                var sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                // Formatiere Datum für Outlook Restrict (MM/DD/YYYY HH:MM)
+                var month = sevenDaysAgo.getMonth() + 1;
+                var day = sevenDaysAgo.getDate();
+                var year = sevenDaysAgo.getFullYear();
+                var filterDate = month + "/" + day + "/" + year + " 00:00";
+
+                showLoading(true, "Durchsuche Posteingang...");
 
                 var newEmails = [];
                 var skippedDuplicate = 0;
-                var totalItems = searchResults.Count;
+                var totalFound = 0;
 
-                showLoading(true, "Verarbeite " + totalItems + " gefundene Emails...");
+                // 1. Durchsuche POSTEINGANG
+                try {
+                    var inboxItems = inbox.Items;
+                    inboxItems.Sort("[ReceivedTime]", true); // Neueste zuerst
 
-                for (var i = 1; i <= totalItems; i++) {
-                    try {
-                        var item = searchResults.Item(i);
+                    // Restrict auf letzte 7 Tage (SCHNELL!)
+                    var filter = "[ReceivedTime] >= '" + filterDate + "'";
+                    var restrictedInbox = inboxItems.Restrict(filter);
 
-                        // Nur Email-Objekte (Class 43 = olMail)
-                        if (item.Class !== 43) continue;
+                    totalFound += restrictedInbox.Count;
 
-                        var emailData = extractEmailData(item);
+                    for (var i = 1; i <= restrictedInbox.Count; i++) {
+                        try {
+                            var item = restrictedInbox.Item(i);
+                            if (item.Class !== 43) continue; // Nur Emails
 
-                        // Duplikat-Check gegen Tracker
-                        var identifier = getEmailIdentifier(emailData);
-                        if (existingEmailsInTracker.has(identifier)) {
-                            skippedDuplicate++;
+                            var emailData = extractEmailData(item);
+                            var identifier = getEmailIdentifier(emailData);
+
+                            if (existingEmailsInTracker.has(identifier)) {
+                                skippedDuplicate++;
+                                continue;
+                            }
+
+                            newEmails.push(emailData);
+
+                            if (i % 10 === 0) {
+                                showLoading(true, "Posteingang: " + i + " von " + restrictedInbox.Count + " verarbeitet...");
+                            }
+
+                            if (newEmails.length >= 200) break;
+                        } catch (e) {
                             continue;
                         }
+                    }
+                } catch (e) {
+                    alert("Fehler beim Durchsuchen des Posteingangs:\n\n" + e.message);
+                }
 
-                        newEmails.push(emailData);
+                // 2. Durchsuche POSTAUSGANG (Gesendete Elemente)
+                if (newEmails.length < 200) {
+                    showLoading(true, "Durchsuche Postausgang...");
 
-                        // Fortschritt anzeigen
-                        if (i % 10 === 0) {
-                            showLoading(true, "Verarbeite Email " + i + " von " + totalItems + "...");
+                    try {
+                        var sentItemsItems = sentItems.Items;
+                        sentItemsItems.Sort("[ReceivedTime]", true); // Neueste zuerst
+
+                        var restrictedSent = sentItemsItems.Restrict(filter);
+                        totalFound += restrictedSent.Count;
+
+                        for (var j = 1; j <= restrictedSent.Count; j++) {
+                            try {
+                                var sentItem = restrictedSent.Item(j);
+                                if (sentItem.Class !== 43) continue;
+
+                                var sentEmailData = extractEmailData(sentItem);
+                                var sentIdentifier = getEmailIdentifier(sentEmailData);
+
+                                if (existingEmailsInTracker.has(sentIdentifier)) {
+                                    skippedDuplicate++;
+                                    continue;
+                                }
+
+                                newEmails.push(sentEmailData);
+
+                                if (j % 10 === 0) {
+                                    showLoading(true, "Postausgang: " + j + " von " + restrictedSent.Count + " verarbeitet...");
+                                }
+
+                                if (newEmails.length >= 200) break;
+                            } catch (e) {
+                                continue;
+                            }
                         }
-
-                        // Limit 200 Emails
-                        if (newEmails.length >= 200) break;
-
                     } catch (e) {
-                        // Einzelne fehlerhafte Email überspringen
-                        continue;
+                        alert("Fehler beim Durchsuchen des Postausgangs:\n\n" + e.message);
                     }
                 }
 
@@ -1119,7 +1171,7 @@
                 if (newEmails.length === 0) {
                     showNotification(
                         'Keine neuen Emails gefunden!\n\n' +
-                        'Gefunden: ' + totalItems + '\n' +
+                        'Gefunden: ' + totalFound + '\n' +
                         'Bereits in Excel: ' + skippedDuplicate,
                         'info',
                         'Keine neuen Emails',
@@ -1129,9 +1181,10 @@
                 }
 
                 // Zeige Statistik
-                var stats = 'Gefunden: ' + totalItems + '\n' +
+                var stats = 'Gefunden: ' + totalFound + '\n' +
                            'Neu: ' + newEmails.length + '\n' +
-                           'Bereits in Excel: ' + skippedDuplicate;
+                           'Bereits in Excel: ' + skippedDuplicate + '\n\n' +
+                           'Quelle: Posteingang + Postausgang (letzte 7 Tage)';
 
                 showNotification(stats, 'success', 'Emails geladen', 5000);
 
