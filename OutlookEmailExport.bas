@@ -49,29 +49,29 @@ Public Sub ExportOutlookToJSON()
     ' Datum: Letzte 7 Tage
     cutoffDate = DateAdd("d", -7, Date)
 
-    Application.StatusBar = "Durchsuche alle Ordner..."
-
-    ' Sammle alle Emails aus allen Ordnern
+    ' Sammle alle Emails aus Posteingang und Postausgang
     Set allEmails = New Collection
 
-    ' Durchsuche alle Stores (Postfächer)
-    Dim stores As Object
-    Dim store As Object
-    Dim rootFolder As Object
+    Dim inboxFolder As Object
+    Dim sentFolder As Object
 
-    Set stores = namespace.stores
+    On Error Resume Next
 
-    For i = 1 To stores.Count
-        On Error Resume Next
-        Set store = stores.item(i)
-        Set rootFolder = store.GetRootFolder
+    ' Posteingang durchsuchen (inklusive Unterordner)
+    Application.StatusBar = "Durchsuche Posteingang..."
+    Set inboxFolder = namespace.GetDefaultFolder(6) ' olFolderInbox = 6
+    If Not inboxFolder Is Nothing Then
+        CollectEmailsFromFolder inboxFolder, cutoffDate, allEmails
+    End If
 
-        If Not rootFolder Is Nothing Then
-            Application.StatusBar = "Durchsuche: " & store.DisplayName & "..."
-            CollectEmailsFromFolder rootFolder, cutoffDate, allEmails
-        End If
-        On Error GoTo ErrorHandler
-    Next i
+    ' Postausgang durchsuchen (inklusive Unterordner)
+    Application.StatusBar = "Durchsuche Postausgang..."
+    Set sentFolder = namespace.GetDefaultFolder(5) ' olFolderSentMail = 5
+    If Not sentFolder Is Nothing Then
+        CollectEmailsFromFolder sentFolder, cutoffDate, allEmails
+    End If
+
+    On Error GoTo ErrorHandler
 
     Application.StatusBar = "Erstelle JSON..."
 
@@ -146,7 +146,7 @@ Public Sub ExportOutlookToJSON()
     MsgBox "✓ Export erfolgreich!" & vbCrLf & vbCrLf & _
            "Emails exportiert: " & allEmails.Count & vbCrLf & _
            "Zeitraum: Letzte 7 Tage" & vbCrLf & _
-           "Quelle: Alle Outlook-Ordner" & vbCrLf & vbCrLf & _
+           "Quelle: Posteingang + Postausgang (inkl. Unterordner)" & vbCrLf & vbCrLf & _
            "PFAD:" & vbCrLf & _
            jsonPath & vbCrLf & vbCrLf & _
            "Der Downloads-Ordner wurde geöffnet." & vbCrLf & vbCrLf & _
