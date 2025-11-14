@@ -1608,45 +1608,21 @@
                 }
 
                 if (!found) {
-                    // Versuche die Datei zu öffnen
-                    var filePath = prompt(debugInfo + "\n\n" +
-                        "Die Datei 'Tracking_Hypercare.xlsx' ist nicht geöffnet!\n\n" +
-                        "Optionen:\n" +
-                        "1. Gib den LOKALEN Dateipfad ein (z.B. C:\\Users\\...\\Tracking_Hypercare.xlsm)\n" +
-                        "2. Klicke Abbrechen um eine NEUE Datei zu erstellen\n\n" +
-                        "HINWEIS: SharePoint-Links funktionieren nicht direkt.\n" +
-                        "Öffne die Datei in Excel und kopiere den Pfad aus der Titelleiste.\n\n" +
-                        "Dateipfad eingeben:",
-                        "");
+                    // WICHTIG: Öffne Tracking_Hypercare.xlsm vorher in Excel!
+                    // SharePoint-Links funktionieren nicht mit Workbooks.Open()
+                    alert(debugInfo + "\n\n" +
+                          "⚠️ WICHTIG: Tracking_Hypercare.xlsm wurde nicht gefunden!\n\n" +
+                          "LÖSUNG:\n" +
+                          "1. Öffne die Datei in Excel (über deinen SharePoint-Link)\n" +
+                          "2. Lass Excel geöffnet\n" +
+                          "3. Klicke in der HTA-App erneut auf 'Nach Excel exportieren'\n\n" +
+                          "Die App erstellt jetzt eine NEUE Datei.\n" +
+                          "Du musst die Daten dann manuell in Tracking_Hypercare.xlsm kopieren.");
 
-                    if (filePath && filePath.trim() !== "") {
-                        // Versuche Datei zu öffnen
-                        try {
-                            workbook = excel.Workbooks.Open(filePath.trim());
-                            try {
-                                worksheet = workbook.Worksheets("Hypercare");
-                                found = true;
-                            } catch (e) {
-                                worksheet = workbook.Worksheets(1);
-                                found = true;
-                            }
-                        } catch (e) {
-                            alert("Fehler beim Öffnen der Datei:\n\n" + e.message + "\n\n" +
-                                  "Bitte stelle sicher dass:\n" +
-                                  "1. Der Pfad korrekt ist\n" +
-                                  "2. Du die Datei nicht bereits in Excel geöffnet hast\n" +
-                                  "3. Du Schreibrechte auf die Datei hast\n\n" +
-                                  "Erstelle stattdessen eine neue Datei...");
-                            found = false;
-                        }
-                    }
-
-                    if (!found) {
-                        // Neue Datei erstellen
-                        workbook = excel.Workbooks.Add();
-                        worksheet = workbook.Worksheets(1);
-                        worksheet.Name = "Hypercare";
-                    }
+                    // Neue Datei erstellen
+                    workbook = excel.Workbooks.Add();
+                    worksheet = workbook.Worksheets(1);
+                    worksheet.Name = "Hypercare";
                 }
 
                 if (!found) {
