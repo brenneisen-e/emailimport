@@ -692,6 +692,29 @@
         </div>
     </div>
 
+    <!-- MAILBOX SELECTION MODAL -->
+    <div class="modal" id="mailboxModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Postfach auswählen</h2>
+                <button class="modal-close" onclick="closeModal('mailboxModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Wähle das Postfach aus dem du Emails der letzten Woche laden möchtest:</p>
+                <select id="mailboxSelect" class="field-input" style="width: 100%; margin-bottom: 1rem;" size="6">
+                    <option value="">Lädt Postfächer...</option>
+                </select>
+                <p style="color: #6c757d; font-size: 0.875rem;">
+                    📅 Es werden alle Emails der letzten 7 Tage aus dem Posteingang geladen (max. 100).
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('mailboxModal')">Abbrechen</button>
+                <button class="btn btn-primary" onclick="loadLastWeekFromSelectedMailbox()">Emails laden</button>
+            </div>
+        </div>
+    </div>
+
     <!-- BATCH EDIT MODAL -->
     <div class="modal" id="batchEditModal">
         <div class="modal-content">
@@ -783,34 +806,62 @@
             }
 
             try {
-                showLoading(true, "Ermittle aktuellen Outlook-Ordner...");
+                // Zeige Postfach-Auswahl Modal
+                openModal('mailboxModal');
 
-                // Hole den aktuell in Outlook geöffneten Ordner
-                var explorer = outlookApp.ActiveExplorer();
-                var currentFolder = explorer.CurrentFolder;
+                // Lade alle verfügbaren Postfächer
+                var mailboxSelect = document.getElementById('mailboxSelect');
+                mailboxSelect.innerHTML = '';
 
-                var folderInfo = "Ordner: " + currentFolder.Name + "\n";
-                folderInfo += "Postfach: " + currentFolder.Store.DisplayName + "\n";
-                folderInfo += "Pfad: " + currentFolder.FolderPath + "\n\n";
-                folderInfo += "Zeitraum: Letzte 7 Tage\n\n";
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var stores = namespace.Stores;
 
-                var response = confirm(folderInfo +
-                    "Möchtest du Emails aus diesem Ordner laden?\n\n" +
-                    "(Wenn nein, navigiere in Outlook zum gewünschten Ordner und klicke erneut auf 'Letzte Woche laden')");
-
-                if (!response) {
-                    showLoading(false);
-                    return;
+                for (var i = 1; i <= stores.Count; i++) {
+                    try {
+                        var store = stores.Item(i);
+                        var option = document.createElement('option');
+                        option.value = i;
+                        option.text = store.DisplayName;
+                        mailboxSelect.appendChild(option);
+                    } catch (e) {
+                        // Manche Stores können nicht geladen werden - ignorieren
+                    }
                 }
 
-                showLoading(true, "Lade Emails der letzten Woche aus '" + currentFolder.Name + "'...");
+                if (mailboxSelect.options.length === 0) {
+                    mailboxSelect.innerHTML = '<option value="">Keine Postfächer gefunden</option>';
+                    alert('Keine Postfächer gefunden!');
+                }
+
+            } catch (e) {
+                alert("Fehler beim Laden der Postfächer:\n\n" + e.message);
+            }
+        }
+
+        function loadLastWeekFromSelectedMailbox() {
+            var mailboxSelect = document.getElementById('mailboxSelect');
+            var storeIndex = mailboxSelect.value;
+
+            if (!storeIndex) {
+                alert('Bitte wähle ein Postfach aus!');
+                return;
+            }
+
+            try {
+                closeModal('mailboxModal');
+
+                var namespace = outlookApp.GetNamespace("MAPI");
+                var store = namespace.Stores.Item(parseInt(storeIndex));
+                var inbox = store.GetDefaultFolder(6); // olFolderInbox = 6
+
+                showLoading(true, "Lade Emails der letzten Woche aus '" + store.DisplayName + "'...");
 
                 // Datum: 7 Tage zurück
                 var sevenDaysAgo = new Date();
                 sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-                document.getElementById('loadingText').innerText = "Hole alle Emails aus Ordner...";
-                var items = currentFolder.Items;
+                document.getElementById('loadingText').innerText = "Hole alle Emails aus Posteingang...";
+                var items = inbox.Items;
 
                 var newEmails = [];
                 var count = 0;
@@ -892,8 +943,8 @@
                 processEmails(newEmails);
 
                 var msg = "✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!\n\n";
-                msg += "Ordner: " + currentFolder.Name + "\n";
-                msg += "Postfach: " + currentFolder.Store.DisplayName + "\n\n";
+                msg += "Ordner: " + inbox.Name + "\n";
+                msg += "Postfach: " + store.DisplayName + "\n\n";
                 msg += "Statistik:\n";
                 msg += "- Items durchsucht: " + totalItems + "\n";
                 msg += "- Zu alt (übersprungen): " + skippedOld;
@@ -908,7 +959,7 @@
                       "Details: " + (e.description || "Keine Details verfügbar") + "\n\n" +
                       "Bitte stelle sicher dass:\n" +
                       "1. Outlook geöffnet ist\n" +
-                      "2. Du in einem Email-Ordner bist (nicht Kalender/Kontakte)");
+                      "2. Ein Postfach ausgewählt ist");
             }
         }
 
