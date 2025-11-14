@@ -1170,6 +1170,12 @@
 
                                 totalProcessed++;
 
+                                // FORTSCHRITT ÖFTER ANZEIGEN (alle 5 Emails)
+                                if (i % 5 === 0 || i === 1) {
+                                    showLoading(true, folderName + ": " + i + " / " + filtered.Count + " durchsucht\n" +
+                                               allNewEmails.length + " neu gefunden");
+                                }
+
                                 // Extrahiere Daten MIT korrekter Email-Adresse
                                 var senderEmail = getSenderEmail(item);
                                 var senderName = item.SenderName || "Unbekannt";
@@ -1199,9 +1205,6 @@
 
                                 allNewEmails.push(emailData);
 
-                                if (i % 20 === 0) {
-                                    showLoading(true, folderName + ": " + i + "/" + filtered.Count + " verarbeitet...");
-                                }
                             } catch (e) {
                                 // Skip fehlerhafte Email
                             }
@@ -1230,6 +1233,11 @@
 
                 for (var i = 0; i < allNewEmails.length; i++) {
                     try {
+                        // FORTSCHRITT ANZEIGEN (alle 3 Emails)
+                        if (i % 3 === 0 || i === 0) {
+                            showLoading(true, "Lade Inhalte: " + (i + 1) + " / " + allNewEmails.length + "\nBitte warten...");
+                        }
+
                         var email = allNewEmails[i];
                         if (email.mailItem) {
                             email.text = getEmailBody(email.mailItem);
@@ -1250,10 +1258,6 @@
 
                             // Lösche Referenz zum Item (Speicher freigeben)
                             delete email.mailItem;
-                        }
-
-                        if (i % 10 === 0) {
-                            showLoading(true, "Lade Inhalt " + (i + 1) + "/" + allNewEmails.length + "...");
                         }
                     } catch (e) {
                         // Skip
@@ -2050,9 +2054,12 @@
             }
         }
 
-        // Entferne Signatur aus Email-Text
+        // Entferne Signatur UND Email-Zitate aus Text
         function removeSignature(text) {
             if (!text) return "";
+
+            // ZUERST: Entferne Email-Zitate (alles ab "Von: ... Gesendet: ...")
+            text = removeEmailQuotes(text);
 
             var lines = text.split('\n');
             var resultLines = [];
@@ -2060,6 +2067,8 @@
 
             // Signatur-Marker
             var signatureMarkers = [
+                /^--\s*$/,  // Deloitte-Signatur beginnt mit "--"
+                /^_{10,}$/,  // Trennlinie mit Unterstrichen
                 /mit\s+freundlichen?\s+gr(ü|ue)(ß|ss)en/i,
                 /viele\s+gr(ü|ue)(ß|ss)e/i,
                 /beste\s+gr(ü|ue)(ß|ss)e/i,
@@ -2068,7 +2077,8 @@
                 /art\.\s*13.*dsgvo/i,
                 /vertraulichkeitshinweis/i,
                 /confidential/i,
-                /disclaimer/i
+                /disclaimer/i,
+                /please\s+consider\s+the\s+environment/i
             ];
 
             for (var i = 0; i < lines.length; i++) {
@@ -2091,6 +2101,30 @@
             }
 
             return resultLines.join('\n').trim();
+        }
+
+        // Entfernt Email-Zitate (alles ab "Von: ... Gesendet: ...")
+        function removeEmailQuotes(text) {
+            if (!text) return "";
+
+            // Pattern für Outlook-Zitate
+            var quotePatterns = [
+                /_{5,}\s*\n\s*Von:/i,  // _____ Von:
+                /^Von:\s+.+\n\s*Gesendet:/im,  // Von: ... Gesendet:
+                /^From:\s+.+\n\s*Sent:/im,  // From: ... Sent:
+                /^Am\s+.+\s+schrieb\s+.+:/im  // Am ... schrieb ...:
+            ];
+
+            for (var i = 0; i < quotePatterns.length; i++) {
+                var match = text.match(quotePatterns[i]);
+                if (match) {
+                    // Schneide alles ab dem Zitat ab
+                    text = text.substring(0, match.index);
+                    break;
+                }
+            }
+
+            return text.trim();
         }
 
         // Suche Antwort zu einer Email im Postausgang
@@ -2165,47 +2199,13 @@
         function extractReplyText(fullText) {
             if (!fullText) return "";
 
-            var lines = fullText.split('\n');
-            var replyLines = [];
-            var foundQuote = false;
+            // Verwende die gleiche Funktion wie bei removeSignature
+            var cleanText = removeEmailQuotes(fullText);
 
-            // Quote-Marker
-            var quoteMarkers = [
-                /^>/,                           // > am Anfang
-                /^-----\s*original/i,           // ----- Original Message -----
-                /^von:.*gesendet:/i,            // Von: ... Gesendet:
-                /^from:.*sent:/i,               // From: ... Sent:
-                /^am.*schrieb.*:/i,             // Am ... schrieb ...:
-                /^on.*wrote:/i,                 // On ... wrote:
-                /^\s*\*{3,}/,                   // ***********
-                /^\s*_{3,}/                     // ___________
-            ];
+            // Entferne auch Signaturen aus der Antwort
+            cleanText = removeSignature(cleanText);
 
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i];
-
-                // Prüfe ob Zitat beginnt
-                if (!foundQuote) {
-                    for (var j = 0; j < quoteMarkers.length; j++) {
-                        if (quoteMarkers[j].test(line)) {
-                            foundQuote = true;
-                            break;
-                        }
-                    }
-                }
-
-                // Wenn noch kein Zitat gefunden, füge Zeile hinzu
-                if (!foundQuote) {
-                    replyLines.push(line);
-                }
-            }
-
-            var reply = replyLines.join('\n').trim();
-
-            // Entferne Signatur aus Antwort
-            reply = removeSignature(reply);
-
-            return reply;
+            return cleanText.trim();
         }
 
         function formatDate(date) {
