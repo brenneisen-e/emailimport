@@ -1083,57 +1083,35 @@
             }
 
             try {
-                // WICHTIG: Zuerst den Emailtracker laden!
-                loadExistingEmailsFromTracker();
+                // Zeige Postfach-Auswahl Modal
+                openModal('mailboxModal');
 
-                showLoading(true, "Durchsuche Posteingang und Postausgang...");
+                // Lade alle verfügbaren Postfächer
+                var mailboxSelect = document.getElementById('mailboxSelect');
+                mailboxSelect.innerHTML = '';
 
                 var namespace = outlookApp.GetNamespace("MAPI");
+                var stores = namespace.Stores;
 
-                // Datum: 7 Tage zurück
-                var sevenDaysAgo = new Date();
-                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-                var allEmails = [];
-
-                // Durchsuche Posteingang (inkl. Unterordner)
-                showLoading(true, "Durchsuche Posteingang (inkl. Unterordner)...");
-                try {
-                    var inbox = namespace.GetDefaultFolder(6); // olFolderInbox
-                    collectEmailsFromFolderRecursive(inbox, sevenDaysAgo, allEmails);
-                } catch (e) {
-                    console.log("Fehler beim Laden des Posteingangs: " + e.message);
+                for (var i = 1; i <= stores.Count; i++) {
+                    try {
+                        var store = stores.Item(i);
+                        var option = document.createElement('option');
+                        option.value = i;
+                        option.text = store.DisplayName;
+                        mailboxSelect.appendChild(option);
+                    } catch (e) {
+                        // Manche Stores können nicht geladen werden - ignorieren
+                    }
                 }
 
-                // Durchsuche Postausgang (inkl. Unterordner)
-                showLoading(true, "Durchsuche Postausgang (inkl. Unterordner)...");
-                try {
-                    var sentItems = namespace.GetDefaultFolder(5); // olFolderSentMail
-                    collectEmailsFromFolderRecursive(sentItems, sevenDaysAgo, allEmails);
-                } catch (e) {
-                    console.log("Fehler beim Laden des Postausgangs: " + e.message);
+                if (mailboxSelect.options.length === 0) {
+                    mailboxSelect.innerHTML = '<option value="">Keine Postfächer gefunden</option>';
+                    alert('Keine Postfächer gefunden!');
                 }
-
-                showLoading(false);
-
-                if (allEmails.length === 0) {
-                    showNotification("Keine Emails der letzten 7 Tage gefunden.", 'info', 'Keine Emails');
-                    return;
-                }
-
-                processEmails(allEmails);
-
-                showNotification(
-                    allEmails.length + " Emails geladen\n" +
-                    "Quelle: Posteingang + Postausgang (inkl. Unterordner)\n" +
-                    "Zeitraum: Letzte 7 Tage",
-                    'success',
-                    'Emails geladen'
-                );
 
             } catch (e) {
-                showLoading(false);
-                alert("Fehler beim Laden der Emails:\n\n" + e.message);
+                alert("Fehler beim Laden der Postfächer:\n\n" + e.message);
             }
         }
 
@@ -1558,11 +1536,39 @@
                 folderSelect.innerHTML = '';
 
                 var namespace = outlookApp.GetNamespace("MAPI");
-                var folders = namespace.Folders;
+                var stores = namespace.Stores;
 
-                for (var i = 1; i <= folders.Count; i++) {
-                    var rootFolder = folders.Item(i);
-                    addFolderOptions(folderSelect, rootFolder, "");
+                // Zeige nur die HAUPTORDNER der Postfächer (nicht alle Unterordner)
+                for (var i = 1; i <= stores.Count; i++) {
+                    try {
+                        var store = stores.Item(i);
+                        var rootFolder = store.GetRootFolder();
+
+                        // Füge Posteingang hinzu
+                        try {
+                            var inbox = store.GetDefaultFolder(6);
+                            var option = document.createElement('option');
+                            option.value = inbox.EntryID;
+                            option.text = store.DisplayName + " - Posteingang (" + inbox.Items.Count + ")";
+                            folderSelect.appendChild(option);
+                        } catch (e) {}
+
+                        // Füge Postausgang hinzu
+                        try {
+                            var sentItems = store.GetDefaultFolder(5);
+                            var option = document.createElement('option');
+                            option.value = sentItems.EntryID;
+                            option.text = store.DisplayName + " - Postausgang (" + sentItems.Items.Count + ")";
+                            folderSelect.appendChild(option);
+                        } catch (e) {}
+                    } catch (e) {
+                        // Store nicht zugänglich - überspringen
+                    }
+                }
+
+                if (folderSelect.options.length === 0) {
+                    alert('Keine Ordner gefunden!');
+                    return;
                 }
 
                 openModal('folderModal');
@@ -1599,52 +1605,47 @@
 
             try {
                 closeModal('folderModal');
-
-                // Frage nach Zeitraum
-                var timeframe = confirm(
-                    "Welchen Zeitraum möchtest du laden?\n\n" +
-                    "OK = Nur letzte 7 Tage (schnell)\n" +
-                    "Abbrechen = Alle Emails (langsam)"
-                );
-
-                // WICHTIG: Zuerst den Emailtracker laden!
-                loadExistingEmailsFromTracker();
+                showLoading(true, "Lade Emails aus Ordner...");
 
                 var namespace = outlookApp.GetNamespace("MAPI");
                 var folder = namespace.GetFolderFromID(entryID);
 
-                var cutoffDate = null;
-                if (timeframe) {
-                    // Nur letzte 7 Tage
-                    cutoffDate = new Date();
-                    cutoffDate.setDate(cutoffDate.getDate() - 7);
-                    showLoading(true, "Lade Emails der letzten 7 Tage aus '" + folder.Name + "' (inkl. Unterordner)...");
-                } else {
-                    // Alle Emails
-                    showLoading(true, "Lade ALLE Emails aus '" + folder.Name + "' (inkl. Unterordner)...");
-                }
-
-                var allEmails = [];
-
-                // Durchsuche Ordner inkl. Unterordner
-                collectEmailsFromFolderRecursive(folder, cutoffDate, allEmails);
-
-                showLoading(false);
-
-                if (allEmails.length === 0) {
-                    showNotification("Keine Emails gefunden.", 'info', 'Keine Emails');
+                if (folder.Items.Count === 0) {
+                    alert("Der Ordner enthält keine Emails!");
+                    showLoading(false);
                     return;
                 }
 
-                processEmails(allEmails);
+                var newEmails = [];
+                var items = folder.Items;
 
-                var message = allEmails.length + " Emails geladen\n" +
-                             "Quelle: " + folder.Name + " (inkl. Unterordner)";
-                if (cutoffDate) {
-                    message += "\nZeitraum: Letzte 7 Tage";
+                // Durchlaufe alle Items (ohne Unterordner!)
+                for (var i = 1; i <= items.Count; i++) {
+                    if (i % 50 === 0) {
+                        document.getElementById('loadingText').innerText = "Lade Email " + i + " von " + items.Count + "...";
+                    }
+
+                    var item = items.Item(i);
+                    if (item.Class === 43) { // olMail
+                        newEmails.push(extractEmailData(item));
+                    }
+
+                    // Limit: Max 200 Emails
+                    if (newEmails.length >= 200) {
+                        if (!confirm("200 Emails geladen. Weitermachen?")) {
+                            break;
+                        }
+                    }
                 }
 
-                showNotification(message, 'success', 'Emails geladen');
+                processEmails(newEmails);
+                showLoading(false);
+
+                showNotification(
+                    newEmails.length + " Emails geladen\nQuelle: " + folder.Name,
+                    'success',
+                    'Emails geladen'
+                );
 
             } catch (e) {
                 showLoading(false);
