@@ -901,6 +901,7 @@
         var existingEmailsInTracker = new Set(); // Set für schnelle Duplikat-Prüfung
         var excelApp = null; // Globale Excel-Instanz (wird beim Tracker-Laden initialisiert)
         var trackingWorkbook = null; // Globales Tracking_Hypercare Workbook
+        var sentItemsCache = null; // Cache für Sent Items (für schnelle Reply-Suche)
 
         // ============================================================================
         // INITIALIZATION
@@ -1141,6 +1142,9 @@
                 var duplicatesWithPotentialReplies = []; // Duplikate die Antwort haben könnten
                 var totalProcessed = 0;
                 var skippedDuplicate = 0;
+
+                // PERFORMANCE: Lade Sent Items Cache EINMAL für schnelle Reply-Suche
+                loadSentItemsCache(sevenDaysAgo);
 
                 // Durchsuche beide Ordner
                 var folders = [
@@ -2165,37 +2169,30 @@
             return text.trim();
         }
 
-        // Suche ALLE Antworten zu einer Email im Postausgang
-        function findReplyInSentItems(originalEmail) {
+        // PERFORMANCE: Lade Sent Items nur EINMAL und cache sie
+        function loadSentItemsCache(cutoffDate) {
             if (!outlookApp) {
-                return null;
+                return;
             }
 
             try {
+                showLoading(true, "Lade Sent Items für schnelle Antwort-Suche...");
+
                 var namespace = outlookApp.GetNamespace("MAPI");
                 var sentFolder = namespace.GetDefaultFolder(5); // olFolderSentMail = 5
                 var items = sentFolder.Items;
 
-                // Sortiere nach Datum (älteste zuerst für chronologische Reihenfolge)
-                // WICHTIG: Im Sent Items Ordner verwenden wir SentOn, nicht ReceivedTime!
+                // Sortiere nach Datum (älteste zuerst)
                 try {
                     items.Sort("[SentOn]", false);
                 } catch (e) {
                     // Sortieren fehlgeschlagen, weitermachen
                 }
 
-                var originalSubject = originalEmail.betreff.toLowerCase().trim();
-                // Entferne "RE:", "AW:", "FWD:" etc.
-                originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
+                sentItemsCache = [];
 
-                var originalDate = new Date(originalEmail.datum);
-
-                // WICHTIG: Sammle ALLE Antworten (nicht nur die erste!)
-                var allReplies = [];
-
-                // Durchsuche max. 200 gesendete Emails (deutlich erhöht für bessere Abdeckung)
+                // Lade nur Sent Items ab Cutoff-Datum (max 200)
                 var maxCheck = Math.min(items.Count, 200);
-                var tooOldCount = 0; // Zähle aufeinanderfolgende zu alte Emails
 
                 for (var i = 1; i <= maxCheck; i++) {
                     try {
@@ -2205,37 +2202,71 @@
 
                         var sentDate = new Date(item.SentOn || item.ReceivedTime);
 
-                        // Antwort muss NACH der Original-Email sein
-                        if (sentDate < originalDate) continue;
+                        // Nur Emails ab Cutoff-Datum
+                        if (cutoffDate && sentDate < cutoffDate) continue;
 
-                        // Antwort sollte max. 30 Tage nach Original sein
-                        var daysDiff = (sentDate - originalDate) / (1000 * 60 * 60 * 24);
-                        if (daysDiff > 30) {
-                            tooOldCount++;
-                            // Breche nur ab wenn 10 aufeinanderfolgende Emails zu alt sind
-                            if (tooOldCount > 10) break;
-                            continue;
-                        }
-                        tooOldCount = 0; // Reset counter
+                        var subject = (item.Subject || "").toLowerCase().trim();
+                        // Normalisiere Betreff (entferne RE:/AW:/FWD:)
+                        var normalizedSubject = subject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
 
-                        var sentSubject = (item.Subject || "").toLowerCase().trim();
-                        sentSubject = sentSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
-
-                        // Prüfe ob Betreff übereinstimmt
-                        if (sentSubject === originalSubject ||
-                            sentSubject.indexOf(originalSubject) !== -1 ||
-                            originalSubject.indexOf(sentSubject) !== -1) {
-
-                            // Gefunden! Extrahiere Antwort-Text
-                            var replyText = getEmailBody(item);
-                            replyText = extractReplyText(replyText);
-
-                            if (replyText && replyText.trim() !== "") {
-                                allReplies.push(replyText.trim());
-                            }
-                        }
+                        // Cache Objekt mit allen wichtigen Infos
+                        sentItemsCache.push({
+                            subject: subject,
+                            normalizedSubject: normalizedSubject,
+                            sentDate: sentDate,
+                            body: getEmailBody(item) // Lade Body direkt
+                        });
                     } catch (e) {
                         // Fehler bei diesem Item, weiter
+                    }
+                }
+
+                showLoading(false);
+            } catch (e) {
+                showLoading(false);
+                console.log("Fehler beim Laden des Sent Items Cache: " + e.message);
+            }
+        }
+
+        // Suche ALLE Antworten zu einer Email im Postausgang (nutzt Cache!)
+        function findReplyInSentItems(originalEmail) {
+            // PERFORMANCE: Nutze Cache statt jedes Mal Outlook zu durchsuchen
+            if (!sentItemsCache || sentItemsCache.length === 0) {
+                return null;
+            }
+
+            try {
+                var originalSubject = originalEmail.betreff.toLowerCase().trim();
+                // Entferne "RE:", "AW:", "FWD:" etc.
+                originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg):\s*/i, '').trim();
+
+                var originalDate = new Date(originalEmail.datum);
+
+                // WICHTIG: Sammle ALLE Antworten (nicht nur die erste!)
+                var allReplies = [];
+
+                // Durchsuche Cache (viel schneller!)
+                for (var i = 0; i < sentItemsCache.length; i++) {
+                    var cachedItem = sentItemsCache[i];
+
+                    // Antwort muss NACH der Original-Email sein
+                    if (cachedItem.sentDate < originalDate) continue;
+
+                    // Antwort sollte max. 30 Tage nach Original sein
+                    var daysDiff = (cachedItem.sentDate - originalDate) / (1000 * 60 * 60 * 24);
+                    if (daysDiff > 30) continue;
+
+                    // Prüfe ob Betreff übereinstimmt
+                    if (cachedItem.normalizedSubject === originalSubject ||
+                        cachedItem.normalizedSubject.indexOf(originalSubject) !== -1 ||
+                        originalSubject.indexOf(cachedItem.normalizedSubject) !== -1) {
+
+                        // Gefunden! Extrahiere Antwort-Text
+                        var replyText = extractReplyText(cachedItem.body);
+
+                        if (replyText && replyText.trim() !== "") {
+                            allReplies.push(replyText.trim());
+                        }
                     }
                 }
 
