@@ -807,6 +807,7 @@
         var filteredEmails = [];
         var nextId = 1;
         var outlookApp = null;
+        var existingEmailsInTracker = new Set(); // Set für schnelle Duplikat-Prüfung
 
         // ============================================================================
         // INITIALIZATION
@@ -821,6 +822,114 @@
                 outlookApp = new ActiveXObject("Outlook.Application");
             } catch (e) {
                 alert("Outlook konnte nicht gestartet werden.\n\nBitte stelle sicher dass:\n1. Microsoft Outlook installiert ist\n2. Outlook mindestens einmal gestartet wurde\n\nFehler: " + e.message);
+            }
+        }
+
+        // ============================================================================
+        // EMAIL TRACKING & DEDUPLICATION
+        // ============================================================================
+        function getEmailIdentifier(email) {
+            // Erstelle eindeutigen Identifier aus Von-Email + Betreff + Datum (nur Datum, keine Zeit)
+            var date = new Date(email.datum);
+            var dateStr = date.getFullYear() + "-" +
+                         ("0" + (date.getMonth() + 1)).slice(-2) + "-" +
+                         ("0" + date.getDate()).slice(-2);
+            return email.von_email.toLowerCase() + "|" + email.betreff.toLowerCase() + "|" + dateStr;
+        }
+
+        function loadExistingEmailsFromTracker() {
+            existingEmailsInTracker.clear();
+
+            try {
+                showLoading(true, "Öffne Excel und lade Emailtracker...");
+
+                var excel = null;
+                try {
+                    excel = GetObject("", "Excel.Application");
+                } catch (e) {
+                    excel = new ActiveXObject("Excel.Application");
+                }
+                excel.Visible = true;
+
+                // Suche Tracking_Hypercare
+                var workbook = null;
+                var found = false;
+
+                // Prüfe offene Workbooks
+                for (var i = 1; i <= excel.Workbooks.Count; i++) {
+                    var wb = excel.Workbooks(i);
+                    var wbName = wb.Name.toLowerCase().replace(/[_\-\s]/g, '');
+                    if (wbName.indexOf('hypercare') !== -1) {
+                        workbook = wb;
+                        found = true;
+                        break;
+                    }
+                }
+
+                // Falls nicht gefunden, versuche zu öffnen
+                if (!found) {
+                    var sharePointUrl = "https://barmeniagroup.sharepoint.com/sites/SAPUnity-WorkstreamICM/Freigegebene%20Dokumente/40%20Team%20Simulation,%20Kalibrierung,%20Verhandlung,%20Vertrag%20&%20EFM/Tracking_Hypercare.xlsm";
+                    try {
+                        workbook = excel.Workbooks.Open(sharePointUrl);
+                        found = true;
+                    } catch (e) {
+                        showLoading(false);
+                        alert("⚠️ Tracking_Hypercare.xlsm konnte nicht geöffnet werden!\n\n" +
+                              "Bitte öffne die Datei manuell in Excel und versuche es erneut.\n\n" +
+                              "Fortfahren ohne Duplikat-Prüfung?");
+                        return; // Ohne Tracker weitermachen
+                    }
+                }
+
+                // Suche Emailtracker Worksheet
+                var trackerSheet = null;
+                try {
+                    trackerSheet = workbook.Worksheets("Emailtracker");
+                } catch (e) {
+                    showLoading(false);
+                    alert("ℹ️ Worksheet 'Emailtracker' nicht gefunden.\n\nFortfahren ohne Duplikat-Prüfung.");
+                    return;
+                }
+
+                // Lese alle Emails aus Emailtracker
+                var lastRow = trackerSheet.Cells(trackerSheet.Rows.Count, 1).End(-4162).Row;
+                var count = 0;
+
+                document.getElementById('loadingText').innerText =
+                    "Lese Emailtracker...\n\n0 Emails gelesen";
+
+                for (var row = 2; row <= lastRow; row++) {
+                    if (row % 10 === 0) {
+                        document.getElementById('loadingText').innerText =
+                            "Lese Emailtracker...\n\n" + (row - 1) + " Emails gelesen";
+                    }
+
+                    try {
+                        var vonEmail = trackerSheet.Cells(row, 4).Value; // Von Email (Spalte D)
+                        var betreff = trackerSheet.Cells(row, 5).Value;  // Betreff (Spalte E)
+                        var datum = trackerSheet.Cells(row, 2).Value;     // Datum (Spalte B)
+
+                        if (vonEmail && betreff && datum) {
+                            // Erstelle Identifier
+                            var dateObj = new Date(datum);
+                            var dateStr = dateObj.getFullYear() + "-" +
+                                         ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
+                                         ("0" + dateObj.getDate()).slice(-2);
+                            var identifier = vonEmail.toLowerCase() + "|" + betreff.toLowerCase() + "|" + dateStr;
+                            existingEmailsInTracker.add(identifier);
+                            count++;
+                        }
+                    } catch (e) {
+                        // Zeile überspringen bei Fehler
+                    }
+                }
+
+                showLoading(false);
+                alert("✅ Emailtracker geladen!\n\n" + count + " Emails bereits in Excel hinterlegt.");
+
+            } catch (e) {
+                showLoading(false);
+                alert("⚠️ Fehler beim Laden des Emailtrackers:\n\n" + e.message + "\n\nFortfahren ohne Duplikat-Prüfung?");
             }
         }
 
@@ -878,6 +987,9 @@
             try {
                 closeModal('mailboxModal');
 
+                // WICHTIG: Zuerst den Emailtracker laden!
+                loadExistingEmailsFromTracker();
+
                 var namespace = outlookApp.GetNamespace("MAPI");
                 var store = namespace.Stores.Item(parseInt(storeIndex));
                 var inbox = store.GetDefaultFolder(6); // olFolderInbox = 6
@@ -903,6 +1015,7 @@
                 var count = 0;
                 var errors = 0;
                 var skippedOld = 0;
+                var skippedDuplicate = 0; // Emails die bereits im Tracker sind
                 var totalItems = items.Count;
 
                 if (totalItems > 1000) {
@@ -923,7 +1036,10 @@
                     try {
                         // Update Fortschritt alle 5 Items
                         if (i % 5 === 0 || newEmails.length % 5 === 0) {
-                            document.getElementById('loadingText').innerText = "⏳ " + i + " / " + totalItems + " durchsucht... ✅ " + newEmails.length + " Emails gefunden";
+                            document.getElementById('loadingText').innerText =
+                                "⏳ " + i + " / " + totalItems + " durchsucht...\n" +
+                                "✅ " + newEmails.length + " neu\n" +
+                                "⚠️ " + skippedDuplicate + " bereits in Excel";
                         }
 
                         var item = items.Item(i);
@@ -948,6 +1064,13 @@
                         // NUR wenn Datum passt: Lade Metadaten (OHNE Body!)
                         var emailData = extractEmailData(item);
                         if (emailData) {
+                            // Prüfe ob Email bereits im Tracker existiert
+                            var identifier = getEmailIdentifier(emailData);
+                            if (existingEmailsInTracker.has(identifier)) {
+                                skippedDuplicate++;
+                                continue; // Überspringen, bereits vorhanden
+                            }
+
                             newEmails.push(emailData);
                             count++;
                         }
@@ -966,24 +1089,37 @@
 
                 showLoading(false);
 
-                if (newEmails.length === 0) {
+                if (newEmails.length === 0 && skippedDuplicate === 0) {
                     alert("Keine Email-Nachrichten gefunden!\n\n" +
                           "Gesamte Items im Ordner: " + totalItems + "\n" +
                           "Zu alte Emails (>7 Tage): " + skippedOld + "\n" +
+                          "Bereits in Excel: " + skippedDuplicate + "\n" +
                           "Fehler beim Laden: " + errors);
+                    return;
+                }
+
+                if (newEmails.length === 0 && skippedDuplicate > 0) {
+                    alert("✅ Alle Emails bereits in Excel vorhanden!\n\n" +
+                          "📊 Statistik:\n" +
+                          "- Items durchsucht: " + totalItems + "\n" +
+                          "- Bereits in Excel: " + skippedDuplicate + "\n" +
+                          "- Zu alt (>7 Tage): " + skippedOld + "\n" +
+                          "- Neue Emails: 0");
                     return;
                 }
 
                 processEmails(newEmails);
 
-                var msg = "✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!\n\n";
-                msg += "Ordner: " + inbox.Name + "\n";
-                msg += "Postfach: " + store.DisplayName + "\n\n";
-                msg += "Statistik:\n";
+                var msg = "✅ " + newEmails.length + " NEUE Email(s) geladen!\n\n";
+                msg += "📍 Ordner: " + inbox.Name + "\n";
+                msg += "📬 Postfach: " + store.DisplayName + "\n\n";
+                msg += "📊 Statistik:\n";
                 msg += "- Items durchsucht: " + totalItems + "\n";
-                msg += "- Zu alt (übersprungen): " + skippedOld;
+                msg += "- ✅ NEU: " + newEmails.length + "\n";
+                msg += "- ⚠️ Bereits in Excel: " + skippedDuplicate + "\n";
+                msg += "- 📅 Zu alt (>7 Tage): " + skippedOld;
                 if (errors > 0) {
-                    msg += "\n- Fehler: " + errors;
+                    msg += "\n- ❌ Fehler: " + errors;
                 }
                 alert(msg);
 
