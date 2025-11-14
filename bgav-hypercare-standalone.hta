@@ -706,7 +706,7 @@
             </div>
             <div class="header-actions">
                 <button class="btn btn-primary" onclick="loadLastWeekFromInbox()">
-                    📆 Letzte Woche laden
+                    ⚡ Letzte Woche (schnell)
                 </button>
                 <button class="btn btn-warning" onclick="loadFromOutlookSelection()">
                     📥 Ausgewählte Emails
@@ -1083,35 +1083,107 @@
             }
 
             try {
-                // Zeige Postfach-Auswahl Modal
-                openModal('mailboxModal');
+                // WICHTIG: Zuerst den Emailtracker laden!
+                loadExistingEmailsFromTracker();
 
-                // Lade alle verfügbaren Postfächer
-                var mailboxSelect = document.getElementById('mailboxSelect');
-                mailboxSelect.innerHTML = '';
+                showLoading(true, "Durchsuche Posteingang und Postausgang...");
 
                 var namespace = outlookApp.GetNamespace("MAPI");
-                var stores = namespace.Stores;
 
-                for (var i = 1; i <= stores.Count; i++) {
+                // Datum: 7 Tage zurück
+                var sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                var allEmails = [];
+
+                // Durchsuche Posteingang (inkl. Unterordner)
+                showLoading(true, "Durchsuche Posteingang (inkl. Unterordner)...");
+                try {
+                    var inbox = namespace.GetDefaultFolder(6); // olFolderInbox
+                    collectEmailsFromFolderRecursive(inbox, sevenDaysAgo, allEmails);
+                } catch (e) {
+                    console.log("Fehler beim Laden des Posteingangs: " + e.message);
+                }
+
+                // Durchsuche Postausgang (inkl. Unterordner)
+                showLoading(true, "Durchsuche Postausgang (inkl. Unterordner)...");
+                try {
+                    var sentItems = namespace.GetDefaultFolder(5); // olFolderSentMail
+                    collectEmailsFromFolderRecursive(sentItems, sevenDaysAgo, allEmails);
+                } catch (e) {
+                    console.log("Fehler beim Laden des Postausgangs: " + e.message);
+                }
+
+                showLoading(false);
+
+                if (allEmails.length === 0) {
+                    showNotification("Keine Emails der letzten 7 Tage gefunden.", 'info', 'Keine Emails');
+                    return;
+                }
+
+                processEmails(allEmails);
+
+                showNotification(
+                    allEmails.length + " Emails geladen\n" +
+                    "Quelle: Posteingang + Postausgang (inkl. Unterordner)\n" +
+                    "Zeitraum: Letzte 7 Tage",
+                    'success',
+                    'Emails geladen'
+                );
+
+            } catch (e) {
+                showLoading(false);
+                alert("Fehler beim Laden der Emails:\n\n" + e.message);
+            }
+        }
+
+        // Rekursive Hilfsfunktion: Sammelt Emails aus Ordner und allen Unterordnern
+        function collectEmailsFromFolderRecursive(folder, cutoffDate, emailArray) {
+            if (!folder) return;
+
+            try {
+                // Durchsuche Emails in diesem Ordner
+                var items = folder.Items;
+
+                for (var i = 1; i <= items.Count; i++) {
                     try {
-                        var store = stores.Item(i);
-                        var option = document.createElement('option');
-                        option.value = i;
-                        option.text = store.DisplayName;
-                        mailboxSelect.appendChild(option);
+                        var item = items.Item(i);
+
+                        // Nur Emails
+                        if (item.Class === 43) { // olMail
+                            var receivedTime = new Date(item.ReceivedTime);
+
+                            // Nur letzte 7 Tage
+                            if (receivedTime >= cutoffDate) {
+                                // Prüfe Duplikat
+                                var senderEmail = getSenderEmail(item);
+                                var emailKey = senderEmail + "|" +
+                                             (item.Subject || "") + "|" +
+                                             formatDate(receivedTime);
+
+                                if (!existingEmailKeys.has(emailKey)) {
+                                    emailArray.push(extractEmailData(item));
+                                }
+                            }
+                        }
                     } catch (e) {
-                        // Manche Stores können nicht geladen werden - ignorieren
+                        // Item-Fehler ignorieren
                     }
                 }
 
-                if (mailboxSelect.options.length === 0) {
-                    mailboxSelect.innerHTML = '<option value="">Keine Postfächer gefunden</option>';
-                    alert('Keine Postfächer gefunden!');
+                // Rekursiv durch Unterordner
+                if (folder.Folders && folder.Folders.Count > 0) {
+                    for (var i = 1; i <= folder.Folders.Count; i++) {
+                        try {
+                            var subFolder = folder.Folders.Item(i);
+                            collectEmailsFromFolderRecursive(subFolder, cutoffDate, emailArray);
+                        } catch (e) {
+                            // Unterordner-Fehler ignorieren
+                        }
+                    }
                 }
-
             } catch (e) {
-                alert("Fehler beim Laden der Postfächer:\n\n" + e.message);
+                console.log("Fehler beim Durchsuchen von Ordner: " + e.message);
             }
         }
 
