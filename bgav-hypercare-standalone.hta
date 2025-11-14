@@ -593,25 +593,17 @@
         /* ============================================================================
            NOTIFICATION SYSTEM
            ============================================================================ */
-        .notification-container {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 10000;
-            max-width: 400px;
-        }
-
         .notification {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 0.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            padding: 1rem;
-            margin-bottom: 0.5rem;
+            border: 1px solid #e9ecef;
+            padding: 0.75rem 1rem;
             display: flex;
-            align-items: start;
+            align-items: center;
             gap: 0.75rem;
-            animation: slideIn 0.3s ease;
+            animation: fadeIn 0.3s ease;
             border-left: 4px solid #366092;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .notification.success {
@@ -631,7 +623,7 @@
         }
 
         .notification-icon {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             line-height: 1;
         }
 
@@ -641,21 +633,22 @@
 
         .notification-title {
             font-weight: 700;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.125rem;
             color: #212529;
+            font-size: 0.875rem;
         }
 
         .notification-message {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             color: #6c757d;
             white-space: pre-line;
-            line-height: 1.4;
+            line-height: 1.3;
         }
 
         .notification-close {
             background: none;
             border: none;
-            font-size: 1.25rem;
+            font-size: 1.125rem;
             cursor: pointer;
             color: #6c757d;
             padding: 0;
@@ -666,37 +659,32 @@
             color: #212529;
         }
 
-        @keyframes slideIn {
+        @keyframes fadeIn {
             from {
-                transform: translateX(100%);
                 opacity: 0;
+                transform: translateY(-10px);
             }
             to {
-                transform: translateX(0);
                 opacity: 1;
+                transform: translateY(0);
             }
         }
 
-        @keyframes slideOut {
+        @keyframes fadeOut {
             from {
-                transform: translateX(0);
                 opacity: 1;
             }
             to {
-                transform: translateX(100%);
                 opacity: 0;
             }
         }
 
         .notification.removing {
-            animation: slideOut 0.3s ease;
+            animation: fadeOut 0.3s ease;
         }
     </style>
 </head>
 <body>
-    <!-- NOTIFICATION CONTAINER -->
-    <div class="notification-container" id="notificationContainer"></div>
-
     <div class="container">
         <!-- HEADER -->
         <div class="header">
@@ -741,6 +729,9 @@
                 <span class="stat-value" id="rueckfrageCount">0</span>
                 <span class="stat-label">Rückfragen</span>
             </div>
+
+            <!-- NOTIFICATION AREA IN STATS BAR -->
+            <div id="notificationContainer" style="flex: 1; display: flex; flex-direction: column; gap: 0.5rem;"></div>
         </div>
 
         <!-- TOOLBAR -->
@@ -2266,7 +2257,7 @@
         // ============================================================================
         function showNotification(message, type, title, duration) {
             type = type || 'info'; // success, error, warning, info
-            duration = duration || 5000; // Auto-close nach 5 Sekunden
+            // duration wird nicht mehr verwendet - Notifications bleiben permanent
 
             var icons = {
                 success: '✅',
@@ -2296,12 +2287,7 @@
 
             container.appendChild(notification);
 
-            // Auto-close
-            if (duration > 0) {
-                setTimeout(function() {
-                    closeNotification(notification.querySelector('.notification-close'));
-                }, duration);
-            }
+            // Kein Auto-close mehr - Notifications bleiben permanent
         }
 
         function closeNotification(button) {
