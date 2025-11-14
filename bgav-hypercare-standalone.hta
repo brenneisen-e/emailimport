@@ -1084,13 +1084,13 @@
             }
         }
 
-        // ULTRA-SCHNELL: Lädt Emails aus einem EINZELNEN Ordner
+        // ULTRA-SCHNELL mit TABLE API: Lädt Emails BLITZSCHNELL
         function loadFromSingleFolder(folderType, folderName) {
             try {
                 showLoading(true, "Lade Emailtracker...");
                 loadExistingEmailsFromTracker();
 
-                showLoading(true, "Durchsuche " + folderName + "...");
+                showLoading(true, "Durchsuche " + folderName + " mit Table API...");
 
                 var namespace = outlookApp.GetNamespace("MAPI");
                 var folder = namespace.GetDefaultFolder(folderType);
@@ -1103,28 +1103,50 @@
                 var year = sevenDaysAgo.getFullYear();
                 var filterDate = month + "/" + day + "/" + year + " 00:00";
 
-                var items = folder.Items;
-                items.Sort("[ReceivedTime]", true); // Neueste zuerst
+                // TABLE API: Nur benötigte Felder laden = ULTRA-SCHNELL!
+                var filter = "[ReceivedTime] >= '" + filterDate + "' AND [MessageClass] = 'IPM.Note'";
 
-                // RESTRICT = BLITZSCHNELL!
-                var filter = "[ReceivedTime] >= '" + filterDate + "'";
-                var filtered = items.Restrict(filter);
+                var table = folder.GetTable(filter);
 
-                var totalFound = filtered.Count;
+                // Sortiere nach ReceivedTime absteigend (neueste zuerst)
+                table.Sort("[ReceivedTime]", true);
+
+                // Begrenze auf erste 200 Zeilen (schneller!)
                 var newEmails = [];
                 var skippedDuplicate = 0;
+                var rowCount = 0;
 
-                showLoading(true, totalFound + " Emails gefunden in " + folderName + "...");
+                showLoading(true, "Lade Emails mit Table API...");
 
-                // Verarbeite gefilterte Emails
-                for (var i = 1; i <= filtered.Count; i++) {
+                // SUPER-SCHNELL: Zeile für Zeile durchgehen
+                while (!table.EndOfTable && newEmails.length < 150) {
+                    var row = table.GetNextRow();
+                    rowCount++;
+
                     try {
-                        var item = filtered.Item(i);
-                        if (item.Class !== 43) continue; // Nur Emails
+                        // Extrahiere Felder direkt aus Tabelle (SCHNELL!)
+                        var subject = row("Subject") || "(Kein Betreff)";
+                        var senderName = row("SenderName") || "Unbekannt";
+                        var senderEmail = row("SenderEmailAddress") || "unknown@unknown.com";
+                        var receivedTime = new Date(row("ReceivedTime"));
+                        var entryID = row("EntryID");
 
-                        var emailData = extractEmailData(item);
+                        // Erstelle Email-Objekt OHNE Body (wird später geladen)
+                        var emailData = {
+                            datum: formatDate(receivedTime),
+                            von_email: senderEmail,
+                            von_name: senderName,
+                            betreff: subject,
+                            text: "", // Wird später geladen
+                            anfrage: "",
+                            antwort: "",
+                            anhänge: [],
+                            bodyLoaded: false,
+                            entryID: entryID // Speichere EntryID für später
+                        };
+
+                        // Duplikat-Check
                         var identifier = getEmailIdentifier(emailData);
-
                         if (existingEmailsInTracker.has(identifier)) {
                             skippedDuplicate++;
                             continue;
@@ -1133,14 +1155,12 @@
                         newEmails.push(emailData);
 
                         // Fortschritt
-                        if (i % 20 === 0) {
-                            showLoading(true, i + " / " + totalFound + " verarbeitet...");
+                        if (rowCount % 20 === 0) {
+                            showLoading(true, rowCount + " Emails verarbeitet...");
                         }
 
-                        // Limit 150 Emails
-                        if (newEmails.length >= 150) break;
                     } catch (e) {
-                        // Skip fehlerhafte Email
+                        // Skip fehlerhafte Zeile
                     }
                 }
 
@@ -1150,7 +1170,7 @@
                     showNotification(
                         'Keine neuen Emails!\n\n' +
                         'Ordner: ' + folderName + '\n' +
-                        'Gefunden: ' + totalFound + '\n' +
+                        'Verarbeitet: ' + rowCount + '\n' +
                         'Bereits in Excel: ' + skippedDuplicate,
                         'info',
                         'Keine neuen Emails',
@@ -1159,9 +1179,44 @@
                     return;
                 }
 
+                // Jetzt BODIES nachladen (nur für neue Emails)
+                showLoading(true, "Lade Email-Inhalte...");
+
+                for (var i = 0; i < newEmails.length; i++) {
+                    try {
+                        var email = newEmails[i];
+                        if (email.entryID) {
+                            var item = namespace.GetItemFromID(email.entryID);
+                            email.text = getEmailBody(item);
+
+                            // Begrenze Länge
+                            if (email.text && email.text.length > 30000) {
+                                email.text = email.text.substring(0, 30000) + "\n\n... (gekürzt)";
+                            }
+
+                            email.bodyLoaded = true;
+
+                            // Anhänge
+                            if (item.Attachments && item.Attachments.Count > 0) {
+                                for (var a = 1; a <= item.Attachments.Count; a++) {
+                                    email.anhänge.push(item.Attachments.Item(a).FileName);
+                                }
+                            }
+                        }
+
+                        if (i % 10 === 0) {
+                            showLoading(true, "Lade Inhalt " + (i + 1) + " / " + newEmails.length + "...");
+                        }
+                    } catch (e) {
+                        // Skip
+                    }
+                }
+
+                showLoading(false);
+
                 // Statistik
                 var stats = 'Ordner: ' + folderName + '\n' +
-                           'Gefunden: ' + totalFound + '\n' +
+                           'Verarbeitet: ' + rowCount + '\n' +
                            'Neu: ' + newEmails.length + '\n' +
                            'Bereits in Excel: ' + skippedDuplicate;
 
@@ -1172,7 +1227,7 @@
 
             } catch (e) {
                 showLoading(false);
-                alert("Fehler:\n\n" + e.message);
+                alert("Fehler:\n\n" + e.message + "\n\nStack: " + (e.stack || "N/A"));
             }
         }
 
