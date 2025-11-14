@@ -1138,6 +1138,7 @@
                 var filterDate = month + "/" + day + "/" + year + " 00:00";
 
                 var allNewEmails = [];
+                var duplicatesWithPotentialReplies = []; // Duplikate die Antwort haben könnten
                 var totalProcessed = 0;
                 var skippedDuplicate = 0;
 
@@ -1200,6 +1201,8 @@
                                 var identifier = getEmailIdentifier(emailData);
                                 if (existingEmailsInTracker.has(identifier)) {
                                     skippedDuplicate++;
+                                    // WICHTIG: Auch für Duplikate auf Antwort prüfen!
+                                    duplicatesWithPotentialReplies.push(emailData);
                                     continue;
                                 }
 
@@ -1214,28 +1217,56 @@
                     }
                 }
 
+                // WICHTIG: Prüfe Duplikate auf neue Antworten und update Excel
+                var updatedReplies = 0;
+                if (duplicatesWithPotentialReplies.length > 0) {
+                    showLoading(true, "Prüfe " + duplicatesWithPotentialReplies.length + " Duplikate auf neue Antworten...");
+
+                    for (var d = 0; d < duplicatesWithPotentialReplies.length; d++) {
+                        try {
+                            var dupEmail = duplicatesWithPotentialReplies[d];
+
+                            // Suche Antwort
+                            if (dupEmail.mailItem) {
+                                var reply = findReplyInSentItems(dupEmail);
+                                if (reply && reply.trim() !== "") {
+                                    // Antwort gefunden! Update in Excel
+                                    updateReplyInExcel(dupEmail, reply);
+                                    updatedReplies++;
+                                }
+                                delete dupEmail.mailItem;
+                            }
+                        } catch (e) {
+                            // Skip
+                        }
+                    }
+                }
+
                 showLoading(false);
 
                 if (allNewEmails.length === 0) {
-                    showNotification(
-                        'Keine neuen Emails!\n\n' +
-                        'Verarbeitet: ' + totalProcessed + '\n' +
-                        'Bereits in Excel: ' + skippedDuplicate,
-                        'info',
-                        'Keine neuen Emails',
-                        5000
-                    );
+                    var msg = 'Keine neuen Emails!\n\n' +
+                              'Verarbeitet: ' + totalProcessed + '\n' +
+                              'Bereits in Excel: ' + skippedDuplicate;
+
+                    if (updatedReplies > 0) {
+                        msg += '\n\n✓ Antworten aktualisiert: ' + updatedReplies;
+                    }
+
+                    showNotification(msg, updatedReplies > 0 ? 'success' : 'info',
+                                   updatedReplies > 0 ? 'Antworten aktualisiert' : 'Keine neuen Emails',
+                                   5000);
                     return;
                 }
 
-                // Jetzt BODIES + ANHÄNGE nachladen
-                showLoading(true, "Lade Email-Inhalte...");
+                // Jetzt BODIES + ANHÄNGE + ANTWORTEN nachladen
+                showLoading(true, "Lade Email-Inhalte und Antworten...");
 
                 for (var i = 0; i < allNewEmails.length; i++) {
                     try {
                         // FORTSCHRITT ANZEIGEN (alle 3 Emails)
                         if (i % 3 === 0 || i === 0) {
-                            showLoading(true, "Lade Inhalte: " + (i + 1) + " / " + allNewEmails.length + "\nBitte warten...");
+                            showLoading(true, "Lade Inhalte + Antworten: " + (i + 1) + " / " + allNewEmails.length);
                         }
 
                         var email = allNewEmails[i];
@@ -1254,6 +1285,23 @@
                                 for (var a = 1; a <= email.mailItem.Attachments.Count; a++) {
                                     email.anhänge.push(email.mailItem.Attachments.Item(a).FileName);
                                 }
+                            }
+
+                            // WICHTIG: Lade ANTWORT direkt beim Email-Abruf (nicht erst beim Export!)
+                            email.anfrage = removeSignature(email.text);
+                            if (email.anfrage && email.anfrage.length > 30000) {
+                                email.anfrage = email.anfrage.substring(0, 30000) + "\n\n... (gekürzt)";
+                            }
+
+                            // Suche Antwort im Postausgang
+                            try {
+                                var reply = findReplyInSentItems(email);
+                                email.antwort = reply || "";
+                                if (email.antwort && email.antwort.length > 30000) {
+                                    email.antwort = email.antwort.substring(0, 30000) + "\n\n... (gekürzt)";
+                                }
+                            } catch (e) {
+                                email.antwort = "";
                             }
 
                             // Lösche Referenz zum Item (Speicher freigeben)
@@ -2001,20 +2049,55 @@
             var resultLines = [];
             var foundSignature = false;
 
-            // Signatur-Marker
+            // ERWEITERTE Signatur-Marker (mehr Pattern für bessere Erkennung)
             var signatureMarkers = [
                 /^--\s*$/,  // Deloitte-Signatur beginnt mit "--"
                 /^_{10,}$/,  // Trennlinie mit Unterstrichen
+                /^-{10,}$/,  // Trennlinie mit Bindestrichen
+                /^={10,}$/,  // Trennlinie mit Gleichheitszeichen
+
+                // Grußformeln (Deutsch)
                 /mit\s+freundlichen?\s+gr(ü|ue)(ß|ss)en/i,
                 /viele\s+gr(ü|ue)(ß|ss)e/i,
                 /beste\s+gr(ü|ue)(ß|ss)e/i,
                 /freundliche\s+gr(ü|ue)(ß|ss)e/i,
+                /herzliche\s+gr(ü|ue)(ß|ss)e/i,
+                /sch(ö|oe)ne\s+gr(ü|ue)(ß|ss)e/i,
+
+                // Grußformeln (Englisch)
+                /best\s+regards/i,
+                /kind\s+regards/i,
+                /warm\s+regards/i,
+                /sincerely/i,
+                /yours\s+sincerely/i,
+                /best\s+wishes/i,
+
+                // Job-Titel und Firmennamen (typisch in Signaturen)
+                /(senior\s+)?(consultant|manager|director|partner|analyst|developer|engineer)/i,
+                /deloitte/i,
+                /gmbh/i,
+                /inc\.|ltd\.|llc/i,
+
+                // Datenschutz und rechtliche Hinweise
                 /datenschutzhinweis/i,
                 /art\.\s*13.*dsgvo/i,
                 /vertraulichkeitshinweis/i,
                 /confidential/i,
                 /disclaimer/i,
-                /please\s+consider\s+the\s+environment/i
+                /privacy\s+notice/i,
+                /confidentiality\s+notice/i,
+
+                // Umwelt/Mobile Hinweise
+                /please\s+consider\s+the\s+environment/i,
+                /think\s+before\s+(you\s+)?print/i,
+                /sent\s+from\s+my\s+(iphone|ipad|android|mobile)/i,
+                /gesendet\s+von\s+(meinem\s+)?(iphone|ipad|android|mobile)/i,
+
+                // Kontaktinformationen (typisch in Signaturen)
+                /^(tel|phone|fax|mobile|email|e-mail):/i,
+                /^(t|f|m|e):\s*[+0-9]/i,  // T: +49..., F: 030..., etc.
+                /www\./i,
+                /@.+\.(de|com|net|org)/i  // Email-Adressen
             ];
 
             for (var i = 0; i < lines.length; i++) {
@@ -2043,12 +2126,31 @@
         function removeEmailQuotes(text) {
             if (!text) return "";
 
-            // Pattern für Outlook-Zitate
+            // ERWEITERTE Pattern für Outlook-Zitate und gesamte ursprüngliche Mails
             var quotePatterns = [
+                // Standard Outlook Zitate (Deutsch)
                 /_{5,}\s*\n\s*Von:/i,  // _____ Von:
-                /^Von:\s+.+\n\s*Gesendet:/im,  // Von: ... Gesendet:
-                /^From:\s+.+\n\s*Sent:/im,  // From: ... Sent:
-                /^Am\s+.+\s+schrieb\s+.+:/im  // Am ... schrieb ...:
+                /\n\s*Von:\s+.+\n\s*Gesendet:/im,  // Von: ... Gesendet:
+
+                // Standard Outlook Zitate (Englisch)
+                /_{5,}\s*\n\s*From:/i,  // _____ From:
+                /\n\s*From:\s+.+\n\s*Sent:/im,  // From: ... Sent:
+
+                // Gmail/Web-Mail Format
+                /\n\s*Am\s+.+\s+schrieb\s+.+:/im,  // Am ... schrieb ...:
+                /\n\s*On\s+.+\s+wrote:/im,  // On ... wrote:
+
+                // Outlook-Zitat ohne Trennlinie (häufiges Format)
+                /\n\s*Von:\s+[^\n]+\n\s*Gesendet:\s+[^\n]+\n\s*An:/im,
+                /\n\s*From:\s+[^\n]+\n\s*Sent:\s+[^\n]+\n\s*To:/im,
+
+                // Weiterleitung
+                /\n\s*-{3,}\s*Weitergeleitete Nachricht\s*-{3,}/i,
+                /\n\s*-{3,}\s*Forwarded message\s*-{3,}/i,
+
+                // Outlook Mobile Format
+                /\n\s*Gesendet von (Outlook|iPhone|iPad|Android)/i,
+                /\n\s*Sent from (Outlook|iPhone|iPad|Android)/i
             ];
 
             for (var i = 0; i < quotePatterns.length; i++) {
@@ -2063,7 +2165,7 @@
             return text.trim();
         }
 
-        // Suche Antwort zu einer Email im Postausgang
+        // Suche ALLE Antworten zu einer Email im Postausgang
         function findReplyInSentItems(originalEmail) {
             if (!outlookApp) {
                 return null;
@@ -2074,9 +2176,9 @@
                 var sentFolder = namespace.GetDefaultFolder(5); // olFolderSentMail = 5
                 var items = sentFolder.Items;
 
-                // Sortiere nach Datum (neueste zuerst)
+                // Sortiere nach Datum (älteste zuerst für chronologische Reihenfolge)
                 try {
-                    items.Sort("[ReceivedTime]", true);
+                    items.Sort("[ReceivedTime]", false);
                 } catch (e) {
                     // Sortieren fehlgeschlagen, weitermachen
                 }
@@ -2087,8 +2189,11 @@
 
                 var originalDate = new Date(originalEmail.datum);
 
-                // Durchsuche max. 30 gesendete Emails (Performance-Optimierung)
-                var maxCheck = Math.min(items.Count, 30);
+                // WICHTIG: Sammle ALLE Antworten (nicht nur die erste!)
+                var allReplies = [];
+
+                // Durchsuche max. 50 gesendete Emails (mehr als vorher, da wir alle Antworten wollen)
+                var maxCheck = Math.min(items.Count, 50);
 
                 for (var i = 1; i <= maxCheck; i++) {
                     try {
@@ -2117,14 +2222,23 @@
                             var replyText = getEmailBody(item);
                             replyText = extractReplyText(replyText);
 
-                            return replyText;
+                            if (replyText && replyText.trim() !== "") {
+                                allReplies.push(replyText.trim());
+                            }
                         }
                     } catch (e) {
                         // Fehler bei diesem Item, weiter
                     }
                 }
 
-                return null; // Keine Antwort gefunden
+                // WICHTIG: Verbinde alle Antworten mit Trennlinie
+                if (allReplies.length === 0) {
+                    return null;
+                } else if (allReplies.length === 1) {
+                    return allReplies[0];
+                } else {
+                    return allReplies.join("\n__________________________\n");
+                }
             } catch (e) {
                 console.log("Fehler beim Suchen der Antwort: " + e.message);
                 return null;
@@ -2622,6 +2736,72 @@
             }
 
             processNext();
+        }
+
+        // WICHTIG: Update Antwort in Excel für bereits existierende Emails (Duplikate)
+        function updateReplyInExcel(email, replyText) {
+            if (!trackingWorkbook) {
+                console.log("updateReplyInExcel: Workbook nicht verfügbar");
+                return false;
+            }
+
+            try {
+                // Schritt 1: Finde Email in "Emailtracker" um HC-ID zu bekommen
+                var trackerSheet = trackingWorkbook.Worksheets("Emailtracker");
+                var lastRow = trackerSheet.Cells(trackerSheet.Rows.Count, 1).End(-4162).Row; // xlUp = -4162
+
+                var hcId = null;
+                var vonEmailToFind = (email.von_email || "").toLowerCase().trim();
+                var betreffToFind = (email.betreff || "").toLowerCase().trim();
+
+                // Suche in Emailtracker nach passender Email
+                for (var row = 2; row <= lastRow; row++) {
+                    var vonEmail = trackerSheet.Cells(row, 4).Value; // Spalte D = von_email
+                    var betreff = trackerSheet.Cells(row, 5).Value;  // Spalte E = betreff
+
+                    if (vonEmail && betreff) {
+                        vonEmail = vonEmail.toLowerCase().trim();
+                        betreff = betreff.toLowerCase().trim();
+
+                        // Prüfe ob Email und Betreff übereinstimmen
+                        if (vonEmail === vonEmailToFind && betreff === betreffToFind) {
+                            hcId = trackerSheet.Cells(row, 1).Value; // Spalte A = HC-ID
+                            break;
+                        }
+                    }
+                }
+
+                if (!hcId) {
+                    console.log("updateReplyInExcel: Email nicht im Tracker gefunden");
+                    return false;
+                }
+
+                // Schritt 2: Finde HC-ID in "Übersicht" und update Antwort
+                var worksheet = trackingWorkbook.Worksheets("Übersicht");
+                var wsLastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
+
+                for (var r = 2; r <= wsLastRow; r++) {
+                    var rowHcId = worksheet.Cells(r, 1).Value; // Spalte A = HC-ID
+
+                    if (rowHcId === hcId) {
+                        // GEFUNDEN! Update Antwort (Spalte 12 = L)
+                        var existingReply = worksheet.Cells(r, 12).Value || "";
+
+                        // Wenn bereits eine Antwort existiert, überschreibe sie nur wenn die neue anders ist
+                        if (existingReply.toString().trim() === "" || existingReply.toString().trim() !== replyText.trim()) {
+                            worksheet.Cells(r, 12).Value = replyText;
+                            console.log("✓ Antwort aktualisiert für HC-ID: " + hcId);
+                            return true;
+                        }
+                        break;
+                    }
+                }
+
+                return false;
+            } catch (e) {
+                console.log("Fehler in updateReplyInExcel: " + e.message);
+                return false;
+            }
         }
 
         // Eigentlicher Excel-Export (ausgelagert für setTimeout)
