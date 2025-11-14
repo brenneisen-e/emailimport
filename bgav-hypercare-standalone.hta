@@ -1187,7 +1187,13 @@
                 var skippedDuplicate = 0;
 
                 // PERFORMANCE: Lade Sent Items Cache EINMAL für schnelle Reply-Suche
-                loadSentItemsCache(sentItems, sevenDaysAgo);
+                debugLog("VOR loadSentItemsCache: sentItems=" + (sentItems ? sentItems.Name : "NULL") + ", sevenDaysAgo=" + sevenDaysAgo);
+                try {
+                    loadSentItemsCache(sentItems, sevenDaysAgo);
+                    debugLog("NACH loadSentItemsCache: Cache Größe = " + (sentItemsCache ? sentItemsCache.length : "NULL"));
+                } catch (e) {
+                    debugLog("FEHLER beim Laden des Cache: " + e.message);
+                }
 
                 // Durchsuche beide Ordner
                 var folders = [
@@ -2214,6 +2220,11 @@
 
         // PERFORMANCE: Lade Sent Items nur EINMAL und cache sie
         function loadSentItemsCache(sentItemsFolder, cutoffDate) {
+            debugLog(">>> loadSentItemsCache AUFGERUFEN <<<");
+            debugLog("  - outlookApp: " + (outlookApp ? "OK" : "NULL"));
+            debugLog("  - sentItemsFolder: " + (sentItemsFolder ? "OK" : "NULL"));
+            debugLog("  - cutoffDate: " + (cutoffDate ? cutoffDate.toISOString() : "NULL"));
+
             if (!outlookApp || !sentItemsFolder) {
                 debugLog("FEHLER: outlookApp oder sentItemsFolder fehlt!");
                 return;
