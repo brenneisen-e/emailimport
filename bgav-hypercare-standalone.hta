@@ -839,30 +839,44 @@
 
                 var newEmails = [];
                 var count = 0;
-                for (var i = 1; i <= filteredItems.Count; i++) {
-                    var mailItem = filteredItems.Item(i);
-                    if (mailItem.Class === 43) { // olMail
-                        newEmails.push(extractEmailData(mailItem));
-                        count++;
+                var errors = 0;
 
-                        if (count % 10 === 0) {
-                            document.getElementById('loadingText').innerText = "Lade Email " + count + " von " + filteredItems.Count + "...";
+                for (var i = 1; i <= filteredItems.Count; i++) {
+                    try {
+                        document.getElementById('loadingText').innerText = "Verarbeite Email " + i + " von " + filteredItems.Count + "...";
+
+                        var mailItem = filteredItems.Item(i);
+                        if (mailItem.Class === 43) { // olMail
+                            var emailData = extractEmailData(mailItem);
+                            if (emailData) {
+                                newEmails.push(emailData);
+                                count++;
+                            }
                         }
+                    } catch (e) {
+                        errors++;
+                        // Fehlerhafte Email überspringen, nicht abbrechen
                     }
                 }
 
+                showLoading(false);
+
                 if (newEmails.length === 0) {
-                    alert("Keine Email-Nachrichten gefunden!");
-                    showLoading(false);
+                    alert("Keine Email-Nachrichten gefunden!\n\n" +
+                          "Gefilterte Items: " + filteredItems.Count + "\n" +
+                          "Fehler beim Laden: " + errors);
                     return;
                 }
 
                 processEmails(newEmails);
-                showLoading(false);
 
-                alert("✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!\n\n" +
-                      "Ordner: " + currentFolder.Name + "\n" +
-                      "Postfach: " + currentFolder.Store.DisplayName);
+                var msg = "✅ " + newEmails.length + " Email(s) aus den letzten 7 Tagen geladen!\n\n";
+                msg += "Ordner: " + currentFolder.Name + "\n";
+                msg += "Postfach: " + currentFolder.Store.DisplayName;
+                if (errors > 0) {
+                    msg += "\n\n⚠ " + errors + " Email(s) konnten nicht geladen werden (übersprungen)";
+                }
+                alert(msg);
 
             } catch (e) {
                 showLoading(false);
@@ -1050,31 +1064,48 @@
 
         function getSenderEmail(mailItem) {
             try {
-                if (mailItem.SenderEmailType === "EX") {
-                    var sender = mailItem.Sender;
-                    if (sender) {
-                        var exUser = sender.GetExchangeUser();
-                        if (exUser) {
-                            return exUser.PrimarySmtpAddress;
+                // Versuche zuerst die einfache Methode
+                var emailAddr = mailItem.SenderEmailAddress;
+
+                // Nur wenn Exchange-Typ UND einfache Adresse nicht verfügbar
+                if ((!emailAddr || emailAddr.indexOf("@") === -1) && mailItem.SenderEmailType === "EX") {
+                    try {
+                        var sender = mailItem.Sender;
+                        if (sender) {
+                            var exUser = sender.GetExchangeUser();
+                            if (exUser && exUser.PrimarySmtpAddress) {
+                                return exUser.PrimarySmtpAddress;
+                            }
                         }
+                    } catch (ex) {
+                        // Exchange-Zugriff fehlgeschlagen, verwende Fallback
                     }
                 }
-                return mailItem.SenderEmailAddress || "unknown@unknown.com";
+
+                return emailAddr || "unknown@unknown.com";
             } catch (e) {
-                return mailItem.SenderEmailAddress || "unknown@unknown.com";
+                return "unknown@unknown.com";
             }
         }
 
         function getEmailBody(mailItem) {
             try {
+                // Bevorzuge Text-Body (schneller)
                 if (mailItem.Body) {
                     var body = mailItem.Body;
-                    if (body.length > 50000) {
-                        body = body.substring(0, 50000) + "... (gekürzt)";
+                    if (body.length > 10000) {
+                        body = body.substring(0, 10000) + "... (gekürzt)";
                     }
                     return body;
                 }
-                return stripHTML(mailItem.HTMLBody);
+
+                // Fallback auf HTML (langsamer)
+                var htmlBody = mailItem.HTMLBody;
+                if (htmlBody) {
+                    return stripHTML(htmlBody);
+                }
+
+                return "";
             } catch (e) {
                 return "";
             }
@@ -1082,14 +1113,30 @@
 
         function stripHTML(html) {
             if (!html) return "";
-            var text = html.replace(/<br\s*\/?>/gi, "\n");
-            text = text.replace(/<[^>]+>/g, '');
-            text = text.replace(/&nbsp;/g, ' ');
-            text = text.replace(/&amp;/g, '&');
-            text = text.replace(/&lt;/g, '<');
-            text = text.replace(/&gt;/g, '>');
-            text = text.replace(/&quot;/g, '"');
-            return text;
+
+            // Begrenze HTML-Länge VOR dem Strippen (Performance!)
+            if (html.length > 50000) {
+                html = html.substring(0, 50000);
+            }
+
+            try {
+                var text = html.replace(/<br\s*\/?>/gi, "\n");
+                text = text.replace(/<[^>]+>/g, '');
+                text = text.replace(/&nbsp;/g, ' ');
+                text = text.replace(/&amp;/g, '&');
+                text = text.replace(/&lt;/g, '<');
+                text = text.replace(/&gt;/g, '>');
+                text = text.replace(/&quot;/g, '"');
+
+                // Final kürzen
+                if (text.length > 10000) {
+                    text = text.substring(0, 10000) + "... (gekürzt)";
+                }
+
+                return text;
+            } catch (e) {
+                return "(Fehler beim Verarbeiten des Inhalts)";
+            }
         }
 
         function formatDate(date) {
@@ -1477,9 +1524,16 @@
             try {
                 // Versuche ZUERST die bereits laufende Excel-Instanz zu verwenden
                 var excel = null;
+                var excelConnected = false;
+                var debugInfo = "";
+
                 try {
                     excel = GetObject("", "Excel.Application");
+                    excelConnected = true;
+                    debugInfo += "✓ Verbunden mit laufender Excel-Instanz\n\n";
                 } catch (e) {
+                    debugInfo += "⚠ Keine laufende Excel-Instanz gefunden: " + e.message + "\n";
+                    debugInfo += "Erstelle neue Excel-Instanz...\n\n";
                     // Keine laufende Instanz, erstelle neue
                     excel = new ActiveXObject("Excel.Application");
                     excel.Visible = true;
@@ -1491,7 +1545,7 @@
                 var found = false;
 
                 // DEBUG: Liste alle offenen Workbooks
-                var debugInfo = "Gefundene Excel-Dateien (" + excel.Workbooks.Count + "):\n\n";
+                debugInfo += "Gefundene Excel-Dateien (" + excel.Workbooks.Count + "):\n\n";
                 for (var i = 1; i <= excel.Workbooks.Count; i++) {
                     var wb = excel.Workbooks(i);
                     debugInfo += i + ". Name: " + wb.Name + "\n";
