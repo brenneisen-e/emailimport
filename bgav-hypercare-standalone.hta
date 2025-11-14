@@ -995,6 +995,15 @@
                         excelApp = new ActiveXObject("Excel.Application");
                     }
                     excelApp.Visible = true;
+
+                    // WICHTIG: Bringe HTA wieder in den Vordergrund nach kurzer Verzögerung
+                    setTimeout(function() {
+                        try {
+                            window.focus();
+                        } catch (e) {
+                            // Focus fehlgeschlagen, ignorieren
+                        }
+                    }, 100);
                 }
 
                 // Suche Tracking_Hypercare
