@@ -793,13 +793,13 @@
             </div>
             <div class="header-actions">
                 <button class="btn btn-primary" onclick="loadEmails()">
-                    <span style="font-size: 1rem;">&#x2709;</span> Emails laden
+                    Emails laden
                 </button>
                 <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
-                    <span style="font-size: 1rem;">&#x2913;</span> Excel Export
+                    Excel Export
                 </button>
                 <button class="btn btn-secondary" onclick="toggleDebugLog()">
-                    <span style="font-size: 1rem;">&#x2630;</span> Log
+                    Log
                 </button>
             </div>
         </div>
@@ -816,21 +816,21 @@
         <!-- STATS BAR -->
         <div class="stats-bar">
             <div class="stat-card">
-                <div class="stat-icon">&#x2709;</div>
+                <div class="stat-icon">@</div>
                 <div>
                     <span class="stat-value" id="totalCount">0</span>
                     <span class="stat-label">Geladen</span>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: #ebf8ff; color: #3182ce;">&#x2713;</div>
+                <div class="stat-icon" style="background: #ebf8ff; color: #3182ce;">+</div>
                 <div>
                     <span class="stat-value" id="selectedCount">0</span>
-                    <span class="stat-label">Ausgewählt</span>
+                    <span class="stat-label">Ausgewahlt</span>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: #fff5f5; color: #c53030;">&#x26A0;</div>
+                <div class="stat-icon" style="background: #fff5f5; color: #c53030;">!</div>
                 <div>
                     <span class="stat-value" id="incidentCount">0</span>
                     <span class="stat-label">Incidents</span>
@@ -840,7 +840,7 @@
                 <div class="stat-icon" style="background: #ebf8ff; color: #2b6cb0;">?</div>
                 <div>
                     <span class="stat-value" id="rueckfrageCount">0</span>
-                    <span class="stat-label">Rückfragen</span>
+                    <span class="stat-label">Ruckfragen</span>
                 </div>
             </div>
 
@@ -851,7 +851,7 @@
         <!-- TOOLBAR -->
         <div class="toolbar">
             <div class="search-box">
-                <span class="search-icon">&#x2315;</span>
+                <span class="search-icon">O</span>
                 <input type="text" id="searchInput" placeholder="Suche in Betreff oder Text..."
                        oninput="filterEmails()">
             </div>
@@ -2462,12 +2462,12 @@
             var listContainer = document.getElementById('emailList');
 
             if (filteredEmails.length === 0 && emails.length > 0) {
-                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon" style="color:#a0aec0;">&#x2315;</div><div class="empty-title">Keine Emails gefunden</div><div class="empty-description">Versuche die Filtereinstellungen zu ändern.</div></div>';
+                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon" style="color:#a0aec0;">O</div><div class="empty-title">Keine Emails gefunden</div><div class="empty-description">Versuche die Filtereinstellungen zu andern.</div></div>';
                 return;
             }
 
             if (filteredEmails.length === 0) {
-                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon" style="color:#a0aec0;">&#x2709;</div><div class="empty-title">Keine Emails geladen</div><div class="empty-description">Wähle in Outlook Emails aus und klicke auf "Ausgewählte Emails laden"<br>oder lade einen ganzen Outlook-Ordner.</div><button class="btn btn-primary btn-lg mt-md" onclick="loadFromOutlookSelection()">Emails aus Outlook laden</button></div>';
+                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon" style="color:#a0aec0;">@</div><div class="empty-title">Keine Emails geladen</div><div class="empty-description">Wahle in Outlook Emails aus und klicke auf Ausgewahlte Emails laden<br>oder lade einen ganzen Outlook-Ordner.</div><button class="btn btn-primary btn-lg mt-md" onclick="loadFromOutlookSelection()">Emails aus Outlook laden</button></div>';
                 return;
             }
 

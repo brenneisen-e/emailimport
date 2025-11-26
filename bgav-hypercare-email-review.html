@@ -6,29 +6,31 @@
     <title>BGAV Hypercare - Email Review Tool</title>
     <style>
         /* ============================================================================
-           VARIABLES & RESET
+           MODERNES DESIGN - Weiss-dominiert, Clean, Minimalistisch
            ============================================================================ */
         :root {
-            --primary: #366092;
-            --primary-dark: #2a4a70;
-            --primary-light: #4a7bb8;
-            --secondary: #00a3e0;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
+            --primary: #4a6fa5;
+            --primary-dark: #3d5d8a;
+            --primary-light: #5d82b8;
+            --secondary: #4299e1;
+            --success: #48bb78;
+            --warning: #ecc94b;
+            --danger: #fc8181;
+            --info: #4299e1;
 
             --bg-primary: #ffffff;
-            --bg-secondary: #f8f9fa;
-            --bg-tertiary: #e9ecef;
+            --bg-secondary: #f7fafc;
+            --bg-tertiary: #edf2f7;
 
-            --text-primary: #212529;
-            --text-secondary: #6c757d;
+            --text-primary: #1a202c;
+            --text-secondary: #718096;
+            --text-muted: #a0aec0;
             --text-light: #ffffff;
 
-            --border: #dee2e6;
-            --shadow: rgba(0, 0, 0, 0.1);
-            --shadow-lg: rgba(0, 0, 0, 0.15);
+            --border: #e2e8f0;
+            --border-light: #edf2f7;
+            --shadow: rgba(0, 0, 0, 0.05);
+            --shadow-lg: rgba(0, 0, 0, 0.1);
 
             --spacing-xs: 0.25rem;
             --spacing-sm: 0.5rem;
@@ -36,11 +38,11 @@
             --spacing-lg: 1.5rem;
             --spacing-xl: 2rem;
 
-            --radius-sm: 0.25rem;
-            --radius-md: 0.5rem;
-            --radius-lg: 1rem;
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
 
-            --transition: all 0.3s ease;
+            --transition: all 0.2s ease;
         }
 
         * {
@@ -51,37 +53,36 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-secondary);
             min-height: 100vh;
             color: var(--text-primary);
             line-height: 1.6;
-            padding: var(--spacing-lg);
+            padding: 0;
         }
 
         /* ============================================================================
            CONTAINER & LAYOUT
            ============================================================================ */
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            max-width: 100%;
+            margin: 0;
             background: var(--bg-primary);
-            border-radius: var(--radius-lg);
-            box-shadow: 0 20px 60px var(--shadow-lg);
-            overflow: hidden;
+            min-height: 100vh;
         }
 
         /* ============================================================================
-           HEADER
+           HEADER - Modern, Clean, Weiss
            ============================================================================ */
         .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: var(--text-light);
-            padding: var(--spacing-xl);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 1.5rem 2.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: var(--spacing-md);
+            border-bottom: 1px solid var(--border);
         }
 
         .header-title {
@@ -91,74 +92,91 @@
         }
 
         .header-title h1 {
-            font-size: 2rem;
-            font-weight: 700;
+            font-size: 1.5rem;
+            font-weight: 600;
             margin: 0;
+            color: var(--text-primary);
         }
 
         .logo {
-            width: 50px;
-            height: 50px;
-            background: var(--text-light);
-            border-radius: var(--radius-md);
+            width: 42px;
+            height: 42px;
+            background: var(--primary);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            color: var(--text-light);
+            font-weight: 700;
+            font-size: 1rem;
         }
 
         .header-actions {
             display: flex;
-            gap: var(--spacing-md);
+            gap: 0.75rem;
             flex-wrap: wrap;
         }
 
         /* ============================================================================
-           STATS BAR
+           STATS BAR - Minimalistisch
            ============================================================================ */
         .stats-bar {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: var(--spacing-md);
-            padding: var(--spacing-xl);
-            background: var(--bg-secondary);
-            border-bottom: 2px solid var(--border);
+            display: flex;
+            gap: 2rem;
+            padding: 1.25rem 2.5rem;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         .stat-card {
-            background: var(--bg-primary);
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-md);
-            box-shadow: 0 2px 8px var(--shadow);
-            text-align: center;
-            transition: var(--transition);
+            background: transparent;
+            padding: 0.5rem 0;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px var(--shadow-lg);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            background: var(--bg-secondary);
+            color: var(--primary);
         }
 
         .stat-value {
-            font-size: 2.5rem;
+            font-size: 1.5rem;
             font-weight: 700;
-            color: var(--primary);
+            color: var(--text-primary);
             display: block;
+            line-height: 1.2;
         }
 
         .stat-label {
             color: var(--text-secondary);
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-top: var(--spacing-xs);
+            margin-top: 0;
         }
 
         /* ============================================================================
            TOOLBAR
            ============================================================================ */
         .toolbar {
-            padding: var(--spacing-lg) var(--spacing-xl);
+            padding: var(--spacing-md) 2.5rem;
             background: var(--bg-primary);
             border-bottom: 1px solid var(--border);
             display: flex;
@@ -169,31 +187,34 @@
 
         .search-box {
             flex: 1;
-            min-width: 250px;
+            min-width: 280px;
             position: relative;
         }
 
         .search-box input {
             width: 100%;
-            padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) 2.5rem;
-            border: 2px solid var(--border);
+            padding: 0.75rem 1rem 0.75rem 2.75rem;
+            border: 1px solid var(--border);
             border-radius: var(--radius-md);
-            font-size: 1rem;
+            font-size: 0.9rem;
+            background: var(--bg-secondary);
             transition: var(--transition);
         }
 
         .search-box input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
+            background: var(--bg-primary);
+            box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.1);
         }
 
         .search-icon {
             position: absolute;
-            left: var(--spacing-md);
+            left: 1rem;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--text-secondary);
+            color: var(--text-muted);
+            font-size: 0.9rem;
         }
 
         .filter-group {
@@ -203,14 +224,14 @@
         }
 
         /* ============================================================================
-           BUTTONS
+           BUTTONS - Modern Flat Design
            ============================================================================ */
         .btn {
-            padding: var(--spacing-md) var(--spacing-lg);
+            padding: 0.625rem 1.25rem;
             border: none;
             border-radius: var(--radius-md);
-            font-size: 1rem;
-            font-weight: 600;
+            font-size: 0.875rem;
+            font-weight: 500;
             cursor: pointer;
             transition: var(--transition);
             display: inline-flex;
@@ -221,8 +242,7 @@
         }
 
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px var(--shadow-lg);
+            transform: translateY(-1px);
         }
 
         .btn:active {
@@ -236,6 +256,7 @@
 
         .btn-primary:hover {
             background: var(--primary-dark);
+            box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
         }
 
         .btn-success {
@@ -243,29 +264,46 @@
             color: var(--text-light);
         }
 
+        .btn-success:hover {
+            background: #38a169;
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+        }
+
         .btn-warning {
             background: var(--warning);
-            color: var(--text-primary);
+            color: #744210;
+        }
+
+        .btn-warning:hover {
+            background: #d69e2e;
         }
 
         .btn-danger {
             background: var(--danger);
-            color: var(--text-light);
+            color: #742a2a;
+        }
+
+        .btn-danger:hover {
+            background: #f56565;
         }
 
         .btn-secondary {
             background: var(--bg-tertiary);
-            color: var(--text-primary);
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
         }
 
         .btn-sm {
-            padding: var(--spacing-sm) var(--spacing-md);
-            font-size: 0.875rem;
+            padding: 0.5rem 0.875rem;
+            font-size: 0.8rem;
         }
 
         .btn-lg {
-            padding: var(--spacing-lg) var(--spacing-xl);
-            font-size: 1.125rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9rem;
         }
 
         /* ============================================================================
@@ -668,18 +706,18 @@
         <!-- HEADER -->
         <div class="header">
             <div class="header-title">
-                <div class="logo">📧</div>
+                <div class="logo">HC</div>
                 <div>
-                    <h1>BGAV Hypercare Email Review</h1>
-                    <div style="font-size: 0.875rem; opacity: 0.9;">Barmenia • Gothaer</div>
+                    <h1>Email Review</h1>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">BGAV Hypercare</div>
                 </div>
             </div>
             <div class="header-actions">
-                <button class="btn btn-warning" onclick="showUploadModal()">
-                    📤 Emails laden
+                <button class="btn btn-primary" onclick="showUploadModal()">
+                    Emails laden
                 </button>
                 <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
-                    💾 Nach Excel exportieren
+                    Excel Export
                 </button>
             </div>
         </div>
@@ -687,27 +725,39 @@
         <!-- STATS BAR -->
         <div class="stats-bar">
             <div class="stat-card">
-                <span class="stat-value" id="totalCount">0</span>
-                <span class="stat-label">Emails geladen</span>
+                <div class="stat-icon">@</div>
+                <div>
+                    <span class="stat-value" id="totalCount">0</span>
+                    <span class="stat-label">Geladen</span>
+                </div>
             </div>
             <div class="stat-card">
-                <span class="stat-value" id="selectedCount">0</span>
-                <span class="stat-label">Ausgewählt</span>
+                <div class="stat-icon" style="background: #ebf8ff; color: #3182ce;">+</div>
+                <div>
+                    <span class="stat-value" id="selectedCount">0</span>
+                    <span class="stat-label">Ausgewahlt</span>
+                </div>
             </div>
             <div class="stat-card">
-                <span class="stat-value" id="incidentCount">0</span>
-                <span class="stat-label">Incidents</span>
+                <div class="stat-icon" style="background: #fff5f5; color: #c53030;">!</div>
+                <div>
+                    <span class="stat-value" id="incidentCount">0</span>
+                    <span class="stat-label">Incidents</span>
+                </div>
             </div>
             <div class="stat-card">
-                <span class="stat-value" id="rueckfrageCount">0</span>
-                <span class="stat-label">Rückfragen</span>
+                <div class="stat-icon" style="background: #ebf8ff; color: #2b6cb0;">?</div>
+                <div>
+                    <span class="stat-value" id="rueckfrageCount">0</span>
+                    <span class="stat-label">Ruckfragen</span>
+                </div>
             </div>
         </div>
 
         <!-- TOOLBAR -->
         <div class="toolbar">
             <div class="search-box">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon">O</span>
                 <input type="text" id="searchInput" placeholder="Suche in Betreff oder Text..."
                        oninput="filterEmails()">
             </div>
@@ -749,7 +799,7 @@
                     hochladen oder aus Outlook exportieren.
                 </div>
                 <button class="btn btn-primary btn-lg mt-md" onclick="showUploadModal()">
-                    📤 Emails laden
+                    Emails laden
                 </button>
             </div>
         </div>
@@ -770,7 +820,7 @@
             </div>
             <div class="modal-body">
                 <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-                    <div class="upload-icon">📁</div>
+                    <div class="upload-icon" style="color: var(--primary);">+</div>
                     <div class="upload-text">
                         <strong>Klicke hier</strong> oder ziehe eine JSON-Datei hierher
                     </div>
@@ -781,7 +831,7 @@
                 <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="handleFileUpload(event)">
 
                 <div style="margin-top: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 1px solid var(--border);">
-                    <h3 style="margin-bottom: var(--spacing-md);">📝 Beispiel JSON-Format:</h3>
+                    <h3 style="margin-bottom: var(--spacing-md);">Beispiel JSON-Format:</h3>
                     <pre style="background: var(--bg-secondary); padding: var(--spacing-md); border-radius: var(--radius-sm); overflow-x: auto; font-size: 0.875rem;">
 [
   {
@@ -1018,7 +1068,7 @@
             if (filteredEmails.length === 0) {
                 listContainer.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-icon">🔍</div>
+                        <div class="empty-icon" style="color: var(--text-muted);">O</div>
                         <div class="empty-title">Keine Emails gefunden</div>
                         <div class="empty-description">
                             Versuche die Filtereinstellungen zu ändern.
@@ -1038,7 +1088,7 @@
                         <div class="email-meta">
                             <div class="email-subject">${email.betreff}</div>
                             <div class="email-from">
-                                <span>📧</span>
+                                <span style="color: var(--primary);">@</span>
                                 <strong>${email.von_name}</strong>
                                 <span style="color: var(--text-secondary);">&lt;${email.von_email}&gt;</span>
                             </div>
@@ -1304,7 +1354,7 @@
             // Download
             XLSX.writeFile(wb, filename);
 
-            alert(`✅ ${selectedEmails.length} Email(s) erfolgreich nach Excel exportiert!\n\nDatei: ${filename}`);
+            alert(`[OK] ${selectedEmails.length} Email(s) erfolgreich nach Excel exportiert!\n\nDatei: ${filename}`);
         }
 
         // ============================================================================
