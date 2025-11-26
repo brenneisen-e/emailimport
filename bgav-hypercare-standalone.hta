@@ -24,6 +24,7 @@
 
     <style>
         /* ============================================================================
+           MODERNES DESIGN - Weiß-dominiert, Clean, Minimalistisch
            IE11-kompatibles CSS (ohne CSS-Variablen)
            ============================================================================ */
         * {
@@ -34,38 +35,36 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            background-attachment: fixed;
+            background: #f5f7fa;
             min-height: 100vh;
-            color: #212529;
+            color: #2d3748;
             line-height: 1.6;
-            padding: 1.5rem;
+            padding: 0;
         }
 
         /* ============================================================================
            CONTAINER & LAYOUT
            ============================================================================ */
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            max-width: 100%;
+            margin: 0;
             background: #ffffff;
-            border-radius: 1rem;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            overflow: hidden;
+            min-height: 100vh;
         }
 
         /* ============================================================================
-           HEADER
+           HEADER - Modern, Clean, Weiß
            ============================================================================ */
         .header {
-            background: linear-gradient(135deg, #366092 0%, #2a4a70 100%);
-            color: #ffffff;
-            padding: 2rem;
+            background: #ffffff;
+            color: #2d3748;
+            padding: 1.5rem 2.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
+            border-bottom: 1px solid #e2e8f0;
         }
 
         .header-title {
@@ -75,76 +74,99 @@
         }
 
         .header-title h1 {
-            font-size: 2rem;
-            font-weight: 700;
+            font-size: 1.5rem;
+            font-weight: 600;
             margin: 0;
+            color: #1a202c;
+        }
+
+        .header-title > div > div {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 0.25rem;
         }
 
         .logo {
-            width: 50px;
-            height: 50px;
-            background: #ffffff;
-            border-radius: 0.5rem;
+            width: 42px;
+            height: 42px;
+            background: #4a6fa5;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 1rem;
         }
 
         .header-actions {
             display: flex;
-            gap: 1rem;
+            gap: 0.75rem;
             flex-wrap: wrap;
         }
 
         /* ============================================================================
-           STATS BAR
+           STATS BAR - Minimalistisch
            ============================================================================ */
         .stats-bar {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            padding: 2rem;
-            background: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
+            display: flex;
+            gap: 2rem;
+            padding: 1.25rem 2.5rem;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         .stat-card {
-            background: #ffffff;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            transition: all 0.3s ease;
+            background: transparent;
+            padding: 0.5rem 0;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            background: #f7fafc;
+            color: #4a6fa5;
         }
 
         .stat-value {
-            font-size: 2.5rem;
+            font-size: 1.5rem;
             font-weight: 700;
-            color: #366092;
+            color: #1a202c;
             display: block;
+            line-height: 1.2;
         }
 
         .stat-label {
-            color: #6c757d;
-            font-size: 0.875rem;
+            color: #718096;
+            font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-top: 0.25rem;
+            margin-top: 0;
         }
 
         /* ============================================================================
            TOOLBAR
            ============================================================================ */
         .toolbar {
-            padding: 1.5rem 2rem;
+            padding: 1rem 2.5rem;
             background: #ffffff;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid #e2e8f0;
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
@@ -153,23 +175,25 @@
 
         .search-box {
             flex: 1;
-            min-width: 250px;
+            min-width: 280px;
             position: relative;
         }
 
         .search-box input {
             width: 100%;
-            padding: 1rem 1rem 1rem 2.5rem;
-            border: 2px solid #dee2e6;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+            padding: 0.75rem 1rem 0.75rem 2.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            background: #f7fafc;
+            transition: all 0.2s ease;
         }
 
         .search-box input:focus {
             outline: none;
-            border-color: #366092;
-            box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
+            border-color: #4a6fa5;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.1);
         }
 
         .search-icon {
@@ -177,7 +201,8 @@
             left: 1rem;
             top: 50%;
             transform: translateY(-50%);
-            color: #6c757d;
+            color: #a0aec0;
+            font-size: 0.9rem;
         }
 
         .filter-group {
@@ -187,16 +212,16 @@
         }
 
         /* ============================================================================
-           BUTTONS
+           BUTTONS - Modern Flat Design
            ============================================================================ */
         .btn {
-            padding: 1rem 1.5rem;
+            padding: 0.625rem 1.25rem;
             border: none;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            font-weight: 600;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
@@ -205,8 +230,7 @@
         }
 
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
         }
 
         .btn:active {
@@ -214,82 +238,102 @@
         }
 
         .btn-primary {
-            background: #366092;
+            background: #4a6fa5;
             color: #ffffff;
         }
 
         .btn-primary:hover {
-            background: #2a4a70;
+            background: #3d5d8a;
+            box-shadow: 0 4px 12px rgba(74, 111, 165, 0.3);
         }
 
         .btn-success {
-            background: #28a745;
+            background: #48bb78;
             color: #ffffff;
+        }
+
+        .btn-success:hover {
+            background: #38a169;
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
         }
 
         .btn-warning {
-            background: #ffc107;
-            color: #212529;
+            background: #ecc94b;
+            color: #744210;
+        }
+
+        .btn-warning:hover {
+            background: #d69e2e;
         }
 
         .btn-danger {
-            background: #dc3545;
-            color: #ffffff;
+            background: #fc8181;
+            color: #742a2a;
+        }
+
+        .btn-danger:hover {
+            background: #f56565;
         }
 
         .btn-secondary {
-            background: #e9ecef;
-            color: #212529;
+            background: #edf2f7;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
         }
 
         .btn-info {
-            background: #17a2b8;
+            background: #4299e1;
             color: #ffffff;
         }
 
         .btn-info:hover {
-            background: #138496;
+            background: #3182ce;
         }
 
         .btn-sm {
-            padding: 0.5rem 1rem;
-            font-size: 0.875rem;
+            padding: 0.5rem 0.875rem;
+            font-size: 0.8rem;
         }
 
         .btn-lg {
-            padding: 1.5rem 2rem;
-            font-size: 1.125rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9rem;
         }
 
         /* ============================================================================
            EMAIL LIST
            ============================================================================ */
         .email-list {
-            padding: 2rem;
+            padding: 1.5rem 2.5rem;
             display: grid;
-            gap: 1.5rem;
-            max-height: 600px;
+            gap: 1rem;
+            max-height: calc(100vh - 280px);
             overflow-y: auto;
+            background: #f7fafc;
         }
 
         .email-card {
             background: #ffffff;
-            border: 2px solid #dee2e6;
-            border-radius: 1rem;
-            padding: 1.5rem;
-            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.2s ease;
             display: grid;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
         .email-card:hover {
-            border-color: #4a7bb8;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-color: #cbd5e0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         .email-card.selected {
-            border-color: #366092;
-            background: rgba(54, 96, 146, 0.05);
+            border-color: #4a6fa5;
+            background: rgba(74, 111, 165, 0.03);
+            box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.1);
         }
 
         .email-header {
@@ -299,13 +343,14 @@
         }
 
         .email-checkbox {
-            margin-top: 0.25rem;
+            margin-top: 0.125rem;
         }
 
         .email-checkbox input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             cursor: pointer;
+            accent-color: #4a6fa5;
         }
 
         .email-meta {
@@ -313,35 +358,36 @@
         }
 
         .email-subject {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #212529;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1a202c;
             margin-bottom: 0.25rem;
         }
 
         .email-from {
-            color: #6c757d;
-            font-size: 0.875rem;
+            color: #718096;
+            font-size: 0.8rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.125rem;
         }
 
         .email-date {
-            color: #6c757d;
-            font-size: 0.875rem;
+            color: #a0aec0;
+            font-size: 0.75rem;
         }
 
         .email-body-preview {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 0.25rem;
-            font-size: 0.875rem;
-            color: #6c757d;
-            max-height: 100px;
+            background: #f7fafc;
+            padding: 0.875rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #718096;
+            max-height: 80px;
             overflow: hidden;
             position: relative;
+            border: 1px solid #edf2f7;
         }
 
         .email-body-preview::after {
@@ -350,8 +396,8 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 30px;
-            background: linear-gradient(transparent, #f8f9fa);
+            height: 25px;
+            background: linear-gradient(transparent, #f7fafc);
         }
 
         /* ============================================================================
@@ -359,11 +405,12 @@
            ============================================================================ */
         .edit-fields {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 0.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+            padding: 0.875rem;
+            background: #f7fafc;
+            border-radius: 8px;
+            border: 1px solid #edf2f7;
         }
 
         .field-group {
@@ -373,12 +420,14 @@
         }
 
         .field-label {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #6c757d;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #718096;
             display: flex;
             align-items: center;
             gap: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .field-label input[type="checkbox"] {
@@ -386,21 +435,22 @@
         }
 
         .field-input {
-            padding: 0.5rem 1rem;
-            border: 1px solid #dee2e6;
-            border-radius: 0.25rem;
-            font-size: 0.875rem;
-            transition: all 0.3s ease;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            background: #ffffff;
+            transition: all 0.2s ease;
         }
 
         .field-input:focus {
             outline: none;
-            border-color: #366092;
-            box-shadow: 0 0 0 3px rgba(54, 96, 146, 0.1);
+            border-color: #4a6fa5;
+            box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.1);
         }
 
         .field-input:disabled {
-            background: #e9ecef;
+            background: #edf2f7;
             cursor: not-allowed;
         }
 
@@ -409,30 +459,30 @@
         }
 
         /* ============================================================================
-           BADGES
+           BADGES - Subtle, Monochrome
            ============================================================================ */
         .badge {
             display: inline-block;
-            padding: 0.25rem 1rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
         }
 
         .badge-incident {
-            background: rgba(220, 53, 69, 0.1);
-            color: #dc3545;
+            background: #fed7d7;
+            color: #c53030;
         }
 
         .badge-rueckfrage {
-            background: rgba(0, 163, 224, 0.1);
-            color: #00a3e0;
+            background: #bee3f8;
+            color: #2b6cb0;
         }
 
         /* ============================================================================
-           MODAL
+           MODAL - Clean & Modern
            ============================================================================ */
         .modal {
             display: none;
@@ -441,7 +491,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(26, 32, 44, 0.6);
             z-index: 1000;
             align-items: center;
             justify-content: center;
@@ -454,38 +504,46 @@
 
         .modal-content {
             background: #ffffff;
-            border-radius: 1rem;
-            max-width: 600px;
+            border-radius: 16px;
+            max-width: 500px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
         }
 
         .modal-header {
-            padding: 1.5rem;
-            border-bottom: 2px solid #dee2e6;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .modal-title {
-            font-size: 1.5rem;
-            font-weight: 700;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1a202c;
         }
 
         .modal-close {
-            background: none;
+            background: #f7fafc;
             border: none;
-            font-size: 1.5rem;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-size: 1.25rem;
             cursor: pointer;
-            color: #6c757d;
-            transition: all 0.3s ease;
+            color: #718096;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .modal-close:hover {
-            color: #212529;
+            background: #edf2f7;
+            color: #1a202c;
         }
 
         .modal-body {
@@ -493,11 +551,12 @@
         }
 
         .modal-footer {
-            padding: 1.5rem;
-            border-top: 1px solid #dee2e6;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e2e8f0;
             display: flex;
-            gap: 1rem;
+            gap: 0.75rem;
             justify-content: flex-end;
+            background: #f7fafc;
         }
 
         /* ============================================================================
@@ -505,29 +564,32 @@
            ============================================================================ */
         .empty-state {
             text-align: center;
-            padding: 2rem * 2;
-            color: #6c757d;
+            padding: 4rem 2rem;
+            color: #718096;
         }
 
         .empty-icon {
-            font-size: 4rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.5;
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.4;
+            color: #a0aec0;
         }
 
         .empty-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
         }
 
         .empty-description {
-            max-width: 500px;
-            margin: 0 auto 2rem;
+            max-width: 400px;
+            margin: 0 auto 1.5rem;
+            font-size: 0.9rem;
         }
 
         /* ============================================================================
-           LOADING
+           LOADING - Modern Overlay
            ============================================================================ */
         .loading {
             display: none;
@@ -536,7 +598,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(255, 255, 255, 0.95);
             z-index: 9999;
             align-items: center;
             justify-content: center;
@@ -548,28 +610,29 @@
         }
 
         .loading-content {
-            background: white;
-            padding: 2rem 3rem;
-            border-radius: 1rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            background: #ffffff;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             text-align: center;
-            min-width: 350px;
+            min-width: 300px;
+            border: 1px solid #e2e8f0;
         }
 
         .spinner {
-            border: 5px solid #e9ecef;
-            border-top: 5px solid #366092;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #4a6fa5;
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1.5rem;
+            width: 48px;
+            height: 48px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1.25rem;
         }
 
         #loadingText {
-            font-size: 1rem;
-            color: #212529;
-            font-weight: 600;
+            font-size: 0.9rem;
+            color: #4a5568;
+            font-weight: 500;
             margin-top: 0.5rem;
             line-height: 1.6;
             white-space: pre-line;
@@ -600,35 +663,35 @@
         }
 
         /* ============================================================================
-           NOTIFICATION SYSTEM
+           NOTIFICATION SYSTEM - Subtle & Clean
            ============================================================================ */
         .notification {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 0.5rem;
-            border: 1px solid #e9ecef;
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
             padding: 0.75rem 1rem;
             display: flex;
             align-items: center;
             gap: 0.75rem;
             animation: fadeIn 0.3s ease;
-            border-left: 4px solid #366092;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-left: 3px solid #4a6fa5;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
         .notification.success {
-            border-left-color: #28a745;
+            border-left-color: #48bb78;
         }
 
         .notification.error {
-            border-left-color: #dc3545;
+            border-left-color: #fc8181;
         }
 
         .notification.warning {
-            border-left-color: #ffc107;
+            border-left-color: #ecc94b;
         }
 
         .notification.info {
-            border-left-color: #17a2b8;
+            border-left-color: #4299e1;
         }
 
         .notification-content {
@@ -636,31 +699,37 @@
         }
 
         .notification-title {
-            font-weight: 700;
+            font-weight: 600;
             margin-bottom: 0.125rem;
-            color: #212529;
-            font-size: 0.875rem;
+            color: #1a202c;
+            font-size: 0.8rem;
         }
 
         .notification-message {
-            font-size: 0.8rem;
-            color: #6c757d;
+            font-size: 0.75rem;
+            color: #718096;
             white-space: pre-line;
             line-height: 1.3;
         }
 
         .notification-close {
-            background: none;
+            background: #f7fafc;
             border: none;
-            font-size: 1.125rem;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            font-size: 1rem;
             cursor: pointer;
-            color: #6c757d;
+            color: #a0aec0;
             padding: 0;
-            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .notification-close:hover {
-            color: #212529;
+            background: #edf2f7;
+            color: #4a5568;
         }
 
         @keyframes fadeIn {
@@ -686,6 +755,29 @@
         .notification.removing {
             animation: fadeOut 0.3s ease;
         }
+
+        /* ============================================================================
+           ICON STYLES - Einfarbig
+           ============================================================================ */
+        .icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a6fa5;
+        }
+
+        .icon-sm { font-size: 0.875rem; }
+        .icon-md { font-size: 1rem; }
+        .icon-lg { font-size: 1.25rem; }
+
+        /* ============================================================================
+           DEBUG PANEL - Dark Theme
+           ============================================================================ */
+        #debugLogPanel {
+            background: #1a202c !important;
+            color: #e2e8f0 !important;
+            border-bottom: 1px solid #2d3748;
+        }
     </style>
 </head>
 <body>
@@ -693,20 +785,21 @@
         <!-- HEADER -->
         <div class="header">
             <div class="header-title">
+                <div class="logo">HC</div>
                 <div>
-                    <h1>BGAV Hypercare Email Review</h1>
-                    <div style="font-size: 0.875rem; opacity: 0.9;">Barmenia • Gothaer • Standalone Edition</div>
+                    <h1>Email Review</h1>
+                    <div style="font-size: 0.75rem; color: #a0aec0;">BGAV Hypercare</div>
                 </div>
             </div>
             <div class="header-actions">
-                <button class="btn btn-primary btn-lg" onclick="loadEmails()">
-                    Emails laden
+                <button class="btn btn-primary" onclick="loadEmails()">
+                    <span style="font-size: 1rem;">&#x2709;</span> Emails laden
                 </button>
-                <button class="btn btn-success btn-lg" onclick="exportToExcel()" id="exportBtn" disabled>
-                    Excel Export
+                <button class="btn btn-success" onclick="exportToExcel()" id="exportBtn" disabled>
+                    <span style="font-size: 1rem;">&#x2913;</span> Excel Export
                 </button>
-                <button class="btn btn-secondary btn-lg" onclick="toggleDebugLog()">
-                    Debug Log
+                <button class="btn btn-secondary" onclick="toggleDebugLog()">
+                    <span style="font-size: 1rem;">&#x2630;</span> Log
                 </button>
             </div>
         </div>
@@ -723,20 +816,32 @@
         <!-- STATS BAR -->
         <div class="stats-bar">
             <div class="stat-card">
-                <span class="stat-value" id="totalCount">0</span>
-                <span class="stat-label">Emails geladen</span>
+                <div class="stat-icon">&#x2709;</div>
+                <div>
+                    <span class="stat-value" id="totalCount">0</span>
+                    <span class="stat-label">Geladen</span>
+                </div>
             </div>
             <div class="stat-card">
-                <span class="stat-value" id="selectedCount">0</span>
-                <span class="stat-label">Ausgewählt</span>
+                <div class="stat-icon" style="background: #ebf8ff; color: #3182ce;">&#x2713;</div>
+                <div>
+                    <span class="stat-value" id="selectedCount">0</span>
+                    <span class="stat-label">Ausgewählt</span>
+                </div>
             </div>
             <div class="stat-card">
-                <span class="stat-value" id="incidentCount">0</span>
-                <span class="stat-label">Incidents</span>
+                <div class="stat-icon" style="background: #fff5f5; color: #c53030;">&#x26A0;</div>
+                <div>
+                    <span class="stat-value" id="incidentCount">0</span>
+                    <span class="stat-label">Incidents</span>
+                </div>
             </div>
             <div class="stat-card">
-                <span class="stat-value" id="rueckfrageCount">0</span>
-                <span class="stat-label">Rückfragen</span>
+                <div class="stat-icon" style="background: #ebf8ff; color: #2b6cb0;">?</div>
+                <div>
+                    <span class="stat-value" id="rueckfrageCount">0</span>
+                    <span class="stat-label">Rückfragen</span>
+                </div>
             </div>
 
             <!-- NOTIFICATION AREA IN STATS BAR -->
@@ -746,7 +851,7 @@
         <!-- TOOLBAR -->
         <div class="toolbar">
             <div class="search-box">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon">&#x2315;</span>
                 <input type="text" id="searchInput" placeholder="Suche in Betreff oder Text..."
                        oninput="filterEmails()">
             </div>
@@ -1029,7 +1134,7 @@
                         found = true;
                     } catch (e) {
                         showLoading(false);
-                        alert("⚠️ Tracking_Hypercare.xlsm konnte nicht geöffnet werden!\n\n" +
+                        alert("[!] Tracking_Hypercare.xlsm konnte nicht geöffnet werden!\n\n" +
                               "Bitte öffne die Datei manuell in Excel und versuche es erneut.\n\n" +
                               "Fortfahren ohne Duplikat-Prüfung?");
                         return; // Ohne Tracker weitermachen
@@ -1042,7 +1147,7 @@
                     trackerSheet = trackingWorkbook.Worksheets("Emailtracker");
                 } catch (e) {
                     showLoading(false);
-                    alert("ℹ️ Worksheet 'Emailtracker' nicht gefunden.\n\nFortfahren ohne Duplikat-Prüfung.");
+                    alert("[i] Worksheet 'Emailtracker' nicht gefunden.\n\nFortfahren ohne Duplikat-Prüfung.");
                     return;
                 }
 
@@ -1301,9 +1406,9 @@
                         // Update Fortschritt alle 5 Items
                         if (i % 5 === 0 || newEmails.length % 5 === 0) {
                             document.getElementById('loadingText').innerText =
-                                "⏳ " + i + " / " + totalItems + " durchsucht...\n" +
-                                "✅ " + newEmails.length + " neu\n" +
-                                "⚠️ " + skippedDuplicate + " bereits in Excel";
+                                "" + i + " / " + totalItems + " durchsucht...\n" +
+                                "[+] " + newEmails.length + " neu\n" +
+                                "[!] " + skippedDuplicate + " bereits in Excel";
                         }
 
                         var item = items.Item(i);
@@ -1355,7 +1460,7 @@
 
                         // Nach 100 Emails aufhören (Performance)
                         if (newEmails.length >= 100) {
-                            alert("⚠️ Limit erreicht: 100 Emails geladen.\n\nWeitere Emails im Ordner werden übersprungen.\n\nTipp: Navigiere zu einem spezifischeren Ordner für weniger Emails.");
+                            alert("[!] Limit erreicht: 100 Emails geladen.\n\nWeitere Emails im Ordner werden übersprungen.\n\nTipp: Navigiere zu einem spezifischeren Ordner für weniger Emails.");
                             break;
                         }
 
@@ -1420,7 +1525,7 @@
                         "Zu alt (>7 Tage): " + skippedOld;
 
                     if (updatedReplies > 0) {
-                        msg += "\n\n✅ Antworten aktualisiert: " + updatedReplies;
+                        msg += "\n\n[+] Antworten aktualisiert: " + updatedReplies;
                     }
 
                     // WICHTIG: Bringe HTA wieder in den Vordergrund
@@ -1454,15 +1559,15 @@
                 var msg = newEmails.length + " NEUE Email(s) geladen!\n\n";
                 msg += "Ordner: " + inbox.Name + "\n";
                 msg += "Postfach: " + store.DisplayName + "\n\n";
-                msg += "📊 Statistik:\n";
-                msg += "✅ NEU: " + newEmails.length + "\n";
-                msg += "⚠️ Bereits in Excel: " + skippedDuplicate + "\n";
+                msg += "Statistik:\n";
+                msg += "[+] NEU: " + newEmails.length + "\n";
+                msg += "[!] Bereits in Excel: " + skippedDuplicate + "\n";
                 if (updatedReplies > 0) {
-                    msg += "🔄 Antworten aktualisiert: " + updatedReplies + "\n";
+                    msg += "[~] Antworten aktualisiert: " + updatedReplies + "\n";
                 }
-                msg += "📅 Zu alt (>7 Tage): " + skippedOld;
+                msg += "[>] Zu alt (>7 Tage): " + skippedOld;
                 if (errors > 0) {
-                    msg += "\n❌ Fehler: " + errors;
+                    msg += "\n[x] Fehler: " + errors;
                 }
                 showNotification(msg, 'success', 'Emails geladen', 8000);
 
@@ -1784,9 +1889,9 @@
                 var body = getEmailBody(mailItem);
 
                 // WICHTIG: Begrenze Text-Länge um Stack-Fehler zu vermeiden
-                // Excel-Zellen haben max. 32.767 Zeichen, wir limitieren auf 30.000
-                if (body && body.length > 30000) {
-                    body = body.substring(0, 30000) + "\n\n... (Text gekürzt)";
+                // Excel-Zellen haben max. 32.767 Zeichen, wir limitieren auf 60.000
+                if (body && body.length > 60000) {
+                    body = body.substring(0, 60000) + "\n\n... (Text gekürzt)";
                 }
 
                 var attachments = [];
@@ -1811,7 +1916,7 @@
                     bodyLoaded: true
                 };
             } catch (e) {
-                debugLog("❌ FEHLER in extractEmailData: " + e.message + " für Email");
+                debugLog("[ERROR] FEHLER in extractEmailData: " + e.message + " für Email");
                 return {
                     datum: formatDate(new Date()),
                     von_email: "error@error.com",
@@ -1853,7 +1958,7 @@
 
                 email.text = getEmailBody(mailItem);
                 email.bodyLoaded = true;
-                debugLog("✓ Body geladen für: " + email.betreff.substring(0, 30) + "...");
+                debugLog("[OK] Body geladen für: " + email.betreff.substring(0, 30) + "...");
             } catch (e) {
                 debugLog("FEHLER beim Laden: " + e.message + " für: " + email.betreff);
                 email.text = "[Fehler beim Laden: " + e.message + "]";
@@ -2357,12 +2462,12 @@
             var listContainer = document.getElementById('emailList');
 
             if (filteredEmails.length === 0 && emails.length > 0) {
-                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Keine Emails gefunden</div><div class="empty-description">Versuche die Filtereinstellungen zu ändern.</div></div>';
+                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon" style="color:#a0aec0;">&#x2315;</div><div class="empty-title">Keine Emails gefunden</div><div class="empty-description">Versuche die Filtereinstellungen zu ändern.</div></div>';
                 return;
             }
 
             if (filteredEmails.length === 0) {
-                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Keine Emails geladen</div><div class="empty-description">Wähle in Outlook Emails aus und klicke auf "Ausgewählte Emails laden"<br>oder lade einen ganzen Outlook-Ordner.</div><button class="btn btn-primary btn-lg mt-md" onclick="loadFromOutlookSelection()">📥 Emails aus Outlook laden</button></div>';
+                listContainer.innerHTML = '<div class="empty-state"><div class="empty-icon" style="color:#a0aec0;">&#x2709;</div><div class="empty-title">Keine Emails geladen</div><div class="empty-description">Wähle in Outlook Emails aus und klicke auf "Ausgewählte Emails laden"<br>oder lade einen ganzen Outlook-Ordner.</div><button class="btn btn-primary btn-lg mt-md" onclick="loadFromOutlookSelection()">Emails aus Outlook laden</button></div>';
                 return;
             }
 
@@ -2714,8 +2819,8 @@
                     var reply = findReplyInSentItems(email);
                     email.antwort = reply || "";
 
-                    if (email.antwort && email.antwort.length > 30000) {
-                        email.antwort = email.antwort.substring(0, 30000) + "\n\n... (gekürzt)";
+                    if (email.antwort && email.antwort.length > 60000) {
+                        email.antwort = email.antwort.substring(0, 60000) + "\n\n... (gekürzt)";
                     }
                 } catch (e) {
                     email.antwort = "";
@@ -2807,7 +2912,7 @@
                                 }
                             }
 
-                            debugLog("✓ Antwort aktualisiert für HC-ID: " + hcId);
+                            debugLog("[OK] Antwort aktualisiert für HC-ID: " + hcId);
                             return true;
                         }
                         break;
@@ -2828,13 +2933,13 @@
 
                 // WICHTIG: Verwende bereits geöffnete Excel-Instanz und Workbook!
                 if (!excelApp || !trackingWorkbook) {
-                    alert("⚠️ Excel oder Workbook nicht gefunden!\n\n" +
+                    alert("[!] Excel oder Workbook nicht gefunden!\n\n" +
                           "Bitte lade zuerst Emails über 'Letzte Woche laden',\n" +
                           "damit Excel und das Tracking_Hypercare Workbook geöffnet werden.");
                     return;
                 }
 
-                debugInfo = "✓ Verwende bereits geöffnetes Excel und Workbook\n\n";
+                debugInfo = "[OK] Verwende bereits geöffnetes Excel und Workbook\n\n";
 
                 // Verwende das bereits geöffnete Workbook
                 var workbook = trackingWorkbook;
@@ -2845,9 +2950,9 @@
                 try {
                     worksheet = workbook.Worksheets("Übersicht");
                     found = true;
-                    debugInfo += "✓✓ Worksheet 'Übersicht' gefunden!\n";
+                    debugInfo += "[OK] Worksheet 'Übersicht' gefunden!\n";
                 } catch (e) {
-                    debugInfo += "⚠ Worksheet 'Übersicht' existiert nicht. Fehler: " + e.message + "\n";
+                    debugInfo += "[!] Worksheet 'Übersicht' existiert nicht. Fehler: " + e.message + "\n";
                     debugInfo += "Verfügbare Worksheets:\n";
                     try {
                         for (var ws = 1; ws <= workbook.Worksheets.Count; ws++) {
@@ -2863,15 +2968,15 @@
                         found = true;
                         debugInfo += "  → Verwende stattdessen erstes Worksheet: '" + worksheet.Name + "'\n";
                     } catch (e2) {
-                        debugInfo += "  ✗ Kann kein Worksheet öffnen: " + e2.message + "\n";
-                        alert("❌ Fehler: Kein Worksheet gefunden!\n\n" + debugInfo);
+                        debugInfo += "  [x] Kann kein Worksheet öffnen: " + e2.message + "\n";
+                        alert("[ERROR] Fehler: Kein Worksheet gefunden!\n\n" + debugInfo);
                         return;
                     }
                 }
 
                 // Worksheet sollte jetzt vorhanden sein
                 if (!found || !worksheet) {
-                    alert("❌ Fehler: Worksheet konnte nicht gefunden werden!\n\n" + debugInfo);
+                    alert("[ERROR] Fehler: Worksheet konnte nicht gefunden werden!\n\n" + debugInfo);
                     return;
                 }
 
