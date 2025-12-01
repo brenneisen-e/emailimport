@@ -402,16 +402,23 @@
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 var count = 0;
 
-                // Read date (col 2) and subject (col 11) to create unique keys
+                // Read ConversationID (col 21), date (col 2), and subject (col 11) for duplicate detection
                 for (var row = 2; row <= lastRow; row++) {
+                    var conversationId = worksheet.Cells(row, 21).Value || '';
                     var datum = worksheet.Cells(row, 2).Value || '';
                     var betreff = worksheet.Cells(row, 11).Value || '';
 
+                    // Primary key: ConversationID + Date (allows new replies in same conversation)
+                    if (conversationId && datum) {
+                        var dateStr = formatDateKey(datum);
+                        existingEmailKeys['conv|' + conversationId + '|' + dateStr] = true;
+                    }
+                    // Fallback key: date + subject (for older entries without ConversationID)
                     if (datum || betreff) {
                         var key = createExportEmailKey(datum, betreff);
                         existingEmailKeys[key] = true;
-                        count++;
                     }
+                    if (conversationId || datum || betreff) count++;
                 }
 
                 document.getElementById('exportExcelStatus').value = "OK: " + exportWorkbook.Name + " (" + count + " Einträge)";
@@ -422,17 +429,54 @@
             }
         }
 
+        function formatDateKey(datum) {
+            try {
+                var d;
+                if (typeof datum === 'number') {
+                    d = new Date((datum - 25569) * 86400 * 1000);
+                } else {
+                    d = new Date(datum);
+                }
+                if (!isNaN(d.getTime())) {
+                    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                }
+            } catch (e) {}
+            return String(datum).substring(0, 10);
+        }
+
+        function normalizeSubject(betreff) {
+            var subjectStr = String(betreff || '').toLowerCase().trim();
+            subjectStr = subjectStr.replace(/^(re|aw|fw|wg|fwd|antwort|antw):\s*/gi, '');
+            subjectStr = subjectStr.replace(/^(re|aw|fw|wg|fwd|antwort|antw):\s*/gi, '');
+            return subjectStr.substring(0, 100);
+        }
+
         function createExportEmailKey(datum, betreff) {
             var dateStr = '';
             if (datum) {
                 try {
-                    var d = new Date(datum);
-                    dateStr = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                    var d;
+                    // Handle Excel serial number (days since 1899-12-30)
+                    if (typeof datum === 'number') {
+                        d = new Date((datum - 25569) * 86400 * 1000);
+                    } else {
+                        d = new Date(datum);
+                    }
+                    // Check if valid date
+                    if (!isNaN(d.getTime())) {
+                        dateStr = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                    } else {
+                        dateStr = String(datum).substring(0, 10);
+                    }
                 } catch (e) {
                     dateStr = String(datum).substring(0, 10);
                 }
             }
-            var subjectStr = String(betreff || '').toLowerCase().trim().substring(0, 100);
+            // Normalize subject: lowercase, remove RE:/AW:/FW:/WG: prefixes
+            var subjectStr = String(betreff || '').toLowerCase().trim();
+            subjectStr = subjectStr.replace(/^(re|aw|fw|wg|fwd|antwort|antw):\s*/gi, '');
+            subjectStr = subjectStr.replace(/^(re|aw|fw|wg|fwd|antwort|antw):\s*/gi, ''); // Remove twice for RE: RE:
+            subjectStr = subjectStr.substring(0, 100);
             return dateStr + '|' + subjectStr;
         }
 
@@ -525,8 +569,11 @@
                     var hasExcelData = false;
                     for (var k in existingEmailKeys) { hasExcelData = true; break; }
                     if (hasExcelData) {
+                        var dateKey = formatDateKey(emailData.datum);
+                        var convKey = 'conv|' + (emailData.conversationId || '') + '|' + dateKey;
                         var emailKey = createExportEmailKey(emailData.datum, emailData.betreff);
-                        if (existingEmailKeys[emailKey]) {
+                        // Check ConversationID+Date first (allows new replies), then date+subject
+                        if ((emailData.conversationId && existingEmailKeys[convKey]) || existingEmailKeys[emailKey]) {
                             exportState.duplicatesSkipped++;
                             continue;  // Skip this email - already in Excel
                         }
@@ -1208,7 +1255,7 @@
         // Write a single email row to Excel
         // Columns: ID, Datum, Kanal, BD-Nummer, Agentur, Absender, Kategorie, Status, In Bearbeitung von,
         //          Cluster, Betreff, Anfrage, Antwort, Diagnose, Workaround, Nächste Schritte,
-        //          Lösung, JIRA, Kommunikation, Kommentar (20 columns)
+        //          Lösung, JIRA, Kommunikation, Kommentar, ConversationID (21 columns)
         function writeEmailRow(worksheet, row, email) {
             var repliesText = formatReplies(email.antworten);
             var pd = email.provisionData || {};
@@ -1218,6 +1265,10 @@
             if (pd.vorname_vermittler || pd.nachname_vermittler) {
                 absender = ((pd.vorname_vermittler || '') + ' ' + (pd.nachname_vermittler || '')).trim();
             }
+            absender = fixEncoding(absender);  // Fix encoding for names
+
+            // Agentur mit Encoding-Fix
+            var agentur = fixEncoding(email.agentur || '');
 
             // Anfrage: Bei Provisionsreklamation nur die "nachricht" nehmen
             var anfrage = email.text || email.anfrage || '';
@@ -1230,19 +1281,22 @@
             // BD-Nummer: Aus provisionData oder email
             var bdNummer = pd.vermittlernummer_vermittler || email.vermittlernr || '';
 
+            // Betreff mit Encoding-Fix
+            var betreff = fixEncoding(email.betreff || '');
+
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
             worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
             worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
             worksheet.Cells(row, 4).Value = bdNummer;                    // BD-Nummer
-            worksheet.Cells(row, 5).Value = email.agentur || '';         // Agentur
+            worksheet.Cells(row, 5).Value = agentur;                     // Agentur
             worksheet.Cells(row, 6).Value = absender;                    // Absender
             worksheet.Cells(row, 7).Value = email.kategorie || '';       // Kategorie
             worksheet.Cells(row, 8).Value = email.status || 'Neu';       // Status
             worksheet.Cells(row, 9).Value = '';                          // In Bearbeitung von
             worksheet.Cells(row, 10).Value = (email.clusters || []).join(', ');  // Cluster
-            worksheet.Cells(row, 11).Value = email.betreff || '';        // Betreff
+            worksheet.Cells(row, 11).Value = betreff;                    // Betreff
             worksheet.Cells(row, 12).Value = anfrage;                    // Anfrage
-            worksheet.Cells(row, 13).Value = repliesText || email.antwort || ''; // Antwort
+            worksheet.Cells(row, 13).Value = fixEncoding(repliesText || email.antwort || ''); // Antwort
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
             worksheet.Cells(row, 15).Value = '';                         // Workaround
             worksheet.Cells(row, 16).Value = '';                         // Nächste Schritte
@@ -1250,6 +1304,7 @@
             worksheet.Cells(row, 18).Value = '';                         // JIRA
             worksheet.Cells(row, 19).Value = '';                         // Kommunikation
             worksheet.Cells(row, 20).Value = email.kommentar || '';      // Kommentar
+            worksheet.Cells(row, 21).Value = email.conversationId || ''; // ConversationID für Duplikatsprüfung
         }
 
         // Fix UTF-8 encoding issues (Ã¼ -> ü, ÃŸ -> ß, etc.)
