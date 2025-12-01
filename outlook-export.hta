@@ -549,14 +549,27 @@
             if (!text) return '';
 
             // Find where quoted content starts and cut it off
+            // Multiple patterns for German and English Outlook
             var patterns = [
-                /_{5,}\s*\n\s*Von:/i,
-                /\n\s*Von:\s+.+\n\s*Gesendet:/im,
-                /_{5,}\s*\n\s*From:/i,
-                /\n\s*From:\s+.+\n\s*Sent:/im,
-                /\n\s*Am\s+.+\s+schrieb\s+.+:/im,
-                /\n\s*On\s+.+\s+wrote:/im,
-                /-{3,}\s*Original/i
+                // German Outlook patterns
+                /_{5,}\s*\r?\n\s*Von:/i,
+                /\r?\n\s*Von:\s+.+\r?\n\s*Gesendet:/im,
+                /\r?\n\s*Von:\s+.+\r?\n\s*An:/im,
+                /-{3,}\s*Urspr[uü]ngliche\s+Nachricht/i,
+                /-{3,}\s*Original\s*Message/i,
+                /-{3,}\s*Weitergeleitete\s+Nachricht/i,
+                // English Outlook patterns
+                /_{5,}\s*\r?\n\s*From:/i,
+                /\r?\n\s*From:\s+.+\r?\n\s*Sent:/im,
+                /\r?\n\s*From:\s+.+\r?\n\s*To:/im,
+                // Quote headers
+                /\r?\n\s*Am\s+\d.+\s+schrieb\s+.+:/im,
+                /\r?\n\s*On\s+.+\s+wrote:/im,
+                /\r?\n\s*>+\s*Von:/im,
+                /\r?\n\s*>+\s*From:/im,
+                // Line of underscores/dashes followed by email header
+                /\r?\n_{10,}\r?\n/,
+                /\r?\n-{10,}\r?\n/
             ];
 
             for (var i = 0; i < patterns.length; i++) {
@@ -566,6 +579,9 @@
                     break;
                 }
             }
+
+            // Remove trailing signature markers
+            text = text.replace(/\r?\n--\s*\r?\n[\s\S]*$/, '');
 
             // Trim and limit length
             text = text.trim();
@@ -781,37 +797,16 @@
 
         function detectExcel() {
             try {
-                // Try multiple methods to connect to Excel
-                excelApp = null;
-
-                // Method 1: GetObject with empty string
-                try {
-                    excelApp = GetObject("", "Excel.Application");
-                } catch (e1) {
-                    // Method 2: GetObject without first parameter
-                    try {
-                        excelApp = GetObject(null, "Excel.Application");
-                    } catch (e2) {
-                        // Method 3: Try creating new instance and check for open workbooks
-                        try {
-                            var tempApp = new ActiveXObject("Excel.Application");
-                            if (tempApp.Workbooks.Count > 0) {
-                                excelApp = tempApp;
-                            } else {
-                                tempApp.Quit();
-                                excelApp = null;
-                            }
-                        } catch (e3) {}
-                    }
-                }
-
+                // Same approach as standalone app: try GetObject, fallback to new instance
                 if (!excelApp) {
-                    document.getElementById('excelStatus').value = "Keine Excel-Instanz gefunden - bitte Excel offnen";
-                    return;
+                    try {
+                        excelApp = GetObject("", "Excel.Application");
+                    } catch (e) {
+                        // Create new instance - will connect to running Excel or start new
+                        excelApp = new ActiveXObject("Excel.Application");
+                    }
+                    excelApp.Visible = true;
                 }
-
-                // Make sure Excel is visible
-                try { excelApp.Visible = true; } catch (e) {}
 
                 // Find Hypercare/Tracking workbook
                 targetWorkbook = null;
@@ -836,7 +831,7 @@
                 } else if (allWorkbooks.length > 0) {
                     document.getElementById('excelStatus').value = "Gefunden: " + allWorkbooks.join(", ") + " (keine Hypercare)";
                 } else {
-                    document.getElementById('excelStatus').value = "Excel offen, aber keine Arbeitsmappen";
+                    document.getElementById('excelStatus').value = "Keine Arbeitsmappe offen - bitte Excel-Datei offnen";
                 }
             } catch (e) {
                 document.getElementById('excelStatus').value = "Fehler: " + e.message;
