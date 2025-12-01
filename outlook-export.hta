@@ -387,7 +387,14 @@
                 }
 
                 if (emails.length === 0) { showExportError("Keine Emails gefunden."); return; }
-                saveExportFile(emails);
+
+                // Count total replies found
+                var totalReplies = 0;
+                for (var r = 0; r < emails.length; r++) {
+                    if (emails[r].antworten) totalReplies += emails[r].antworten.length;
+                }
+
+                saveExportFile(emails, totalReplies);
             } catch (e) {
                 showExportError("Fehler: " + e.message);
             }
@@ -395,39 +402,86 @@
 
         function cacheSentItems(days) {
             sentItemsCache = [];
+            var cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - (days + 30));
+
+            // Try multiple sent folders: selected store AND default store
+            var sentFolders = [];
+
+            // 1. Try selected store's Sent Items
             try {
-                // Get Sent Items folder (olFolderSentMail = 5)
-                var sentFolder = selectedStore.GetDefaultFolder(5);
-                var sentItems = sentFolder.Items;
-                try { sentItems.Sort("[SentOn]", true); } catch (e) {}
+                sentFolders.push(selectedStore.GetDefaultFolder(5));
+            } catch (e) {}
 
-                var cutoffDate = new Date();
-                cutoffDate.setDate(cutoffDate.getDate() - (days + 30)); // Include 30 extra days for replies
-
-                var maxItems = Math.min(sentItems.Count, 500);
-                for (var i = 1; i <= maxItems; i++) {
+            // 2. Try default/primary account's Sent Items (for shared mailboxes)
+            try {
+                var defaultSent = namespace.GetDefaultFolder(5);
+                // Avoid duplicates
+                var isDuplicate = false;
+                for (var f = 0; f < sentFolders.length; f++) {
                     try {
-                        var item = sentItems.Item(i);
-                        if (item.Class !== 43) continue;
+                        if (sentFolders[f].EntryID === defaultSent.EntryID) isDuplicate = true;
+                    } catch (e) {}
+                }
+                if (!isDuplicate) sentFolders.push(defaultSent);
+            } catch (e) {}
 
-                        var sentDate = new Date(item.SentOn);
-                        if (sentDate < cutoffDate) break;
-
-                        var subject = (item.Subject || '').toLowerCase().trim();
-                        // Remove Re:, AW:, Fwd:, etc.
-                        subject = subject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
-
-                        var body = '';
-                        try { body = item.Body || ''; } catch (e) {}
-
-                        sentItemsCache.push({
-                            sentDate: sentDate,
-                            normalizedSubject: subject,
-                            body: removeEmailQuotes(body)
-                        });
+            // 3. Try all stores' Sent Items
+            try {
+                for (var s = 1; s <= namespace.Stores.Count; s++) {
+                    try {
+                        var storeSent = namespace.Stores.Item(s).GetDefaultFolder(5);
+                        var isDup = false;
+                        for (var f = 0; f < sentFolders.length; f++) {
+                            try {
+                                if (sentFolders[f].EntryID === storeSent.EntryID) isDup = true;
+                            } catch (e) {}
+                        }
+                        if (!isDup) sentFolders.push(storeSent);
                     } catch (e) {}
                 }
             } catch (e) {}
+
+            // Cache items from all sent folders
+            for (var sf = 0; sf < sentFolders.length; sf++) {
+                try {
+                    var sentItems = sentFolders[sf].Items;
+                    try { sentItems.Sort("[SentOn]", true); } catch (e) {}
+
+                    var maxItems = Math.min(sentItems.Count, 300);
+                    for (var i = 1; i <= maxItems; i++) {
+                        try {
+                            var item = sentItems.Item(i);
+                            if (item.Class !== 43) continue;
+
+                            var sentDate = new Date(item.SentOn);
+                            if (sentDate < cutoffDate) break;
+
+                            var subject = (item.Subject || '').toLowerCase().trim();
+                            // Remove Re:, AW:, Fwd:, etc. - handle multiple prefixes
+                            while (subject.match(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i)) {
+                                subject = subject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i, '').trim();
+                            }
+
+                            var body = '';
+                            try { body = item.Body || ''; } catch (e) {}
+
+                            var toRecipient = '';
+                            try { toRecipient = item.To || ''; } catch (e) {}
+
+                            sentItemsCache.push({
+                                sentDate: sentDate,
+                                normalizedSubject: subject,
+                                body: removeEmailQuotes(body),
+                                to: toRecipient
+                            });
+                        } catch (e) {}
+                    }
+                } catch (e) {}
+            }
+
+            document.getElementById('exportProgressText').innerText =
+                'Gesendete Emails geladen: ' + sentItemsCache.length + ' (aus ' + sentFolders.length + ' Ordnern)';
         }
 
         function findReplies(originalEmail) {
@@ -436,8 +490,14 @@
 
             try {
                 var originalSubject = (originalEmail.betreff || '').toLowerCase().trim();
-                originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
+                // Remove multiple reply prefixes
+                while (originalSubject.match(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i)) {
+                    originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i, '').trim();
+                }
                 var originalDate = new Date(originalEmail.datum);
+
+                // Also get original sender for matching
+                var originalSender = (originalEmail.von_email || '').toLowerCase();
 
                 for (var i = 0; i < sentItemsCache.length; i++) {
                     var cached = sentItemsCache[i];
@@ -449,14 +509,23 @@
                     var daysDiff = (cached.sentDate - originalDate) / (1000 * 60 * 60 * 24);
                     if (daysDiff > 30) continue;
 
-                    // Subject must match
-                    if (cached.normalizedSubject === originalSubject ||
-                        cached.normalizedSubject.indexOf(originalSubject) !== -1 ||
-                        originalSubject.indexOf(cached.normalizedSubject) !== -1) {
+                    // Subject matching - more flexible
+                    var subjectMatch = false;
+                    if (cached.normalizedSubject === originalSubject) {
+                        subjectMatch = true;
+                    } else if (cached.normalizedSubject.length > 5 && originalSubject.length > 5) {
+                        // Partial match (at least 80% of shorter subject in longer one)
+                        if (cached.normalizedSubject.indexOf(originalSubject) !== -1 ||
+                            originalSubject.indexOf(cached.normalizedSubject) !== -1) {
+                            subjectMatch = true;
+                        }
+                    }
 
+                    if (subjectMatch) {
                         if (cached.body && cached.body.trim() !== '') {
                             replies.push({
                                 datum: formatDate(cached.sentDate),
+                                an: cached.to || '',
                                 text: cached.body.trim()
                             });
                         }
@@ -528,7 +597,7 @@
 
         function pad(n) { return n < 10 ? '0' + n : n; }
 
-        function saveExportFile(emails) {
+        function saveExportFile(emails, totalReplies) {
             try {
                 var shell = new ActiveXObject("WScript.Shell");
                 var shellApp = new ActiveXObject("Shell.Application");
@@ -548,7 +617,10 @@
 
                 document.getElementById('exportProgress').style.display = 'none';
                 document.getElementById('exportSuccess').style.display = 'block';
-                document.getElementById('exportSuccessMsg').innerHTML = emails.length + ' Emails exportiert nach:<br><strong>' + filename + '</strong>';
+                document.getElementById('exportSuccessMsg').innerHTML =
+                    emails.length + ' Emails exportiert<br>' +
+                    '<strong>' + (totalReplies || 0) + ' Antworten</strong> gefunden<br>' +
+                    'Datei: <strong>' + filename + '</strong>';
                 document.getElementById('exportActions').style.display = 'block';
                 document.getElementById('exportBtn').disabled = false;
             } catch (e) {
