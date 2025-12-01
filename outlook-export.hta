@@ -1545,12 +1545,12 @@
                 .replace(/Ã®/g, 'î').replace(/Ã¯/g, 'ï')
                 .replace(/Ã´/g, 'ô').replace(/Ã¹/g, 'ù')
                 .replace(/Ã»/g, 'û').replace(/Ã§/g, 'ç')
-                .replace(/â‚¬/g, '€')
-                // German quotation marks and dashes
-                .replace(/â€ž/g, '„').replace(/â€œ/g, '"')
-                .replace(/â€˜/g, ''').replace(/â€™/g, ''')
-                .replace(/â€"/g, '–').replace(/â€"/g, '—')
-                .replace(/â€¦/g, '…');
+                .replace(/â‚¬/g, '\u20AC')
+                // German quotation marks and dashes (using Unicode escapes for JScript compatibility)
+                .replace(/â€ž/g, '\u201E').replace(/â€œ/g, '\u201C')
+                .replace(/â€˜/g, '\u2018').replace(/â€™/g, '\u2019')
+                .replace(/â€"/g, '\u2013').replace(/â€"/g, '\u2014')
+                .replace(/â€¦/g, '\u2026');
         }
 
         // JSON polyfill
