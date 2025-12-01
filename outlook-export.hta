@@ -469,11 +469,13 @@
                             var toRecipient = '';
                             try { toRecipient = item.To || ''; } catch (e) {}
 
+                            var convId = '';
+                            try { convId = item.ConversationID || ''; } catch (e) {}
+
                             sentItemsCache.push({
                                 sentDate: sentDate,
-                                normalizedSubject: subject,
+                                conversationId: convId,
                                 body: removeEmailQuotes(body),
-                                fullBody: body,  // Keep full body for content matching
                                 to: toRecipient
                             });
                         } catch (e) {}
@@ -490,50 +492,20 @@
             if (!sentItemsCache || sentItemsCache.length === 0) return replies;
 
             try {
+                var originalConvId = originalEmail.conversationId || '';
                 var originalDate = new Date(originalEmail.datum);
-                var originalText = (originalEmail.text || '').toLowerCase();
-                var originalSender = (originalEmail.von_email || '').toLowerCase();
 
-                // Extract unique identifiers from original email for content matching
-                var identifiers = extractIdentifiers(originalEmail);
+                // No ConversationID = can't match reliably
+                if (!originalConvId) return replies;
 
                 for (var i = 0; i < sentItemsCache.length; i++) {
                     var cached = sentItemsCache[i];
 
-                    // Reply must be after original email
-                    if (cached.sentDate < originalDate) continue;
+                    // Match by ConversationID (Outlook's built-in thread tracking)
+                    if (cached.conversationId && cached.conversationId === originalConvId) {
+                        // Reply must be after original email
+                        if (cached.sentDate <= originalDate) continue;
 
-                    // Reply must be within 30 days
-                    var daysDiff = (cached.sentDate - originalDate) / (1000 * 60 * 60 * 24);
-                    if (daysDiff > 30) continue;
-
-                    // Content-based matching: check if reply contains original email content
-                    var fullReplyBody = (cached.fullBody || '').toLowerCase();
-                    var contentMatch = false;
-                    var matchScore = 0;
-
-                    // Check for identifiers in the reply (quoted content)
-                    for (var id = 0; id < identifiers.length; id++) {
-                        if (identifiers[id] && identifiers[id].length >= 4) {
-                            if (fullReplyBody.indexOf(identifiers[id].toLowerCase()) !== -1) {
-                                matchScore++;
-                            }
-                        }
-                    }
-
-                    // Check if original sender email appears in reply (typical for replies)
-                    if (originalSender && originalSender.length > 5) {
-                        if (fullReplyBody.indexOf(originalSender) !== -1) {
-                            matchScore += 2;
-                        }
-                    }
-
-                    // Need at least 2 matching identifiers to consider it a match
-                    if (matchScore >= 2) {
-                        contentMatch = true;
-                    }
-
-                    if (contentMatch) {
                         if (cached.body && cached.body.trim() !== '') {
                             replies.push({
                                 datum: formatDate(cached.sentDate),
@@ -546,45 +518,6 @@
             } catch (e) {}
 
             return replies;
-        }
-
-        // Extract unique identifiers from email for matching
-        function extractIdentifiers(email) {
-            var ids = [];
-            var text = email.text || '';
-
-            // Vermittlernummer
-            var vmMatch = text.match(/vermittlernummer[_\s]*vermittler\s*:\s*(\d+)/i);
-            if (vmMatch) ids.push(vmMatch[1]);
-
-            // Versicherungsnummer
-            var vsMatch = text.match(/versicherungsnummer[_\s]*kunde\s*:\s*(\d+)/i);
-            if (vsMatch) ids.push(vsMatch[1]);
-
-            // Nachname Vermittler
-            var nvMatch = text.match(/nachname[_\s]*vermittler\s*:\s*(\S+)/i);
-            if (nvMatch) ids.push(nvMatch[1]);
-
-            // Nachname Kunde
-            var nkMatch = text.match(/nachname[_\s]*kunde\s*:\s*(\S+)/i);
-            if (nkMatch) ids.push(nkMatch[1]);
-
-            // Vorname Kunde
-            var vkMatch = text.match(/vorname[_\s]*kunde\s*:\s*(\S+)/i);
-            if (vkMatch) ids.push(vkMatch[1]);
-
-            // Any 6+ digit numbers (likely IDs)
-            var numberMatches = text.match(/\b\d{6,}\b/g);
-            if (numberMatches) {
-                for (var n = 0; n < Math.min(numberMatches.length, 3); n++) {
-                    ids.push(numberMatches[n]);
-                }
-            }
-
-            // Sender email
-            if (email.von_email) ids.push(email.von_email);
-
-            return ids;
         }
 
         function removeEmailQuotes(text) {
@@ -630,6 +563,9 @@
             var attachments = [];
             try { for (var a = 1; a <= item.Attachments.Count; a++) { attachments.push(item.Attachments.Item(a).FileName); } } catch (e) {}
 
+            var convId = '';
+            try { convId = item.ConversationID || ''; } catch (e) {}
+
             return {
                 datum: formatDate(item.ReceivedTime),
                 von_email: senderEmail,
@@ -637,6 +573,7 @@
                 betreff: item.Subject || '(Kein Betreff)',
                 text: body,
                 anhaenge: attachments,
+                conversationId: convId,
                 antworten: []
             };
         }
