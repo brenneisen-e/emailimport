@@ -348,6 +348,7 @@
         .badge-incident { background: var(--danger-light); color: var(--danger); }
         .badge-question { background: var(--purple-light); color: var(--purple); }
         .badge-cluster { background: var(--bg-tertiary); color: var(--text-secondary); }
+        .badge-update { background: #dbeafe; color: #1d4ed8; }
 
         /* Detail Panel */
         .detail-panel {
@@ -714,6 +715,38 @@
             line-height: 1.6;
         }
 
+        /* New reply indicator */
+        .reply-card.reply-new {
+            border-left-color: #10b981;
+            background: linear-gradient(to right, rgba(16, 185, 129, 0.05), white);
+        }
+
+        .reply-card.reply-existing {
+            border-left-color: #94a3b8;
+            background: #f8fafc;
+            opacity: 0.8;
+        }
+
+        .reply-status-new {
+            background: #10b981;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .reply-status-existing {
+            background: #e2e8f0;
+            color: #64748b;
+            font-size: 0.65rem;
+            font-weight: 500;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+        }
+
         .no-replies {
             text-align: center;
             padding: 3rem;
@@ -1027,7 +1060,10 @@
                     betreff: subject || '(Kein Betreff)',
                     text: text,
                     anhaenge: email.anhaenge || email.attachments || [],
-                    antworten: email.antworten || [],  // Replies from HTA export
+                    antworten: email.antworten || [],  // Replies from HTA export (nur neue bei Duplikaten)
+                    alleAntworten: email.alleAntworten || email.antworten || [],  // Alle Antworten (für Anzeige)
+                    existingReplies: email.existingReplies || '',  // Bereits in Excel vorhandene Antworten
+                    isDuplicateWithNewReplies: email.isDuplicateWithNewReplies || false,
                     conversationId: email.conversationId || '',  // Outlook ConversationID für Duplikatsprüfung
 
                     // Pre-filled fields
@@ -1197,6 +1233,10 @@
                 const isChecked = selectedForExport.has(email.id) ? 'checked' : '';
 
                 let badges = '';
+                // Show update badge for duplicates with new replies
+                if (email.isDuplicateWithNewReplies) {
+                    badges += '<span class="badge badge-update">🔄 Update</span>';
+                }
                 if (email.isProvision) badges += '<span class="badge badge-provision">€ Provision</span>';
                 else if (email.kategorie.includes('Incident')) badges += '<span class="badge badge-incident">! Incident</span>';
                 else if (email.kategorie === 'Fachliche Rückfrage') badges += '<span class="badge badge-question">? Frage</span>';
@@ -1330,21 +1370,36 @@
             const replyCountBadge = document.getElementById('replyCount');
             const tabAntworten = document.getElementById('tabAntworten');
 
-            if (email.antworten && email.antworten.length > 0) {
-                // Show reply count badge
-                replyCountBadge.textContent = email.antworten.length;
+            // Use alleAntworten for display (shows all), antworten for import (only new)
+            const displayReplies = email.alleAntworten && email.alleAntworten.length > 0
+                ? email.alleAntworten
+                : (email.antworten || []);
+            const newRepliesCount = (email.antworten || []).filter(r => r.isNew).length;
+
+            if (displayReplies.length > 0) {
+                // Show reply count badge with new indicator
+                if (email.isDuplicateWithNewReplies && newRepliesCount > 0) {
+                    replyCountBadge.textContent = displayReplies.length + ' (' + newRepliesCount + ' neu)';
+                } else {
+                    replyCountBadge.textContent = displayReplies.length;
+                }
                 replyCountBadge.style.display = 'inline';
                 tabAntworten.classList.remove('disabled');
 
-                // Render replies in card format
-                repliesList.innerHTML = email.antworten.map(reply => {
+                // Render replies in card format with new/existing indicator
+                repliesList.innerHTML = displayReplies.map(reply => {
                     const replyDate = new Date(reply.datum || reply.date);
                     const dateStr = replyDate.toLocaleString('de-DE');
                     const replyText = reply.text || reply.body || '';
+                    const isNew = reply.isNew === true;
+                    const statusClass = isNew ? 'reply-new' : (email.isDuplicateWithNewReplies ? 'reply-existing' : '');
+                    const statusLabel = isNew ? '<span class="reply-status-new">✨ NEU</span>' :
+                        (email.isDuplicateWithNewReplies ? '<span class="reply-status-existing">📋 Bereits importiert</span>' : '');
                     return `
-                        <div class="reply-card">
+                        <div class="reply-card ${statusClass}">
                             <div class="reply-card-header">
                                 <span class="reply-card-from">📤 An: ${escapeHtml(reply.an || reply.to || 'Unbekannt')}</span>
+                                ${statusLabel}
                                 <span class="reply-card-date">${dateStr}</span>
                             </div>
                             <div class="reply-card-text">${escapeHtml(replyText)}</div>
