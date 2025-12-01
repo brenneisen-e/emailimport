@@ -1516,12 +1516,17 @@
             // Agentur mit Encoding-Fix
             var agentur = fixEncoding(email.agentur || '');
 
-            // Anfrage: Bei Provisionsreklamation nur die "nachricht" nehmen
-            var anfrage = email.text || email.anfrage || '';
-            if (pd.nachricht) {
+            // Anfrage/Zusammenfassung: User-edited content has priority
+            var anfrage = '';
+            if (email.anfrage && email.anfrage.trim()) {
+                // User edited the summary in web app - use that
+                anfrage = fixEncoding(email.anfrage);
+            } else if (pd.nachricht) {
+                // Provisionsreklamation: use nachricht field
                 anfrage = fixEncoding(pd.nachricht);
-            } else if (anfrage) {
-                anfrage = fixEncoding(anfrage);
+            } else {
+                // Fallback to original email text
+                anfrage = fixEncoding(email.text || '');
             }
 
             // BD-Nummer: Aus provisionData oder email
@@ -1535,6 +1540,16 @@
             var status = fixEncoding(email.status || 'Neu');
             var clusters = fixEncoding((email.clusters || []).join(', '));
             var kommentar = fixEncoding(email.kommentar || '');
+            var bearbeiter = fixEncoding(email.bearbeiter || '');
+
+            // Combine user's manual answer with automatic replies
+            var antwortText = '';
+            var userAntwort = fixEncoding(email.antwort || '');
+            if (userAntwort && repliesText) {
+                antwortText = userAntwort + '\n\n--- Gefundene Antworten ---\n\n' + repliesText;
+            } else {
+                antwortText = userAntwort || repliesText || '';
+            }
 
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
             worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
@@ -1544,11 +1559,11 @@
             worksheet.Cells(row, 6).Value = absender;                    // Absender
             worksheet.Cells(row, 7).Value = kategorie;                   // Kategorie
             worksheet.Cells(row, 8).Value = status;                      // Status
-            worksheet.Cells(row, 9).Value = '';                          // In Bearbeitung von
+            worksheet.Cells(row, 9).Value = bearbeiter;                  // In Bearbeitung von
             worksheet.Cells(row, 10).Value = clusters;                   // Cluster
             worksheet.Cells(row, 11).Value = betreff;                    // Betreff
             worksheet.Cells(row, 12).Value = anfrage;                    // Anfrage
-            worksheet.Cells(row, 13).Value = fixEncoding(repliesText || email.antwort || ''); // Antwort
+            worksheet.Cells(row, 13).Value = fixEncoding(antwortText);   // Antwort
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
             worksheet.Cells(row, 15).Value = '';                         // Workaround
             worksheet.Cells(row, 16).Value = '';                         // Nächste Schritte

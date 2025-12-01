@@ -811,6 +811,12 @@
                 </button>
             </div>
 
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label">Dein Name (für "In Bearbeitung von")</label>
+                <input type="text" class="form-input" id="bearbeiterName" placeholder="Max Mustermann"
+                       onchange="saveBearbeiterName()" style="text-align: center;">
+            </div>
+
             <div class="upload-info">
                 <div class="upload-info-title">So geht's:</div>
                 <ol>
@@ -986,6 +992,21 @@
 
         const allClusters = ['KV', 'KFZ', 'SHUK', 'LV', 'Provisionierung', 'Produktzuordnung', 'Allgemein'];
 
+        // Load bearbeiter name from localStorage on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedName = localStorage.getItem('bearbeiterName') || '';
+            document.getElementById('bearbeiterName').value = savedName;
+        });
+
+        function saveBearbeiterName() {
+            const name = document.getElementById('bearbeiterName').value.trim();
+            localStorage.setItem('bearbeiterName', name);
+        }
+
+        function getBearbeiterName() {
+            return localStorage.getItem('bearbeiterName') || '';
+        }
+
         // ============================================================================
         // FILE HANDLING
         // ============================================================================
@@ -1073,9 +1094,10 @@
                     agentur: agentur,
                     vermittlernr: vermittlernr,
                     vsnr: vsnr,
-                    anfrage: '',
-                    antwort: '',
-                    kommentar: '',
+                    anfrage: email.anfrage || '',
+                    antwort: email.antwort || '',
+                    kommentar: email.kommentar || '',
+                    bearbeiter: email.bearbeiter || getBearbeiterName(),  // Default to logged-in user
 
                     isProvision: isProvision,
                     provisionData: provisionData
