@@ -1111,17 +1111,29 @@
 
         function parseProvisionData(text) {
             const data = {};
-            const simpleFields = [
-                'vermittlernummer_vermittler', 'vorname_vermittler', 'nachname_vermittler',
+            const allFields = [
+                'reklamation_provision', 'reklamation_absatz',
+                'vorname_vermittler', 'nachname_vermittler', 'vermittlernummer_vermittler',
                 'versicherungsnummer_kunde', 'vorname_kunde', 'nachname_kunde',
-                'reklamation_provision', 'reklamation_absatz', 'datenschutz'
+                'adresse_kunde', 'nachricht', 'datenschutz'
             ];
 
+            // Build lookahead pattern for all field names (to stop at next field)
+            const fieldLookahead = allFields.map(f => f + '\\s*:').join('|');
+
             // Parse simple single-line fields
-            simpleFields.forEach(field => {
-                const regex = new RegExp(field + '\\s*:\\s*(.+?)(?=\\n|$)', 'i');
+            allFields.forEach(field => {
+                if (field === 'nachricht' || field === 'adresse_kunde') return; // Handle separately
+
+                // Match field value until next field name, newline, or end
+                const regex = new RegExp(field + '\\s*:\\s*(.+?)(?=\\s+(?:' + fieldLookahead + ')|\\n|$)', 'i');
                 const match = text.match(regex);
-                if (match) data[field] = match[1].trim();
+                if (match) {
+                    let value = match[1].trim();
+                    // Clean up any trailing field names that might have been captured
+                    value = value.replace(/\s+(reklamation_|vorname_|nachname_|vermittlernummer_|versicherungsnummer_|adresse_|nachricht|datenschutz).*$/i, '').trim();
+                    if (value) data[field] = value;
+                }
             });
 
             // Parse 'nachricht' specially - it's multiline
