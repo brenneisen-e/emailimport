@@ -351,6 +351,8 @@
             setTimeout(function() { doExport(folderId, days); }, 100);
         }
 
+        var sentItemsCache = [];
+
         function doExport(folderId, days) {
             try {
                 var folder = (folderId === 'inbox') ? selectedStore.GetDefaultFolder(6) : namespace.GetFolderFromID(folderId);
@@ -359,6 +361,11 @@
 
                 var cutoffDate = new Date();
                 cutoffDate.setDate(cutoffDate.getDate() - days);
+
+                // Cache sent items first for reply matching
+                updateExportProgress(0, 100, 0);
+                document.getElementById('exportProgressText').innerText = 'Lade gesendete Emails...';
+                cacheSentItems(days);
 
                 var emails = [];
                 var total = Math.min(items.Count, 500);
@@ -371,7 +378,11 @@
                         if (item.Class !== 43) continue;
                         var receivedTime = new Date(item.ReceivedTime);
                         if (receivedTime < cutoffDate) { oldCount++; if (oldCount >= 20) break; continue; }
-                        emails.push(extractEmail(item));
+
+                        var emailData = extractEmail(item);
+                        // Find matching replies
+                        emailData.antworten = findReplies(emailData);
+                        emails.push(emailData);
                     } catch (e) {}
                 }
 
@@ -380,6 +391,108 @@
             } catch (e) {
                 showExportError("Fehler: " + e.message);
             }
+        }
+
+        function cacheSentItems(days) {
+            sentItemsCache = [];
+            try {
+                // Get Sent Items folder (olFolderSentMail = 5)
+                var sentFolder = selectedStore.GetDefaultFolder(5);
+                var sentItems = sentFolder.Items;
+                try { sentItems.Sort("[SentOn]", true); } catch (e) {}
+
+                var cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - (days + 30)); // Include 30 extra days for replies
+
+                var maxItems = Math.min(sentItems.Count, 500);
+                for (var i = 1; i <= maxItems; i++) {
+                    try {
+                        var item = sentItems.Item(i);
+                        if (item.Class !== 43) continue;
+
+                        var sentDate = new Date(item.SentOn);
+                        if (sentDate < cutoffDate) break;
+
+                        var subject = (item.Subject || '').toLowerCase().trim();
+                        // Remove Re:, AW:, Fwd:, etc.
+                        subject = subject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
+
+                        var body = '';
+                        try { body = item.Body || ''; } catch (e) {}
+
+                        sentItemsCache.push({
+                            sentDate: sentDate,
+                            normalizedSubject: subject,
+                            body: removeEmailQuotes(body)
+                        });
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        }
+
+        function findReplies(originalEmail) {
+            var replies = [];
+            if (!sentItemsCache || sentItemsCache.length === 0) return replies;
+
+            try {
+                var originalSubject = (originalEmail.betreff || '').toLowerCase().trim();
+                originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
+                var originalDate = new Date(originalEmail.datum);
+
+                for (var i = 0; i < sentItemsCache.length; i++) {
+                    var cached = sentItemsCache[i];
+
+                    // Reply must be after original email
+                    if (cached.sentDate < originalDate) continue;
+
+                    // Reply must be within 30 days
+                    var daysDiff = (cached.sentDate - originalDate) / (1000 * 60 * 60 * 24);
+                    if (daysDiff > 30) continue;
+
+                    // Subject must match
+                    if (cached.normalizedSubject === originalSubject ||
+                        cached.normalizedSubject.indexOf(originalSubject) !== -1 ||
+                        originalSubject.indexOf(cached.normalizedSubject) !== -1) {
+
+                        if (cached.body && cached.body.trim() !== '') {
+                            replies.push({
+                                datum: formatDate(cached.sentDate),
+                                text: cached.body.trim()
+                            });
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            return replies;
+        }
+
+        function removeEmailQuotes(text) {
+            if (!text) return '';
+
+            // Find where quoted content starts and cut it off
+            var patterns = [
+                /_{5,}\s*\n\s*Von:/i,
+                /\n\s*Von:\s+.+\n\s*Gesendet:/im,
+                /_{5,}\s*\n\s*From:/i,
+                /\n\s*From:\s+.+\n\s*Sent:/im,
+                /\n\s*Am\s+.+\s+schrieb\s+.+:/im,
+                /\n\s*On\s+.+\s+wrote:/im,
+                /-{3,}\s*Original/i
+            ];
+
+            for (var i = 0; i < patterns.length; i++) {
+                var match = text.search(patterns[i]);
+                if (match > 0) {
+                    text = text.substring(0, match);
+                    break;
+                }
+            }
+
+            // Trim and limit length
+            text = text.trim();
+            if (text.length > 10000) text = text.substring(0, 10000) + '...';
+            return text;
         }
 
         function extractEmail(item) {
@@ -403,7 +516,8 @@
                 von_name: item.SenderName || 'Unbekannt',
                 betreff: item.Subject || '(Kein Betreff)',
                 text: body,
-                anhaenge: attachments
+                anhaenge: attachments,
+                antworten: []
             };
         }
 
