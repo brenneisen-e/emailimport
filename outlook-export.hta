@@ -387,7 +387,14 @@
                 }
 
                 if (emails.length === 0) { showExportError("Keine Emails gefunden."); return; }
-                saveExportFile(emails);
+
+                // Count total replies found
+                var totalReplies = 0;
+                for (var r = 0; r < emails.length; r++) {
+                    if (emails[r].antworten) totalReplies += emails[r].antworten.length;
+                }
+
+                saveExportFile(emails, totalReplies);
             } catch (e) {
                 showExportError("Fehler: " + e.message);
             }
@@ -395,39 +402,89 @@
 
         function cacheSentItems(days) {
             sentItemsCache = [];
+            var cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - (days + 30));
+
+            // Try multiple sent folders: selected store AND default store
+            var sentFolders = [];
+
+            // 1. Try selected store's Sent Items
             try {
-                // Get Sent Items folder (olFolderSentMail = 5)
-                var sentFolder = selectedStore.GetDefaultFolder(5);
-                var sentItems = sentFolder.Items;
-                try { sentItems.Sort("[SentOn]", true); } catch (e) {}
+                sentFolders.push(selectedStore.GetDefaultFolder(5));
+            } catch (e) {}
 
-                var cutoffDate = new Date();
-                cutoffDate.setDate(cutoffDate.getDate() - (days + 30)); // Include 30 extra days for replies
-
-                var maxItems = Math.min(sentItems.Count, 500);
-                for (var i = 1; i <= maxItems; i++) {
+            // 2. Try default/primary account's Sent Items (for shared mailboxes)
+            try {
+                var defaultSent = namespace.GetDefaultFolder(5);
+                // Avoid duplicates
+                var isDuplicate = false;
+                for (var f = 0; f < sentFolders.length; f++) {
                     try {
-                        var item = sentItems.Item(i);
-                        if (item.Class !== 43) continue;
+                        if (sentFolders[f].EntryID === defaultSent.EntryID) isDuplicate = true;
+                    } catch (e) {}
+                }
+                if (!isDuplicate) sentFolders.push(defaultSent);
+            } catch (e) {}
 
-                        var sentDate = new Date(item.SentOn);
-                        if (sentDate < cutoffDate) break;
-
-                        var subject = (item.Subject || '').toLowerCase().trim();
-                        // Remove Re:, AW:, Fwd:, etc.
-                        subject = subject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
-
-                        var body = '';
-                        try { body = item.Body || ''; } catch (e) {}
-
-                        sentItemsCache.push({
-                            sentDate: sentDate,
-                            normalizedSubject: subject,
-                            body: removeEmailQuotes(body)
-                        });
+            // 3. Try all stores' Sent Items
+            try {
+                for (var s = 1; s <= namespace.Stores.Count; s++) {
+                    try {
+                        var storeSent = namespace.Stores.Item(s).GetDefaultFolder(5);
+                        var isDup = false;
+                        for (var f = 0; f < sentFolders.length; f++) {
+                            try {
+                                if (sentFolders[f].EntryID === storeSent.EntryID) isDup = true;
+                            } catch (e) {}
+                        }
+                        if (!isDup) sentFolders.push(storeSent);
                     } catch (e) {}
                 }
             } catch (e) {}
+
+            // Cache items from all sent folders
+            for (var sf = 0; sf < sentFolders.length; sf++) {
+                try {
+                    var sentItems = sentFolders[sf].Items;
+                    try { sentItems.Sort("[SentOn]", true); } catch (e) {}
+
+                    var maxItems = Math.min(sentItems.Count, 300);
+                    for (var i = 1; i <= maxItems; i++) {
+                        try {
+                            var item = sentItems.Item(i);
+                            if (item.Class !== 43) continue;
+
+                            var sentDate = new Date(item.SentOn);
+                            if (sentDate < cutoffDate) break;
+
+                            var subject = (item.Subject || '').toLowerCase().trim();
+                            // Remove Re:, AW:, Fwd:, etc. - handle multiple prefixes
+                            while (subject.match(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i)) {
+                                subject = subject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i, '').trim();
+                            }
+
+                            var body = '';
+                            try { body = item.Body || ''; } catch (e) {}
+
+                            var toRecipient = '';
+                            try { toRecipient = item.To || ''; } catch (e) {}
+
+                            var convId = '';
+                            try { convId = item.ConversationID || ''; } catch (e) {}
+
+                            sentItemsCache.push({
+                                sentDate: sentDate,
+                                conversationId: convId,
+                                body: removeEmailQuotes(body),
+                                to: toRecipient
+                            });
+                        } catch (e) {}
+                    }
+                } catch (e) {}
+            }
+
+            document.getElementById('exportProgressText').innerText =
+                'Gesendete Emails geladen: ' + sentItemsCache.length + ' (aus ' + sentFolders.length + ' Ordnern)';
         }
 
         function findReplies(originalEmail) {
@@ -435,28 +492,24 @@
             if (!sentItemsCache || sentItemsCache.length === 0) return replies;
 
             try {
-                var originalSubject = (originalEmail.betreff || '').toLowerCase().trim();
-                originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
+                var originalConvId = originalEmail.conversationId || '';
                 var originalDate = new Date(originalEmail.datum);
+
+                // No ConversationID = can't match reliably
+                if (!originalConvId) return replies;
 
                 for (var i = 0; i < sentItemsCache.length; i++) {
                     var cached = sentItemsCache[i];
 
-                    // Reply must be after original email
-                    if (cached.sentDate < originalDate) continue;
-
-                    // Reply must be within 30 days
-                    var daysDiff = (cached.sentDate - originalDate) / (1000 * 60 * 60 * 24);
-                    if (daysDiff > 30) continue;
-
-                    // Subject must match
-                    if (cached.normalizedSubject === originalSubject ||
-                        cached.normalizedSubject.indexOf(originalSubject) !== -1 ||
-                        originalSubject.indexOf(cached.normalizedSubject) !== -1) {
+                    // Match by ConversationID (Outlook's built-in thread tracking)
+                    if (cached.conversationId && cached.conversationId === originalConvId) {
+                        // Reply must be after original email
+                        if (cached.sentDate <= originalDate) continue;
 
                         if (cached.body && cached.body.trim() !== '') {
                             replies.push({
                                 datum: formatDate(cached.sentDate),
+                                an: cached.to || '',
                                 text: cached.body.trim()
                             });
                         }
@@ -510,6 +563,9 @@
             var attachments = [];
             try { for (var a = 1; a <= item.Attachments.Count; a++) { attachments.push(item.Attachments.Item(a).FileName); } } catch (e) {}
 
+            var convId = '';
+            try { convId = item.ConversationID || ''; } catch (e) {}
+
             return {
                 datum: formatDate(item.ReceivedTime),
                 von_email: senderEmail,
@@ -517,6 +573,7 @@
                 betreff: item.Subject || '(Kein Betreff)',
                 text: body,
                 anhaenge: attachments,
+                conversationId: convId,
                 antworten: []
             };
         }
@@ -528,7 +585,7 @@
 
         function pad(n) { return n < 10 ? '0' + n : n; }
 
-        function saveExportFile(emails) {
+        function saveExportFile(emails, totalReplies) {
             try {
                 var shell = new ActiveXObject("WScript.Shell");
                 var shellApp = new ActiveXObject("Shell.Application");
@@ -548,7 +605,10 @@
 
                 document.getElementById('exportProgress').style.display = 'none';
                 document.getElementById('exportSuccess').style.display = 'block';
-                document.getElementById('exportSuccessMsg').innerHTML = emails.length + ' Emails exportiert nach:<br><strong>' + filename + '</strong>';
+                document.getElementById('exportSuccessMsg').innerHTML =
+                    emails.length + ' Emails exportiert<br>' +
+                    '<strong>' + (totalReplies || 0) + ' Antworten</strong> gefunden<br>' +
+                    'Datei: <strong>' + filename + '</strong>';
                 document.getElementById('exportActions').style.display = 'block';
                 document.getElementById('exportBtn').disabled = false;
             } catch (e) {
@@ -696,28 +756,62 @@
 
         function detectExcel() {
             try {
+                // Try multiple methods to connect to Excel
+                excelApp = null;
+
+                // Method 1: GetObject with empty string
                 try {
                     excelApp = GetObject("", "Excel.Application");
-                } catch (e) {
-                    document.getElementById('excelStatus').value = "Keine Excel-Instanz gefunden";
+                } catch (e1) {
+                    // Method 2: GetObject without first parameter
+                    try {
+                        excelApp = GetObject(null, "Excel.Application");
+                    } catch (e2) {
+                        // Method 3: Try creating new instance and check for open workbooks
+                        try {
+                            var tempApp = new ActiveXObject("Excel.Application");
+                            if (tempApp.Workbooks.Count > 0) {
+                                excelApp = tempApp;
+                            } else {
+                                tempApp.Quit();
+                                excelApp = null;
+                            }
+                        } catch (e3) {}
+                    }
+                }
+
+                if (!excelApp) {
+                    document.getElementById('excelStatus').value = "Keine Excel-Instanz gefunden - bitte Excel offnen";
                     return;
                 }
 
+                // Make sure Excel is visible
+                try { excelApp.Visible = true; } catch (e) {}
+
+                // Find Hypercare/Tracking workbook
                 targetWorkbook = null;
+                var allWorkbooks = [];
+
                 for (var i = 1; i <= excelApp.Workbooks.Count; i++) {
-                    var wb = excelApp.Workbooks(i);
-                    if (wb.Name.toLowerCase().indexOf('hypercare') !== -1 ||
-                        wb.Name.toLowerCase().indexOf('tracking') !== -1) {
-                        targetWorkbook = wb;
-                        break;
-                    }
+                    try {
+                        var wb = excelApp.Workbooks(i);
+                        allWorkbooks.push(wb.Name);
+                        var wbName = wb.Name.toLowerCase();
+                        if (wbName.indexOf('hypercare') !== -1 ||
+                            wbName.indexOf('tracking') !== -1) {
+                            targetWorkbook = wb;
+                            break;
+                        }
+                    } catch (e) {}
                 }
 
                 if (targetWorkbook) {
                     document.getElementById('excelStatus').value = targetWorkbook.Name;
                     checkImportReady();
+                } else if (allWorkbooks.length > 0) {
+                    document.getElementById('excelStatus').value = "Gefunden: " + allWorkbooks.join(", ") + " (keine Hypercare)";
                 } else {
-                    document.getElementById('excelStatus').value = "Keine Hypercare-Excel offen";
+                    document.getElementById('excelStatus').value = "Excel offen, aber keine Arbeitsmappen";
                 }
             } catch (e) {
                 document.getElementById('excelStatus').value = "Fehler: " + e.message;
