@@ -184,12 +184,15 @@
                 <div class="status error" id="exportError"><span id="exportErrorMsg"></span></div>
 
                 <div class="action-buttons" id="exportActions">
-                    <button class="btn btn-success" onclick="openWebApp()">&#127760; Web-App offnen</button>
-                    <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads offnen</button>
+                    <button class="btn btn-success" id="btnDirectImport" onclick="directImport()" style="display:none;">
+                        &#128200; Direkt in Excel importieren
+                    </button>
+                    <button class="btn btn-success" onclick="openWebApp()">&#127760; Web-App öffnen (bearbeiten)</button>
+                    <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads öffnen</button>
                 </div>
 
                 <div class="info-box">
-                    <strong>Workflow:</strong> Excel öffnen → Excel verbinden → Export → Web-App → Excel Import
+                    <strong>Workflow:</strong> Excel verbinden → Export → Direkt importieren ODER Web-App → Import
                 </div>
             </div>
 
@@ -252,6 +255,7 @@
         var exportExcelApp = null;
         var exportWorkbook = null;
         var existingEmailKeys = {};  // Keys of emails already in Excel
+        var lastExportedEmails = null;  // Store for direct import
 
         // ============================================================================
         // INITIALIZATION
@@ -932,9 +936,97 @@
                 document.getElementById('exportSuccessMsg').innerHTML = msg;
                 document.getElementById('exportActions').style.display = 'block';
                 document.getElementById('exportBtn').disabled = false;
+
+                // Store emails and show direct import button if Excel was connected
+                lastExportedEmails = emails;
+                if (exportWorkbook) {
+                    document.getElementById('btnDirectImport').style.display = 'block';
+                }
             } catch (e) {
                 showExportError("Speichern fehlgeschlagen: " + e.message);
             }
+        }
+
+        // Direct import without web app (uses lastExportedEmails and exportWorkbook)
+        function directImport() {
+            if (!lastExportedEmails || lastExportedEmails.length === 0) {
+                alert('Keine Emails zum Importieren!');
+                return;
+            }
+            if (!exportWorkbook) {
+                alert('Excel nicht verbunden!');
+                return;
+            }
+
+            document.getElementById('exportActions').style.display = 'none';
+            document.getElementById('exportProgress').style.display = 'block';
+            document.getElementById('exportProgressText').innerText = 'Importiere direkt in Excel...';
+            document.getElementById('exportProgressFill').style.width = '10%';
+
+            setTimeout(function() {
+                try {
+                    var worksheet;
+                    try {
+                        worksheet = exportWorkbook.Worksheets("Übersicht");
+                    } catch (e) {
+                        worksheet = exportWorkbook.Worksheets(1);
+                    }
+
+                    var existingData = readExistingData(worksheet);
+                    var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
+                    if (lastRow === 1 && !worksheet.Cells(1, 1).Value) lastRow = 0;
+                    var nextRow = lastRow + 1;
+
+                    var newCount = 0, updateCount = 0, skipCount = 0;
+
+                    for (var i = 0; i < lastExportedEmails.length; i++) {
+                        var email = lastExportedEmails[i];
+                        var pct = 10 + Math.round((i / lastExportedEmails.length) * 85);
+                        document.getElementById('exportProgressFill').style.width = pct + '%';
+
+                        var emailKey = createEmailKey(email.datum, email.betreff);
+                        var existingRow = existingData[emailKey];
+
+                        if (existingRow) {
+                            if (email.antworten && email.antworten.length > 0) {
+                                var currentReplies = worksheet.Cells(existingRow, 13).Value || '';
+                                var newRepliesText = formatReplies(email.antworten);
+                                if (newRepliesText && currentReplies.indexOf(newRepliesText.substring(0, 50)) === -1) {
+                                    var combinedReplies = currentReplies ? currentReplies + '\n\n' + newRepliesText : newRepliesText;
+                                    worksheet.Cells(existingRow, 13).Value = combinedReplies;
+                                    updateCount++;
+                                } else {
+                                    skipCount++;
+                                }
+                            } else {
+                                skipCount++;
+                            }
+                        } else {
+                            writeEmailRow(worksheet, nextRow, email);
+                            existingData[emailKey] = nextRow;
+                            nextRow++;
+                            newCount++;
+                        }
+                    }
+
+                    exportWorkbook.Save();
+                    document.getElementById('exportProgressFill').style.width = '100%';
+
+                    document.getElementById('exportProgress').style.display = 'none';
+                    document.getElementById('exportSuccess').style.display = 'block';
+                    document.getElementById('exportSuccessMsg').innerHTML =
+                        '<strong>Direkt-Import erfolgreich!</strong><br>' +
+                        '<strong>' + newCount + '</strong> neue Vorgänge<br>' +
+                        '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
+                        skipCount + ' übersprungen';
+                    document.getElementById('exportActions').style.display = 'block';
+                    document.getElementById('btnDirectImport').style.display = 'none';
+
+                } catch (e) {
+                    document.getElementById('exportProgress').style.display = 'none';
+                    showExportError('Import fehlgeschlagen: ' + e.message);
+                }
+            }, 100);
         }
 
         function updateExportProgress(current, total, found) {
