@@ -1,144 +1,156 @@
 # BGAV Hypercare - Email Review Tool
 
-Tool zur Überprüfung und Kategorisierung von Hypercare-Emails für das Barmenia/Gothaer-Projekt.
+Tool zur Uberprufung und Kategorisierung von Hypercare-Emails fur das Barmenia/Gothaer-Projekt.
 
-## 🎯 Zwei Versionen verfügbar
+## Drei Versionen verfugbar
 
-### 🚀 HTA-Version (EMPFOHLEN für Windows)
+### Web-Version (Cloudflare Pages) - NEU!
 
-**`bgav-hypercare-standalone.hta`** - Die All-in-One-Lösung!
+**`index.html`** - Moderne Web-App mit Dark Mode Design
 
-✅ **Direkter Outlook-Zugriff** - Keine Scripts, keine Exports
-✅ **Direkter Excel-Export** - Öffnet sich automatisch in Excel
-✅ **One-Click-Workflow** - Emails laden → Review → Export
-✅ **Komplett offline** - Keine Internetverbindung nötig
+- Modernes Dark-Mode UI mit Animationen
+- Funktioniert in jedem Browser
+- Kann auf Cloudflare Pages gehostet werden
+- JSON-Import per Drag & Drop
+- Fortschrittsanzeigen bei allen Operationen
+- CSV-Export
 
-**Quick Start:**
-1. Doppelklick auf `bgav-hypercare-standalone.hta`
-2. "📥 Ausgewählte Emails laden" oder "📂 Ordner laden"
-3. Review & Kategorisierung
-4. "💾 Nach Excel exportieren"
-5. Fertig!
+**Deployment auf Cloudflare Pages:**
+1. Repository mit GitHub verbinden
+2. Build command: (leer lassen - statische Site)
+3. Build output directory: `/` oder `.`
+4. Fertig! Die App ist unter deiner Cloudflare-URL erreichbar
 
-👉 **[Vollständige Anleitung](HTA-ANLEITUNG.md)**
-
----
-
-### 🌐 HTML-Version (Plattformübergreifend)
-
-**`bgav-hypercare-email-review.html`** - Läuft in jedem Browser
-
-- Für Mac, Linux, Windows
-- Benötigt JSON-Export aus Outlook (via PowerShell/VBA)
-- XLSX-Download statt direktem Excel-Export
-
-**Quick Start:**
-1. Öffne `bgav-hypercare-email-review.html` im Browser
-2. JSON-Datei hochladen (siehe Outlook-Integration)
-3. Review & Kategorisierung
-4. Excel-Datei wird heruntergeladen
+**Live Demo:** Lade einfach `index.html` im Browser
 
 ---
 
-## 📋 Features
+### HTA-Version (Windows-Desktop)
 
-- **Intelligente Kategorisierung**: Automatische Erkennung von:
-  - Kategorie (Incident / Fachliche Rückfrage)
-  - Cluster (SHUK, LV, KV, Provisionierung, Produktzuordnung, Allgemein)
-  - Agentur
-- **Filterung & Suche**: Durchsuche und filtere Emails nach verschiedenen Kriterien
-- **Batch-Bearbeitung**: Bearbeite mehrere Emails gleichzeitig
-- **Excel-Export**: Exportiere im Hypercare-Template-Format
+**`bgav-hypercare-standalone.hta`** - Fur Windows mit direktem Outlook-Zugriff
 
-## 🚀 Verwendung
+- Direkter Outlook-Zugriff - Keine Scripts, keine Exports
+- Direkter Excel-Export - Offnet sich automatisch in Excel
+- Komplett offline - Keine Internetverbindung notig
 
-### HTA-Version (Windows - EMPFOHLEN)
-
+**Quick Start:**
 1. Doppelklick auf `bgav-hypercare-standalone.hta`
-2. Emails direkt aus Outlook laden
-3. Review & Export - Fertig!
+2. "Emails laden" klicken
+3. Postfach auswahlen
+4. Review & Kategorisierung
+5. "Excel Export" klicken
 
-Siehe **[HTA-ANLEITUNG.md](HTA-ANLEITUNG.md)** für Details.
+---
 
-### HTML-Version (Alle Plattformen)
+### HTML-Version (Legacy)
 
-1. Öffne `bgav-hypercare-email-review.html` im Browser
-2. Lade eine JSON-Datei hoch
-3. Die App funktioniert komplett offline
+**`bgav-hypercare-email-review.html`** - Altere Version
 
-### 📧 Outlook-Integration
+- Fur Mac, Linux, Windows
+- Benotigt JSON-Export aus Outlook
 
-**NEU:** Du kannst Emails jetzt direkt aus Outlook exportieren!
+---
 
-Siehe **[OUTLOOK-INTEGRATION.md](OUTLOOK-INTEGRATION.md)** für eine detaillierte Anleitung zu:
-- **PowerShell-Script** (empfohlen) - Einfacher Export ausgewählter Emails oder ganzer Ordner
-- **VBA-Makro** - Direkte Integration in Outlook mit Button im Ribbon
+## Features v3.0
 
-Beide Methoden exportieren Emails im korrekten JSON-Format für diese App.
+### Provisionsreklamation b24 Template
+- **Automatische Erkennung**: Betreff "Provisionsreklamation b24" oder Emails von redaktion@barmenia.de
+- **Parser fur strukturierte Daten**: Extrahiert alle Felder wie:
+  - `vermittlernummer_vermittler`, `vorname_vermittler`, `nachname_vermittler`
+  - `versicherungsnummer_kunde`, `vorname_kunde`, `nachname_kunde`
+  - `reklamation_provision`, `reklamation_absatz`, `datenschutz`, `nachricht`
 
-### Email-Daten importieren
+### Mehrfachkategorisierung
+- Emails konnen **mehrere Cluster** gleichzeitig haben (z.B. KV + KFZ)
+- **Klickbare Tags** zum An-/Abwahlen der Cluster
+- Filter funktioniert mit Mehrfachauswahl
 
-Die App erwartet JSON-Dateien mit folgendem Format:
+### Outlook-ahnliches Design
+- Email-Ansicht wie in Outlook
+- Header mit Von / Datum / Betreff
+- Anhange-Leiste mit Datei-Icons
+
+### Email-Thread Baumansicht
+- Original-Email oben angezeigt
+- Antworten darunter als eingeruckte Zweige
+- Auf-/Zuklappbar per Klick
+
+### Moderne UI
+- Dark Mode mit Glow-Effekten
+- Smooth Animationen uberall
+- Fortschrittsanzeigen bei allen Operationen
+- Skeleton Loading States
+
+---
+
+## Outlook-Integration
+
+### PowerShell-Script (empfohlen)
+
+```powershell
+# Ausfuhren in PowerShell
+.\Export-OutlookEmails.ps1
+```
+
+Das Script:
+1. Verbindet sich mit Outlook
+2. Exportiert ausgewahlte Emails oder einen ganzen Ordner
+3. Speichert als JSON-Datei
+
+### JSON-Format
 
 ```json
 [
   {
     "datum": "2025-11-14T10:30:00",
     "von_email": "max.mueller@agentur.de",
-    "von_name": "Max Müller",
-    "betreff": "Frage zur SHUK Provision",
-    "text": "Email Text hier...",
-    "anhänge": ["dokument.pdf"]
+    "von_name": "Max Muller",
+    "betreff": "Provisionsreklamation b24",
+    "text": "reklamation_provision : true\nvermittlernummer_vermittler : 00400288\n...",
+    "anhaenge": ["dokument.pdf"]
   }
 ]
 ```
 
-### Workflow
+---
 
-1. **Emails laden**: Klicke auf "📤 Emails laden" und wähle deine JSON-Datei
-2. **Überprüfen**: Die App kategorisiert die Emails automatisch
-3. **Anpassen**: Korrigiere bei Bedarf die automatische Kategorisierung
-4. **Exportieren**: Exportiere die kategorisierten Emails nach Excel
+## Cloudflare Pages Deployment
 
-### 🧪 Testen mit Beispiel-Daten
+### Option 1: Via GitHub
 
-Möchtest du die App erst einmal ausprobieren? Nutze die Datei **`beispiel-emails.json`**:
-- Enthält 10 realistische Test-Emails
-- Verschiedene Kategorien (Incidents, Rückfragen)
-- Verschiedene Cluster (SHUK, LV, KV, Provisionierung, etc.)
-- Perfekt zum Testen aller Features der App
+1. Repository zu GitHub pushen
+2. Cloudflare Dashboard > Pages > Create a project
+3. "Connect to Git" > Repository auswahlen
+4. Settings:
+   - Build command: (leer)
+   - Build output directory: `/`
+5. Deploy!
 
-## 🛠️ Technische Details
+### Option 2: Direct Upload
 
-- **Standalone**: Alle CSS und JavaScript sind inline - keine externen Abhängigkeiten außer der XLSX-Bibliothek (via CDN)
-- **Framework**: Vanilla JavaScript (kein Framework erforderlich)
-- **Browser-Kompatibilität**: Alle modernen Browser
-- **Offline-fähig**: Funktioniert ohne Internetverbindung (Excel-Export benötigt einmalig CDN-Zugriff)
+1. Cloudflare Dashboard > Pages > Create a project
+2. "Upload assets" auswahlen
+3. `index.html` hochladen
+4. Deploy!
 
-## 📦 Excel-Export-Format
+---
 
-Der Export erstellt eine Excel-Datei mit folgenden Spalten:
+## Dateien-Ubersicht
 
-- ID (HC-001, HC-002, ...)
-- Datum
-- Kanal (immer "Email")
-- Agentur
-- Kategorie
-- Status
-- In Bearbeitung von
-- Cluster
-- Anfrage
-- Diagnose
-- Nächste Schritte
-- Lösung
-- JIRA
-- Kommunikation
-- Kommentar
+| Datei | Beschreibung |
+|-------|-------------|
+| `index.html` | **Moderne Web-App** - Fur Cloudflare Pages |
+| `bgav-hypercare-standalone.hta` | Windows HTA mit Outlook-Integration |
+| `bgav-hypercare-email-review.html` | Legacy HTML-Version |
+| `Export-OutlookEmails.ps1` | PowerShell Export-Script |
+| `beispiel-emails.json` | Test-Daten |
 
-## 🔒 Datenschutz
+---
 
-Alle Daten bleiben lokal im Browser. Es werden keine Daten an externe Server übertragen.
+## Datenschutz
 
-## 📝 Lizenz
+Alle Daten bleiben lokal im Browser. Es werden keine Daten an externe Server ubertragen.
 
-Internes Tool für Barmenia/Gothaer BGAV Hypercare Projekt.
+## Lizenz
+
+Internes Tool fur Barmenia/Gothaer BGAV Hypercare Projekt.
