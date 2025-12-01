@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>BGAV Outlook Export</title>
+    <HTA:APPLICATION
+        ID="BGAV_Export"
+        APPLICATIONNAME="BGAV Outlook Export"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        ICON=""
+        MAXIMIZEBUTTON="no"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(30, 30, 50, 0.9);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.5rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: #252542;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.9375rem;
+            margin-bottom: 1rem;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 0.75rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #252542;
+            color: #94a3b8;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .progress-container {
+            display: none;
+            margin: 1.5rem 0;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #252542;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #818cf8);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        .status {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .status.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #10b981;
+        }
+
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+        }
+
+        .steps {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            color: #64748b;
+        }
+
+        .step.active {
+            color: #f1f5f9;
+        }
+
+        .step.done {
+            color: #10b981;
+        }
+
+        .step-number {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #252542;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .step.active .step-number {
+            background: #6366f1;
+            color: white;
+        }
+
+        .step.done .step-number {
+            background: #10b981;
+            color: white;
+        }
+
+        .info-box {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.8125rem;
+            color: #94a3b8;
+        }
+
+        .info-box strong {
+            color: #818cf8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">&#9993;</div>
+                <h1>BGAV Outlook Export</h1>
+                <p class="subtitle">Emails aus Outlook exportieren</p>
+            </div>
+
+            <div id="step1">
+                <label>Postfach auswahlen</label>
+                <select id="mailboxSelect" onchange="loadFolders()">
+                    <option value="">-- Postfach wahlen --</option>
+                </select>
+
+                <label>Ordner auswahlen</label>
+                <select id="folderSelect" disabled>
+                    <option value="">-- Erst Postfach wahlen --</option>
+                </select>
+
+                <label>Zeitraum (Tage)</label>
+                <input type="number" id="daysInput" value="7" min="1" max="30">
+
+                <button class="btn btn-primary" id="exportBtn" onclick="startExport()" disabled>
+                    Emails exportieren
+                </button>
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Starte Export...</div>
+            </div>
+
+            <div class="status success" id="successStatus">
+                <strong>&#10003; Export erfolgreich!</strong><br>
+                <span id="successMessage"></span>
+            </div>
+
+            <div class="status error" id="errorStatus">
+                <strong>&#10007; Fehler</strong><br>
+                <span id="errorMessage"></span>
+            </div>
+
+            <div id="actionButtons" style="display: none; margin-top: 1rem;">
+                <button class="btn btn-success" onclick="openWebApp()">
+                    &#127760; Web-App offnen
+                </button>
+                <button class="btn btn-secondary" onclick="openDownloads()">
+                    &#128193; Downloads-Ordner offnen
+                </button>
+            </div>
+
+            <div class="steps">
+                <div class="step done" id="stepConnect">
+                    <div class="step-number">1</div>
+                    <span>Mit Outlook verbinden</span>
+                </div>
+                <div class="step active" id="stepSelect">
+                    <div class="step-number">2</div>
+                    <span>Postfach & Ordner wahlen</span>
+                </div>
+                <div class="step" id="stepExport">
+                    <div class="step-number">3</div>
+                    <span>JSON exportieren</span>
+                </div>
+                <div class="step" id="stepWeb">
+                    <div class="step-number">4</div>
+                    <span>In Web-App offnen</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Nachster Schritt:</strong> Die exportierte JSON-Datei in die Web-App laden unter:<br>
+            <span id="webAppUrl">https://deine-cloudflare-url.pages.dev</span>
+        </div>
+    </div>
+
+    <script>
+        var outlookApp = null;
+        var namespace = null;
+        var selectedStore = null;
+        var selectedFolder = null;
+
+        // Initialize on load
+        window.onload = function() {
+            initOutlook();
+        };
+
+        function initOutlook() {
+            try {
+                outlookApp = new ActiveXObject("Outlook.Application");
+                namespace = outlookApp.GetNamespace("MAPI");
+                loadMailboxes();
+                updateStep('stepConnect', 'done');
+                updateStep('stepSelect', 'active');
+            } catch (e) {
+                showError("Outlook konnte nicht gestartet werden. Bitte Outlook offnen und erneut versuchen.\n\n" + e.message);
+            }
+        }
+
+        function loadMailboxes() {
+            var select = document.getElementById('mailboxSelect');
+            select.innerHTML = '<option value="">-- Postfach wahlen --</option>';
+
+            try {
+                var stores = namespace.Stores;
+                for (var i = 1; i <= stores.Count; i++) {
+                    try {
+                        var store = stores.Item(i);
+                        var option = document.createElement('option');
+                        option.value = i;
+                        option.text = store.DisplayName;
+                        select.appendChild(option);
+                    } catch (e) {}
+                }
+            } catch (e) {
+                showError("Fehler beim Laden der Postfacher: " + e.message);
+            }
+        }
+
+        function loadFolders() {
+            var mailboxSelect = document.getElementById('mailboxSelect');
+            var folderSelect = document.getElementById('folderSelect');
+            var exportBtn = document.getElementById('exportBtn');
+
+            if (!mailboxSelect.value) {
+                folderSelect.innerHTML = '<option value="">-- Erst Postfach wahlen --</option>';
+                folderSelect.disabled = true;
+                exportBtn.disabled = true;
+                return;
+            }
+
+            try {
+                selectedStore = namespace.Stores.Item(parseInt(mailboxSelect.value));
+                var rootFolder = selectedStore.GetRootFolder();
+
+                folderSelect.innerHTML = '';
+
+                // Add Inbox first
+                try {
+                    var inbox = selectedStore.GetDefaultFolder(6);
+                    var option = document.createElement('option');
+                    option.value = 'inbox';
+                    option.text = '&#9993; Posteingang (' + inbox.Items.Count + ' Emails)';
+                    folderSelect.appendChild(option);
+                } catch (e) {}
+
+                // Add subfolders
+                addSubfolders(rootFolder.Folders, folderSelect, '');
+
+                folderSelect.disabled = false;
+                exportBtn.disabled = false;
+
+            } catch (e) {
+                showError("Fehler beim Laden der Ordner: " + e.message);
+            }
+        }
+
+        function addSubfolders(folders, select, prefix) {
+            for (var i = 1; i <= folders.Count; i++) {
+                try {
+                    var folder = folders.Item(i);
+                    if (folder.DefaultItemType === 0) { // Mail items
+                        var option = document.createElement('option');
+                        option.value = folder.EntryID;
+                        option.text = prefix + folder.Name + ' (' + folder.Items.Count + ')';
+                        select.appendChild(option);
+
+                        // Recursively add subfolders
+                        if (folder.Folders.Count > 0) {
+                            addSubfolders(folder.Folders, select, prefix + '  ');
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+
+        function startExport() {
+            var folderSelect = document.getElementById('folderSelect');
+            var daysInput = document.getElementById('daysInput');
+
+            if (!folderSelect.value) {
+                alert('Bitte einen Ordner auswahlen!');
+                return;
+            }
+
+            updateStep('stepSelect', 'done');
+            updateStep('stepExport', 'active');
+
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('exportBtn').disabled = true;
+
+            // Use setTimeout to allow UI to update
+            setTimeout(function() {
+                doExport(folderSelect.value, parseInt(daysInput.value) || 7);
+            }, 100);
+        }
+
+        function doExport(folderId, days) {
+            try {
+                var folder;
+                if (folderId === 'inbox') {
+                    folder = selectedStore.GetDefaultFolder(6);
+                } else {
+                    folder = namespace.GetFolderFromID(folderId);
+                }
+
+                var items = folder.Items;
+                try { items.Sort("[ReceivedTime]", true); } catch (e) {}
+
+                var cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - days);
+
+                var emails = [];
+                var total = Math.min(items.Count, 500);
+                var oldCount = 0;
+
+                for (var i = 1; i <= total; i++) {
+                    // Update progress
+                    if (i % 5 === 0) {
+                        updateProgress(i, total, emails.length);
+                    }
+
+                    try {
+                        var item = items.Item(i);
+                        if (item.Class !== 43) continue;
+
+                        var receivedTime = new Date(item.ReceivedTime);
+                        if (receivedTime < cutoffDate) {
+                            oldCount++;
+                            if (oldCount >= 20) break;
+                            continue;
+                        }
+
+                        emails.push(extractEmail(item));
+
+                    } catch (e) {}
+                }
+
+                updateProgress(total, total, emails.length);
+
+                if (emails.length === 0) {
+                    showError("Keine Emails im gewahlten Zeitraum gefunden.");
+                    return;
+                }
+
+                // Save to file
+                saveToFile(emails);
+
+            } catch (e) {
+                showError("Fehler beim Export: " + e.message);
+            }
+        }
+
+        function extractEmail(item) {
+            var senderEmail = '';
+            try {
+                senderEmail = item.SenderEmailAddress || '';
+                if ((!senderEmail || senderEmail.indexOf('@') === -1) && item.SenderEmailType === 'EX') {
+                    try {
+                        var exUser = item.Sender.GetExchangeUser();
+                        if (exUser) senderEmail = exUser.PrimarySmtpAddress || senderEmail;
+                    } catch (e) {}
+                }
+            } catch (e) {}
+
+            var body = '';
+            try {
+                body = item.Body || '';
+                if (body.length > 50000) body = body.substring(0, 50000) + '... (gekurzt)';
+            } catch (e) {}
+
+            var attachments = [];
+            try {
+                for (var a = 1; a <= item.Attachments.Count; a++) {
+                    attachments.push(item.Attachments.Item(a).FileName);
+                }
+            } catch (e) {}
+
+            return {
+                datum: formatDate(item.ReceivedTime),
+                von_email: senderEmail,
+                von_name: item.SenderName || 'Unbekannt',
+                betreff: item.Subject || '(Kein Betreff)',
+                text: body,
+                anhaenge: attachments
+            };
+        }
+
+        function formatDate(date) {
+            var d = new Date(date);
+            return d.getFullYear() + '-' +
+                   pad(d.getMonth() + 1) + '-' +
+                   pad(d.getDate()) + 'T' +
+                   pad(d.getHours()) + ':' +
+                   pad(d.getMinutes()) + ':' +
+                   pad(d.getSeconds());
+        }
+
+        function pad(n) {
+            return n < 10 ? '0' + n : n;
+        }
+
+        function saveToFile(emails) {
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var shell = new ActiveXObject("WScript.Shell");
+
+                // Save to Downloads folder
+                var downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+
+                var filename = 'hypercare_emails_' + new Date().toISOString().slice(0, 10) + '.json';
+                var filepath = downloads + '\\' + filename;
+
+                var file = fso.CreateTextFile(filepath, true, true);
+                file.Write(JSON.stringify(emails, null, 2));
+                file.Close();
+
+                updateStep('stepExport', 'done');
+                updateStep('stepWeb', 'active');
+
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('successStatus').style.display = 'block';
+                document.getElementById('successMessage').innerHTML =
+                    emails.length + ' Emails exportiert nach:<br><strong>Downloads\\' + filename + '</strong>';
+
+                // Show action buttons
+                document.getElementById('actionButtons').style.display = 'block';
+                window.exportedFilePath = filepath;
+
+            } catch (e) {
+                showError("Fehler beim Speichern: " + e.message);
+            }
+        }
+
+        function openDownloads() {
+            var shell = new ActiveXObject("WScript.Shell");
+            var downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+            shell.Run('explorer.exe "' + downloads + '"');
+        }
+
+        function openWebApp() {
+            var shell = new ActiveXObject("WScript.Shell");
+            // Opens default browser with the web app URL
+            shell.Run('https://bgav-hypercare.pages.dev');
+        }
+
+        function updateProgress(current, total, found) {
+            var percent = Math.round((current / total) * 100);
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').innerText =
+                'Durchsuche ' + current + ' / ' + total + ' ... (' + found + ' gefunden)';
+        }
+
+        function updateStep(stepId, state) {
+            var step = document.getElementById(stepId);
+            step.className = 'step ' + state;
+        }
+
+        function showError(message) {
+            document.getElementById('progressContainer').style.display = 'none';
+            document.getElementById('errorStatus').style.display = 'block';
+            document.getElementById('errorMessage').innerText = message;
+            document.getElementById('exportBtn').disabled = false;
+        }
+
+        // JSON polyfill for older IE
+        if (!window.JSON) {
+            window.JSON = {
+                stringify: function(obj) {
+                    var t = typeof obj;
+                    if (t !== 'object' || obj === null) {
+                        if (t === 'string') obj = '"' + obj.replace(/"/g, '\\"') + '"';
+                        return String(obj);
+                    } else {
+                        var n, v, json = [], arr = (obj && obj.constructor === Array);
+                        for (n in obj) {
+                            v = obj[n];
+                            t = typeof v;
+                            if (t === 'string') v = '"' + v.replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') + '"';
+                            else if (t === 'object' && v !== null) v = JSON.stringify(v);
+                            json.push((arr ? '' : '"' + n + '":') + String(v));
+                        }
+                        return (arr ? '[' : '{') + String(json) + (arr ? ']' : '}');
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
