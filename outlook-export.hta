@@ -532,6 +532,7 @@
             try {
                 var shell = new ActiveXObject("WScript.Shell");
                 var shellApp = new ActiveXObject("Shell.Application");
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
 
                 var downloads;
                 try { downloads = shellApp.NameSpace("shell:Downloads").Self.Path; }
@@ -540,14 +541,10 @@
                 var filename = 'hypercare_emails_' + new Date().toISOString().slice(0, 10) + '.json';
                 var filepath = downloads + '\\' + filename;
 
-                // Use ADODB.Stream for UTF-8 without BOM
-                var stream = new ActiveXObject("ADODB.Stream");
-                stream.Type = 2; // Text
-                stream.Charset = "utf-8";
-                stream.Open();
-                stream.WriteText(JSON.stringify(emails, null, 2));
-                stream.SaveToFile(filepath, 2); // 2 = overwrite
-                stream.Close();
+                // Use FSO with Unicode encoding
+                var file = fso.CreateTextFile(filepath, true, true); // true = overwrite, true = unicode
+                file.Write(JSON.stringify(emails, null, 2));
+                file.Close();
 
                 document.getElementById('exportProgress').style.display = 'none';
                 document.getElementById('exportSuccess').style.display = 'block';
@@ -630,25 +627,21 @@
                 var fso = new ActiveXObject("Scripting.FileSystemObject");
                 if (!fso.FileExists(path)) { alert("Datei nicht gefunden!"); return; }
 
-                // Use ADODB.Stream for proper UTF-8 reading
+                // Try Unicode first (for files created by this tool), then ASCII
                 var content = '';
                 try {
-                    var stream = new ActiveXObject("ADODB.Stream");
-                    stream.Type = 2; // Text
-                    stream.Charset = "utf-8";
-                    stream.Open();
-                    stream.LoadFromFile(path);
-                    content = stream.ReadText();
-                    stream.Close();
+                    var file = fso.OpenTextFile(path, 1, false, -1); // -1 = TristateTrue (Unicode)
+                    content = file.ReadAll();
+                    file.Close();
                 } catch (e) {
-                    // Fallback to FSO
+                    // Fallback to ASCII
                     var file = fso.OpenTextFile(path, 1, false, 0); // 0 = ASCII
                     content = file.ReadAll();
                     file.Close();
                 }
 
-                // Remove BOM if present
-                if (content.charCodeAt(0) === 0xFEFF || content.charCodeAt(0) === 65279) {
+                // Remove BOM if present (UTF-16 LE BOM or UTF-8 BOM)
+                if (content.charCodeAt(0) === 0xFEFF || content.charCodeAt(0) === 65279 || content.charCodeAt(0) === 0xFFFE) {
                     content = content.substring(1);
                 }
 
