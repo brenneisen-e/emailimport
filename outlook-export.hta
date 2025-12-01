@@ -756,28 +756,62 @@
 
         function detectExcel() {
             try {
+                // Try multiple methods to connect to Excel
+                excelApp = null;
+
+                // Method 1: GetObject with empty string
                 try {
                     excelApp = GetObject("", "Excel.Application");
-                } catch (e) {
-                    document.getElementById('excelStatus').value = "Keine Excel-Instanz gefunden";
+                } catch (e1) {
+                    // Method 2: GetObject without first parameter
+                    try {
+                        excelApp = GetObject(null, "Excel.Application");
+                    } catch (e2) {
+                        // Method 3: Try creating new instance and check for open workbooks
+                        try {
+                            var tempApp = new ActiveXObject("Excel.Application");
+                            if (tempApp.Workbooks.Count > 0) {
+                                excelApp = tempApp;
+                            } else {
+                                tempApp.Quit();
+                                excelApp = null;
+                            }
+                        } catch (e3) {}
+                    }
+                }
+
+                if (!excelApp) {
+                    document.getElementById('excelStatus').value = "Keine Excel-Instanz gefunden - bitte Excel offnen";
                     return;
                 }
 
+                // Make sure Excel is visible
+                try { excelApp.Visible = true; } catch (e) {}
+
+                // Find Hypercare/Tracking workbook
                 targetWorkbook = null;
+                var allWorkbooks = [];
+
                 for (var i = 1; i <= excelApp.Workbooks.Count; i++) {
-                    var wb = excelApp.Workbooks(i);
-                    if (wb.Name.toLowerCase().indexOf('hypercare') !== -1 ||
-                        wb.Name.toLowerCase().indexOf('tracking') !== -1) {
-                        targetWorkbook = wb;
-                        break;
-                    }
+                    try {
+                        var wb = excelApp.Workbooks(i);
+                        allWorkbooks.push(wb.Name);
+                        var wbName = wb.Name.toLowerCase();
+                        if (wbName.indexOf('hypercare') !== -1 ||
+                            wbName.indexOf('tracking') !== -1) {
+                            targetWorkbook = wb;
+                            break;
+                        }
+                    } catch (e) {}
                 }
 
                 if (targetWorkbook) {
                     document.getElementById('excelStatus').value = targetWorkbook.Name;
                     checkImportReady();
+                } else if (allWorkbooks.length > 0) {
+                    document.getElementById('excelStatus').value = "Gefunden: " + allWorkbooks.join(", ") + " (keine Hypercare)";
                 } else {
-                    document.getElementById('excelStatus').value = "Keine Hypercare-Excel offen";
+                    document.getElementById('excelStatus').value = "Excel offen, aber keine Arbeitsmappen";
                 }
             } catch (e) {
                 document.getElementById('excelStatus').value = "Fehler: " + e.message;
