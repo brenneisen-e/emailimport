@@ -835,23 +835,22 @@
             document.getElementById('excelStatus').value = "Suche Excel...";
 
             try {
-                // Try to connect to running Excel - do NOT create new instance
                 excelApp = null;
+                var createdNew = false;
 
-                // Method 1: GetObject with running instance
+                // Method 1: GetObject with empty string (preferred)
                 try {
                     excelApp = GetObject("", "Excel.Application");
-                } catch (e1) {}
-
-                // Method 2: Try with null as first parameter
-                if (!excelApp) {
+                } catch (e1) {
+                    // Method 2: Create new - but will check if it has workbooks
                     try {
-                        excelApp = GetObject(null, "Excel.Application");
+                        excelApp = new ActiveXObject("Excel.Application");
+                        createdNew = true;
                     } catch (e2) {}
                 }
 
                 if (!excelApp) {
-                    document.getElementById('excelStatus').value = "Excel nicht gefunden - bitte Excel mit der Datei offnen und erneut versuchen";
+                    document.getElementById('excelStatus').value = "Excel konnte nicht verbunden werden";
                     return;
                 }
 
@@ -871,6 +870,16 @@
                         }
                     } catch (e) {}
                 }
+
+                // If we created a new Excel and it has no workbooks, close it
+                if (createdNew && allWorkbooks.length === 0) {
+                    try { excelApp.Quit(); } catch (e) {}
+                    excelApp = null;
+                    document.getElementById('excelStatus').value = "Bitte erst Tracking_Hypercare.xlsm in Excel offnen!";
+                    return;
+                }
+
+                excelApp.Visible = true;
 
                 if (targetWorkbook) {
                     document.getElementById('excelStatus').value = "OK: " + targetWorkbook.Name;
