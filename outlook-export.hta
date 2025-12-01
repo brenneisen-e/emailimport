@@ -355,6 +355,10 @@
 
         function doExport(folderId, days) {
             try {
+                // Phase 1: Get folder
+                document.getElementById('exportProgressText').innerText = 'Phase 1/3: Ordner wird geladen...';
+                updateExportProgress(0, 100, 0);
+
                 var folder = (folderId === 'inbox') ? selectedStore.GetDefaultFolder(6) : namespace.GetFolderFromID(folderId);
                 var items = folder.Items;
                 try { items.Sort("[ReceivedTime]", true); } catch (e) {}
@@ -362,17 +366,27 @@
                 var cutoffDate = new Date();
                 cutoffDate.setDate(cutoffDate.getDate() - days);
 
-                // Cache sent items first for reply matching
-                updateExportProgress(0, 100, 0);
-                document.getElementById('exportProgressText').innerText = 'Lade gesendete Emails...';
+                // Phase 2: Cache sent items for reply matching
+                document.getElementById('exportProgressText').innerText = 'Phase 2/3: Lade gesendete Emails fur Antwort-Matching...';
+                updateExportProgress(10, 100, 0);
                 cacheSentItems(days);
 
+                // Phase 3: Process emails
+                document.getElementById('exportProgressText').innerText = 'Phase 3/3: Verarbeite Posteingang...';
                 var emails = [];
                 var total = Math.min(items.Count, 500);
                 var oldCount = 0;
+                var repliesFound = 0;
 
                 for (var i = 1; i <= total; i++) {
-                    if (i % 5 === 0) updateExportProgress(i, total, emails.length);
+                    // Update progress every email for better feedback
+                    if (i % 2 === 0 || i === 1) {
+                        var pct = 30 + Math.round((i / total) * 70);
+                        document.getElementById('exportProgressFill').style.width = pct + '%';
+                        document.getElementById('exportProgressText').innerText =
+                            'Phase 3/3: Email ' + i + '/' + total + ' (' + emails.length + ' gefunden, ' + repliesFound + ' Antworten)';
+                    }
+
                     try {
                         var item = items.Item(i);
                         if (item.Class !== 43) continue;
@@ -382,6 +396,7 @@
                         var emailData = extractEmail(item);
                         // Find matching replies
                         emailData.antworten = findReplies(emailData);
+                        repliesFound += emailData.antworten.length;
                         emails.push(emailData);
                     } catch (e) {}
                 }
@@ -450,6 +465,15 @@
 
                     var maxItems = Math.min(sentItems.Count, 300);
                     for (var i = 1; i <= maxItems; i++) {
+                        // Update progress every 10 items
+                        if (i % 10 === 0) {
+                            var pct = 10 + Math.round(((sf * 300 + i) / (sentFolders.length * 300)) * 20);
+                            document.getElementById('exportProgressFill').style.width = pct + '%';
+                            document.getElementById('exportProgressText').innerText =
+                                'Phase 2/3: Gesendete Ordner ' + (sf + 1) + '/' + sentFolders.length +
+                                ' - Email ' + i + '/' + maxItems + ' (' + sentItemsCache.length + ' geladen)';
+                        }
+
                         try {
                             var item = sentItems.Item(i);
                             if (item.Class !== 43) continue;
@@ -484,7 +508,8 @@
             }
 
             document.getElementById('exportProgressText').innerText =
-                'Gesendete Emails geladen: ' + sentItemsCache.length + ' (aus ' + sentFolders.length + ' Ordnern)';
+                'Phase 2/3 fertig: ' + sentItemsCache.length + ' gesendete Emails geladen';
+            document.getElementById('exportProgressFill').style.width = '30%';
         }
 
         function findReplies(originalEmail) {
@@ -524,14 +549,27 @@
             if (!text) return '';
 
             // Find where quoted content starts and cut it off
+            // Multiple patterns for German and English Outlook
             var patterns = [
-                /_{5,}\s*\n\s*Von:/i,
-                /\n\s*Von:\s+.+\n\s*Gesendet:/im,
-                /_{5,}\s*\n\s*From:/i,
-                /\n\s*From:\s+.+\n\s*Sent:/im,
-                /\n\s*Am\s+.+\s+schrieb\s+.+:/im,
-                /\n\s*On\s+.+\s+wrote:/im,
-                /-{3,}\s*Original/i
+                // German Outlook patterns
+                /_{5,}\s*\r?\n\s*Von:/i,
+                /\r?\n\s*Von:\s+.+\r?\n\s*Gesendet:/im,
+                /\r?\n\s*Von:\s+.+\r?\n\s*An:/im,
+                /-{3,}\s*Urspr[uü]ngliche\s+Nachricht/i,
+                /-{3,}\s*Original\s*Message/i,
+                /-{3,}\s*Weitergeleitete\s+Nachricht/i,
+                // English Outlook patterns
+                /_{5,}\s*\r?\n\s*From:/i,
+                /\r?\n\s*From:\s+.+\r?\n\s*Sent:/im,
+                /\r?\n\s*From:\s+.+\r?\n\s*To:/im,
+                // Quote headers
+                /\r?\n\s*Am\s+\d.+\s+schrieb\s+.+:/im,
+                /\r?\n\s*On\s+.+\s+wrote:/im,
+                /\r?\n\s*>+\s*Von:/im,
+                /\r?\n\s*>+\s*From:/im,
+                // Line of underscores/dashes followed by email header
+                /\r?\n_{10,}\r?\n/,
+                /\r?\n-{10,}\r?\n/
             ];
 
             for (var i = 0; i < patterns.length; i++) {
@@ -541,6 +579,9 @@
                     break;
                 }
             }
+
+            // Remove trailing signature markers
+            text = text.replace(/\r?\n--\s*\r?\n[\s\S]*$/, '');
 
             // Trim and limit length
             text = text.trim();
@@ -756,37 +797,16 @@
 
         function detectExcel() {
             try {
-                // Try multiple methods to connect to Excel
-                excelApp = null;
-
-                // Method 1: GetObject with empty string
-                try {
-                    excelApp = GetObject("", "Excel.Application");
-                } catch (e1) {
-                    // Method 2: GetObject without first parameter
-                    try {
-                        excelApp = GetObject(null, "Excel.Application");
-                    } catch (e2) {
-                        // Method 3: Try creating new instance and check for open workbooks
-                        try {
-                            var tempApp = new ActiveXObject("Excel.Application");
-                            if (tempApp.Workbooks.Count > 0) {
-                                excelApp = tempApp;
-                            } else {
-                                tempApp.Quit();
-                                excelApp = null;
-                            }
-                        } catch (e3) {}
-                    }
-                }
-
+                // Same approach as standalone app: try GetObject, fallback to new instance
                 if (!excelApp) {
-                    document.getElementById('excelStatus').value = "Keine Excel-Instanz gefunden - bitte Excel offnen";
-                    return;
+                    try {
+                        excelApp = GetObject("", "Excel.Application");
+                    } catch (e) {
+                        // Create new instance - will connect to running Excel or start new
+                        excelApp = new ActiveXObject("Excel.Application");
+                    }
+                    excelApp.Visible = true;
                 }
-
-                // Make sure Excel is visible
-                try { excelApp.Visible = true; } catch (e) {}
 
                 // Find Hypercare/Tracking workbook
                 targetWorkbook = null;
@@ -811,7 +831,7 @@
                 } else if (allWorkbooks.length > 0) {
                     document.getElementById('excelStatus').value = "Gefunden: " + allWorkbooks.join(", ") + " (keine Hypercare)";
                 } else {
-                    document.getElementById('excelStatus').value = "Excel offen, aber keine Arbeitsmappen";
+                    document.getElementById('excelStatus').value = "Keine Arbeitsmappe offen - bitte Excel-Datei offnen";
                 }
             } catch (e) {
                 document.getElementById('excelStatus').value = "Fehler: " + e.message;
