@@ -556,6 +556,7 @@
                 exportState.repliesFound = 0;
                 exportState.duplicatesSkipped = 0;
                 exportState.duplicatesWithReplies = 0;
+                exportState.processedConvIds = {};  // Track ConversationIDs already processed in this export
 
                 // Phase 2: Cache sent items (async - will start Phase 3 when done)
                 document.getElementById('exportProgressText').innerText = 'Phase 2/3: Lade gesendete Emails...';
@@ -593,6 +594,16 @@
                     }
 
                     var emailData = extractEmail(item);
+
+                    // Skip if we already processed this ConversationID in this export batch
+                    // (handles forwarded emails appearing multiple times in folder)
+                    if (emailData.conversationId && exportState.processedConvIds[emailData.conversationId]) {
+                        exportState.duplicatesSkipped++;
+                        continue;
+                    }
+                    if (emailData.conversationId) {
+                        exportState.processedConvIds[emailData.conversationId] = true;
+                    }
 
                     // Check for duplicates if Excel was connected
                     var hasExcelData = false;
