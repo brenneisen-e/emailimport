@@ -6,9 +6,6 @@
     <title>BGAV Hypercare - Email Review Tool</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
 
-    <!-- SheetJS for Excel Export -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-
     <style>
         :root {
             --primary: #0078d4;
@@ -521,6 +518,49 @@
         .notification-icon { font-size: 1.25rem; }
         .notification-text { font-size: 0.875rem; }
 
+        /* Replies Section */
+        .replies-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .replies-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .reply-item {
+            background: var(--success-light);
+            border: 1px solid #0b5a0b;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .reply-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.8125rem;
+        }
+
+        .reply-to { color: var(--success); font-weight: 600; }
+        .reply-date { color: var(--text-muted); }
+
+        .reply-text {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-tertiary); }
@@ -554,8 +594,8 @@
             <button class="btn btn-white" id="btnNewFile" style="display: none;" onclick="resetApp()">
                 📁 Neue Datei
             </button>
-            <button class="btn btn-white" id="btnExport" style="display: none;" onclick="exportToExcel()">
-                📊 Excel Export
+            <button class="btn btn-white" id="btnExport" style="display: none;" onclick="copyToClipboard()">
+                📋 In Zwischenablage kopieren
             </button>
         </div>
     </header>
@@ -627,6 +667,10 @@
                     <div class="email-content">
                         <div id="provisionBox"></div>
                         <div class="email-text" id="detailText"></div>
+                        <div class="replies-section" id="repliesSection" style="display: none;">
+                            <div class="replies-title">📤 Antworten aus Postausgang</div>
+                            <div id="repliesList"></div>
+                        </div>
                     </div>
 
                     <!-- Right Form Panel -->
@@ -1015,6 +1059,29 @@
 
             // Update cluster tags
             updateClusterTags(email);
+
+            // Display replies
+            const repliesSection = document.getElementById('repliesSection');
+            const repliesList = document.getElementById('repliesList');
+            if (email.antworten && email.antworten.length > 0) {
+                repliesSection.style.display = 'block';
+                repliesList.innerHTML = email.antworten.map(reply => {
+                    const replyDate = new Date(reply.datum || reply.date);
+                    const dateStr = replyDate.toLocaleString('de-DE');
+                    const replyText = (reply.text || reply.body || '').substring(0, 500);
+                    return `
+                        <div class="reply-item">
+                            <div class="reply-header">
+                                <span class="reply-to">An: ${escapeHtml(reply.an || reply.to || 'Unbekannt')}</span>
+                                <span class="reply-date">${dateStr}</span>
+                            </div>
+                            <div class="reply-text">${escapeHtml(replyText)}${replyText.length >= 500 ? '...' : ''}</div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                repliesSection.style.display = 'none';
+            }
         }
 
         // ============================================================================
@@ -1114,36 +1181,46 @@
         }
 
         // ============================================================================
-        // EXCEL EXPORT
+        // COPY TO CLIPBOARD (for pasting into Excel)
         // ============================================================================
-        function exportToExcel() {
-            const data = emails.map(e => ({
-                'Datum': e.datum,
-                'Von Email': e.von_email,
-                'Von Name': e.von_name,
-                'Betreff': e.betreff,
-                'Kategorie': e.kategorie,
-                'Status': e.status,
-                'Cluster': e.clusters.join(', '),
-                'Agentur': e.agentur,
-                'Vermittlernr': e.vermittlernr,
-                'Versicherungsnr': e.vsnr,
-                'Anfrage': e.anfrage,
-                'Antwort': e.antwort,
-                'Kommentar': e.kommentar,
-                'Provision': e.isProvision ? 'Ja' : 'Nein'
-            }));
+        function copyToClipboard() {
+            // Headers
+            const headers = ['Datum', 'Von Email', 'Von Name', 'Betreff', 'Kategorie', 'Status', 'Cluster', 'Agentur', 'Vermittlernr', 'Versicherungsnr', 'Anfrage', 'Antwort', 'Kommentar', 'Provision'];
 
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Emails');
+            // Data rows
+            const rows = emails.map(e => [
+                e.datum,
+                e.von_email,
+                e.von_name,
+                e.betreff.replace(/\t/g, ' ').replace(/\n/g, ' '),
+                e.kategorie,
+                e.status,
+                e.clusters.join(', '),
+                e.agentur,
+                e.vermittlernr,
+                e.vsnr,
+                (e.anfrage || '').replace(/\t/g, ' ').replace(/\n/g, ' '),
+                (e.antwort || '').replace(/\t/g, ' ').replace(/\n/g, ' '),
+                (e.kommentar || '').replace(/\t/g, ' ').replace(/\n/g, ' '),
+                e.isProvision ? 'Ja' : 'Nein'
+            ]);
 
-            // Auto-width columns
-            const colWidths = Object.keys(data[0] || {}).map(key => ({ wch: Math.max(key.length, 15) }));
-            ws['!cols'] = colWidths;
+            // Create tab-separated text
+            const tsv = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
 
-            XLSX.writeFile(wb, 'hypercare_export_' + new Date().toISOString().slice(0, 10) + '.xlsx');
-            showNotification(emails.length + ' Emails exportiert', 'success');
+            // Copy to clipboard
+            navigator.clipboard.writeText(tsv).then(() => {
+                showNotification(emails.length + ' Emails in Zwischenablage kopiert - jetzt in Excel einfügen (Strg+V)', 'success');
+            }).catch(err => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = tsv;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showNotification(emails.length + ' Emails kopiert - in Excel einfügen (Strg+V)', 'success');
+            });
         }
 
         // ============================================================================
