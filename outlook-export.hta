@@ -252,9 +252,10 @@
         };
 
         function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(function(t, i) {
-                t.className = 'tab' + (i === (tab === 'export' ? 0 : 1) ? ' active' : '');
-            });
+            var tabs = document.getElementsByClassName('tab');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].className = 'tab' + (i === (tab === 'export' ? 0 : 1) ? ' active' : '');
+            }
             document.getElementById('tabExport').className = 'tab-content' + (tab === 'export' ? ' active' : '');
             document.getElementById('tabImport').className = 'tab-content' + (tab === 'import' ? ' active' : '');
         }
