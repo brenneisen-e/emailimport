@@ -382,16 +382,12 @@
                 exportState.oldCount = 0;
                 exportState.repliesFound = 0;
 
-                // Phase 2: Cache sent items (with UI updates)
+                // Phase 2: Cache sent items (async - will start Phase 3 when done)
                 document.getElementById('exportProgressText').innerText = 'Phase 2/3: Lade gesendete Emails...';
                 document.getElementById('exportProgressFill').style.width = '10%';
 
                 setTimeout(function() {
                     cacheSentItems(days);
-                    // Start Phase 3 after a short delay
-                    setTimeout(function() {
-                        processEmailBatch();
-                    }, 50);
                 }, 50);
 
             } catch (e) {
@@ -451,101 +447,129 @@
             saveExportFile(exportState.emails, exportState.repliesFound);
         }
 
+        // State for async sent items caching
+        var sentCacheState = {
+            folders: [],
+            folderIdx: 0,
+            itemIdx: 1,
+            maxItems: 0,
+            items: null,
+            cutoffDate: null,
+            days: 7
+        };
+
         function cacheSentItems(days) {
             sentItemsCache = [];
-            var cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - (days + 30));
+            sentCacheState.days = days;
+            sentCacheState.cutoffDate = new Date();
+            sentCacheState.cutoffDate.setDate(sentCacheState.cutoffDate.getDate() - (days + 30));
+            sentCacheState.folders = [];
+            sentCacheState.folderIdx = 0;
 
-            // Try multiple sent folders: selected store AND default store
-            var sentFolders = [];
+            // Collect all sent folders
+            try { sentCacheState.folders.push(selectedStore.GetDefaultFolder(5)); } catch (e) {}
 
-            // 1. Try selected store's Sent Items
-            try {
-                sentFolders.push(selectedStore.GetDefaultFolder(5));
-            } catch (e) {}
-
-            // 2. Try default/primary account's Sent Items (for shared mailboxes)
             try {
                 var defaultSent = namespace.GetDefaultFolder(5);
-                // Avoid duplicates
-                var isDuplicate = false;
-                for (var f = 0; f < sentFolders.length; f++) {
-                    try {
-                        if (sentFolders[f].EntryID === defaultSent.EntryID) isDuplicate = true;
-                    } catch (e) {}
+                var isDup = false;
+                for (var f = 0; f < sentCacheState.folders.length; f++) {
+                    try { if (sentCacheState.folders[f].EntryID === defaultSent.EntryID) isDup = true; } catch (e) {}
                 }
-                if (!isDuplicate) sentFolders.push(defaultSent);
+                if (!isDup) sentCacheState.folders.push(defaultSent);
             } catch (e) {}
 
-            // 3. Try all stores' Sent Items
             try {
                 for (var s = 1; s <= namespace.Stores.Count; s++) {
                     try {
                         var storeSent = namespace.Stores.Item(s).GetDefaultFolder(5);
                         var isDup = false;
-                        for (var f = 0; f < sentFolders.length; f++) {
-                            try {
-                                if (sentFolders[f].EntryID === storeSent.EntryID) isDup = true;
-                            } catch (e) {}
+                        for (var f = 0; f < sentCacheState.folders.length; f++) {
+                            try { if (sentCacheState.folders[f].EntryID === storeSent.EntryID) isDup = true; } catch (e) {}
                         }
-                        if (!isDup) sentFolders.push(storeSent);
+                        if (!isDup) sentCacheState.folders.push(storeSent);
                     } catch (e) {}
                 }
             } catch (e) {}
 
-            // Cache items from all sent folders
-            for (var sf = 0; sf < sentFolders.length; sf++) {
+            // Start first folder
+            startNextSentFolder();
+        }
+
+        function startNextSentFolder() {
+            if (sentCacheState.folderIdx >= sentCacheState.folders.length) {
+                // All folders done - start Phase 3
+                document.getElementById('exportProgressText').innerText =
+                    'Phase 2/3 fertig: ' + sentItemsCache.length + ' gesendete Emails geladen';
+                document.getElementById('exportProgressFill').style.width = '30%';
+                setTimeout(processEmailBatch, 10);
+                return;
+            }
+
+            try {
+                sentCacheState.items = sentCacheState.folders[sentCacheState.folderIdx].Items;
+                try { sentCacheState.items.Sort("[SentOn]", true); } catch (e) {}
+                sentCacheState.maxItems = Math.min(sentCacheState.items.Count, 300);
+                sentCacheState.itemIdx = 1;
+                setTimeout(processSentBatch, 10);
+            } catch (e) {
+                sentCacheState.folderIdx++;
+                setTimeout(startNextSentFolder, 10);
+            }
+        }
+
+        function processSentBatch() {
+            var batchSize = 5;
+            var processed = 0;
+
+            while (processed < batchSize && sentCacheState.itemIdx <= sentCacheState.maxItems) {
+                var i = sentCacheState.itemIdx;
+                sentCacheState.itemIdx++;
+                processed++;
+
                 try {
-                    var sentItems = sentFolders[sf].Items;
-                    try { sentItems.Sort("[SentOn]", true); } catch (e) {}
+                    var item = sentCacheState.items.Item(i);
+                    if (item.Class !== 43) continue;
 
-                    var maxItems = Math.min(sentItems.Count, 300);
-                    for (var i = 1; i <= maxItems; i++) {
-                        // Update progress every 10 items
-                        if (i % 10 === 0) {
-                            var pct = 10 + Math.round(((sf * 300 + i) / (sentFolders.length * 300)) * 20);
-                            document.getElementById('exportProgressFill').style.width = pct + '%';
-                            document.getElementById('exportProgressText').innerText =
-                                'Phase 2/3: Gesendete Ordner ' + (sf + 1) + '/' + sentFolders.length +
-                                ' - Email ' + i + '/' + maxItems + ' (' + sentItemsCache.length + ' geladen)';
-                        }
-
-                        try {
-                            var item = sentItems.Item(i);
-                            if (item.Class !== 43) continue;
-
-                            var sentDate = new Date(item.SentOn);
-                            if (sentDate < cutoffDate) break;
-
-                            var subject = (item.Subject || '').toLowerCase().trim();
-                            // Remove Re:, AW:, Fwd:, etc. - handle multiple prefixes
-                            while (subject.match(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i)) {
-                                subject = subject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/i, '').trim();
-                            }
-
-                            var body = '';
-                            try { body = item.Body || ''; } catch (e) {}
-
-                            var toRecipient = '';
-                            try { toRecipient = item.To || ''; } catch (e) {}
-
-                            var convId = '';
-                            try { convId = item.ConversationID || ''; } catch (e) {}
-
-                            sentItemsCache.push({
-                                sentDate: sentDate,
-                                conversationId: convId,
-                                body: removeEmailQuotes(body),
-                                to: toRecipient
-                            });
-                        } catch (e) {}
+                    var sentDate = new Date(item.SentOn);
+                    if (sentDate < sentCacheState.cutoffDate) {
+                        sentCacheState.itemIdx = sentCacheState.maxItems + 1;
+                        break;
                     }
+
+                    var body = '';
+                    try { body = item.Body || ''; } catch (e) {}
+
+                    var toRecipient = '';
+                    try { toRecipient = item.To || ''; } catch (e) {}
+
+                    var convId = '';
+                    try { convId = item.ConversationID || ''; } catch (e) {}
+
+                    sentItemsCache.push({
+                        sentDate: sentDate,
+                        conversationId: convId,
+                        body: removeEmailQuotes(body),
+                        to: toRecipient
+                    });
                 } catch (e) {}
             }
 
+            // Update progress
+            var totalFolders = sentCacheState.folders.length;
+            var pct = 10 + Math.round(((sentCacheState.folderIdx * 300 + sentCacheState.itemIdx) / (totalFolders * 300)) * 20);
+            document.getElementById('exportProgressFill').style.width = pct + '%';
             document.getElementById('exportProgressText').innerText =
-                'Phase 2/3 fertig: ' + sentItemsCache.length + ' gesendete Emails geladen';
-            document.getElementById('exportProgressFill').style.width = '30%';
+                'Phase 2/3: Ordner ' + (sentCacheState.folderIdx + 1) + '/' + totalFolders +
+                ' - Email ' + sentCacheState.itemIdx + '/' + sentCacheState.maxItems +
+                ' (' + sentItemsCache.length + ' geladen)';
+
+            // Continue or next folder
+            if (sentCacheState.itemIdx <= sentCacheState.maxItems) {
+                setTimeout(processSentBatch, 10);
+            } else {
+                sentCacheState.folderIdx++;
+                setTimeout(startNextSentFolder, 10);
+            }
         }
 
         function findReplies(originalEmail) {
