@@ -843,10 +843,10 @@
                     excelApp = GetObject("", "Excel.Application");
                 } catch (e1) {}
 
-                // Method 2: Try without first parameter
+                // Method 2: Try with null as first parameter
                 if (!excelApp) {
                     try {
-                        excelApp = GetObject(, "Excel.Application");
+                        excelApp = GetObject(null, "Excel.Application");
                     } catch (e2) {}
                 }
 
