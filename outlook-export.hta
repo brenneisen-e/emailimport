@@ -835,27 +835,17 @@
             document.getElementById('excelStatus').value = "Suche Excel...";
 
             try {
-                // Try to connect to running Excel - do NOT create new instance
-                excelApp = null;
-
-                // Method 1: GetObject with running instance
+                // Method 1: GetObject with empty string (preferred - connects to running Excel)
                 try {
                     excelApp = GetObject("", "Excel.Application");
-                } catch (e1) {}
-
-                // Method 2: Try with null as first parameter
-                if (!excelApp) {
-                    try {
-                        excelApp = GetObject(null, "Excel.Application");
-                    } catch (e2) {}
+                } catch (e1) {
+                    // Method 2: Create new ActiveXObject
+                    excelApp = new ActiveXObject("Excel.Application");
                 }
 
-                if (!excelApp) {
-                    document.getElementById('excelStatus').value = "Excel nicht gefunden - bitte Excel mit der Datei offnen und erneut versuchen";
-                    return;
-                }
+                excelApp.Visible = true;
 
-                // Find Hypercare/Tracking workbook
+                // Find Hypercare/Tracking workbook in open workbooks
                 targetWorkbook = null;
                 var allWorkbooks = [];
 
@@ -863,22 +853,31 @@
                     try {
                         var wb = excelApp.Workbooks(i);
                         allWorkbooks.push(wb.Name);
-                        var wbName = wb.Name.toLowerCase();
-                        if (wbName.indexOf('hypercare') !== -1 ||
-                            wbName.indexOf('tracking') !== -1) {
+                        var wbName = wb.Name.toLowerCase().replace(/[_\-\s]/g, '');
+                        if (wbName.indexOf('hypercare') !== -1) {
                             targetWorkbook = wb;
                             break;
                         }
                     } catch (e) {}
                 }
 
+                // If not found, try to open from SharePoint
+                if (!targetWorkbook) {
+                    document.getElementById('excelStatus').value = "Offne SharePoint-Datei...";
+                    var sharePointUrl = "https://barmeniagroup.sharepoint.com/sites/SAPUnity-WorkstreamICM/Freigegebene%20Dokumente/40%20Team%20Simulation,%20Kalibrierung,%20Verhandlung,%20Vertrag%20&%20EFM/Tracking_Hypercare.xlsm";
+                    try {
+                        targetWorkbook = excelApp.Workbooks.Open(sharePointUrl);
+                    } catch (e) {
+                        document.getElementById('excelStatus').value = "SharePoint-Datei konnte nicht geoffnet werden - bitte manuell offnen";
+                        return;
+                    }
+                }
+
                 if (targetWorkbook) {
                     document.getElementById('excelStatus').value = "OK: " + targetWorkbook.Name;
                     checkImportReady();
-                } else if (allWorkbooks.length > 0) {
-                    document.getElementById('excelStatus').value = "Gefunden: " + allWorkbooks.join(", ") + " - keine Hypercare dabei";
                 } else {
-                    document.getElementById('excelStatus').value = "Excel offen aber keine Dateien - bitte Hypercare-Datei offnen";
+                    document.getElementById('excelStatus').value = "Hypercare-Datei nicht gefunden";
                 }
             } catch (e) {
                 document.getElementById('excelStatus').value = "Fehler: " + e.message;
