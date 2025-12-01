@@ -1062,12 +1062,29 @@
         //          Lösung, JIRA, Kommunikation, Kommentar (20 columns)
         function writeEmailRow(worksheet, row, email) {
             var repliesText = formatReplies(email.antworten);
+            var pd = email.provisionData || {};
+
+            // Absender: Bei Provisionsreklamation den Vermittlernamen nehmen
             var absender = email.von_name || email.von_email || '';
+            if (pd.vorname_vermittler || pd.nachname_vermittler) {
+                absender = ((pd.vorname_vermittler || '') + ' ' + (pd.nachname_vermittler || '')).trim();
+            }
+
+            // Anfrage: Bei Provisionsreklamation nur die "nachricht" nehmen
+            var anfrage = email.text || email.anfrage || '';
+            if (pd.nachricht) {
+                anfrage = fixEncoding(pd.nachricht);
+            } else if (anfrage) {
+                anfrage = fixEncoding(anfrage);
+            }
+
+            // BD-Nummer: Aus provisionData oder email
+            var bdNummer = pd.vermittlernummer_vermittler || email.vermittlernr || '';
 
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
             worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
             worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
-            worksheet.Cells(row, 4).Value = email.vermittlernr || '';    // BD-Nummer
+            worksheet.Cells(row, 4).Value = bdNummer;                    // BD-Nummer
             worksheet.Cells(row, 5).Value = email.agentur || '';         // Agentur
             worksheet.Cells(row, 6).Value = absender;                    // Absender
             worksheet.Cells(row, 7).Value = email.kategorie || '';       // Kategorie
@@ -1075,7 +1092,7 @@
             worksheet.Cells(row, 9).Value = '';                          // In Bearbeitung von
             worksheet.Cells(row, 10).Value = (email.clusters || []).join(', ');  // Cluster
             worksheet.Cells(row, 11).Value = email.betreff || '';        // Betreff
-            worksheet.Cells(row, 12).Value = email.text || email.anfrage || '';  // Anfrage
+            worksheet.Cells(row, 12).Value = anfrage;                    // Anfrage
             worksheet.Cells(row, 13).Value = repliesText || email.antwort || ''; // Antwort
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
             worksheet.Cells(row, 15).Value = '';                         // Workaround
@@ -1084,6 +1101,23 @@
             worksheet.Cells(row, 18).Value = '';                         // JIRA
             worksheet.Cells(row, 19).Value = '';                         // Kommunikation
             worksheet.Cells(row, 20).Value = email.kommentar || '';      // Kommentar
+        }
+
+        // Fix UTF-8 encoding issues (Ã¼ -> ü, ÃŸ -> ß, etc.)
+        function fixEncoding(text) {
+            if (!text) return '';
+            // Common UTF-8 decoded as Latin-1 patterns
+            return text
+                .replace(/Ã¤/g, 'ä').replace(/Ã„/g, 'Ä')
+                .replace(/Ã¶/g, 'ö').replace(/Ã–/g, 'Ö')
+                .replace(/Ã¼/g, 'ü').replace(/Ãœ/g, 'Ü')
+                .replace(/ÃŸ/g, 'ß')
+                .replace(/Ã©/g, 'é').replace(/Ã¨/g, 'è')
+                .replace(/Ã /g, 'à').replace(/Ã¢/g, 'â')
+                .replace(/Ã®/g, 'î').replace(/Ã¯/g, 'ï')
+                .replace(/Ã´/g, 'ô').replace(/Ã¹/g, 'ù')
+                .replace(/Ã»/g, 'û').replace(/Ã§/g, 'ç')
+                .replace(/â‚¬/g, '€');
         }
 
         // JSON polyfill
