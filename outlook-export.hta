@@ -746,7 +746,8 @@
             try {
                 sentCacheState.items = sentCacheState.folders[sentCacheState.folderIdx].Items;
                 try { sentCacheState.items.Sort("[SentOn]", true); } catch (e) {}
-                sentCacheState.maxItems = Math.min(sentCacheState.items.Count, 300);
+                // Increased limit for group mailboxes with many sent items
+                sentCacheState.maxItems = Math.min(sentCacheState.items.Count, 1000);
                 sentCacheState.itemIdx = 1;
                 setTimeout(processSentBatch, 10);
             } catch (e) {
@@ -756,7 +757,7 @@
         }
 
         function processSentBatch() {
-            var batchSize = 5;
+            var batchSize = 20;  // Increased batch size for faster processing
             var processed = 0;
 
             while (processed < batchSize && sentCacheState.itemIdx <= sentCacheState.maxItems) {
@@ -794,7 +795,7 @@
 
             // Update progress
             var totalFolders = sentCacheState.folders.length;
-            var pct = 10 + Math.round(((sentCacheState.folderIdx * 300 + sentCacheState.itemIdx) / (totalFolders * 300)) * 20);
+            var pct = 10 + Math.round(((sentCacheState.folderIdx * 1000 + sentCacheState.itemIdx) / (totalFolders * 1000)) * 20);
             document.getElementById('exportProgressFill').style.width = pct + '%';
             document.getElementById('exportProgressText').innerText =
                 'Phase 2/3: Ordner ' + (sentCacheState.folderIdx + 1) + '/' + totalFolders +
@@ -1460,6 +1461,19 @@
         //          Cluster, Betreff, Anfrage, Antwort, Diagnose, Workaround, Nächste Schritte,
         //          Lösung, JIRA, Kommunikation, Kommentar, ConversationID (21 columns)
         function writeEmailRow(worksheet, row, email) {
+            // Copy formatting from row above (if exists and row > 2)
+            if (row > 2) {
+                try {
+                    var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 21));
+                    var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 21));
+                    sourceRange.Copy();
+                    targetRange.PasteSpecial(-4122); // xlPasteFormats = -4122
+                    try { worksheet.Application.CutCopyMode = false; } catch(e) {}
+                } catch (e) {
+                    // Formatting copy failed, continue without it
+                }
+            }
+
             var repliesText = formatReplies(email.antworten);
             var pd = email.provisionData || {};
 
