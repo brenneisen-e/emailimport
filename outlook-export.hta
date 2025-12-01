@@ -832,16 +832,27 @@
         }
 
         function detectExcel() {
+            document.getElementById('excelStatus').value = "Suche Excel...";
+
             try {
-                // Same approach as standalone app: try GetObject, fallback to new instance
+                // Try to connect to running Excel - do NOT create new instance
+                excelApp = null;
+
+                // Method 1: GetObject with running instance
+                try {
+                    excelApp = GetObject("", "Excel.Application");
+                } catch (e1) {}
+
+                // Method 2: Try without first parameter
                 if (!excelApp) {
                     try {
-                        excelApp = GetObject("", "Excel.Application");
-                    } catch (e) {
-                        // Create new instance - will connect to running Excel or start new
-                        excelApp = new ActiveXObject("Excel.Application");
-                    }
-                    excelApp.Visible = true;
+                        excelApp = GetObject(, "Excel.Application");
+                    } catch (e2) {}
+                }
+
+                if (!excelApp) {
+                    document.getElementById('excelStatus').value = "Excel nicht gefunden - bitte Excel mit der Datei offnen und erneut versuchen";
+                    return;
                 }
 
                 // Find Hypercare/Tracking workbook
@@ -862,12 +873,12 @@
                 }
 
                 if (targetWorkbook) {
-                    document.getElementById('excelStatus').value = targetWorkbook.Name;
+                    document.getElementById('excelStatus').value = "OK: " + targetWorkbook.Name;
                     checkImportReady();
                 } else if (allWorkbooks.length > 0) {
-                    document.getElementById('excelStatus').value = "Gefunden: " + allWorkbooks.join(", ") + " (keine Hypercare)";
+                    document.getElementById('excelStatus').value = "Gefunden: " + allWorkbooks.join(", ") + " - keine Hypercare dabei";
                 } else {
-                    document.getElementById('excelStatus').value = "Keine Arbeitsmappe offen - bitte Excel-Datei offnen";
+                    document.getElementById('excelStatus').value = "Excel offen aber keine Dateien - bitte Hypercare-Datei offnen";
                 }
             } catch (e) {
                 document.getElementById('excelStatus').value = "Fehler: " + e.message;
