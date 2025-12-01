@@ -160,15 +160,15 @@
                 <label>Zeitraum (Tage)</label>
                 <input type="number" id="daysInput" value="7" min="1" max="30">
 
-                <label>Excel für Duplikatsprüfung (optional)</label>
+                <label>Excel verbinden (Pflicht)</label>
                 <div class="row">
-                    <input type="text" id="exportExcelStatus" readonly placeholder="Keine Excel - alle Emails werden exportiert" style="flex:1">
+                    <input type="text" id="exportExcelStatus" readonly placeholder="Tracking_Hypercare.xlsm öffnen, dann verbinden" style="flex:1">
                 </div>
-                <button class="btn btn-secondary" onclick="detectExcelForExport()" style="margin-bottom:0.75rem;">
-                    &#128269; Excel verbinden (Duplikate filtern)
+                <button class="btn btn-primary" onclick="detectExcelForExport()" style="margin-bottom:0.75rem;">
+                    &#128269; Excel verbinden
                 </button>
 
-                <button class="btn btn-primary" id="exportBtn" onclick="startExport()" disabled>
+                <button class="btn btn-success" id="exportBtn" onclick="startExport()" disabled>
                     &#128229; Emails exportieren
                 </button>
 
@@ -348,7 +348,7 @@
 
                 addSubfolders(rootFolder.Folders, folderSelect, '');
                 folderSelect.disabled = false;
-                exportBtn.disabled = false;
+                checkExportReady();
             } catch (e) {
                 showExportError("Fehler: " + e.message);
             }
@@ -374,6 +374,25 @@
         // ============================================================================
         // EXCEL CONNECTION FOR DUPLICATE CHECK
         // ============================================================================
+
+        // Check if export can be started (folder selected AND Excel connected)
+        function checkExportReady() {
+            var folderSelected = document.getElementById('folderSelect').value !== '';
+            var excelConnected = exportWorkbook !== null;
+            var btn = document.getElementById('exportBtn');
+
+            if (folderSelected && excelConnected) {
+                btn.disabled = false;
+                btn.innerHTML = '&#128229; Emails exportieren';
+            } else if (folderSelected && !excelConnected) {
+                btn.disabled = true;
+                btn.innerHTML = '&#128229; Erst Excel verbinden!';
+            } else {
+                btn.disabled = true;
+                btn.innerHTML = '&#128229; Emails exportieren';
+            }
+        }
+
         function detectExcelForExport() {
             document.getElementById('exportExcelStatus').value = "Suche Excel...";
             existingEmailKeys = {};
@@ -449,10 +468,13 @@
                 }
 
                 document.getElementById('exportExcelStatus').value = "OK: " + exportWorkbook.Name + " (" + count + " Einträge)";
+                checkExportReady();
 
             } catch (e) {
                 document.getElementById('exportExcelStatus').value = "Fehler: " + e.message;
                 existingEmailKeys = {};
+                exportWorkbook = null;
+                checkExportReady();
             }
         }
 
@@ -1494,12 +1516,17 @@
             // Agentur mit Encoding-Fix
             var agentur = fixEncoding(email.agentur || '');
 
-            // Anfrage: Bei Provisionsreklamation nur die "nachricht" nehmen
-            var anfrage = email.text || email.anfrage || '';
-            if (pd.nachricht) {
+            // Anfrage/Zusammenfassung: User-edited content has priority
+            var anfrage = '';
+            if (email.anfrage && email.anfrage.trim()) {
+                // User edited the summary in web app - use that
+                anfrage = fixEncoding(email.anfrage);
+            } else if (pd.nachricht) {
+                // Provisionsreklamation: use nachricht field
                 anfrage = fixEncoding(pd.nachricht);
-            } else if (anfrage) {
-                anfrage = fixEncoding(anfrage);
+            } else {
+                // Fallback to original email text
+                anfrage = fixEncoding(email.text || '');
             }
 
             // BD-Nummer: Aus provisionData oder email
@@ -1508,26 +1535,42 @@
             // Betreff mit Encoding-Fix
             var betreff = fixEncoding(email.betreff || '');
 
+            // Apply fixEncoding to all text fields
+            var kategorie = fixEncoding(email.kategorie || '');
+            var status = fixEncoding(email.status || 'Neu');
+            var clusters = fixEncoding((email.clusters || []).join(', '));
+            var kommentar = fixEncoding(email.kommentar || '');
+            var bearbeiter = fixEncoding(email.bearbeiter || '');
+
+            // Combine user's manual answer with automatic replies
+            var antwortText = '';
+            var userAntwort = fixEncoding(email.antwort || '');
+            if (userAntwort && repliesText) {
+                antwortText = userAntwort + '\n\n--- Gefundene Antworten ---\n\n' + repliesText;
+            } else {
+                antwortText = userAntwort || repliesText || '';
+            }
+
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
             worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
             worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
             worksheet.Cells(row, 4).Value = bdNummer;                    // BD-Nummer
             worksheet.Cells(row, 5).Value = agentur;                     // Agentur
             worksheet.Cells(row, 6).Value = absender;                    // Absender
-            worksheet.Cells(row, 7).Value = email.kategorie || '';       // Kategorie
-            worksheet.Cells(row, 8).Value = email.status || 'Neu';       // Status
-            worksheet.Cells(row, 9).Value = '';                          // In Bearbeitung von
-            worksheet.Cells(row, 10).Value = (email.clusters || []).join(', ');  // Cluster
+            worksheet.Cells(row, 7).Value = kategorie;                   // Kategorie
+            worksheet.Cells(row, 8).Value = status;                      // Status
+            worksheet.Cells(row, 9).Value = bearbeiter;                  // In Bearbeitung von
+            worksheet.Cells(row, 10).Value = clusters;                   // Cluster
             worksheet.Cells(row, 11).Value = betreff;                    // Betreff
             worksheet.Cells(row, 12).Value = anfrage;                    // Anfrage
-            worksheet.Cells(row, 13).Value = fixEncoding(repliesText || email.antwort || ''); // Antwort
+            worksheet.Cells(row, 13).Value = fixEncoding(antwortText);   // Antwort
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
             worksheet.Cells(row, 15).Value = '';                         // Workaround
             worksheet.Cells(row, 16).Value = '';                         // Nächste Schritte
             worksheet.Cells(row, 17).Value = '';                         // Lösung
             worksheet.Cells(row, 18).Value = '';                         // JIRA
             worksheet.Cells(row, 19).Value = '';                         // Kommunikation
-            worksheet.Cells(row, 20).Value = email.kommentar || '';      // Kommentar
+            worksheet.Cells(row, 20).Value = kommentar;                  // Kommentar
             worksheet.Cells(row, 21).Value = email.conversationId || ''; // ConversationID für Duplikatsprüfung
         }
 
