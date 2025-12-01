@@ -1530,16 +1530,22 @@
             // Betreff mit Encoding-Fix
             var betreff = fixEncoding(email.betreff || '');
 
+            // Apply fixEncoding to all text fields
+            var kategorie = fixEncoding(email.kategorie || '');
+            var status = fixEncoding(email.status || 'Neu');
+            var clusters = fixEncoding((email.clusters || []).join(', '));
+            var kommentar = fixEncoding(email.kommentar || '');
+
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
             worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
             worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
             worksheet.Cells(row, 4).Value = bdNummer;                    // BD-Nummer
             worksheet.Cells(row, 5).Value = agentur;                     // Agentur
             worksheet.Cells(row, 6).Value = absender;                    // Absender
-            worksheet.Cells(row, 7).Value = email.kategorie || '';       // Kategorie
-            worksheet.Cells(row, 8).Value = email.status || 'Neu';       // Status
+            worksheet.Cells(row, 7).Value = kategorie;                   // Kategorie
+            worksheet.Cells(row, 8).Value = status;                      // Status
             worksheet.Cells(row, 9).Value = '';                          // In Bearbeitung von
-            worksheet.Cells(row, 10).Value = (email.clusters || []).join(', ');  // Cluster
+            worksheet.Cells(row, 10).Value = clusters;                   // Cluster
             worksheet.Cells(row, 11).Value = betreff;                    // Betreff
             worksheet.Cells(row, 12).Value = anfrage;                    // Anfrage
             worksheet.Cells(row, 13).Value = fixEncoding(repliesText || email.antwort || ''); // Antwort
@@ -1549,7 +1555,7 @@
             worksheet.Cells(row, 17).Value = '';                         // Lösung
             worksheet.Cells(row, 18).Value = '';                         // JIRA
             worksheet.Cells(row, 19).Value = '';                         // Kommunikation
-            worksheet.Cells(row, 20).Value = email.kommentar || '';      // Kommentar
+            worksheet.Cells(row, 20).Value = kommentar;                  // Kommentar
             worksheet.Cells(row, 21).Value = email.conversationId || ''; // ConversationID für Duplikatsprüfung
         }
 
