@@ -6,6 +6,9 @@
     <title>BGAV Hypercare - Email Review Tool</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
 
+    <!-- Microsoft Authentication Library (MSAL) -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+
     <style>
         /* ============================================================================
            CSS VARIABLES & RESET
@@ -25,6 +28,9 @@
             --info: #06b6d4;
             --info-bg: rgba(6, 182, 212, 0.1);
 
+            --microsoft: #00a4ef;
+            --microsoft-dark: #0078d4;
+
             --bg-primary: #0f0f1a;
             --bg-secondary: #1a1a2e;
             --bg-tertiary: #252542;
@@ -38,8 +44,6 @@
             --glass-bg: rgba(255, 255, 255, 0.05);
             --glass-border: rgba(255, 255, 255, 0.1);
 
-            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
             --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
             --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.3);
 
@@ -50,102 +54,45 @@
 
             --transition-fast: 0.15s ease;
             --transition-normal: 0.25s ease;
-            --transition-slow: 0.4s ease;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
-            overflow-x: hidden;
         }
 
-        /* Background Animation */
         body::before {
             content: '';
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background:
                 radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+                radial-gradient(ellipse at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
             pointer-events: none;
             z-index: -1;
-            animation: backgroundPulse 15s ease-in-out infinite;
-        }
-
-        @keyframes backgroundPulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
         }
 
         /* ============================================================================
            ANIMATIONS
            ============================================================================ */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-
-        @keyframes progressPulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
-        }
-
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
-            50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); } 50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
         .animate-fade-in { animation: fadeIn 0.4s ease forwards; }
         .animate-slide-in { animation: slideIn 0.4s ease forwards; }
-        .animate-slide-up { animation: slideUp 0.4s ease forwards; }
 
-        /* Staggered Animation */
+        /* Stagger delays */
         .stagger-1 { animation-delay: 0.05s; }
         .stagger-2 { animation-delay: 0.1s; }
         .stagger-3 { animation-delay: 0.15s; }
@@ -153,107 +100,38 @@
         .stagger-5 { animation-delay: 0.25s; }
 
         /* ============================================================================
-           SKELETON LOADING
+           LOADING COMPONENTS
            ============================================================================ */
-        .skeleton {
-            background: linear-gradient(90deg,
-                var(--bg-tertiary) 25%,
-                var(--bg-secondary) 50%,
-                var(--bg-tertiary) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: var(--radius-sm);
-        }
-
-        .skeleton-text {
-            height: 14px;
-            margin-bottom: 8px;
-            border-radius: 4px;
-        }
-
-        .skeleton-title {
-            height: 20px;
-            width: 60%;
-            margin-bottom: 12px;
-        }
-
-        .skeleton-circle {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-        }
-
-        /* ============================================================================
-           PROGRESS INDICATORS
-           ============================================================================ */
-        .progress-bar {
-            height: 4px;
-            background: var(--bg-tertiary);
-            border-radius: 2px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--primary-light));
-            border-radius: 2px;
-            transition: width 0.3s ease;
-            position: relative;
-        }
-
-        .progress-bar-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            animation: shimmer 1.5s infinite;
-        }
-
-        .progress-ring {
-            transform: rotate(-90deg);
-        }
-
-        .progress-ring-circle {
-            transition: stroke-dashoffset 0.5s ease;
-            transform-origin: 50% 50%;
-        }
-
-        /* Spinner */
         .spinner {
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             border: 3px solid var(--bg-tertiary);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
+        .spinner-sm { width: 20px; height: 20px; border-width: 2px; }
+        .spinner-microsoft { border-top-color: var(--microsoft); }
 
-        .spinner-sm {
-            width: 20px;
-            height: 20px;
-            border-width: 2px;
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-sm);
         }
 
-        /* Dots Loading */
-        .loading-dots {
-            display: flex;
-            gap: 4px;
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
         }
-
-        .loading-dots span {
-            width: 8px;
-            height: 8px;
-            background: var(--primary);
-            border-radius: 50%;
-            animation: bounce 0.6s ease-in-out infinite;
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            border-radius: 2px;
+            transition: width 0.3s ease;
         }
-
-        .loading-dots span:nth-child(2) { animation-delay: 0.1s; }
-        .loading-dots span:nth-child(3) { animation-delay: 0.2s; }
+        .progress-bar-fill.microsoft { background: linear-gradient(90deg, var(--microsoft), var(--microsoft-dark)); }
 
         /* ============================================================================
            LAYOUT
@@ -279,7 +157,6 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            animation: fadeIn 0.5s ease;
         }
 
         .header-brand {
@@ -289,8 +166,7 @@
         }
 
         .logo {
-            width: 48px;
-            height: 48px;
+            width: 48px; height: 48px;
             background: linear-gradient(135deg, var(--primary), var(--primary-light));
             border-radius: var(--radius-md);
             display: flex;
@@ -299,7 +175,6 @@
             font-weight: 700;
             font-size: 1.1rem;
             color: white;
-            box-shadow: var(--shadow-glow);
             animation: glow 3s ease-in-out infinite;
         }
 
@@ -309,18 +184,33 @@
             background: linear-gradient(135deg, var(--text-primary), var(--primary-light));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
+        .header-subtitle { font-size: 0.75rem; color: var(--text-muted); }
 
-        .header-subtitle {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
+        .header-actions { display: flex; gap: 0.75rem; align-items: center; }
 
-        .header-actions {
+        .user-info {
             display: flex;
+            align-items: center;
             gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
         }
+        .user-avatar {
+            width: 32px; height: 32px;
+            background: var(--microsoft);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: white;
+        }
+        .user-name { font-size: 0.875rem; color: var(--text-primary); }
+        .user-email { font-size: 0.6875rem; color: var(--text-muted); }
 
         /* ============================================================================
            BUTTONS
@@ -339,87 +229,34 @@
             position: relative;
             overflow: hidden;
         }
+        .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
 
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s ease;
-        }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; }
+        .btn-primary:hover { background: linear-gradient(135deg, var(--primary-light), var(--primary)); }
 
-        .btn:hover::before {
-            left: 100%;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        .btn-microsoft {
+            background: linear-gradient(135deg, var(--microsoft), var(--microsoft-dark));
             color: white;
+            font-size: 1rem;
+            padding: 0.875rem 2rem;
         }
+        .btn-microsoft:hover { background: linear-gradient(135deg, #2bb5f4, var(--microsoft)); }
 
-        .btn-primary:hover {
-            background: linear-gradient(135deg, var(--primary-light), var(--primary));
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, var(--success), #059669);
-            color: white;
-        }
-
+        .btn-success { background: linear-gradient(135deg, var(--success), #059669); color: white; }
         .btn-secondary {
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
             color: var(--text-primary);
         }
+        .btn-secondary:hover { background: var(--bg-tertiary); border-color: var(--primary); }
 
-        .btn-secondary:hover {
-            background: var(--bg-tertiary);
-            border-color: var(--primary);
-        }
+        .btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: white; }
 
-        .btn-ghost {
-            background: transparent;
-            color: var(--text-secondary);
-        }
-
-        .btn-ghost:hover {
-            background: var(--glass-bg);
-            color: var(--text-primary);
-        }
-
-        .btn-sm {
-            padding: 0.5rem 0.875rem;
-            font-size: 0.8125rem;
-        }
-
-        .btn-icon {
-            width: 40px;
-            height: 40px;
-            padding: 0;
-            justify-content: center;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .btn-loading .spinner-sm {
-            margin-right: 0.5rem;
-        }
+        .btn-sm { padding: 0.5rem 0.875rem; font-size: 0.8125rem; }
+        .btn-lg { padding: 1rem 2rem; font-size: 1rem; }
 
         /* ============================================================================
            STATS BAR
@@ -431,7 +268,6 @@
             background: var(--glass-bg);
             border-bottom: 1px solid var(--glass-border);
             overflow-x: auto;
-            animation: slideUp 0.5s ease;
         }
 
         .stat-card {
@@ -445,58 +281,25 @@
             min-width: 140px;
             transition: all var(--transition-fast);
         }
-
-        .stat-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
+        .stat-card:hover { border-color: var(--primary); transform: translateY(-2px); }
 
         .stat-icon {
-            width: 44px;
-            height: 44px;
+            width: 44px; height: 44px;
             border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.25rem;
             font-weight: 600;
-            transition: transform var(--transition-fast);
         }
-
-        .stat-card:hover .stat-icon {
-            transform: scale(1.1);
-        }
-
         .stat-icon.total { background: var(--primary-bg); color: var(--primary); }
         .stat-icon.selected { background: var(--info-bg); color: var(--info); }
         .stat-icon.incident { background: var(--danger-bg); color: var(--danger); }
         .stat-icon.question { background: var(--warning-bg); color: var(--warning); }
         .stat-icon.provision { background: var(--success-bg); color: var(--success); }
 
-        .stat-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            line-height: 1.2;
-            transition: all var(--transition-fast);
-        }
-
-        .stat-label {
-            font-size: 0.6875rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Animating stat value */
-        .stat-value.updating {
-            animation: pulse 0.3s ease;
-        }
+        .stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+        .stat-label { font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
         /* ============================================================================
            TOOLBAR
@@ -509,7 +312,6 @@
             border-bottom: 1px solid var(--border-color);
             flex-wrap: wrap;
             align-items: center;
-            animation: slideUp 0.5s ease 0.1s both;
         }
 
         .search-box {
@@ -517,7 +319,6 @@
             min-width: 280px;
             position: relative;
         }
-
         .search-box input {
             width: 100%;
             padding: 0.75rem 1rem 0.75rem 3rem;
@@ -528,35 +329,21 @@
             font-size: 0.875rem;
             transition: all var(--transition-fast);
         }
-
         .search-box input:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px var(--primary-bg);
         }
-
-        .search-box input::placeholder {
-            color: var(--text-muted);
-        }
-
+        .search-box input::placeholder { color: var(--text-muted); }
         .search-icon {
             position: absolute;
             left: 1rem;
             top: 50%;
             transform: translateY(-50%);
             color: var(--text-muted);
-            pointer-events: none;
-            transition: color var(--transition-fast);
         }
 
-        .search-box input:focus + .search-icon {
-            color: var(--primary);
-        }
-
-        .filter-group {
-            display: flex;
-            gap: 0.5rem;
-        }
+        .filter-group { display: flex; gap: 0.5rem; }
 
         .filter-select {
             padding: 0.625rem 2.5rem 0.625rem 1rem;
@@ -570,26 +357,16 @@
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 0.75rem center;
-            transition: all var(--transition-fast);
         }
-
-        .filter-select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .filter-select:hover {
-            border-color: var(--text-muted);
-        }
+        .filter-select:focus { outline: none; border-color: var(--primary); }
 
         /* ============================================================================
-           MAIN CONTENT - SPLIT VIEW
+           MAIN CONTENT
            ============================================================================ */
         .main-content {
             flex: 1;
             display: flex;
             overflow: hidden;
-            animation: fadeIn 0.5s ease 0.2s both;
         }
 
         /* Email List Panel */
@@ -600,7 +377,6 @@
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
 
         .email-list-header {
@@ -610,37 +386,18 @@
             justify-content: space-between;
             align-items: center;
         }
-
-        .email-list-title {
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-        }
+        .email-list-title { font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); }
 
         .email-list {
             flex: 1;
             overflow-y: auto;
             padding: 0.5rem;
         }
+        .email-list::-webkit-scrollbar { width: 6px; }
+        .email-list::-webkit-scrollbar-track { background: transparent; }
+        .email-list::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
 
-        .email-list::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .email-list::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .email-list::-webkit-scrollbar-thumb {
-            background: var(--bg-tertiary);
-            border-radius: 3px;
-        }
-
-        .email-list::-webkit-scrollbar-thumb:hover {
-            background: var(--text-muted);
-        }
-
-        /* Email List Item */
+        /* Email Item */
         .email-item {
             padding: 1rem;
             background: var(--bg-card);
@@ -654,79 +411,18 @@
             opacity: 0;
             animation: slideIn 0.3s ease forwards;
         }
+        .email-item:hover { border-color: var(--primary); background: var(--bg-tertiary); transform: translateX(4px); }
+        .email-item.active { border-color: var(--primary); background: var(--primary-bg); box-shadow: 0 0 0 1px var(--primary); }
 
-        .email-item:hover {
-            border-color: var(--primary);
-            background: var(--bg-tertiary);
-            transform: translateX(4px);
-        }
+        .email-checkbox { flex-shrink: 0; padding-top: 2px; }
+        .email-checkbox input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
 
-        .email-item.active {
-            border-color: var(--primary);
-            background: var(--primary-bg);
-            box-shadow: 0 0 0 1px var(--primary);
-        }
-
-        .email-item.selected {
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        .email-checkbox {
-            flex-shrink: 0;
-            padding-top: 2px;
-        }
-
-        .email-checkbox input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--primary);
-            cursor: pointer;
-        }
-
-        .email-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .email-sender {
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--text-primary);
-            margin-bottom: 0.25rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .email-subject {
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.25rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .email-preview {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 0.5rem;
-        }
-
-        .email-meta {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .email-date {
-            font-size: 0.6875rem;
-            color: var(--text-muted);
-        }
+        .email-content { flex: 1; min-width: 0; }
+        .email-sender { font-weight: 600; font-size: 0.875rem; color: var(--text-primary); margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .email-subject { font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .email-preview { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.5rem; }
+        .email-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .email-date { font-size: 0.6875rem; color: var(--text-muted); }
 
         /* ============================================================================
            BADGES
@@ -740,17 +436,9 @@
             font-size: 0.625rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-            transition: transform var(--transition-fast);
         }
-
-        .badge:hover {
-            transform: scale(1.05);
-        }
-
         .badge-provision { background: var(--success-bg); color: var(--success); }
         .badge-incident { background: var(--danger-bg); color: var(--danger); }
-        .badge-rueckfrage { background: var(--warning-bg); color: var(--warning); }
         .badge-cluster { background: var(--glass-bg); color: var(--text-secondary); border: 1px solid var(--border-color); }
 
         /* ============================================================================
@@ -774,51 +462,19 @@
             text-align: center;
             padding: 2rem;
         }
+        .email-detail-empty .icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.3; animation: bounce 2s ease-in-out infinite; }
 
-        .email-detail-empty .icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.3;
-            animation: bounce 2s ease-in-out infinite;
-        }
-
-        /* Email Header - Outlook Style */
         .email-header {
             padding: 1.5rem 2rem;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
-            animation: slideUp 0.3s ease;
         }
+        .email-header-subject { font-size: 1.375rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem; line-height: 1.3; }
+        .email-header-row { display: flex; margin-bottom: 0.5rem; font-size: 0.875rem; }
+        .email-header-label { width: 70px; color: var(--text-muted); flex-shrink: 0; }
+        .email-header-value { color: var(--text-secondary); }
+        .email-header-value strong { color: var(--text-primary); }
 
-        .email-header-subject {
-            font-size: 1.375rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 1rem;
-            line-height: 1.3;
-        }
-
-        .email-header-row {
-            display: flex;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .email-header-label {
-            width: 70px;
-            color: var(--text-muted);
-            flex-shrink: 0;
-        }
-
-        .email-header-value {
-            color: var(--text-secondary);
-        }
-
-        .email-header-value strong {
-            color: var(--text-primary);
-        }
-
-        /* Attachments */
         .attachments-bar {
             padding: 0.75rem 2rem;
             background: var(--bg-tertiary);
@@ -828,7 +484,6 @@
             gap: 0.5rem;
             flex-wrap: wrap;
         }
-
         .attachment-item {
             display: inline-flex;
             align-items: center;
@@ -839,21 +494,13 @@
             border-radius: var(--radius-sm);
             font-size: 0.75rem;
             color: var(--text-secondary);
-            transition: all var(--transition-fast);
         }
 
-        .attachment-item:hover {
-            border-color: var(--primary);
-            color: var(--text-primary);
-        }
-
-        /* Email Body */
         .email-body {
             flex: 1;
             padding: 2rem;
             overflow-y: auto;
         }
-
         .email-body-content {
             font-size: 0.9375rem;
             line-height: 1.7;
@@ -862,16 +509,14 @@
             word-wrap: break-word;
         }
 
-        /* Provision Data Card */
+        /* Provision Card */
         .provision-card {
             background: var(--bg-secondary);
             border: 1px solid var(--success);
             border-radius: var(--radius-lg);
             margin-bottom: 2rem;
             overflow: hidden;
-            animation: slideUp 0.4s ease;
         }
-
         .provision-card-header {
             padding: 1rem 1.25rem;
             background: linear-gradient(135deg, var(--success), #059669);
@@ -881,37 +526,11 @@
             align-items: center;
             gap: 0.5rem;
         }
-
-        .provision-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 0;
-        }
-
-        .provision-field {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border-color);
-            border-right: 1px solid var(--border-color);
-        }
-
-        .provision-field-label {
-            font-size: 0.6875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-            margin-bottom: 0.25rem;
-        }
-
-        .provision-field-value {
-            font-size: 0.9375rem;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .provision-message {
-            padding: 1.25rem;
-            background: var(--bg-tertiary);
-        }
+        .provision-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .provision-field { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
+        .provision-field-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 0.25rem; }
+        .provision-field-value { font-size: 0.9375rem; color: var(--text-primary); font-weight: 500; }
+        .provision-message { padding: 1.25rem; background: var(--bg-tertiary); }
 
         /* Edit Panel */
         .edit-panel {
@@ -919,27 +538,9 @@
             background: var(--bg-secondary);
             border-top: 1px solid var(--border-color);
         }
-
-        .edit-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-        }
-
-        .field-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.375rem;
-        }
-
-        .field-label {
-            font-size: 0.6875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-        }
-
+        .edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+        .field-group { display: flex; flex-direction: column; gap: 0.375rem; }
+        .field-label { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
         .field-input {
             padding: 0.625rem 0.875rem;
             background: var(--bg-tertiary);
@@ -947,22 +548,11 @@
             border-radius: var(--radius-sm);
             color: var(--text-primary);
             font-size: 0.875rem;
-            transition: all var(--transition-fast);
         }
-
-        .field-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px var(--primary-bg);
-        }
+        .field-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-bg); }
 
         /* Cluster Tags */
-        .cluster-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.375rem;
-        }
-
+        .cluster-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; }
         .cluster-tag {
             padding: 0.375rem 0.75rem;
             border-radius: 20px;
@@ -974,24 +564,13 @@
             background: var(--bg-tertiary);
             color: var(--text-secondary);
         }
-
-        .cluster-tag:hover {
-            border-color: var(--primary);
-            transform: scale(1.05);
-        }
-
-        .cluster-tag.active {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: white;
-        }
-
+        .cluster-tag:hover { border-color: var(--primary); transform: scale(1.05); }
+        .cluster-tag.active { background: var(--primary); border-color: var(--primary); color: white; }
         .cluster-tag[data-cluster="KV"].active { background: #10b981; border-color: #10b981; }
         .cluster-tag[data-cluster="KFZ"].active { background: #6366f1; border-color: #6366f1; }
         .cluster-tag[data-cluster="SHUK"].active { background: #8b5cf6; border-color: #8b5cf6; }
         .cluster-tag[data-cluster="LV"].active { background: #ef4444; border-color: #ef4444; }
         .cluster-tag[data-cluster="Provisionierung"].active { background: #f59e0b; border-color: #f59e0b; color: #000; }
-        .cluster-tag[data-cluster="Produktzuordnung"].active { background: #06b6d4; border-color: #06b6d4; }
 
         /* ============================================================================
            THREAD PANEL
@@ -1003,9 +582,7 @@
             border-left: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
-
         .thread-header {
             padding: 1rem;
             border-bottom: 1px solid var(--border-color);
@@ -1015,13 +592,7 @@
             align-items: center;
             gap: 0.5rem;
         }
-
-        .thread-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
+        .thread-list { flex: 1; overflow-y: auto; padding: 1rem; }
         .thread-item {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -1029,22 +600,10 @@
             margin-bottom: 0.75rem;
             overflow: hidden;
             transition: all var(--transition-fast);
-            animation: slideIn 0.3s ease;
         }
-
-        .thread-item:hover {
-            border-color: var(--primary);
-        }
-
-        .thread-item.original {
-            border-left: 3px solid var(--primary);
-        }
-
-        .thread-item.reply {
-            border-left: 3px solid var(--success);
-            margin-left: 1rem;
-        }
-
+        .thread-item:hover { border-color: var(--primary); }
+        .thread-item.original { border-left: 3px solid var(--primary); }
+        .thread-item.reply { border-left: 3px solid var(--success); margin-left: 1rem; }
         .thread-item-header {
             padding: 0.75rem;
             background: var(--bg-tertiary);
@@ -1053,45 +612,20 @@
             gap: 0.5rem;
             cursor: pointer;
         }
-
         .thread-item-icon {
-            width: 28px;
-            height: 28px;
+            width: 28px; height: 28px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 0.75rem;
         }
-
-        .thread-item.original .thread-item-icon {
-            background: var(--primary-bg);
-            color: var(--primary);
-        }
-
-        .thread-item.reply .thread-item-icon {
-            background: var(--success-bg);
-            color: var(--success);
-        }
-
-        .thread-item-info {
-            flex: 1;
-        }
-
-        .thread-item-type {
-            font-size: 0.6875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
+        .thread-item.original .thread-item-icon { background: var(--primary-bg); color: var(--primary); }
+        .thread-item.reply .thread-item-icon { background: var(--success-bg); color: var(--success); }
+        .thread-item-type { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; }
         .thread-item.original .thread-item-type { color: var(--primary); }
         .thread-item.reply .thread-item-type { color: var(--success); }
-
-        .thread-item-date {
-            font-size: 0.6875rem;
-            color: var(--text-muted);
-        }
-
+        .thread-item-date { font-size: 0.6875rem; color: var(--text-muted); }
         .thread-item-body {
             padding: 0.75rem;
             font-size: 0.75rem;
@@ -1101,68 +635,101 @@
             overflow: hidden;
             transition: max-height 0.3s ease;
         }
-
-        .thread-item.expanded .thread-item-body {
-            max-height: 200px;
-            overflow-y: auto;
-        }
+        .thread-item.expanded .thread-item-body { max-height: 200px; overflow-y: auto; }
 
         /* ============================================================================
-           UPLOAD ZONE
+           LOGIN SCREEN
            ============================================================================ */
-        .upload-zone {
-            padding: 3rem;
+        .login-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
             text-align: center;
-            animation: fadeIn 0.5s ease;
         }
 
-        .upload-dropzone {
-            border: 2px dashed var(--border-color);
+        .login-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: var(--radius-xl);
-            padding: 4rem 2rem;
-            background: var(--glass-bg);
-            transition: all var(--transition-normal);
-            cursor: pointer;
+            padding: 3rem;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.5s ease;
         }
 
-        .upload-dropzone:hover,
-        .upload-dropzone.dragover {
-            border-color: var(--primary);
-            background: var(--primary-bg);
-            transform: scale(1.02);
+        .login-icon {
+            width: 80px; height: 80px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, var(--microsoft), var(--microsoft-dark));
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        .login-icon svg { width: 48px; height: 48px; }
 
-        .upload-dropzone.dragover {
-            animation: pulse 0.5s ease infinite;
-        }
-
-        .upload-icon {
-            font-size: 4rem;
-            margin-bottom: 1.5rem;
-            animation: bounce 2s ease-in-out infinite;
-        }
-
-        .upload-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
+        .login-title {
+            font-size: 1.5rem;
+            font-weight: 700;
             margin-bottom: 0.5rem;
         }
-
-        .upload-subtitle {
-            color: var(--text-muted);
-            font-size: 0.875rem;
-            margin-bottom: 1.5rem;
+        .login-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
         }
 
-        .upload-hint {
+        .login-features {
+            text-align: left;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+        }
+        .login-feature {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        .login-feature:last-child { margin-bottom: 0; }
+        .login-feature-icon {
+            width: 24px; height: 24px;
+            background: var(--success-bg);
+            color: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+
+        .login-note {
             font-size: 0.75rem;
             color: var(--text-muted);
             margin-top: 1.5rem;
         }
 
-        #fileInput {
-            display: none;
+        /* ============================================================================
+           FOLDER SELECTION
+           ============================================================================ */
+        .folder-select-container {
+            padding: 1rem 2rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .folder-select-container label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
         }
 
         /* ============================================================================
@@ -1171,21 +738,14 @@
         .loading-overlay {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(15, 15, 26, 0.95);
             backdrop-filter: blur(10px);
             z-index: 9999;
             align-items: center;
             justify-content: center;
         }
-
-        .loading-overlay.active {
-            display: flex;
-        }
-
+        .loading-overlay.active { display: flex; }
         .loading-content {
             text-align: center;
             padding: 3rem;
@@ -1193,30 +753,12 @@
             border: 1px solid var(--border-color);
             border-radius: var(--radius-xl);
             box-shadow: var(--shadow-lg);
-            animation: slideUp 0.3s ease;
-            min-width: 300px;
+            min-width: 320px;
         }
-
-        .loading-spinner {
-            margin: 0 auto 1.5rem;
-        }
-
-        .loading-text {
-            color: var(--text-secondary);
-            font-size: 0.9375rem;
-            white-space: pre-line;
-            line-height: 1.6;
-        }
-
-        .loading-progress {
-            margin-top: 1.5rem;
-        }
-
-        .loading-progress-text {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 0.5rem;
-        }
+        .loading-spinner { margin: 0 auto 1.5rem; }
+        .loading-text { color: var(--text-secondary); font-size: 0.9375rem; white-space: pre-line; line-height: 1.6; }
+        .loading-progress { margin-top: 1.5rem; }
+        .loading-progress-text { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
 
         /* ============================================================================
            NOTIFICATIONS
@@ -1231,7 +773,6 @@
             gap: 0.5rem;
             max-width: 380px;
         }
-
         .notification {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
@@ -1243,58 +784,28 @@
             box-shadow: var(--shadow-lg);
             animation: slideIn 0.3s ease;
         }
-
         .notification.success { border-left: 4px solid var(--success); }
         .notification.error { border-left: 4px solid var(--danger); }
         .notification.warning { border-left: 4px solid var(--warning); }
         .notification.info { border-left: 4px solid var(--info); }
-
         .notification-icon {
-            width: 24px;
-            height: 24px;
+            width: 24px; height: 24px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 0.75rem;
             font-weight: 700;
-            flex-shrink: 0;
         }
-
         .notification.success .notification-icon { background: var(--success-bg); color: var(--success); }
         .notification.error .notification-icon { background: var(--danger-bg); color: var(--danger); }
         .notification.warning .notification-icon { background: var(--warning-bg); color: var(--warning); }
         .notification.info .notification-icon { background: var(--info-bg); color: var(--info); }
-
         .notification-content { flex: 1; }
-
-        .notification-title {
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--text-primary);
-            margin-bottom: 0.125rem;
-        }
-
-        .notification-message {
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-
-        .notification-close {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 0;
-            font-size: 1.25rem;
-            line-height: 1;
-            transition: color var(--transition-fast);
-        }
-
-        .notification-close:hover {
-            color: var(--text-primary);
-        }
+        .notification-title { font-weight: 600; font-size: 0.875rem; color: var(--text-primary); margin-bottom: 0.125rem; }
+        .notification-message { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.4; }
+        .notification-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem; }
+        .notification-close:hover { color: var(--text-primary); }
 
         /* ============================================================================
            MODAL
@@ -1302,10 +813,7 @@
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(15, 15, 26, 0.9);
             backdrop-filter: blur(10px);
             z-index: 1000;
@@ -1313,11 +821,7 @@
             justify-content: center;
             padding: 2rem;
         }
-
-        .modal.active {
-            display: flex;
-        }
-
+        .modal.active { display: flex; }
         .modal-content {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
@@ -1329,7 +833,6 @@
             box-shadow: var(--shadow-lg);
             animation: slideUp 0.3s ease;
         }
-
         .modal-header {
             padding: 1.25rem 1.5rem;
             border-bottom: 1px solid var(--border-color);
@@ -1337,17 +840,11 @@
             justify-content: space-between;
             align-items: center;
         }
-
-        .modal-title {
-            font-size: 1.125rem;
-            font-weight: 600;
-        }
-
+        .modal-title { font-size: 1.125rem; font-weight: 600; }
         .modal-close {
             background: transparent;
             border: none;
-            width: 36px;
-            height: 36px;
+            width: 36px; height: 36px;
             border-radius: var(--radius-sm);
             font-size: 1.25rem;
             cursor: pointer;
@@ -1355,19 +852,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all var(--transition-fast);
         }
-
-        .modal-close:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
-        .modal-body {
-            padding: 1.5rem;
-            overflow-y: auto;
-        }
-
+        .modal-close:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+        .modal-body { padding: 1.5rem; overflow-y: auto; }
         .modal-footer {
             padding: 1rem 1.5rem;
             border-top: 1px solid var(--border-color);
@@ -1378,62 +865,14 @@
         }
 
         /* ============================================================================
-           EMPTY STATE
-           ============================================================================ */
-        .empty-state {
-            text-align: center;
-            padding: 3rem 2rem;
-            animation: fadeIn 0.5s ease;
-        }
-
-        .empty-state .icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.3;
-        }
-
-        .empty-state h3 {
-            font-size: 1.125rem;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .empty-state p {
-            color: var(--text-muted);
-            font-size: 0.875rem;
-            margin-bottom: 1.5rem;
-        }
-
-        /* ============================================================================
            RESPONSIVE
            ============================================================================ */
         @media (max-width: 1200px) {
-            .thread-panel {
-                display: none;
-            }
+            .thread-panel { display: none; }
         }
-
         @media (max-width: 900px) {
-            .email-list-panel {
-                width: 100%;
-                min-width: auto;
-            }
-
-            .email-detail-panel {
-                display: none;
-            }
-
-            .stats-bar {
-                padding: 0.75rem 1rem;
-            }
-
-            .toolbar {
-                padding: 0.75rem 1rem;
-            }
-
-            .header {
-                padding: 0.75rem 1rem;
-            }
+            .email-list-panel { width: 100%; min-width: auto; }
+            .email-detail-panel { display: none; }
         }
     </style>
 </head>
@@ -1448,178 +887,189 @@
                     <div class="header-subtitle">BGAV Hypercare v3.0</div>
                 </div>
             </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary" onclick="showUploadModal()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="17 8 12 3 7 8"/>
-                        <line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                    JSON importieren
-                </button>
-                <button class="btn btn-success" onclick="exportToCSV()" id="exportBtn" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    CSV Export
-                </button>
+            <div class="header-actions" id="headerActions">
+                <!-- Will be populated by JS -->
             </div>
         </header>
 
-        <!-- STATS BAR -->
-        <div class="stats-bar">
-            <div class="stat-card">
-                <div class="stat-icon total">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                        <polyline points="22,6 12,13 2,6"/>
-                    </svg>
-                </div>
-                <div class="stat-info">
-                    <span class="stat-value" id="totalCount">0</span>
-                    <span class="stat-label">Geladen</span>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon selected">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                </div>
-                <div class="stat-info">
-                    <span class="stat-value" id="selectedCount">0</span>
-                    <span class="stat-label">Ausgewahlt</span>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon incident">!</div>
-                <div class="stat-info">
-                    <span class="stat-value" id="incidentCount">0</span>
-                    <span class="stat-label">Incidents</span>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon question">?</div>
-                <div class="stat-info">
-                    <span class="stat-value" id="rueckfrageCount">0</span>
-                    <span class="stat-label">Ruckfragen</span>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon provision">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="1" x2="12" y2="23"/>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                    </svg>
-                </div>
-                <div class="stat-info">
-                    <span class="stat-value" id="provisionCount">0</span>
-                    <span class="stat-label">Provision</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- TOOLBAR -->
-        <div class="toolbar">
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Suche in Betreff, Absender oder Text..." oninput="filterEmails()">
-                <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-            </div>
-            <div class="filter-group">
-                <select class="filter-select" id="filterKategorie" onchange="filterEmails()">
-                    <option value="">Alle Kategorien</option>
-                    <option value="Provisionsreklamation">Provisionsreklamation</option>
-                    <option value="Fachliche Ruckfrage">Fachliche Ruckfrage</option>
-                    <option value="Incident (Leicht)">Incident (Leicht)</option>
-                    <option value="Incident (Mittel)">Incident (Mittel)</option>
-                    <option value="Incident (Schwer)">Incident (Schwer)</option>
-                </select>
-                <select class="filter-select" id="filterCluster" onchange="filterEmails()">
-                    <option value="">Alle Cluster</option>
-                    <option value="KV">KV</option>
-                    <option value="KFZ">KFZ</option>
-                    <option value="SHUK">SHUK</option>
-                    <option value="LV">LV</option>
-                    <option value="Provisionierung">Provisionierung</option>
-                    <option value="Produktzuordnung">Produktzuordnung</option>
-                    <option value="Allgemein">Allgemein</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <button class="btn btn-secondary btn-sm" onclick="selectAll()">Alle</button>
-                <button class="btn btn-secondary btn-sm" onclick="deselectAll()">Keine</button>
-                <button class="btn btn-primary btn-sm" onclick="showBatchEditModal()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                    Bearbeiten
-                </button>
-            </div>
-        </div>
-
-        <!-- MAIN CONTENT -->
-        <div class="main-content">
-            <!-- EMAIL LIST PANEL -->
-            <div class="email-list-panel">
-                <div class="email-list-header">
-                    <span class="email-list-title" id="emailListTitle">Keine Emails</span>
-                    <div class="loading-dots" id="listLoadingDots" style="display: none;">
-                        <span></span><span></span><span></span>
-                    </div>
-                </div>
-                <div id="emailList" class="email-list">
-                    <div class="upload-zone" id="uploadZone">
-                        <div class="upload-dropzone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                            <div class="upload-icon">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--primary)">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                    <polyline points="17 8 12 3 7 8"/>
-                                    <line x1="12" y1="3" x2="12" y2="15"/>
-                                </svg>
-                            </div>
-                            <div class="upload-title">JSON-Datei hochladen</div>
-                            <div class="upload-subtitle">Ziehe eine Datei hierher oder klicke zum Auswahlen</div>
-                            <button class="btn btn-primary">Datei auswahlen</button>
-                            <div class="upload-hint">
-                                Exportiere Emails aus Outlook mit dem PowerShell-Script
-                            </div>
-                        </div>
-                        <input type="file" id="fileInput" accept=".json" onchange="handleFileUpload(event)">
-                    </div>
-                </div>
-            </div>
-
-            <!-- EMAIL DETAIL PANEL -->
-            <div class="email-detail-panel">
-                <div id="emailDetail" class="email-detail-empty">
-                    <div class="icon">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.3">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                            <polyline points="22,6 12,13 2,6"/>
+        <!-- MAIN APP CONTAINER -->
+        <div id="appContainer">
+            <!-- LOGIN SCREEN (shown initially) -->
+            <div class="login-screen" id="loginScreen">
+                <div class="login-card">
+                    <div class="login-icon">
+                        <svg viewBox="0 0 24 24" fill="white">
+                            <path d="M11.5 3v8.5H3V3h8.5zm0 18H3v-8.5h8.5V21zm1-18H21v8.5h-8.5V3zm8.5 18h-8.5v-8.5H21V21z"/>
                         </svg>
                     </div>
-                    <p>Wahle eine Email aus der Liste</p>
+                    <h2 class="login-title">Mit Microsoft anmelden</h2>
+                    <p class="login-subtitle">Greife direkt auf deine Outlook-Emails zu</p>
+
+                    <div class="login-features">
+                        <div class="login-feature">
+                            <div class="login-feature-icon">✓</div>
+                            <span>Direkter Zugriff auf dein Postfach</span>
+                        </div>
+                        <div class="login-feature">
+                            <div class="login-feature-icon">✓</div>
+                            <span>Automatische Kategorisierung</span>
+                        </div>
+                        <div class="login-feature">
+                            <div class="login-feature-icon">✓</div>
+                            <span>Provisionsreklamation Parser</span>
+                        </div>
+                        <div class="login-feature">
+                            <div class="login-feature-icon">✓</div>
+                            <span>CSV Export</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-microsoft btn-lg" onclick="signIn()" id="loginBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                            <path d="M11.5 3v8.5H3V3h8.5zm0 18H3v-8.5h8.5V21zm1-18H21v8.5h-8.5V3zm8.5 18h-8.5v-8.5H21V21z"/>
+                        </svg>
+                        Mit Microsoft anmelden
+                    </button>
+
+                    <p class="login-note">
+                        Deine Daten werden nur lokal im Browser verarbeitet und nicht gespeichert.
+                    </p>
                 </div>
             </div>
 
-            <!-- THREAD PANEL -->
-            <div class="thread-panel" id="threadPanel" style="display: none;">
-                <div class="thread-header">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="17 1 21 5 17 9"/>
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                        <polyline points="7 23 3 19 7 15"/>
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                    </svg>
-                    Email-Verlauf
+            <!-- MAIN APP (hidden initially) -->
+            <div id="mainApp" style="display: none; flex: 1; display: flex; flex-direction: column;">
+                <!-- FOLDER SELECTION -->
+                <div class="folder-select-container" id="folderSelectContainer">
+                    <label>Ordner:</label>
+                    <select class="filter-select" id="folderSelect" onchange="loadEmails()" style="min-width: 200px;">
+                        <option value="inbox">Posteingang</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="loadEmails()" id="refreshBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                        Aktualisieren
+                    </button>
+                    <span id="emailCount" style="font-size: 0.875rem; color: var(--text-muted); margin-left: auto;"></span>
                 </div>
-                <div id="threadList" class="thread-list"></div>
+
+                <!-- STATS BAR -->
+                <div class="stats-bar" id="statsBar">
+                    <div class="stat-card">
+                        <div class="stat-icon total">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                <polyline points="22,6 12,13 2,6"/>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalCount">0</span>
+                            <span class="stat-label">Geladen</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon selected">✓</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="selectedCount">0</span>
+                            <span class="stat-label">Ausgewahlt</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon incident">!</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="incidentCount">0</span>
+                            <span class="stat-label">Incidents</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon question">?</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="rueckfrageCount">0</span>
+                            <span class="stat-label">Ruckfragen</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon provision">€</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="provisionCount">0</span>
+                            <span class="stat-label">Provision</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TOOLBAR -->
+                <div class="toolbar">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Suche in Betreff, Absender oder Text..." oninput="filterEmails()">
+                        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </div>
+                    <div class="filter-group">
+                        <select class="filter-select" id="filterKategorie" onchange="filterEmails()">
+                            <option value="">Alle Kategorien</option>
+                            <option value="Provisionsreklamation">Provisionsreklamation</option>
+                            <option value="Fachliche Ruckfrage">Fachliche Ruckfrage</option>
+                            <option value="Incident (Leicht)">Incident (Leicht)</option>
+                            <option value="Incident (Mittel)">Incident (Mittel)</option>
+                            <option value="Incident (Schwer)">Incident (Schwer)</option>
+                        </select>
+                        <select class="filter-select" id="filterCluster" onchange="filterEmails()">
+                            <option value="">Alle Cluster</option>
+                            <option value="KV">KV</option>
+                            <option value="KFZ">KFZ</option>
+                            <option value="SHUK">SHUK</option>
+                            <option value="LV">LV</option>
+                            <option value="Provisionierung">Provisionierung</option>
+                            <option value="Produktzuordnung">Produktzuordnung</option>
+                            <option value="Allgemein">Allgemein</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <button class="btn btn-secondary btn-sm" onclick="selectAll()">Alle</button>
+                        <button class="btn btn-secondary btn-sm" onclick="deselectAll()">Keine</button>
+                        <button class="btn btn-primary btn-sm" onclick="showBatchEditModal()">Bearbeiten</button>
+                        <button class="btn btn-success btn-sm" onclick="exportToCSV()" id="exportBtn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Export
+                        </button>
+                    </div>
+                </div>
+
+                <!-- MAIN CONTENT -->
+                <div class="main-content">
+                    <div class="email-list-panel">
+                        <div class="email-list-header">
+                            <span class="email-list-title" id="emailListTitle">Emails laden...</span>
+                        </div>
+                        <div id="emailList" class="email-list"></div>
+                    </div>
+
+                    <div class="email-detail-panel">
+                        <div id="emailDetail" class="email-detail-empty">
+                            <div class="icon">📧</div>
+                            <p>Wahle eine Email aus der Liste</p>
+                        </div>
+                    </div>
+
+                    <div class="thread-panel" id="threadPanel" style="display: none;">
+                        <div class="thread-header">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="17 1 21 5 17 9"/>
+                                <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                            </svg>
+                            Email-Verlauf
+                        </div>
+                        <div id="threadList" class="thread-list"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1627,11 +1077,11 @@
     <!-- LOADING OVERLAY -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-content">
-            <div class="spinner loading-spinner"></div>
-            <div class="loading-text" id="loadingText">Wird geladen...</div>
+            <div class="spinner loading-spinner spinner-microsoft"></div>
+            <div class="loading-text" id="loadingText">Verbinde mit Microsoft...</div>
             <div class="loading-progress">
                 <div class="progress-bar">
-                    <div class="progress-bar-fill" id="loadingProgressBar" style="width: 0%"></div>
+                    <div class="progress-bar-fill microsoft" id="loadingProgressBar" style="width: 0%"></div>
                 </div>
                 <div class="loading-progress-text" id="loadingProgressText"></div>
             </div>
@@ -1652,7 +1102,6 @@
                 <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
                     Anderungen werden auf <strong><span id="batchCount">0</span> ausgewahlte Emails</strong> angewendet.
                 </p>
-
                 <div class="field-group" style="margin-bottom: 1rem;">
                     <label class="field-label">
                         <input type="checkbox" id="batchKategorieCheck" style="margin-right: 0.5rem;"> Kategorie andern
@@ -1665,7 +1114,6 @@
                         <option value="Incident (Schwer)">Incident (Schwer)</option>
                     </select>
                 </div>
-
                 <div class="field-group" style="margin-bottom: 1rem;">
                     <label class="field-label">
                         <input type="checkbox" id="batchClusterCheck" style="margin-right: 0.5rem;"> Cluster andern
@@ -1676,11 +1124,9 @@
                         <span class="cluster-tag" data-cluster="SHUK" onclick="toggleBatchCluster(this)">SHUK</span>
                         <span class="cluster-tag" data-cluster="LV" onclick="toggleBatchCluster(this)">LV</span>
                         <span class="cluster-tag" data-cluster="Provisionierung" onclick="toggleBatchCluster(this)">Provision</span>
-                        <span class="cluster-tag" data-cluster="Produktzuordnung" onclick="toggleBatchCluster(this)">Produkt</span>
                         <span class="cluster-tag" data-cluster="Allgemein" onclick="toggleBatchCluster(this)">Allgemein</span>
                     </div>
                 </div>
-
                 <div class="field-group">
                     <label class="field-label">
                         <input type="checkbox" id="batchStatusCheck" style="margin-right: 0.5rem;"> Status andern
@@ -1702,6 +1148,27 @@
 
     <script>
         // ============================================================================
+        // MICROSOFT GRAPH CONFIGURATION
+        // ============================================================================
+        const msalConfig = {
+            auth: {
+                clientId: "your-client-id-here", // Will be configured
+                authority: "https://login.microsoftonline.com/common",
+                redirectUri: window.location.origin + window.location.pathname
+            },
+            cache: {
+                cacheLocation: "sessionStorage",
+                storeAuthStateInCookie: false
+            }
+        };
+
+        const graphScopes = ["User.Read", "Mail.Read"];
+
+        let msalInstance = null;
+        let currentUser = null;
+        let accessToken = null;
+
+        // ============================================================================
         // GLOBAL STATE
         // ============================================================================
         let emails = [];
@@ -1713,167 +1180,366 @@
         // ============================================================================
         // INITIALIZATION
         // ============================================================================
-        document.addEventListener('DOMContentLoaded', () => {
-            setupDragAndDrop();
+        document.addEventListener('DOMContentLoaded', async () => {
             setupBatchEditCheckboxes();
+
+            // Check for existing Client ID in URL or localStorage
+            const urlParams = new URLSearchParams(window.location.search);
+            const clientIdFromUrl = urlParams.get('clientId');
+            const storedClientId = localStorage.getItem('msGraphClientId');
+
+            if (clientIdFromUrl) {
+                msalConfig.auth.clientId = clientIdFromUrl;
+                localStorage.setItem('msGraphClientId', clientIdFromUrl);
+            } else if (storedClientId) {
+                msalConfig.auth.clientId = storedClientId;
+            }
+
+            // Try to initialize MSAL
+            try {
+                if (msalConfig.auth.clientId && msalConfig.auth.clientId !== 'your-client-id-here') {
+                    msalInstance = new msal.PublicClientApplication(msalConfig);
+                    await msalInstance.initialize();
+
+                    // Handle redirect response
+                    const response = await msalInstance.handleRedirectPromise();
+                    if (response) {
+                        await handleAuthResponse(response);
+                    } else {
+                        // Check for existing session
+                        const accounts = msalInstance.getAllAccounts();
+                        if (accounts.length > 0) {
+                            await silentLogin(accounts[0]);
+                        }
+                    }
+                } else {
+                    // Show configuration hint
+                    showConfigurationHint();
+                }
+            } catch (error) {
+                console.error("MSAL init error:", error);
+                showConfigurationHint();
+            }
         });
 
-        // ============================================================================
-        // DRAG & DROP
-        // ============================================================================
-        function setupDragAndDrop() {
-            const dropZone = document.getElementById('dropZone');
+        function showConfigurationHint() {
+            const loginCard = document.querySelector('.login-card');
+            loginCard.innerHTML = `
+                <div class="login-icon">
+                    <svg viewBox="0 0 24 24" fill="white">
+                        <path d="M11.5 3v8.5H3V3h8.5zm0 18H3v-8.5h8.5V21zm1-18H21v8.5h-8.5V3zm8.5 18h-8.5v-8.5H21V21z"/>
+                    </svg>
+                </div>
+                <h2 class="login-title">Konfiguration erforderlich</h2>
+                <p class="login-subtitle">Bitte gib deine Azure AD Client ID ein</p>
 
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
-                document.body.addEventListener(eventName, preventDefaults, false);
-            });
+                <div style="margin: 1.5rem 0;">
+                    <input type="text" id="clientIdInput" class="field-input" style="width: 100%; margin-bottom: 1rem;"
+                           placeholder="Azure AD Client ID eingeben...">
+                    <button class="btn btn-microsoft" style="width: 100%;" onclick="saveClientId()">
+                        Speichern & Anmelden
+                    </button>
+                </div>
 
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
-            });
-
-            dropZone.addEventListener('drop', handleDrop, false);
+                <div class="login-features" style="text-align: left;">
+                    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                        <strong>So erstellst du eine Azure AD App:</strong>
+                    </p>
+                    <ol style="font-size: 0.8125rem; color: var(--text-muted); padding-left: 1.25rem; line-height: 1.8;">
+                        <li>Gehe zu <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" style="color: var(--primary);">Azure Portal > App Registrations</a></li>
+                        <li>Klicke "New registration"</li>
+                        <li>Name: "BGAV Hypercare"</li>
+                        <li>Redirect URI: <code style="background: var(--bg-primary); padding: 0.125rem 0.375rem; border-radius: 4px;">${window.location.origin}${window.location.pathname}</code></li>
+                        <li>Kopiere die "Application (client) ID"</li>
+                        <li>Unter "API permissions" > "Add permission" > "Microsoft Graph" > "Delegated" > <code>Mail.Read</code> und <code>User.Read</code></li>
+                    </ol>
+                </div>
+            `;
         }
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function handleDrop(e) {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                loadJSONFile(files[0]);
-            }
-        }
-
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-                loadJSONFile(file);
-            }
-        }
-
-        // ============================================================================
-        // FILE LOADING WITH PROGRESS
-        // ============================================================================
-        function loadJSONFile(file) {
-            if (!file.name.endsWith('.json')) {
-                showNotification('Bitte eine JSON-Datei auswahlen!', 'error', 'Falsches Format');
+        function saveClientId() {
+            const clientId = document.getElementById('clientIdInput').value.trim();
+            if (!clientId) {
+                showNotification('Bitte eine Client ID eingeben!', 'warning', 'Fehler');
                 return;
             }
 
-            showLoading(true, 'Lade JSON-Datei...');
-            updateProgress(10, 'Datei wird gelesen...');
-
-            const reader = new FileReader();
-
-            reader.onprogress = (e) => {
-                if (e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 30) + 10;
-                    updateProgress(percent, `Datei wird gelesen... ${Math.round(e.loaded / 1024)}KB`);
-                }
-            };
-
-            reader.onload = async (e) => {
-                try {
-                    updateProgress(40, 'JSON wird geparst...');
-                    await sleep(100); // Small delay for UI update
-
-                    const data = JSON.parse(e.target.result);
-
-                    if (!Array.isArray(data)) {
-                        throw new Error('JSON muss ein Array von Emails sein');
-                    }
-
-                    updateProgress(50, `${data.length} Emails gefunden...`);
-                    await sleep(100);
-
-                    // Process emails with progress
-                    await processEmailsWithProgress(data);
-
-                } catch (error) {
-                    showLoading(false);
-                    showNotification('Fehler beim Parsen: ' + error.message, 'error', 'JSON Fehler');
-                }
-            };
-
-            reader.onerror = () => {
-                showLoading(false);
-                showNotification('Fehler beim Lesen der Datei', 'error', 'Lesefehler');
-            };
-
-            reader.readAsText(file);
+            localStorage.setItem('msGraphClientId', clientId);
+            window.location.href = window.location.origin + window.location.pathname + '?clientId=' + clientId;
         }
 
-        async function processEmailsWithProgress(data) {
+        // ============================================================================
+        // AUTHENTICATION
+        // ============================================================================
+        async function signIn() {
+            if (!msalInstance) {
+                showNotification('MSAL nicht initialisiert. Bitte Client ID konfigurieren.', 'error', 'Fehler');
+                return;
+            }
+
+            showLoading(true, 'Verbinde mit Microsoft...');
+            updateProgress(20, 'Authentifizierung...');
+
+            try {
+                const loginResponse = await msalInstance.loginPopup({
+                    scopes: graphScopes,
+                    prompt: "select_account"
+                });
+
+                await handleAuthResponse(loginResponse);
+            } catch (error) {
+                showLoading(false);
+                console.error("Login error:", error);
+                showNotification('Login fehlgeschlagen: ' + error.message, 'error', 'Fehler');
+            }
+        }
+
+        async function silentLogin(account) {
+            showLoading(true, 'Sitzung wird wiederhergestellt...');
+            updateProgress(30, 'Token abrufen...');
+
+            try {
+                const tokenResponse = await msalInstance.acquireTokenSilent({
+                    scopes: graphScopes,
+                    account: account
+                });
+
+                await handleAuthResponse(tokenResponse);
+            } catch (error) {
+                showLoading(false);
+                console.log("Silent login failed, user needs to sign in again");
+            }
+        }
+
+        async function handleAuthResponse(response) {
+            if (response && response.account) {
+                currentUser = response.account;
+                accessToken = response.accessToken;
+
+                updateProgress(50, 'Benutzer geladen...');
+                await sleep(200);
+
+                // Update UI
+                updateHeaderWithUser();
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'flex';
+
+                // Load mail folders and emails
+                updateProgress(70, 'Ordner laden...');
+                await loadMailFolders();
+
+                updateProgress(90, 'Emails laden...');
+                await loadEmails();
+
+                updateProgress(100, 'Fertig!');
+                await sleep(200);
+                showLoading(false);
+
+                showNotification(`Willkommen, ${currentUser.name || currentUser.username}!`, 'success', 'Angemeldet');
+            }
+        }
+
+        function signOut() {
+            if (msalInstance) {
+                msalInstance.logoutPopup({
+                    account: currentUser,
+                    postLogoutRedirectUri: window.location.origin + window.location.pathname
+                });
+            }
+            currentUser = null;
+            accessToken = null;
             emails = [];
-            const total = data.length;
+            filteredEmails = [];
+
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            updateHeaderWithUser();
+        }
+
+        function updateHeaderWithUser() {
+            const headerActions = document.getElementById('headerActions');
+
+            if (currentUser) {
+                const initials = (currentUser.name || currentUser.username || 'U').split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+
+                headerActions.innerHTML = `
+                    <div class="user-info">
+                        <div class="user-avatar">${initials}</div>
+                        <div>
+                            <div class="user-name">${currentUser.name || currentUser.username}</div>
+                            <div class="user-email">${currentUser.username}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="signOut()">Abmelden</button>
+                `;
+            } else {
+                headerActions.innerHTML = '';
+            }
+        }
+
+        // ============================================================================
+        // MICROSOFT GRAPH API
+        // ============================================================================
+        async function graphFetch(endpoint, options = {}) {
+            if (!accessToken) {
+                throw new Error('Nicht angemeldet');
+            }
+
+            // Try to refresh token if needed
+            try {
+                const tokenResponse = await msalInstance.acquireTokenSilent({
+                    scopes: graphScopes,
+                    account: currentUser
+                });
+                accessToken = tokenResponse.accessToken;
+            } catch (e) {
+                // Token refresh failed, need to re-login
+                signOut();
+                throw new Error('Sitzung abgelaufen, bitte erneut anmelden');
+            }
+
+            const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+                ...options,
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error?.message || `HTTP ${response.status}`);
+            }
+
+            return response.json();
+        }
+
+        async function loadMailFolders() {
+            try {
+                const data = await graphFetch('/me/mailFolders?$top=50');
+                const folderSelect = document.getElementById('folderSelect');
+                folderSelect.innerHTML = '';
+
+                for (const folder of data.value) {
+                    const option = document.createElement('option');
+                    option.value = folder.id;
+                    option.textContent = `${folder.displayName} (${folder.totalItemCount})`;
+                    if (folder.displayName === 'Inbox' || folder.displayName === 'Posteingang') {
+                        option.selected = true;
+                    }
+                    folderSelect.appendChild(option);
+                }
+            } catch (error) {
+                console.error("Error loading folders:", error);
+                showNotification('Fehler beim Laden der Ordner: ' + error.message, 'error', 'Fehler');
+            }
+        }
+
+        async function loadEmails() {
+            const folderId = document.getElementById('folderSelect').value;
+            if (!folderId) return;
+
+            showLoading(true, 'Lade Emails...');
+            updateProgress(10, 'Verbinde mit Server...');
+
+            try {
+                // Load last 7 days of emails
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                const filterDate = sevenDaysAgo.toISOString();
+
+                updateProgress(30, 'Emails abrufen...');
+
+                const data = await graphFetch(
+                    `/me/mailFolders/${folderId}/messages?` +
+                    `$filter=receivedDateTime ge ${filterDate}&` +
+                    `$orderby=receivedDateTime desc&` +
+                    `$top=100&` +
+                    `$select=id,subject,bodyPreview,body,from,receivedDateTime,hasAttachments,attachments`
+                );
+
+                updateProgress(60, `${data.value.length} Emails gefunden...`);
+                await sleep(100);
+
+                // Process emails
+                await processEmailsWithProgress(data.value);
+
+            } catch (error) {
+                showLoading(false);
+                console.error("Error loading emails:", error);
+                showNotification('Fehler beim Laden der Emails: ' + error.message, 'error', 'Fehler');
+            }
+        }
+
+        async function processEmailsWithProgress(graphEmails) {
+            emails = [];
+            const total = graphEmails.length;
 
             for (let i = 0; i < total; i++) {
-                const emailData = data[i];
-                const isProvision = isProvisionsreklamation(emailData);
-                const parsedProvision = isProvision ? parseProvisionsreklamation(emailData.text || emailData.body || '') : null;
+                const graphEmail = graphEmails[i];
+                const subject = graphEmail.subject || '(Kein Betreff)';
+                const body = graphEmail.body?.content || graphEmail.bodyPreview || '';
+                const plainBody = stripHtml(body);
+                const senderEmail = graphEmail.from?.emailAddress?.address || 'unknown@unknown.com';
+                const senderName = graphEmail.from?.emailAddress?.name || 'Unbekannt';
+
+                const isProvision = isProvisionsreklamation({ betreff: subject, text: plainBody, von_email: senderEmail });
+                const parsedProvision = isProvision ? parseProvisionsreklamation(plainBody) : null;
 
                 emails.push({
                     id: nextId++,
+                    graphId: graphEmail.id,
                     selected: true,
-                    datum: emailData.datum || emailData.date || new Date().toISOString(),
-                    von_email: emailData.von_email || emailData.from_email || emailData.from || 'unknown@unknown.com',
-                    von_name: emailData.von_name || emailData.from_name || emailData.sender || 'Unbekannt',
-                    betreff: emailData.betreff || emailData.subject || '(Kein Betreff)',
-                    text: emailData.text || emailData.body || '',
-                    anhaenge: emailData.anhänge || emailData.attachments || [],
-                    antworten: emailData.antworten || emailData.replies || [],
+                    datum: graphEmail.receivedDateTime,
+                    von_email: senderEmail,
+                    von_name: senderName,
+                    betreff: subject,
+                    text: plainBody,
+                    hasAttachments: graphEmail.hasAttachments,
+                    antworten: [],
 
-                    kategorie: categorizeEmail(emailData.betreff || emailData.subject || '', emailData.text || emailData.body || '', emailData.von_email || ''),
-                    agentur: extractAgentur(emailData.von_name || '', emailData.betreff || ''),
-                    clusters: identifyClusters(emailData.betreff || emailData.subject || '', emailData.text || emailData.body || ''),
+                    kategorie: categorizeEmail(subject, plainBody, senderEmail),
+                    agentur: extractAgentur(senderName, subject),
+                    clusters: identifyClusters(subject, plainBody),
                     status: 'Neu',
 
                     isProvision: isProvision,
                     provisionData: parsedProvision
                 });
 
-                // Update progress every 10 emails
                 if (i % 10 === 0 || i === total - 1) {
-                    const percent = 50 + Math.round((i / total) * 45);
-                    updateProgress(percent, `Verarbeite Email ${i + 1} von ${total}...`);
-                    await sleep(10); // Allow UI to update
+                    const percent = 60 + Math.round((i / total) * 35);
+                    updateProgress(percent, `Verarbeite ${i + 1} von ${total}...`);
+                    await sleep(5);
                 }
             }
-
-            updateProgress(98, 'Rendering...');
-            await sleep(50);
 
             filteredEmails = [...emails];
             renderEmailList();
             updateStats();
-            document.getElementById('exportBtn').disabled = false;
-            document.getElementById('uploadZone').style.display = 'none';
 
             updateProgress(100, 'Fertig!');
             await sleep(200);
-
             showLoading(false);
-            showNotification(`${emails.length} Emails erfolgreich geladen!`, 'success', 'Import abgeschlossen');
+
+            document.getElementById('emailCount').textContent = `${emails.length} Emails geladen`;
+            showNotification(`${emails.length} Emails geladen`, 'success', 'Erfolgreich');
         }
 
-        function sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
+        function stripHtml(html) {
+            if (!html) return '';
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
         }
 
         // ============================================================================
         // PROVISIONSREKLAMATION PARSER
         // ============================================================================
         function isProvisionsreklamation(email) {
-            const subject = (email.betreff || email.subject || '').toLowerCase();
-            const body = (email.text || email.body || '').toLowerCase();
+            const subject = (email.betreff || '').toLowerCase();
+            const body = (email.text || '').toLowerCase();
 
             if (subject.includes('provisionsreklamation')) return true;
             if (body.includes('reklamation_provision') ||
@@ -2005,7 +1671,7 @@
         }
 
         // ============================================================================
-        // RENDER EMAIL LIST
+        // RENDER FUNCTIONS
         // ============================================================================
         function renderEmailList() {
             const container = document.getElementById('emailList');
@@ -2015,22 +1681,22 @@
 
             if (filteredEmails.length === 0 && emails.length > 0) {
                 container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <circle cx="11" cy="11" r="8"/>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                            </svg>
-                        </div>
-                        <h3>Keine Emails gefunden</h3>
-                        <p>Versuche die Filtereinstellungen zu andern.</p>
+                    <div class="email-detail-empty" style="padding: 2rem;">
+                        <div class="icon">🔍</div>
+                        <p>Keine Emails gefunden</p>
                     </div>
                 `;
                 return;
             }
 
             if (filteredEmails.length === 0) {
-                return; // Upload zone is already shown
+                container.innerHTML = `
+                    <div class="email-detail-empty" style="padding: 2rem;">
+                        <div class="icon">📭</div>
+                        <p>Keine Emails geladen</p>
+                    </div>
+                `;
+                return;
             }
 
             let html = '';
@@ -2039,7 +1705,6 @@
             });
             container.innerHTML = html;
 
-            // Select first email if none selected
             if (!selectedEmailId && filteredEmails.length > 0) {
                 selectEmail(filteredEmails[0].id);
             }
@@ -2051,13 +1716,12 @@
             const preview = (email.text || '').substring(0, 80).replace(/\n/g, ' ');
 
             const activeClass = email.id === selectedEmailId ? ' active' : '';
-            const selectedClass = email.selected ? ' selected' : '';
 
             let badges = '';
             if (email.isProvision) {
-                badges += '<span class="badge badge-provision">Provision</span>';
+                badges += '<span class="badge badge-provision">€ Prov</span>';
             } else if (email.kategorie.startsWith('Incident')) {
-                badges += `<span class="badge badge-incident">${email.kategorie.replace('Incident ', '').replace('(', '').replace(')', '')}</span>`;
+                badges += `<span class="badge badge-incident">${email.kategorie.replace('Incident ', '').replace(/[()]/g, '')}</span>`;
             }
 
             const clusterBadges = email.clusters.slice(0, 2).map(c =>
@@ -2065,7 +1729,7 @@
             ).join('');
 
             return `
-                <div class="email-item${activeClass}${selectedClass} stagger-${(index % 5) + 1}" onclick="selectEmail(${email.id})">
+                <div class="email-item${activeClass} stagger-${(index % 5) + 1}" onclick="selectEmail(${email.id})">
                     <div class="email-checkbox">
                         <input type="checkbox" ${email.selected ? 'checked' : ''} onclick="event.stopPropagation(); toggleEmail(${email.id})">
                     </div>
@@ -2077,16 +1741,12 @@
                             <span class="email-date">${dateStr}</span>
                             ${badges}
                             ${clusterBadges}
-                            ${email.clusters.length > 2 ? `<span class="badge badge-cluster">+${email.clusters.length - 2}</span>` : ''}
                         </div>
                     </div>
                 </div>
             `;
         }
 
-        // ============================================================================
-        // RENDER EMAIL DETAIL
-        // ============================================================================
         function selectEmail(id) {
             selectedEmailId = id;
             const email = findEmailById(id);
@@ -2094,12 +1754,7 @@
             if (!email) {
                 document.getElementById('emailDetail').innerHTML = `
                     <div class="email-detail-empty">
-                        <div class="icon">
-                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.3">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                                <polyline points="22,6 12,13 2,6"/>
-                            </svg>
-                        </div>
+                        <div class="icon">📧</div>
                         <p>Wahle eine Email aus der Liste</p>
                     </div>
                 `;
@@ -2130,18 +1785,10 @@
                 </div>
             `;
 
-            if (email.anhaenge && email.anhaenge.length > 0) {
+            if (email.hasAttachments) {
                 html += `
                     <div class="attachments-bar">
-                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Anhange:</span>
-                        ${email.anhaenge.map(a => `
-                            <span class="attachment-item">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                                </svg>
-                                ${escapeHtml(a)}
-                            </span>
-                        `).join('')}
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">📎 Anhange vorhanden</span>
                     </div>
                 `;
             }
@@ -2196,11 +1843,7 @@
             return `
                 <div class="provision-card">
                     <div class="provision-card-header">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="1" x2="12" y2="23"/>
-                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                        </svg>
-                        Provisionsreklamation - Extrahierte Daten
+                        € Provisionsreklamation - Extrahierte Daten
                     </div>
                     <div class="provision-grid">
                         <div class="provision-field">
@@ -2219,21 +1862,10 @@
                             <div class="provision-field-label">Versicherungsnr.</div>
                             <div class="provision-field-value" style="font-family: monospace;">${escapeHtml(data.versicherungsnummer_kunde || '-')}</div>
                         </div>
-                        <div class="provision-field">
-                            <div class="provision-field-label">Reklamationstyp</div>
-                            <div class="provision-field-value">
-                                ${data.reklamation_provision ? '<span class="badge badge-provision">Provision</span>' : ''}
-                                ${data.reklamation_absatz ? '<span class="badge badge-provision">Absatz</span>' : ''}
-                            </div>
-                        </div>
-                        <div class="provision-field">
-                            <div class="provision-field-label">Datenschutz</div>
-                            <div class="provision-field-value">${data.datenschutz ? 'Bestatigt' : 'Nicht bestatigt'}</div>
-                        </div>
                     </div>
                     ${data.nachricht ? `
                         <div class="provision-message">
-                            <div class="provision-field-label">Nachricht des Vermittlers</div>
+                            <div class="provision-field-label">Nachricht</div>
                             <div style="margin-top: 0.5rem; color: var(--text-secondary);">${escapeHtml(data.nachricht)}</div>
                         </div>
                     ` : ''}
@@ -2241,19 +1873,15 @@
             `;
         }
 
-        // ============================================================================
-        // THREAD PANEL
-        // ============================================================================
         function renderThreadPanel(email) {
             const panel = document.getElementById('threadPanel');
             const list = document.getElementById('threadList');
-
             panel.style.display = 'flex';
 
             const date = new Date(email.datum);
             const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-            let html = `
+            list.innerHTML = `
                 <div class="thread-item original expanded" onclick="toggleThreadItem(this)">
                     <div class="thread-item-header">
                         <div class="thread-item-icon">→</div>
@@ -2264,39 +1892,10 @@
                     </div>
                     <div class="thread-item-body">${escapeHtml((email.text || '').substring(0, 500))}</div>
                 </div>
+                <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.75rem;">
+                    Keine weiteren Nachrichten im Thread
+                </div>
             `;
-
-            if (email.antworten && email.antworten.length > 0) {
-                email.antworten.forEach((reply, i) => {
-                    const replyDate = new Date(reply.datum || email.datum);
-                    const replyDateStr = replyDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-
-                    html += `
-                        <div class="thread-item reply" onclick="toggleThreadItem(this)">
-                            <div class="thread-item-header">
-                                <div class="thread-item-icon">←</div>
-                                <div class="thread-item-info">
-                                    <div class="thread-item-type">Antwort ${i + 1}</div>
-                                    <div class="thread-item-date">${replyDateStr}</div>
-                                </div>
-                            </div>
-                            <div class="thread-item-body">${escapeHtml((reply.text || '').substring(0, 500))}</div>
-                        </div>
-                    `;
-                });
-            } else {
-                html += `
-                    <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 0.5rem; opacity: 0.3;">
-                            <polyline points="17 1 21 5 17 9"/>
-                            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                        </svg>
-                        <div style="font-size: 0.75rem;">Keine Antworten gefunden</div>
-                    </div>
-                `;
-            }
-
-            list.innerHTML = html;
         }
 
         function toggleThreadItem(element) {
@@ -2315,6 +1914,10 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
 
         // ============================================================================
@@ -2338,9 +1941,7 @@
                 email.clusters.push(cluster);
             } else {
                 email.clusters.splice(idx, 1);
-                if (email.clusters.length === 0) {
-                    email.clusters.push('Allgemein');
-                }
+                if (email.clusters.length === 0) email.clusters.push('Allgemein');
             }
 
             renderEmailDetail(email);
@@ -2408,22 +2009,11 @@
                 }
             });
 
-            animateStatValue('totalCount', emails.length);
-            animateStatValue('selectedCount', selected);
-            animateStatValue('incidentCount', incidents);
-            animateStatValue('rueckfrageCount', rueckfragen);
-            animateStatValue('provisionCount', provisions);
-        }
-
-        function animateStatValue(elementId, newValue) {
-            const element = document.getElementById(elementId);
-            const currentValue = parseInt(element.textContent) || 0;
-
-            if (currentValue !== newValue) {
-                element.classList.add('updating');
-                element.textContent = newValue;
-                setTimeout(() => element.classList.remove('updating'), 300);
-            }
+            document.getElementById('totalCount').textContent = emails.length;
+            document.getElementById('selectedCount').textContent = selected;
+            document.getElementById('incidentCount').textContent = incidents;
+            document.getElementById('rueckfrageCount').textContent = rueckfragen;
+            document.getElementById('provisionCount').textContent = provisions;
         }
 
         // ============================================================================
@@ -2433,13 +2023,11 @@
             document.getElementById('batchKategorieCheck').onchange = function() {
                 document.getElementById('batchKategorie').disabled = !this.checked;
             };
-
             document.getElementById('batchClusterCheck').onchange = function() {
                 const tags = document.getElementById('batchClusterTags');
                 tags.style.opacity = this.checked ? '1' : '0.5';
                 tags.style.pointerEvents = this.checked ? 'auto' : 'none';
             };
-
             document.getElementById('batchStatusCheck').onchange = function() {
                 document.getElementById('batchStatus').disabled = !this.checked;
             };
@@ -2452,10 +2040,9 @@
         function showBatchEditModal() {
             const selectedEmails = emails.filter(e => e.selected);
             if (selectedEmails.length === 0) {
-                showNotification('Bitte wahle mindestens eine Email aus!', 'warning', 'Keine Auswahl');
+                showNotification('Bitte mindestens eine Email auswahlen!', 'warning', 'Keine Auswahl');
                 return;
             }
-
             document.getElementById('batchCount').textContent = selectedEmails.length;
             document.querySelectorAll('#batchClusterTags .cluster-tag').forEach(t => t.classList.remove('active'));
             openModal('batchEditModal');
@@ -2489,7 +2076,7 @@
         }
 
         // ============================================================================
-        // MODALS
+        // MODALS & UI
         // ============================================================================
         function openModal(id) {
             document.getElementById(id).classList.add('active');
@@ -2499,13 +2086,6 @@
             document.getElementById(id).classList.remove('active');
         }
 
-        function showUploadModal() {
-            document.getElementById('fileInput').click();
-        }
-
-        // ============================================================================
-        // LOADING & NOTIFICATIONS
-        // ============================================================================
         function showLoading(show, text) {
             const overlay = document.getElementById('loadingOverlay');
             if (show) {
@@ -2524,10 +2104,9 @@
         function showNotification(message, type, title, duration = 5000) {
             const container = document.getElementById('notificationContainer');
             const id = `notif_${Date.now()}`;
-
             const icons = { success: '✓', error: '✕', warning: '!', info: 'i' };
 
-            const html = `
+            container.insertAdjacentHTML('beforeend', `
                 <div class="notification ${type}" id="${id}">
                     <div class="notification-icon">${icons[type]}</div>
                     <div class="notification-content">
@@ -2536,9 +2115,7 @@
                     </div>
                     <button class="notification-close" onclick="removeNotification('${id}')">×</button>
                 </div>
-            `;
-
-            container.insertAdjacentHTML('beforeend', html);
+            `);
 
             setTimeout(() => removeNotification(id), duration);
         }
@@ -2557,7 +2134,7 @@
         function exportToCSV() {
             const selectedEmails = emails.filter(e => e.selected);
             if (selectedEmails.length === 0) {
-                showNotification('Bitte wahle mindestens eine Email aus!', 'warning', 'Keine Auswahl');
+                showNotification('Bitte mindestens eine Email auswahlen!', 'warning', 'Keine Auswahl');
                 return;
             }
 
