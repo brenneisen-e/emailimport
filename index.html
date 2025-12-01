@@ -6,172 +6,73 @@
     <title>BGAV Hypercare - Email Review Tool</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
 
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
     <style>
-        /* ============================================================================
-           CSS VARIABLES & RESET
-           ============================================================================ */
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --primary-light: #818cf8;
-            --primary-bg: rgba(99, 102, 241, 0.1);
+            --primary: #0078d4;
+            --primary-dark: #106ebe;
+            --primary-light: #deecf9;
+            --success: #107c10;
+            --success-light: #dff6dd;
+            --warning: #ffb900;
+            --warning-light: #fff4ce;
+            --danger: #d13438;
+            --danger-light: #fde7e9;
+            --purple: #8764b8;
+            --purple-light: #e8dff5;
 
-            --success: #10b981;
-            --success-bg: rgba(16, 185, 129, 0.1);
-            --warning: #f59e0b;
-            --warning-bg: rgba(245, 158, 11, 0.1);
-            --danger: #ef4444;
-            --danger-bg: rgba(239, 68, 68, 0.1);
-            --info: #06b6d4;
-            --info-bg: rgba(6, 182, 212, 0.1);
-
-            --bg-primary: #0f0f1a;
-            --bg-secondary: #1a1a2e;
-            --bg-tertiary: #252542;
-            --bg-card: rgba(30, 30, 50, 0.8);
-
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
-
-            --border-color: rgba(148, 163, 184, 0.1);
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-
-            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
-            --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.3);
-
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --radius-xl: 24px;
-
-            --transition-fast: 0.15s ease;
-            --transition-normal: 0.25s ease;
+            --bg-primary: #ffffff;
+            --bg-secondary: #faf9f8;
+            --bg-tertiary: #f3f2f1;
+            --border-color: #e1dfdd;
+            --text-primary: #323130;
+            --text-secondary: #605e5c;
+            --text-muted: #a19f9d;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
+            background: var(--bg-secondary);
             color: var(--text-primary);
             min-height: 100vh;
-            line-height: 1.6;
+            line-height: 1.5;
         }
 
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background:
-                radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        /* ============================================================================
-           ANIMATIONS
-           ============================================================================ */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); } 50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); } }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-        @keyframes dash { to { stroke-dashoffset: 0; } }
-
-        .animate-fade-in { animation: fadeIn 0.4s ease forwards; }
-        .animate-slide-in { animation: slideIn 0.4s ease forwards; }
-
-        /* ============================================================================
-           LOADING COMPONENTS
-           ============================================================================ */
-        .spinner {
-            width: 40px; height: 40px;
-            border: 3px solid var(--bg-tertiary);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        .spinner-sm { width: 20px; height: 20px; border-width: 2px; }
-
-        .progress-bar {
-            height: 4px;
-            background: var(--bg-tertiary);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--primary-light));
-            border-radius: 2px;
-            transition: width 0.3s ease;
-        }
-
-        /* ============================================================================
-           LAYOUT
-           ============================================================================ */
-        .container {
-            max-width: 100%;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* ============================================================================
-           HEADER
-           ============================================================================ */
+        /* Header */
         .header {
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--glass-border);
-            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .header-brand {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
         .header-logo {
-            width: 40px; height: 40px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            border-radius: var(--radius-md);
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: var(--shadow-glow);
         }
 
-        .header-logo svg { width: 24px; height: 24px; fill: white; }
+        .header-title { font-size: 1.125rem; font-weight: 600; }
+        .header-subtitle { font-size: 0.6875rem; opacity: 0.9; }
 
-        .header-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .header-subtitle {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-        }
+        .header-actions { display: flex; gap: 0.5rem; align-items: center; }
 
         .header-stats {
             display: flex;
@@ -179,225 +80,135 @@
             margin-right: 1rem;
         }
 
-        .stat-item {
-            text-align: center;
-        }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.25rem; font-weight: 700; }
+        .stat-label { font-size: 0.625rem; opacity: 0.9; text-transform: uppercase; }
 
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-light);
-        }
-
-        .stat-label {
-            font-size: 0.6875rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* ============================================================================
-           BUTTONS
-           ============================================================================ */
+        /* Buttons */
         .btn {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.625rem 1.25rem;
-            border-radius: var(--radius-md);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
             font-size: 0.875rem;
             font-weight: 500;
             cursor: pointer;
-            transition: all var(--transition-fast);
             border: none;
-            outline: none;
+            transition: all 0.15s;
         }
-
-        .btn svg { width: 18px; height: 18px; }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            background: var(--primary);
             color: white;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-        }
-
-        .btn-secondary {
-            background: var(--glass-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--glass-border);
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-tertiary);
-            border-color: var(--primary);
-        }
+        .btn-primary:hover { background: var(--primary-dark); }
 
         .btn-success {
-            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            background: var(--success);
             color: white;
         }
 
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        .btn-success:hover { background: #0b5a0b; }
+
+        .btn-white {
+            background: white;
+            color: var(--primary);
+            border: 1px solid rgba(255,255,255,0.3);
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
+        .btn-white:hover { background: rgba(255,255,255,0.9); }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
         }
 
-        /* ============================================================================
-           UPLOAD SCREEN
-           ============================================================================ */
+        .btn-outline:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Upload Screen */
         .upload-screen {
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: calc(100vh - 80px);
+            min-height: calc(100vh - 60px);
             padding: 2rem;
         }
 
         .upload-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-xl);
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             padding: 3rem;
-            max-width: 600px;
+            max-width: 500px;
             width: 100%;
             text-align: center;
-            animation: slideUp 0.5s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
         .upload-icon {
-            width: 80px; height: 80px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            width: 64px;
+            height: 64px;
+            background: var(--primary-light);
+            color: var(--primary);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 1.5rem;
-            box-shadow: var(--shadow-glow);
-            animation: glow 2s ease-in-out infinite;
-        }
-
-        .upload-icon svg { width: 40px; height: 40px; fill: white; }
-
-        .upload-title {
             font-size: 1.75rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
         }
 
-        .upload-subtitle {
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-        }
+        .upload-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .upload-subtitle { color: var(--text-secondary); margin-bottom: 2rem; }
 
-        .drop-zone {
-            border: 2px dashed var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 3rem 2rem;
-            margin-bottom: 1.5rem;
-            transition: all var(--transition-normal);
-            cursor: pointer;
-            position: relative;
-        }
+        .upload-buttons { display: flex; flex-direction: column; gap: 0.75rem; }
 
-        .drop-zone:hover, .drop-zone.drag-over {
-            border-color: var(--primary);
-            background: var(--primary-bg);
-        }
-
-        .drop-zone.drag-over {
-            transform: scale(1.02);
-        }
-
-        .drop-zone-icon {
-            width: 60px; height: 60px;
-            margin: 0 auto 1rem;
-            color: var(--text-muted);
-        }
-
-        .drop-zone-text {
+        .upload-btn {
+            padding: 1rem 1.5rem;
             font-size: 1rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .drop-zone-hint {
-            font-size: 0.8125rem;
-            color: var(--text-muted);
-        }
-
-        .drop-zone input[type="file"] {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            cursor: pointer;
         }
 
         .upload-info {
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-md);
-            padding: 1.25rem;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
             text-align: left;
         }
 
         .upload-info-title {
             font-size: 0.875rem;
             font-weight: 600;
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .upload-info-title svg {
-            width: 18px; height: 18px;
-            color: var(--info);
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
         }
 
         .upload-info ol {
             font-size: 0.8125rem;
             color: var(--text-muted);
             padding-left: 1.25rem;
-            line-height: 1.8;
         }
 
-        .upload-info code {
-            background: var(--bg-primary);
-            padding: 0.125rem 0.375rem;
-            border-radius: 4px;
-            font-family: 'Consolas', monospace;
-        }
-
-        /* ============================================================================
-           MAIN CONTENT
-           ============================================================================ */
+        /* Main Layout */
         .main-content {
             display: none;
-            flex: 1;
-            overflow: hidden;
+            height: calc(100vh - 52px);
         }
 
-        .main-content.active {
-            display: flex;
-        }
+        .main-content.active { display: flex; }
 
-        /* ============================================================================
-           SIDEBAR - EMAIL LIST
-           ============================================================================ */
+        /* Sidebar */
         .sidebar {
-            width: 400px;
-            background: var(--bg-secondary);
+            width: 380px;
+            background: white;
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
@@ -405,7 +216,7 @@
         }
 
         .sidebar-header {
-            padding: 1rem;
+            padding: 0.75rem;
             border-bottom: 1px solid var(--border-color);
         }
 
@@ -415,146 +226,101 @@
 
         .search-box input {
             width: 100%;
-            padding: 0.75rem 1rem 0.75rem 2.75rem;
+            padding: 0.5rem 0.75rem 0.5rem 2.25rem;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
+            border-radius: 4px;
             font-size: 0.875rem;
-            transition: all var(--transition-fast);
         }
 
         .search-box input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px var(--primary-bg);
+            background: white;
         }
 
-        .search-box svg {
+        .search-icon {
             position: absolute;
-            left: 0.875rem;
+            left: 0.75rem;
             top: 50%;
             transform: translateY(-50%);
-            width: 18px; height: 18px;
             color: var(--text-muted);
         }
 
         .filter-bar {
             display: flex;
             gap: 0.5rem;
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 0.75rem;
             border-bottom: 1px solid var(--border-color);
             flex-wrap: wrap;
         }
 
         .filter-chip {
-            padding: 0.375rem 0.75rem;
+            padding: 0.25rem 0.625rem;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
-            border-radius: 20px;
+            border-radius: 4px;
             font-size: 0.75rem;
             color: var(--text-secondary);
             cursor: pointer;
-            transition: all var(--transition-fast);
         }
 
-        .filter-chip:hover {
-            border-color: var(--primary);
-            color: var(--primary-light);
-        }
-
+        .filter-chip:hover { border-color: var(--primary); }
         .filter-chip.active {
-            background: var(--primary-bg);
+            background: var(--primary-light);
             border-color: var(--primary);
-            color: var(--primary-light);
+            color: var(--primary);
         }
 
-        .email-list {
-            flex: 1;
-            overflow-y: auto;
-        }
+        /* Email List */
+        .email-list { flex: 1; overflow-y: auto; }
 
         .email-item {
-            padding: 1rem;
+            padding: 0.75rem 1rem;
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
-            transition: all var(--transition-fast);
-            animation: fadeIn 0.3s ease;
+            transition: background 0.1s;
         }
 
-        .email-item:hover {
-            background: var(--bg-tertiary);
-        }
-
+        .email-item:hover { background: var(--bg-tertiary); }
         .email-item.selected {
-            background: var(--primary-bg);
+            background: var(--primary-light);
             border-left: 3px solid var(--primary);
         }
 
         .email-item-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 0.375rem;
+            margin-bottom: 0.25rem;
         }
 
-        .email-sender {
+        .email-sender { font-weight: 600; font-size: 0.875rem; }
+        .email-date { font-size: 0.75rem; color: var(--text-muted); }
+        .email-subject { font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .email-preview { font-size: 0.75rem; color: var(--text-muted); }
+
+        .email-badges { display: flex; gap: 0.25rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+        .badge {
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            font-size: 0.625rem;
             font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--text-primary);
+            text-transform: uppercase;
         }
 
-        .email-date {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
+        .badge-provision { background: var(--warning-light); color: #996600; }
+        .badge-incident { background: var(--danger-light); color: var(--danger); }
+        .badge-question { background: var(--purple-light); color: var(--purple); }
+        .badge-cluster { background: var(--bg-tertiary); color: var(--text-secondary); }
 
-        .email-subject {
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.375rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .email-preview {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .email-tags {
-            display: flex;
-            gap: 0.375rem;
-            margin-top: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .email-tag {
-            padding: 0.125rem 0.5rem;
-            background: var(--primary-bg);
-            border-radius: 4px;
-            font-size: 0.6875rem;
-            color: var(--primary-light);
-        }
-
-        .email-tag.provision {
-            background: var(--warning-bg);
-            color: var(--warning);
-        }
-
-        /* ============================================================================
-           EMAIL DETAIL PANEL
-           ============================================================================ */
+        /* Detail Panel */
         .detail-panel {
             flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            background: var(--bg-primary);
+            background: var(--bg-secondary);
         }
 
         .detail-empty {
@@ -563,198 +329,153 @@
             align-items: center;
             justify-content: center;
             color: var(--text-muted);
-        }
-
-        .detail-empty-content {
             text-align: center;
         }
 
-        .detail-empty svg {
-            width: 80px; height: 80px;
-            margin-bottom: 1rem;
-            opacity: 0.3;
-        }
+        .email-detail { display: none; flex-direction: column; height: 100%; }
+        .email-detail.active { display: flex; }
 
-        .email-detail {
-            display: none;
-            flex-direction: column;
-            height: 100%;
-        }
-
-        .email-detail.active {
-            display: flex;
-        }
-
-        .email-detail-header {
-            padding: 1.5rem;
+        .detail-header {
+            padding: 1rem 1.5rem;
+            background: white;
             border-bottom: 1px solid var(--border-color);
-            background: var(--bg-secondary);
         }
 
-        .email-detail-subject {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
+        .detail-subject { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; }
 
-        .email-detail-meta {
+        .detail-meta {
             display: flex;
-            gap: 2rem;
-            font-size: 0.875rem;
+            gap: 1.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
         }
 
-        .email-meta-item {
+        .detail-body {
+            flex: 1;
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            overflow: hidden;
         }
 
-        .email-meta-label {
-            color: var(--text-muted);
-        }
-
-        .email-meta-value {
-            color: var(--text-primary);
-        }
-
-        .email-detail-body {
+        /* Email Content */
+        .email-content {
             flex: 1;
             padding: 1.5rem;
             overflow-y: auto;
+            background: white;
+            margin: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
         }
 
-        .email-body-content {
+        .email-text {
             white-space: pre-wrap;
             font-size: 0.9375rem;
             line-height: 1.7;
             color: var(--text-secondary);
         }
 
-        /* Provisionsreklamation Parsed Data */
-        .provision-data {
-            background: var(--bg-secondary);
-            border: 1px solid var(--warning-bg);
-            border-radius: var(--radius-md);
-            padding: 1.25rem;
-            margin-bottom: 1.5rem;
+        /* Provision Data Box */
+        .provision-box {
+            background: var(--warning-light);
+            border: 1px solid #e6a700;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
         }
 
-        .provision-data-title {
-            font-size: 0.875rem;
+        .provision-box-title {
             font-weight: 600;
-            color: var(--warning);
-            margin-bottom: 1rem;
+            color: #996600;
+            margin-bottom: 0.75rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .provision-data-title svg {
-            width: 18px; height: 18px;
-        }
-
-        .provision-fields {
+        .provision-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 0.75rem;
         }
 
-        .provision-field {
-            background: var(--bg-tertiary);
-            padding: 0.75rem;
-            border-radius: var(--radius-sm);
+        .provision-field-small {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 4px;
         }
 
         .provision-field-label {
-            font-size: 0.6875rem;
+            font-size: 0.625rem;
+            text-transform: uppercase;
             color: var(--text-muted);
+            margin-bottom: 0.125rem;
+        }
+
+        .provision-field-value { font-size: 0.8125rem; font-weight: 500; }
+
+        /* Right Form Panel */
+        .form-panel {
+            width: 350px;
+            background: white;
+            border-left: 1px solid var(--border-color);
+            padding: 1rem;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .form-section {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-section-title {
+            font-size: 0.6875rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .form-group { margin-bottom: 0.75rem; }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
             margin-bottom: 0.25rem;
         }
 
-        .provision-field-value {
-            font-size: 0.875rem;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        /* Attachments */
-        .email-attachments {
-            padding: 1rem 1.5rem;
-            border-top: 1px solid var(--border-color);
-            background: var(--bg-secondary);
-        }
-
-        .attachments-title {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.75rem;
-        }
-
-        .attachments-list {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .attachment-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 0.75rem;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-sm);
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 0.5rem 0.625rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
             font-size: 0.8125rem;
-            color: var(--text-secondary);
+            background: white;
         }
 
-        .attachment-item svg {
-            width: 16px; height: 16px;
-            color: var(--text-muted);
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
-        /* ============================================================================
-           CATEGORIZATION PANEL
-           ============================================================================ */
-        .categorization-panel {
-            padding: 1.5rem;
-            border-top: 1px solid var(--border-color);
-            background: var(--bg-secondary);
-        }
+        .form-textarea { resize: vertical; min-height: 60px; }
 
-        .cat-panel-title {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 1rem;
-        }
-
-        .cluster-tags {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-bottom: 1rem;
-        }
+        /* Cluster Tags */
+        .cluster-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; }
 
         .cluster-tag {
-            padding: 0.5rem 1rem;
+            padding: 0.375rem 0.625rem;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
+            border-radius: 4px;
+            font-size: 0.75rem;
             cursor: pointer;
-            transition: all var(--transition-fast);
+            transition: all 0.15s;
         }
 
-        .cluster-tag:hover {
-            border-color: var(--primary);
-            color: var(--primary-light);
-        }
+        .cluster-tag:hover { border-color: var(--primary); }
 
         .cluster-tag.active {
             background: var(--primary);
@@ -762,233 +483,225 @@
             color: white;
         }
 
-        .comment-box {
-            margin-top: 1rem;
-        }
+        /* Status Select Colors */
+        .status-neu { color: var(--text-muted); }
+        .status-bearbeitung { color: var(--warning); }
+        .status-erledigt { color: var(--success); }
 
-        .comment-box textarea {
-            width: 100%;
-            padding: 0.75rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .comment-box textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* ============================================================================
-           NOTIFICATIONS
-           ============================================================================ */
+        /* Notifications */
         .notification-container {
             position: fixed;
-            top: 1rem;
+            top: 60px;
             right: 1rem;
             z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
         }
 
         .notification {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-md);
-            padding: 1rem 1.5rem;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
             gap: 0.75rem;
             animation: slideIn 0.3s ease;
-            min-width: 300px;
         }
 
-        .notification.success { border-left: 3px solid var(--success); }
-        .notification.warning { border-left: 3px solid var(--warning); }
-        .notification.danger { border-left: 3px solid var(--danger); }
-        .notification.info { border-left: 3px solid var(--info); }
-
-        .notification-icon {
-            width: 24px; height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
-        .notification.success .notification-icon { background: var(--success-bg); color: var(--success); }
-        .notification.warning .notification-icon { background: var(--warning-bg); color: var(--warning); }
-        .notification.danger .notification-icon { background: var(--danger-bg); color: var(--danger); }
-        .notification.info .notification-icon { background: var(--info-bg); color: var(--info); }
+        .notification.success { border-left: 4px solid var(--success); }
+        .notification.error { border-left: 4px solid var(--danger); }
+        .notification.warning { border-left: 4px solid var(--warning); }
 
-        .notification-content { flex: 1; }
-        .notification-title { font-weight: 600; font-size: 0.875rem; }
-        .notification-message { font-size: 0.8125rem; color: var(--text-secondary); }
+        .notification-icon { font-size: 1.25rem; }
+        .notification-text { font-size: 0.875rem; }
 
-        /* ============================================================================
-           SCROLLBAR
-           ============================================================================ */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
-        ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-tertiary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
-        /* ============================================================================
-           RESPONSIVE
-           ============================================================================ */
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; max-width: 100%; }
-            .main-content { flex-direction: column; }
-            .header-stats { display: none; }
-        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-brand">
-                <div class="header-logo">
-                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-brand">
+            <div class="header-logo">📧</div>
+            <div>
+                <div class="header-title">BGAV Hypercare</div>
+                <div class="header-subtitle">Email Review Tool</div>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <div class="header-stats" id="headerStats" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">Gesamt</div>
                 </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statDone">0</div>
+                    <div class="stat-label">Erledigt</div>
+                </div>
+            </div>
+
+            <button class="btn btn-white" id="btnNewFile" style="display: none;" onclick="resetApp()">
+                📁 Neue Datei
+            </button>
+            <button class="btn btn-white" id="btnExport" style="display: none;" onclick="exportToExcel()">
+                📊 Excel Export
+            </button>
+        </div>
+    </header>
+
+    <!-- Upload Screen -->
+    <div class="upload-screen" id="uploadScreen">
+        <div class="upload-card">
+            <div class="upload-icon">📂</div>
+            <h1 class="upload-title">Emails importieren</h1>
+            <p class="upload-subtitle">JSON-Datei aus dem Outlook Export laden</p>
+
+            <div class="upload-buttons">
+                <button class="btn btn-primary upload-btn" onclick="openFilePicker()">
+                    📁 Datei auswählen
+                </button>
+            </div>
+
+            <div class="upload-info">
+                <div class="upload-info-title">So geht's:</div>
+                <ol>
+                    <li>outlook-export.hta starten</li>
+                    <li>Postfach wählen und exportieren</li>
+                    <li>Hier die JSON-Datei aus Downloads laden</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" placeholder="Suchen..." id="searchInput" oninput="applyFilters()">
+                </div>
+            </div>
+
+            <div class="filter-bar">
+                <span class="filter-chip active" data-filter="all" onclick="setFilter('all')">Alle</span>
+                <span class="filter-chip" data-filter="open" onclick="setFilter('open')">Offen</span>
+                <span class="filter-chip" data-filter="provision" onclick="setFilter('provision')">Provision</span>
+                <span class="filter-chip" data-filter="incident" onclick="setFilter('incident')">Incident</span>
+            </div>
+
+            <div class="email-list" id="emailList"></div>
+        </aside>
+
+        <!-- Detail Panel -->
+        <main class="detail-panel">
+            <div class="detail-empty" id="detailEmpty">
                 <div>
-                    <div class="header-title">BGAV Hypercare</div>
-                    <div class="header-subtitle">Email Review Tool v3.0</div>
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📧</div>
+                    <p>Email auswählen um Details anzuzeigen</p>
                 </div>
             </div>
 
-            <div class="header-actions">
-                <div class="header-stats" id="headerStats" style="display: none;">
-                    <div class="stat-item">
-                        <div class="stat-value" id="statTotal">0</div>
-                        <div class="stat-label">Gesamt</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="statCategorized">0</div>
-                        <div class="stat-label">Kategorisiert</div>
+            <div class="email-detail" id="emailDetail">
+                <div class="detail-header">
+                    <div class="detail-subject" id="detailSubject"></div>
+                    <div class="detail-meta">
+                        <span><strong>Von:</strong> <span id="detailFrom"></span></span>
+                        <span><strong>Datum:</strong> <span id="detailDate"></span></span>
                     </div>
                 </div>
 
-                <button class="btn btn-secondary" id="btnNewFile" style="display: none;">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
-                    Neue Datei
-                </button>
-
-                <button class="btn btn-success" id="btnExport" style="display: none;">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                    CSV Export
-                </button>
-            </div>
-        </header>
-
-        <!-- Upload Screen -->
-        <div class="upload-screen" id="uploadScreen">
-            <div class="upload-card">
-                <div class="upload-icon">
-                    <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
-                </div>
-                <h1 class="upload-title">Emails importieren</h1>
-                <p class="upload-subtitle">JSON-Datei per Drag & Drop oder Klick hochladen</p>
-
-                <div class="drop-zone" id="dropZone">
-                    <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
-                        <path d="M8 15h8v2H8zM8 11h8v2H8z"/>
-                    </svg>
-                    <p class="drop-zone-text">JSON-Datei hier ablegen</p>
-                    <p class="drop-zone-hint">oder klicken zum Auswählen</p>
-                    <input type="file" accept=".json" id="fileInput">
-                </div>
-
-                <div class="upload-info">
-                    <div class="upload-info-title">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                        So exportierst du Emails aus Outlook
+                <div class="detail-body">
+                    <div class="email-content">
+                        <div id="provisionBox"></div>
+                        <div class="email-text" id="detailText"></div>
                     </div>
-                    <ol>
-                        <li>PowerShell öffnen</li>
-                        <li><code>.\Export-OutlookEmails.ps1</code> ausführen</li>
-                        <li>Emails in Outlook markieren</li>
-                        <li>JSON-Datei hier hochladen</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
 
-        <!-- Main Content -->
-        <div class="main-content" id="mainContent">
-            <!-- Sidebar - Email List -->
-            <aside class="sidebar">
-                <div class="sidebar-header">
-                    <div class="search-box">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                        <input type="text" placeholder="Emails durchsuchen..." id="searchInput">
-                    </div>
-                </div>
+                    <!-- Right Form Panel -->
+                    <div class="form-panel">
+                        <div class="form-section">
+                            <div class="form-section-title">Kategorisierung</div>
 
-                <div class="filter-bar" id="filterBar">
-                    <span class="filter-chip active" data-filter="all">Alle</span>
-                    <span class="filter-chip" data-filter="uncategorized">Offen</span>
-                    <span class="filter-chip" data-filter="provision">Provision</span>
-                </div>
-
-                <div class="email-list" id="emailList">
-                    <!-- Email items will be inserted here -->
-                </div>
-            </aside>
-
-            <!-- Detail Panel -->
-            <main class="detail-panel">
-                <div class="detail-empty" id="detailEmpty">
-                    <div class="detail-empty-content">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-                        <p>Email auswählen um Details anzuzeigen</p>
-                    </div>
-                </div>
-
-                <div class="email-detail" id="emailDetail">
-                    <div class="email-detail-header">
-                        <h2 class="email-detail-subject" id="detailSubject"></h2>
-                        <div class="email-detail-meta">
-                            <div class="email-meta-item">
-                                <span class="email-meta-label">Von:</span>
-                                <span class="email-meta-value" id="detailFrom"></span>
+                            <div class="form-group">
+                                <label class="form-label">Kategorie</label>
+                                <select class="form-select" id="formKategorie" onchange="updateField('kategorie')">
+                                    <option value="Provisionsreklamation">Provisionsreklamation</option>
+                                    <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                                    <option value="Incident (Leicht)">Incident (Leicht)</option>
+                                    <option value="Incident (Mittel)">Incident (Mittel)</option>
+                                    <option value="Incident (Schwer)">Incident (Schwer)</option>
+                                    <option value="Sonstiges">Sonstiges</option>
+                                </select>
                             </div>
-                            <div class="email-meta-item">
-                                <span class="email-meta-label">Datum:</span>
-                                <span class="email-meta-value" id="detailDate"></span>
+
+                            <div class="form-group">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" id="formStatus" onchange="updateField('status')">
+                                    <option value="Neu">Neu</option>
+                                    <option value="In Bearbeitung">In Bearbeitung</option>
+                                    <option value="Erledigt">Erledigt</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Cluster (Mehrfachauswahl)</label>
+                                <div class="cluster-tags" id="clusterTags"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="form-section-title">Details</div>
+
+                            <div class="form-group">
+                                <label class="form-label">Agentur</label>
+                                <input type="text" class="form-input" id="formAgentur" onchange="updateField('agentur')">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Vermittlernummer</label>
+                                <input type="text" class="form-input" id="formVermittlernr" onchange="updateField('vermittlernr')">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Versicherungsnummer</label>
+                                <input type="text" class="form-input" id="formVsnr" onchange="updateField('vsnr')">
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="form-section-title">Bearbeitung</div>
+
+                            <div class="form-group">
+                                <label class="form-label">Zusammenfassung der Anfrage</label>
+                                <textarea class="form-textarea" id="formAnfrage" rows="3" onchange="updateField('anfrage')"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Antwort / Lösung</label>
+                                <textarea class="form-textarea" id="formAntwort" rows="3" onchange="updateField('antwort')"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Kommentar</label>
+                                <textarea class="form-textarea" id="formKommentar" rows="2" onchange="updateField('kommentar')"></textarea>
                             </div>
                         </div>
                     </div>
-
-                    <div class="email-detail-body">
-                        <div id="provisionData"></div>
-                        <div class="email-body-content" id="detailBody"></div>
-                    </div>
-
-                    <div class="email-attachments" id="attachmentsSection" style="display: none;">
-                        <div class="attachments-title">Anhänge</div>
-                        <div class="attachments-list" id="attachmentsList"></div>
-                    </div>
-
-                    <div class="categorization-panel">
-                        <div class="cat-panel-title">Kategorisierung</div>
-                        <div class="cluster-tags" id="clusterTags">
-                            <!-- Cluster tags will be inserted here -->
-                        </div>
-                        <div class="comment-box">
-                            <textarea id="commentInput" placeholder="Kommentar hinzufügen..."></textarea>
-                        </div>
-                    </div>
                 </div>
-            </main>
-        </div>
+            </div>
+        </main>
     </div>
 
     <!-- Notifications -->
@@ -996,107 +709,91 @@
 
     <script>
         // ============================================================================
-        // GLOBAL STATE
+        // STATE
         // ============================================================================
         let emails = [];
         let filteredEmails = [];
-        let nextId = 1;
         let selectedEmailId = null;
+        let currentFilter = 'all';
+        let nextId = 1;
+
         const allClusters = ['KV', 'KFZ', 'SHUK', 'LV', 'Provisionierung', 'Produktzuordnung', 'Allgemein'];
 
         // ============================================================================
-        // INITIALIZATION
+        // FILE HANDLING
         // ============================================================================
-        document.addEventListener('DOMContentLoaded', () => {
-            setupDropZone();
-            setupSearch();
-            setupFilters();
-            setupClusterTags();
-        });
-
-        // ============================================================================
-        // FILE UPLOAD
-        // ============================================================================
-        function setupDropZone() {
-            const dropZone = document.getElementById('dropZone');
-            const fileInput = document.getElementById('fileInput');
-
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
-                dropZone.addEventListener(event, e => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                });
-            });
-
-            ['dragenter', 'dragover'].forEach(event => {
-                dropZone.addEventListener(event, () => dropZone.classList.add('drag-over'));
-            });
-
-            ['dragleave', 'drop'].forEach(event => {
-                dropZone.addEventListener(event, () => dropZone.classList.remove('drag-over'));
-            });
-
-            dropZone.addEventListener('drop', e => {
-                const files = e.dataTransfer.files;
-                if (files.length > 0) handleFile(files[0]);
-            });
-
-            fileInput.addEventListener('change', e => {
-                if (e.target.files.length > 0) handleFile(e.target.files[0]);
-            });
-
-            // New file button
-            document.getElementById('btnNewFile').addEventListener('click', () => {
-                emails = [];
-                filteredEmails = [];
-                selectedEmailId = null;
-                document.getElementById('uploadScreen').style.display = 'flex';
-                document.getElementById('mainContent').classList.remove('active');
-                document.getElementById('headerStats').style.display = 'none';
-                document.getElementById('btnNewFile').style.display = 'none';
-                document.getElementById('btnExport').style.display = 'none';
-            });
-
-            // Export button
-            document.getElementById('btnExport').addEventListener('click', exportToCSV);
+        function openFilePicker() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    loadFile(e.target.files[0]);
+                }
+            };
+            input.click();
         }
 
-        function handleFile(file) {
-            if (!file.name.endsWith('.json')) {
-                showNotification('Bitte eine JSON-Datei auswählen', 'warning', 'Falsches Format');
-                return;
-            }
-
+        function loadFile(file) {
             const reader = new FileReader();
-            reader.onload = e => {
+            reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
                     processEmails(Array.isArray(data) ? data : [data]);
                 } catch (err) {
-                    showNotification('Fehler beim Lesen der JSON-Datei: ' + err.message, 'danger', 'Fehler');
+                    showNotification('Fehler beim Laden: ' + err.message, 'error');
                 }
             };
             reader.readAsText(file);
         }
 
+        // ============================================================================
+        // EMAIL PROCESSING
+        // ============================================================================
         function processEmails(rawEmails) {
-            emails = rawEmails.map(email => ({
-                id: nextId++,
-                datum: email.datum || email.date || new Date().toISOString(),
-                von_email: email.von_email || email.from_email || email.from || '',
-                von_name: email.von_name || email.from_name || email.von_email || '',
-                betreff: email.betreff || email.subject || '(Kein Betreff)',
-                text: email.text || email.body || '',
-                anhaenge: email.anhaenge || email.anhänge || email.attachments || [],
-                cluster: [],
-                kommentar: '',
-                isProvision: isProvisionEmail(email),
-                provisionData: parseProvisionData(email.text || email.body || '')
-            }));
+            emails = rawEmails.map(email => {
+                const text = email.text || email.body || '';
+                const subject = email.betreff || email.subject || '';
+                const fromEmail = email.von_email || email.from_email || '';
+                const fromName = email.von_name || email.from_name || '';
+
+                // Auto-categorize
+                const kategorie = categorizeEmail(subject, text, fromEmail);
+                const clusters = identifyClusters(subject, text);
+                const isProvision = isProvisionEmail(subject, text, fromEmail);
+                const provisionData = isProvision ? parseProvisionData(text) : null;
+                const agentur = extractAgentur(fromName, subject);
+                const vermittlernr = provisionData?.vermittlernummer_vermittler || extractVermittlernr(text);
+                const vsnr = provisionData?.versicherungsnummer_kunde || extractVsnr(text);
+
+                return {
+                    id: nextId++,
+                    datum: email.datum || email.date || new Date().toISOString(),
+                    von_email: fromEmail,
+                    von_name: fromName,
+                    betreff: subject || '(Kein Betreff)',
+                    text: text,
+                    anhaenge: email.anhaenge || email.attachments || [],
+
+                    // Pre-filled fields
+                    kategorie: kategorie,
+                    status: 'Neu',
+                    clusters: clusters,
+                    agentur: agentur,
+                    vermittlernr: vermittlernr,
+                    vsnr: vsnr,
+                    anfrage: '',
+                    antwort: '',
+                    kommentar: '',
+
+                    isProvision: isProvision,
+                    provisionData: provisionData
+                };
+            });
 
             filteredEmails = [...emails];
 
-            // Switch to main view
+            // Show main content
             document.getElementById('uploadScreen').style.display = 'none';
             document.getElementById('mainContent').classList.add('active');
             document.getElementById('headerStats').style.display = 'flex';
@@ -1105,20 +802,54 @@
 
             renderEmailList();
             updateStats();
+            initClusterTags();
 
-            showNotification(`${emails.length} Emails erfolgreich geladen`, 'success', 'Import abgeschlossen');
+            showNotification(emails.length + ' Emails geladen', 'success');
         }
 
         // ============================================================================
-        // PROVISIONSREKLAMATION PARSER
+        // AUTO-CATEGORIZATION
         // ============================================================================
-        function isProvisionEmail(email) {
-            const subject = (email.betreff || email.subject || '').toLowerCase();
-            const from = (email.von_email || email.from_email || email.from || '').toLowerCase();
+        function categorizeEmail(subject, text, fromEmail) {
+            const s = subject.toLowerCase();
+            const t = text.toLowerCase();
+            const f = fromEmail.toLowerCase();
 
-            return subject.includes('provisionsreklamation') ||
-                   subject.includes('provision') ||
-                   from.includes('redaktion@barmenia');
+            if (s.includes('provisionsreklamation') || s.includes('provision') || f.includes('redaktion@barmenia')) {
+                return 'Provisionsreklamation';
+            }
+            if (s.includes('incident') || s.includes('störung') || s.includes('fehler')) {
+                if (s.includes('schwer') || s.includes('kritisch') || s.includes('dringend')) return 'Incident (Schwer)';
+                if (s.includes('mittel')) return 'Incident (Mittel)';
+                return 'Incident (Leicht)';
+            }
+            if (s.includes('frage') || s.includes('rückfrage') || s.includes('anfrage') || t.includes('können sie mir')) {
+                return 'Fachliche Rückfrage';
+            }
+            return 'Sonstiges';
+        }
+
+        function identifyClusters(subject, text) {
+            const clusters = [];
+            const s = subject.toLowerCase();
+            const t = text.toLowerCase();
+            const combined = s + ' ' + t;
+
+            if (combined.match(/\bkv\b|kranken|gesundheit|pflege/)) clusters.push('KV');
+            if (combined.match(/\bkfz\b|auto|fahrzeug|kasko|haftpflicht/)) clusters.push('KFZ');
+            if (combined.match(/\bshuk\b|sach|haft|unfall|hausrat|wohngebäude/)) clusters.push('SHUK');
+            if (combined.match(/\blv\b|leben|rente|vorsorge|altersvorsorge/)) clusters.push('LV');
+            if (combined.match(/provision|vergütung|courtage|abrechnung/)) clusters.push('Provisionierung');
+            if (combined.match(/produkt|tarif|angebot|deckung/)) clusters.push('Produktzuordnung');
+
+            return clusters.length > 0 ? clusters : ['Allgemein'];
+        }
+
+        function isProvisionEmail(subject, text, fromEmail) {
+            const s = subject.toLowerCase();
+            const f = fromEmail.toLowerCase();
+            return s.includes('provisionsreklamation') || s.includes('provision') || f.includes('redaktion@barmenia') ||
+                   text.includes('reklamation_provision') || text.includes('vermittlernummer_vermittler');
         }
 
         function parseProvisionData(text) {
@@ -1130,127 +861,138 @@
             ];
 
             fields.forEach(field => {
-                const regex = new RegExp(`${field}\\s*:\\s*(.+?)(?=\\n|$)`, 'i');
+                const regex = new RegExp(field + '\\s*:\\s*(.+?)(?=\\n|$)', 'i');
                 const match = text.match(regex);
-                if (match) {
-                    data[field] = match[1].trim();
-                }
+                if (match) data[field] = match[1].trim();
             });
 
             return Object.keys(data).length > 0 ? data : null;
         }
 
+        function extractAgentur(fromName, subject) {
+            // Try to extract agency name from sender or subject
+            const patterns = [/agentur\s+([^\s,]+)/i, /([A-Z][a-zäöü]+)\s+(?:GmbH|AG|Versicherung)/];
+            for (const pattern of patterns) {
+                const match = (fromName + ' ' + subject).match(pattern);
+                if (match) return match[1];
+            }
+            return fromName || '';
+        }
+
+        function extractVermittlernr(text) {
+            const match = text.match(/vermittler(?:nummer|nr)?[:\s]*(\d{5,10})/i);
+            return match ? match[1] : '';
+        }
+
+        function extractVsnr(text) {
+            const match = text.match(/versicherungs(?:nummer|nr|schein)?[:\s]*(\d{5,15})/i);
+            return match ? match[1] : '';
+        }
+
         // ============================================================================
-        // EMAIL LIST
+        // RENDER EMAIL LIST
         // ============================================================================
         function renderEmailList() {
             const list = document.getElementById('emailList');
-            list.innerHTML = '';
 
-            filteredEmails.forEach((email, index) => {
-                const item = document.createElement('div');
-                item.className = `email-item${email.id === selectedEmailId ? ' selected' : ''}`;
-                item.style.animationDelay = `${index * 0.03}s`;
+            if (filteredEmails.length === 0) {
+                list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">Keine Emails gefunden</div>';
+                return;
+            }
 
+            list.innerHTML = filteredEmails.map(email => {
                 const date = new Date(email.datum);
-                const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                const preview = (email.text || '').substring(0, 60).replace(/\n/g, ' ') + '...';
+                const selectedClass = email.id === selectedEmailId ? ' selected' : '';
 
-                let tagsHtml = '';
-                if (email.isProvision) {
-                    tagsHtml += '<span class="email-tag provision">Provision</span>';
-                }
-                email.cluster.forEach(c => {
-                    tagsHtml += `<span class="email-tag">${c}</span>`;
+                let badges = '';
+                if (email.isProvision) badges += '<span class="badge badge-provision">€ Provision</span>';
+                else if (email.kategorie.includes('Incident')) badges += '<span class="badge badge-incident">! Incident</span>';
+                else if (email.kategorie === 'Fachliche Rückfrage') badges += '<span class="badge badge-question">? Frage</span>';
+
+                email.clusters.slice(0, 2).forEach(c => {
+                    badges += '<span class="badge badge-cluster">' + c + '</span>';
                 });
 
-                item.innerHTML = `
-                    <div class="email-item-header">
-                        <span class="email-sender">${escapeHtml(email.von_name || email.von_email)}</span>
-                        <span class="email-date">${dateStr}</span>
+                return `
+                    <div class="email-item${selectedClass}" onclick="selectEmail(${email.id})">
+                        <div class="email-item-header">
+                            <span class="email-sender">${escapeHtml(email.von_name || email.von_email)}</span>
+                            <span class="email-date">${dateStr}</span>
+                        </div>
+                        <div class="email-subject">${escapeHtml(email.betreff)}</div>
+                        <div class="email-preview">${escapeHtml(preview)}</div>
+                        <div class="email-badges">${badges}</div>
                     </div>
-                    <div class="email-subject">${escapeHtml(email.betreff)}</div>
-                    <div class="email-preview">${escapeHtml(email.text.substring(0, 100))}</div>
-                    ${tagsHtml ? `<div class="email-tags">${tagsHtml}</div>` : ''}
                 `;
-
-                item.addEventListener('click', () => selectEmail(email.id));
-                list.appendChild(item);
-            });
+            }).join('');
         }
 
+        // ============================================================================
+        // SELECT EMAIL
+        // ============================================================================
         function selectEmail(id) {
             selectedEmailId = id;
             const email = emails.find(e => e.id === id);
             if (!email) return;
 
-            // Update list selection
-            document.querySelectorAll('.email-item').forEach(item => item.classList.remove('selected'));
-            event.currentTarget?.classList.add('selected');
+            // Update list
+            renderEmailList();
 
             // Show detail
             document.getElementById('detailEmpty').style.display = 'none';
             document.getElementById('emailDetail').classList.add('active');
 
-            // Fill detail data
+            // Fill header
             document.getElementById('detailSubject').textContent = email.betreff;
-            document.getElementById('detailFrom').textContent = `${email.von_name} <${email.von_email}>`;
+            document.getElementById('detailFrom').textContent = email.von_name + ' <' + email.von_email + '>';
             document.getElementById('detailDate').textContent = new Date(email.datum).toLocaleString('de-DE');
-            document.getElementById('detailBody').textContent = email.text;
-            document.getElementById('commentInput').value = email.kommentar || '';
 
-            // Provision data
-            const provisionDiv = document.getElementById('provisionData');
+            // Provision box
+            const provisionBox = document.getElementById('provisionBox');
             if (email.provisionData) {
-                let fieldsHtml = '';
-                const labels = {
-                    'vermittlernummer_vermittler': 'Vermittlernummer',
-                    'vorname_vermittler': 'Vorname (Vermittler)',
-                    'nachname_vermittler': 'Nachname (Vermittler)',
-                    'versicherungsnummer_kunde': 'Versicherungsnr.',
-                    'vorname_kunde': 'Vorname (Kunde)',
-                    'nachname_kunde': 'Nachname (Kunde)',
-                    'reklamation_provision': 'Provision',
-                    'reklamation_absatz': 'Absatz',
-                    'datenschutz': 'Datenschutz',
-                    'nachricht': 'Nachricht'
-                };
-
-                for (const [key, value] of Object.entries(email.provisionData)) {
-                    fieldsHtml += `
-                        <div class="provision-field">
-                            <div class="provision-field-label">${labels[key] || key}</div>
-                            <div class="provision-field-value">${escapeHtml(value)}</div>
+                const pd = email.provisionData;
+                provisionBox.innerHTML = `
+                    <div class="provision-box">
+                        <div class="provision-box-title">💰 Provisionsreklamation - Extrahierte Daten</div>
+                        <div class="provision-grid">
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Vermittler</div>
+                                <div class="provision-field-value">${escapeHtml((pd.vorname_vermittler || '') + ' ' + (pd.nachname_vermittler || ''))}</div>
+                            </div>
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Vermittlernr.</div>
+                                <div class="provision-field-value">${escapeHtml(pd.vermittlernummer_vermittler || '-')}</div>
+                            </div>
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Kunde</div>
+                                <div class="provision-field-value">${escapeHtml((pd.vorname_kunde || '') + ' ' + (pd.nachname_kunde || ''))}</div>
+                            </div>
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Versicherungsnr.</div>
+                                <div class="provision-field-value">${escapeHtml(pd.versicherungsnummer_kunde || '-')}</div>
+                            </div>
                         </div>
-                    `;
-                }
-
-                provisionDiv.innerHTML = `
-                    <div class="provision-data">
-                        <div class="provision-data-title">
-                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                            Provisionsreklamation - Geparste Daten
-                        </div>
-                        <div class="provision-fields">${fieldsHtml}</div>
+                        ${pd.nachricht ? '<div style="margin-top: 0.75rem; font-size: 0.8125rem;"><strong>Nachricht:</strong> ' + escapeHtml(pd.nachricht) + '</div>' : ''}
                     </div>
                 `;
             } else {
-                provisionDiv.innerHTML = '';
+                provisionBox.innerHTML = '';
             }
 
-            // Attachments
-            const attachSection = document.getElementById('attachmentsSection');
-            const attachList = document.getElementById('attachmentsList');
-            if (email.anhaenge && email.anhaenge.length > 0) {
-                attachSection.style.display = 'block';
-                attachList.innerHTML = email.anhaenge.map(a => `
-                    <div class="attachment-item">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
-                        ${escapeHtml(a)}
-                    </div>
-                `).join('');
-            } else {
-                attachSection.style.display = 'none';
-            }
+            // Email text
+            document.getElementById('detailText').textContent = email.text;
+
+            // Fill form
+            document.getElementById('formKategorie').value = email.kategorie;
+            document.getElementById('formStatus').value = email.status;
+            document.getElementById('formAgentur').value = email.agentur;
+            document.getElementById('formVermittlernr').value = email.vermittlernr;
+            document.getElementById('formVsnr').value = email.vsnr;
+            document.getElementById('formAnfrage').value = email.anfrage;
+            document.getElementById('formAntwort').value = email.antwort;
+            document.getElementById('formKommentar').value = email.kommentar;
 
             // Update cluster tags
             updateClusterTags(email);
@@ -1259,94 +1001,84 @@
         // ============================================================================
         // CLUSTER TAGS
         // ============================================================================
-        function setupClusterTags() {
+        function initClusterTags() {
             const container = document.getElementById('clusterTags');
-            container.innerHTML = allClusters.map(c => `
-                <span class="cluster-tag" data-cluster="${c}">${c}</span>
-            `).join('');
-
-            container.addEventListener('click', e => {
-                if (e.target.classList.contains('cluster-tag')) {
-                    toggleCluster(e.target.dataset.cluster);
-                }
-            });
-
-            // Comment input
-            document.getElementById('commentInput').addEventListener('change', e => {
-                if (selectedEmailId) {
-                    const email = emails.find(em => em.id === selectedEmailId);
-                    if (email) {
-                        email.kommentar = e.target.value;
-                    }
-                }
-            });
+            container.innerHTML = allClusters.map(c =>
+                `<span class="cluster-tag" data-cluster="${c}" onclick="toggleCluster('${c}')">${c}</span>`
+            ).join('');
         }
 
         function updateClusterTags(email) {
             document.querySelectorAll('.cluster-tag').forEach(tag => {
-                tag.classList.toggle('active', email.cluster.includes(tag.dataset.cluster));
+                const cluster = tag.dataset.cluster;
+                tag.classList.toggle('active', email.clusters.includes(cluster));
             });
         }
 
         function toggleCluster(cluster) {
             if (!selectedEmailId) return;
-
             const email = emails.find(e => e.id === selectedEmailId);
             if (!email) return;
 
-            const index = email.cluster.indexOf(cluster);
-            if (index > -1) {
-                email.cluster.splice(index, 1);
+            const idx = email.clusters.indexOf(cluster);
+            if (idx > -1) {
+                email.clusters.splice(idx, 1);
+                if (email.clusters.length === 0) email.clusters.push('Allgemein');
             } else {
-                email.cluster.push(cluster);
+                email.clusters.push(cluster);
+                const allgIdx = email.clusters.indexOf('Allgemein');
+                if (allgIdx > -1 && email.clusters.length > 1) email.clusters.splice(allgIdx, 1);
             }
 
             updateClusterTags(email);
             renderEmailList();
-            updateStats();
         }
 
         // ============================================================================
-        // SEARCH & FILTER
+        // FORM UPDATES
         // ============================================================================
-        function setupSearch() {
-            const input = document.getElementById('searchInput');
-            let timeout;
-            input.addEventListener('input', () => {
-                clearTimeout(timeout);
-                timeout = setTimeout(applyFilters, 300);
-            });
+        function updateField(field) {
+            if (!selectedEmailId) return;
+            const email = emails.find(e => e.id === selectedEmailId);
+            if (!email) return;
+
+            const elementId = 'form' + field.charAt(0).toUpperCase() + field.slice(1);
+            const element = document.getElementById(elementId);
+            if (element) {
+                email[field] = element.value;
+            }
+
+            if (field === 'status') updateStats();
+            renderEmailList();
         }
 
-        function setupFilters() {
-            document.getElementById('filterBar').addEventListener('click', e => {
-                if (e.target.classList.contains('filter-chip')) {
-                    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-                    e.target.classList.add('active');
-                    applyFilters();
-                }
+        // ============================================================================
+        // FILTERS
+        // ============================================================================
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.filter === filter);
             });
+            applyFilters();
         }
 
         function applyFilters() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const activeFilter = document.querySelector('.filter-chip.active')?.dataset.filter || 'all';
 
             filteredEmails = emails.filter(email => {
-                // Search filter
+                // Search
                 const matchesSearch = !searchTerm ||
                     email.betreff.toLowerCase().includes(searchTerm) ||
                     email.von_name.toLowerCase().includes(searchTerm) ||
                     email.von_email.toLowerCase().includes(searchTerm) ||
                     email.text.toLowerCase().includes(searchTerm);
 
-                // Category filter
+                // Filter
                 let matchesFilter = true;
-                if (activeFilter === 'uncategorized') {
-                    matchesFilter = email.cluster.length === 0;
-                } else if (activeFilter === 'provision') {
-                    matchesFilter = email.isProvision;
-                }
+                if (currentFilter === 'open') matchesFilter = email.status !== 'Erledigt';
+                else if (currentFilter === 'provision') matchesFilter = email.isProvision;
+                else if (currentFilter === 'incident') matchesFilter = email.kategorie.includes('Incident');
 
                 return matchesSearch && matchesFilter;
             });
@@ -1359,65 +1091,74 @@
         // ============================================================================
         function updateStats() {
             document.getElementById('statTotal').textContent = emails.length;
-            document.getElementById('statCategorized').textContent = emails.filter(e => e.cluster.length > 0).length;
+            document.getElementById('statDone').textContent = emails.filter(e => e.status === 'Erledigt').length;
         }
 
         // ============================================================================
-        // EXPORT
+        // EXCEL EXPORT
         // ============================================================================
-        function exportToCSV() {
-            const headers = ['ID', 'Datum', 'Von Email', 'Von Name', 'Betreff', 'Cluster', 'Kommentar', 'Ist Provision'];
-            const rows = emails.map(e => [
-                e.id,
-                e.datum,
-                e.von_email,
-                e.von_name,
-                e.betreff,
-                e.cluster.join('; '),
-                e.kommentar,
-                e.isProvision ? 'Ja' : 'Nein'
-            ]);
+        function exportToExcel() {
+            const data = emails.map(e => ({
+                'Datum': e.datum,
+                'Von Email': e.von_email,
+                'Von Name': e.von_name,
+                'Betreff': e.betreff,
+                'Kategorie': e.kategorie,
+                'Status': e.status,
+                'Cluster': e.clusters.join(', '),
+                'Agentur': e.agentur,
+                'Vermittlernr': e.vermittlernr,
+                'Versicherungsnr': e.vsnr,
+                'Anfrage': e.anfrage,
+                'Antwort': e.antwort,
+                'Kommentar': e.kommentar,
+                'Provision': e.isProvision ? 'Ja' : 'Nein'
+            }));
 
-            const csvContent = [headers, ...rows]
-                .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-                .join('\n');
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Emails');
 
-            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `hypercare_export_${new Date().toISOString().slice(0, 10)}.csv`;
-            link.click();
+            // Auto-width columns
+            const colWidths = Object.keys(data[0] || {}).map(key => ({ wch: Math.max(key.length, 15) }));
+            ws['!cols'] = colWidths;
 
-            showNotification(`${emails.length} Emails exportiert`, 'success', 'Export erfolgreich');
+            XLSX.writeFile(wb, 'hypercare_export_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+            showNotification(emails.length + ' Emails exportiert', 'success');
+        }
+
+        // ============================================================================
+        // RESET
+        // ============================================================================
+        function resetApp() {
+            emails = [];
+            filteredEmails = [];
+            selectedEmailId = null;
+            nextId = 1;
+
+            document.getElementById('uploadScreen').style.display = 'flex';
+            document.getElementById('mainContent').classList.remove('active');
+            document.getElementById('headerStats').style.display = 'none';
+            document.getElementById('btnNewFile').style.display = 'none';
+            document.getElementById('btnExport').style.display = 'none';
         }
 
         // ============================================================================
         // NOTIFICATIONS
         // ============================================================================
-        function showNotification(message, type = 'info', title = '') {
+        function showNotification(message, type = 'success') {
             const container = document.getElementById('notificationContainer');
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
+            const icons = { success: '✅', error: '❌', warning: '⚠️' };
 
-            const icons = {
-                success: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
-                warning: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
-                danger: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>',
-                info: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>'
-            };
-
-            notification.innerHTML = `
-                <div class="notification-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">${icons[type]}</svg>
-                </div>
-                <div class="notification-content">
-                    ${title ? `<div class="notification-title">${title}</div>` : ''}
-                    <div class="notification-message">${message}</div>
-                </div>
+            const notif = document.createElement('div');
+            notif.className = 'notification ' + type;
+            notif.innerHTML = `
+                <span class="notification-icon">${icons[type]}</span>
+                <span class="notification-text">${message}</span>
             `;
 
-            container.appendChild(notification);
-            setTimeout(() => notification.remove(), 4000);
+            container.appendChild(notif);
+            setTimeout(() => notif.remove(), 4000);
         }
 
         // ============================================================================
@@ -1425,7 +1166,7 @@
         // ============================================================================
         function escapeHtml(text) {
             const div = document.createElement('div');
-            div.textContent = text;
+            div.textContent = text || '';
             return div.innerHTML;
         }
     </script>
