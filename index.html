@@ -722,7 +722,26 @@
         // ============================================================================
         // FILE HANDLING
         // ============================================================================
-        function openFilePicker() {
+        async function openFilePicker() {
+            // Try modern File System Access API (opens in Downloads directly)
+            if ('showOpenFilePicker' in window) {
+                try {
+                    const [handle] = await window.showOpenFilePicker({
+                        startIn: 'downloads',
+                        types: [{
+                            description: 'JSON Dateien',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    const file = await handle.getFile();
+                    loadFile(file);
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return; // User cancelled
+                }
+            }
+
+            // Fallback for older browsers
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
