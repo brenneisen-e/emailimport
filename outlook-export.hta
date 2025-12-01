@@ -961,13 +961,13 @@
                     if (existingRow) {
                         // Email exists - check if we have new replies to add
                         if (email.antworten && email.antworten.length > 0) {
-                            var currentReplies = worksheet.Cells(existingRow, 10).Value || '';
+                            var currentReplies = worksheet.Cells(existingRow, 12).Value || '';  // Antwort = col 12
                             var newRepliesText = formatReplies(email.antworten);
 
                             // Only update if we have new content
                             if (newRepliesText && currentReplies.indexOf(newRepliesText.substring(0, 50)) === -1) {
                                 var combinedReplies = currentReplies ? currentReplies + '\n\n' + newRepliesText : newRepliesText;
-                                worksheet.Cells(existingRow, 10).Value = combinedReplies;
+                                worksheet.Cells(existingRow, 12).Value = combinedReplies;  // Antwort = col 12
                                 updateCount++;
                             } else {
                                 skipCount++;
@@ -1016,10 +1016,10 @@
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 if (lastRow <= 1) return data;
 
-                // Read date (col 2) and subject (col 8) to create unique keys
+                // Read date (col 2) and subject (col 10) to create unique keys
                 for (var row = 2; row <= lastRow; row++) {
                     var datum = worksheet.Cells(row, 2).Value || '';
-                    var betreff = worksheet.Cells(row, 8).Value || '';
+                    var betreff = worksheet.Cells(row, 10).Value || '';
 
                     if (datum || betreff) {
                         var key = createEmailKey(datum, betreff);
@@ -1057,27 +1057,32 @@
         }
 
         // Write a single email row to Excel
+        // Columns: ID, Datum, Kanal, BD-Nummer, Absender, Kategorie, Status, In Bearbeitung von,
+        //          Cluster, Betreff, Anfrage, Antwort, Diagnose, Workaround, Nächste Schritte,
+        //          Lösung, JIRA, Kommunikation, Kommentar
         function writeEmailRow(worksheet, row, email) {
-            var pd = email.provisionData || {};
-            var vermittlerName = pd.vorname_vermittler ? (pd.vorname_vermittler + ' ' + (pd.nachname_vermittler || '')) : '';
-            var kundeName = pd.vorname_kunde ? (pd.vorname_kunde + ' ' + (pd.nachname_kunde || '')) : '';
             var repliesText = formatReplies(email.antworten);
+            var absender = email.von_name || email.von_email || '';
 
-            worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);
-            worksheet.Cells(row, 2).Value = email.datum || '';
-            worksheet.Cells(row, 3).Value = 'Email';
-            worksheet.Cells(row, 4).Value = email.agentur || '';
-            worksheet.Cells(row, 5).Value = email.kategorie || '';
-            worksheet.Cells(row, 6).Value = email.status || 'Neu';
-            worksheet.Cells(row, 7).Value = (email.clusters || []).join(', ');
-            worksheet.Cells(row, 8).Value = email.betreff || '';
-            worksheet.Cells(row, 9).Value = email.text || email.anfrage || '';
-            worksheet.Cells(row, 10).Value = repliesText || email.antwort || '';
-            worksheet.Cells(row, 11).Value = vermittlerName || '';
-            worksheet.Cells(row, 12).Value = pd.vermittlernummer_vermittler || email.vermittlernr || '';
-            worksheet.Cells(row, 13).Value = kundeName || '';
-            worksheet.Cells(row, 14).Value = pd.versicherungsnummer_kunde || email.vsnr || '';
-            worksheet.Cells(row, 15).Value = email.kommentar || '';
+            worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
+            worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
+            worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
+            worksheet.Cells(row, 4).Value = email.agentur || email.vermittlernr || '';  // BD-Nummer
+            worksheet.Cells(row, 5).Value = absender;                    // Absender
+            worksheet.Cells(row, 6).Value = email.kategorie || '';       // Kategorie
+            worksheet.Cells(row, 7).Value = email.status || 'Neu';       // Status
+            worksheet.Cells(row, 8).Value = '';                          // In Bearbeitung von
+            worksheet.Cells(row, 9).Value = (email.clusters || []).join(', ');  // Cluster
+            worksheet.Cells(row, 10).Value = email.betreff || '';        // Betreff
+            worksheet.Cells(row, 11).Value = email.text || email.anfrage || '';  // Anfrage
+            worksheet.Cells(row, 12).Value = repliesText || email.antwort || ''; // Antwort
+            worksheet.Cells(row, 13).Value = '';                         // Diagnose
+            worksheet.Cells(row, 14).Value = '';                         // Workaround
+            worksheet.Cells(row, 15).Value = '';                         // Nächste Schritte
+            worksheet.Cells(row, 16).Value = '';                         // Lösung
+            worksheet.Cells(row, 17).Value = '';                         // JIRA
+            worksheet.Cells(row, 18).Value = '';                         // Kommunikation
+            worksheet.Cells(row, 19).Value = email.kommentar || '';      // Kommentar
         }
 
         // JSON polyfill
