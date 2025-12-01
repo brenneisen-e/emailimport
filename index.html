@@ -277,6 +277,9 @@
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
             transition: background 0.1s;
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
         }
 
         .email-item:hover { background: var(--bg-tertiary); }
@@ -285,10 +288,45 @@
             border-left: 3px solid var(--primary);
         }
 
+        .email-checkbox {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .email-item-content { flex: 1; min-width: 0; }
+
         .email-item-header {
             display: flex;
             justify-content: space-between;
             margin-bottom: 0.25rem;
+        }
+
+        .select-all-row {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .select-all-row label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .selected-count {
+            margin-left: auto;
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
 
         .email-sender { font-weight: 600; font-size: 0.875rem; }
@@ -769,6 +807,14 @@
                 <span class="filter-chip" data-filter="incident" onclick="setFilter('incident')">Incident</span>
             </div>
 
+            <div class="select-all-row" id="selectAllRow" style="display: none;">
+                <label>
+                    <input type="checkbox" id="selectAllCheckbox" class="email-checkbox" onchange="toggleSelectAll()">
+                    Alle auswählen
+                </label>
+                <span class="selected-count" id="selectedCount">0 ausgewählt</span>
+            </div>
+
             <div class="email-list" id="emailList"></div>
         </aside>
 
@@ -901,6 +947,7 @@
         let emails = [];
         let filteredEmails = [];
         let selectedEmailId = null;
+        let selectedForExport = new Set();  // IDs der für Export ausgewählten Emails
         let currentFilter = 'all';
         let nextId = 1;
 
@@ -1007,6 +1054,9 @@
             document.getElementById('btnNewFile').style.display = 'flex';
             document.getElementById('btnExport').style.display = 'flex';
 
+            // Select all emails for export by default
+            selectedForExport = new Set(emails.map(e => e.id));
+
             renderEmailList();
             updateStats();
             initClusterTags();
@@ -1061,17 +1111,31 @@
 
         function parseProvisionData(text) {
             const data = {};
-            const fields = [
+            const simpleFields = [
                 'vermittlernummer_vermittler', 'vorname_vermittler', 'nachname_vermittler',
                 'versicherungsnummer_kunde', 'vorname_kunde', 'nachname_kunde',
-                'reklamation_provision', 'reklamation_absatz', 'datenschutz', 'nachricht'
+                'reklamation_provision', 'reklamation_absatz', 'datenschutz'
             ];
 
-            fields.forEach(field => {
+            // Parse simple single-line fields
+            simpleFields.forEach(field => {
                 const regex = new RegExp(field + '\\s*:\\s*(.+?)(?=\\n|$)', 'i');
                 const match = text.match(regex);
                 if (match) data[field] = match[1].trim();
             });
+
+            // Parse 'nachricht' specially - it's multiline
+            // Extract from "nachricht :" until "datenschutz" or signature
+            const nachrichtMatch = text.match(/nachricht\s*:\s*([\s\S]*?)(?=datenschutz\s*:|_{5,}|Datenschutzhinweise|Vertraulichkeitshinweis|Confidentiality|________________________________|$)/i);
+            if (nachrichtMatch) {
+                let nachricht = nachrichtMatch[1].trim();
+                // Clean up extra whitespace and remove any trailing signature parts
+                nachricht = nachricht
+                    .replace(/\n{3,}/g, '\n\n')  // Reduce multiple newlines
+                    .replace(/[\r\n]+$/g, '')     // Remove trailing newlines
+                    .trim();
+                if (nachricht) data.nachricht = nachricht;
+            }
 
             return Object.keys(data).length > 0 ? data : null;
         }
@@ -1104,14 +1168,20 @@
 
             if (filteredEmails.length === 0) {
                 list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">Keine Emails gefunden</div>';
+                document.getElementById('selectAllRow').style.display = 'none';
                 return;
             }
+
+            // Show select-all row
+            document.getElementById('selectAllRow').style.display = 'flex';
+            updateSelectedCount();
 
             list.innerHTML = filteredEmails.map(email => {
                 const date = new Date(email.datum);
                 const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
                 const preview = (email.text || '').substring(0, 60).replace(/\n/g, ' ') + '...';
                 const selectedClass = email.id === selectedEmailId ? ' selected' : '';
+                const isChecked = selectedForExport.has(email.id) ? 'checked' : '';
 
                 let badges = '';
                 if (email.isProvision) badges += '<span class="badge badge-provision">€ Provision</span>';
@@ -1123,17 +1193,52 @@
                 });
 
                 return `
-                    <div class="email-item${selectedClass}" onclick="selectEmail(${email.id})">
-                        <div class="email-item-header">
-                            <span class="email-sender">${escapeHtml(email.von_name || email.von_email)}</span>
-                            <span class="email-date">${dateStr}</span>
+                    <div class="email-item${selectedClass}">
+                        <input type="checkbox" class="email-checkbox" ${isChecked}
+                               onclick="event.stopPropagation(); toggleEmailSelection(${email.id})">
+                        <div class="email-item-content" onclick="selectEmail(${email.id})">
+                            <div class="email-item-header">
+                                <span class="email-sender">${escapeHtml(email.von_name || email.von_email)}</span>
+                                <span class="email-date">${dateStr}</span>
+                            </div>
+                            <div class="email-subject">${escapeHtml(email.betreff)}</div>
+                            <div class="email-preview">${escapeHtml(preview)}</div>
+                            <div class="email-badges">${badges}</div>
                         </div>
-                        <div class="email-subject">${escapeHtml(email.betreff)}</div>
-                        <div class="email-preview">${escapeHtml(preview)}</div>
-                        <div class="email-badges">${badges}</div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function toggleEmailSelection(id) {
+            if (selectedForExport.has(id)) {
+                selectedForExport.delete(id);
+            } else {
+                selectedForExport.add(id);
+            }
+            updateSelectedCount();
+        }
+
+        function toggleSelectAll() {
+            const checkbox = document.getElementById('selectAllCheckbox');
+            if (checkbox.checked) {
+                // Select all visible emails
+                filteredEmails.forEach(email => selectedForExport.add(email.id));
+            } else {
+                // Deselect all visible emails
+                filteredEmails.forEach(email => selectedForExport.delete(email.id));
+            }
+            renderEmailList();
+        }
+
+        function updateSelectedCount() {
+            const count = selectedForExport.size;
+            document.getElementById('selectedCount').textContent = count + ' ausgewählt';
+
+            // Update select-all checkbox state
+            const allSelected = filteredEmails.length > 0 &&
+                               filteredEmails.every(e => selectedForExport.has(e.id));
+            document.getElementById('selectAllCheckbox').checked = allSelected;
         }
 
         // ============================================================================
@@ -1346,7 +1451,18 @@
         // SAVE AS JSON (for Excel Import HTA)
         // ============================================================================
         async function saveAsJson() {
-            const jsonData = JSON.stringify(emails, null, 2);
+            // Export only selected emails, or all if none selected
+            let emailsToExport = emails;
+            if (selectedForExport.size > 0) {
+                emailsToExport = emails.filter(e => selectedForExport.has(e.id));
+            }
+
+            if (emailsToExport.length === 0) {
+                showNotification('Keine Emails zum Exportieren ausgewählt', 'error');
+                return;
+            }
+
+            const jsonData = JSON.stringify(emailsToExport, null, 2);
             const filename = 'hypercare_bearbeitet_' + new Date().toISOString().slice(0, 10) + '.json';
 
             // Try modern File System Access API (saves to Downloads directly)
@@ -1363,7 +1479,7 @@
                     const writable = await handle.createWritable();
                     await writable.write(jsonData);
                     await writable.close();
-                    showNotification(emails.length + ' Emails gespeichert - jetzt mit excel-import.hta in Excel importieren', 'success');
+                    showNotification(emailsToExport.length + ' Emails gespeichert - jetzt mit Excel Import Tab importieren', 'success');
                     return;
                 } catch (err) {
                     if (err.name === 'AbortError') return;
@@ -1378,7 +1494,7 @@
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
-            showNotification(emails.length + ' Emails gespeichert - jetzt mit excel-import.hta in Excel importieren', 'success');
+            showNotification(emailsToExport.length + ' Emails gespeichert - jetzt mit Excel Import Tab importieren', 'success');
         }
 
         // ============================================================================
@@ -1388,6 +1504,7 @@
             emails = [];
             filteredEmails = [];
             selectedEmailId = null;
+            selectedForExport = new Set();
             nextId = 1;
 
             document.getElementById('uploadScreen').style.display = 'flex';
