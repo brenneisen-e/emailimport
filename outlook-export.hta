@@ -351,6 +351,8 @@
             setTimeout(function() { doExport(folderId, days); }, 100);
         }
 
+        var sentItemsCache = [];
+
         function doExport(folderId, days) {
             try {
                 var folder = (folderId === 'inbox') ? selectedStore.GetDefaultFolder(6) : namespace.GetFolderFromID(folderId);
@@ -359,6 +361,11 @@
 
                 var cutoffDate = new Date();
                 cutoffDate.setDate(cutoffDate.getDate() - days);
+
+                // Cache sent items first for reply matching
+                updateExportProgress(0, 100, 0);
+                document.getElementById('exportProgressText').innerText = 'Lade gesendete Emails...';
+                cacheSentItems(days);
 
                 var emails = [];
                 var total = Math.min(items.Count, 500);
@@ -371,7 +378,11 @@
                         if (item.Class !== 43) continue;
                         var receivedTime = new Date(item.ReceivedTime);
                         if (receivedTime < cutoffDate) { oldCount++; if (oldCount >= 20) break; continue; }
-                        emails.push(extractEmail(item));
+
+                        var emailData = extractEmail(item);
+                        // Find matching replies
+                        emailData.antworten = findReplies(emailData);
+                        emails.push(emailData);
                     } catch (e) {}
                 }
 
@@ -380,6 +391,108 @@
             } catch (e) {
                 showExportError("Fehler: " + e.message);
             }
+        }
+
+        function cacheSentItems(days) {
+            sentItemsCache = [];
+            try {
+                // Get Sent Items folder (olFolderSentMail = 5)
+                var sentFolder = selectedStore.GetDefaultFolder(5);
+                var sentItems = sentFolder.Items;
+                try { sentItems.Sort("[SentOn]", true); } catch (e) {}
+
+                var cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - (days + 30)); // Include 30 extra days for replies
+
+                var maxItems = Math.min(sentItems.Count, 500);
+                for (var i = 1; i <= maxItems; i++) {
+                    try {
+                        var item = sentItems.Item(i);
+                        if (item.Class !== 43) continue;
+
+                        var sentDate = new Date(item.SentOn);
+                        if (sentDate < cutoffDate) break;
+
+                        var subject = (item.Subject || '').toLowerCase().trim();
+                        // Remove Re:, AW:, Fwd:, etc.
+                        subject = subject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
+
+                        var body = '';
+                        try { body = item.Body || ''; } catch (e) {}
+
+                        sentItemsCache.push({
+                            sentDate: sentDate,
+                            normalizedSubject: subject,
+                            body: removeEmailQuotes(body)
+                        });
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        }
+
+        function findReplies(originalEmail) {
+            var replies = [];
+            if (!sentItemsCache || sentItemsCache.length === 0) return replies;
+
+            try {
+                var originalSubject = (originalEmail.betreff || '').toLowerCase().trim();
+                originalSubject = originalSubject.replace(/^(re|aw|fwd|fw|wg|antwort|antw):\s*/gi, '').trim();
+                var originalDate = new Date(originalEmail.datum);
+
+                for (var i = 0; i < sentItemsCache.length; i++) {
+                    var cached = sentItemsCache[i];
+
+                    // Reply must be after original email
+                    if (cached.sentDate < originalDate) continue;
+
+                    // Reply must be within 30 days
+                    var daysDiff = (cached.sentDate - originalDate) / (1000 * 60 * 60 * 24);
+                    if (daysDiff > 30) continue;
+
+                    // Subject must match
+                    if (cached.normalizedSubject === originalSubject ||
+                        cached.normalizedSubject.indexOf(originalSubject) !== -1 ||
+                        originalSubject.indexOf(cached.normalizedSubject) !== -1) {
+
+                        if (cached.body && cached.body.trim() !== '') {
+                            replies.push({
+                                datum: formatDate(cached.sentDate),
+                                text: cached.body.trim()
+                            });
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            return replies;
+        }
+
+        function removeEmailQuotes(text) {
+            if (!text) return '';
+
+            // Find where quoted content starts and cut it off
+            var patterns = [
+                /_{5,}\s*\n\s*Von:/i,
+                /\n\s*Von:\s+.+\n\s*Gesendet:/im,
+                /_{5,}\s*\n\s*From:/i,
+                /\n\s*From:\s+.+\n\s*Sent:/im,
+                /\n\s*Am\s+.+\s+schrieb\s+.+:/im,
+                /\n\s*On\s+.+\s+wrote:/im,
+                /-{3,}\s*Original/i
+            ];
+
+            for (var i = 0; i < patterns.length; i++) {
+                var match = text.search(patterns[i]);
+                if (match > 0) {
+                    text = text.substring(0, match);
+                    break;
+                }
+            }
+
+            // Trim and limit length
+            text = text.trim();
+            if (text.length > 10000) text = text.substring(0, 10000) + '...';
+            return text;
         }
 
         function extractEmail(item) {
@@ -403,7 +516,8 @@
                 von_name: item.SenderName || 'Unbekannt',
                 betreff: item.Subject || '(Kein Betreff)',
                 text: body,
-                anhaenge: attachments
+                anhaenge: attachments,
+                antworten: []
             };
         }
 
@@ -612,45 +726,56 @@
                 try { worksheet = targetWorkbook.Worksheets(sheetName); }
                 catch (e) { worksheet = targetWorkbook.Worksheets(1); }
 
-                // Auto-detect last row
+                // Read existing data for duplicate check
+                document.getElementById('importProgressText').innerText = 'Lese bestehende Daten...';
+                var existingData = readExistingData(worksheet);
+
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 if (lastRow === 1 && !worksheet.Cells(1, 1).Value) lastRow = 0;
-                var startRow = lastRow + 1;
+                var nextRow = lastRow + 1;
 
                 var total = jsonData.length;
+                var newCount = 0;
+                var skipCount = 0;
+                var updateCount = 0;
+
                 for (var i = 0; i < total; i++) {
-                    var row = startRow + i;
                     var email = jsonData[i];
-
-                    if (i % 5 === 0) updateImportProgress(i, total);
-
-                    var pd = email.provisionData || {};
-                    var vermittlerName = pd.vorname_vermittler ? (pd.vorname_vermittler + ' ' + (pd.nachname_vermittler || '')) : '';
-                    var kundeName = pd.vorname_kunde ? (pd.vorname_kunde + ' ' + (pd.nachname_kunde || '')) : '';
-
-                    var repliesText = '';
-                    if (email.antworten && email.antworten.length > 0) {
-                        for (var r = 0; r < email.antworten.length; r++) {
-                            var reply = email.antworten[r];
-                            repliesText += '[' + (reply.datum || '') + '] ' + (reply.text || '') + '\n\n';
-                        }
+                    if (i % 3 === 0) {
+                        updateImportProgress(i, total);
+                        document.getElementById('importProgressText').innerText =
+                            'Verarbeite ' + (i+1) + '/' + total + ' (Neu: ' + newCount + ', Aktualisiert: ' + updateCount + ', Übersprungen: ' + skipCount + ')';
                     }
 
-                    worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);
-                    worksheet.Cells(row, 2).Value = email.datum || '';
-                    worksheet.Cells(row, 3).Value = 'Email';
-                    worksheet.Cells(row, 4).Value = email.agentur || '';
-                    worksheet.Cells(row, 5).Value = email.kategorie || '';
-                    worksheet.Cells(row, 6).Value = email.status || 'Neu';
-                    worksheet.Cells(row, 7).Value = (email.clusters || []).join(', ');
-                    worksheet.Cells(row, 8).Value = email.betreff || '';
-                    worksheet.Cells(row, 9).Value = email.text || email.anfrage || '';
-                    worksheet.Cells(row, 10).Value = repliesText || email.antwort || '';
-                    worksheet.Cells(row, 11).Value = vermittlerName || '';
-                    worksheet.Cells(row, 12).Value = pd.vermittlernummer_vermittler || email.vermittlernr || '';
-                    worksheet.Cells(row, 13).Value = kundeName || '';
-                    worksheet.Cells(row, 14).Value = pd.versicherungsnummer_kunde || email.vsnr || '';
-                    worksheet.Cells(row, 15).Value = email.kommentar || '';
+                    // Create unique key from date + subject
+                    var emailKey = createEmailKey(email.datum, email.betreff);
+                    var existingRow = existingData[emailKey];
+
+                    if (existingRow) {
+                        // Email exists - check if we have new replies to add
+                        if (email.antworten && email.antworten.length > 0) {
+                            var currentReplies = worksheet.Cells(existingRow, 10).Value || '';
+                            var newRepliesText = formatReplies(email.antworten);
+
+                            // Only update if we have new content
+                            if (newRepliesText && currentReplies.indexOf(newRepliesText.substring(0, 50)) === -1) {
+                                var combinedReplies = currentReplies ? currentReplies + '\n\n' + newRepliesText : newRepliesText;
+                                worksheet.Cells(existingRow, 10).Value = combinedReplies;
+                                updateCount++;
+                            } else {
+                                skipCount++;
+                            }
+                        } else {
+                            skipCount++;
+                        }
+                    } else {
+                        // New email - add to Excel
+                        writeEmailRow(worksheet, nextRow, email);
+                        // Add to existing data cache to prevent duplicates within same import
+                        existingData[emailKey] = nextRow;
+                        nextRow++;
+                        newCount++;
+                    }
                 }
 
                 updateImportProgress(total, total);
@@ -658,7 +783,10 @@
 
                 document.getElementById('importProgress').style.display = 'none';
                 document.getElementById('importSuccess').style.display = 'block';
-                document.getElementById('importSuccessMsg').innerHTML = total + ' Datensatze importiert (Zeile ' + startRow + ' bis ' + (startRow + total - 1) + ')';
+                document.getElementById('importSuccessMsg').innerHTML =
+                    '<strong>' + newCount + '</strong> neue Vorgange importiert<br>' +
+                    '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
+                    '<strong>' + skipCount + '</strong> Duplikate ubersprungen';
                 document.getElementById('importBtn').disabled = false;
 
             } catch (e) {
@@ -672,6 +800,77 @@
         function updateImportProgress(current, total) {
             document.getElementById('importProgressFill').style.width = Math.round((current / total) * 100) + '%';
             document.getElementById('importProgressText').innerText = 'Importiere ' + current + '/' + total + '...';
+        }
+
+        // Read existing data from Excel for duplicate checking
+        function readExistingData(worksheet) {
+            var data = {};
+            try {
+                var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
+                if (lastRow <= 1) return data;
+
+                // Read date (col 2) and subject (col 8) to create unique keys
+                for (var row = 2; row <= lastRow; row++) {
+                    var datum = worksheet.Cells(row, 2).Value || '';
+                    var betreff = worksheet.Cells(row, 8).Value || '';
+
+                    if (datum || betreff) {
+                        var key = createEmailKey(datum, betreff);
+                        data[key] = row;
+                    }
+                }
+            } catch (e) {}
+            return data;
+        }
+
+        // Create unique key from date and subject
+        function createEmailKey(datum, betreff) {
+            var dateStr = '';
+            if (datum) {
+                try {
+                    var d = new Date(datum);
+                    dateStr = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                } catch (e) {
+                    dateStr = String(datum).substring(0, 10);
+                }
+            }
+            var subjectStr = String(betreff || '').toLowerCase().trim().substring(0, 100);
+            return dateStr + '|' + subjectStr;
+        }
+
+        // Format replies array to text
+        function formatReplies(antworten) {
+            if (!antworten || antworten.length === 0) return '';
+            var text = '';
+            for (var r = 0; r < antworten.length; r++) {
+                var reply = antworten[r];
+                text += '[' + (reply.datum || '') + '] ' + (reply.text || '') + '\n\n';
+            }
+            return text.trim();
+        }
+
+        // Write a single email row to Excel
+        function writeEmailRow(worksheet, row, email) {
+            var pd = email.provisionData || {};
+            var vermittlerName = pd.vorname_vermittler ? (pd.vorname_vermittler + ' ' + (pd.nachname_vermittler || '')) : '';
+            var kundeName = pd.vorname_kunde ? (pd.vorname_kunde + ' ' + (pd.nachname_kunde || '')) : '';
+            var repliesText = formatReplies(email.antworten);
+
+            worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);
+            worksheet.Cells(row, 2).Value = email.datum || '';
+            worksheet.Cells(row, 3).Value = 'Email';
+            worksheet.Cells(row, 4).Value = email.agentur || '';
+            worksheet.Cells(row, 5).Value = email.kategorie || '';
+            worksheet.Cells(row, 6).Value = email.status || 'Neu';
+            worksheet.Cells(row, 7).Value = (email.clusters || []).join(', ');
+            worksheet.Cells(row, 8).Value = email.betreff || '';
+            worksheet.Cells(row, 9).Value = email.text || email.anfrage || '';
+            worksheet.Cells(row, 10).Value = repliesText || email.antwort || '';
+            worksheet.Cells(row, 11).Value = vermittlerName || '';
+            worksheet.Cells(row, 12).Value = pd.vermittlernummer_vermittler || email.vermittlernr || '';
+            worksheet.Cells(row, 13).Value = kundeName || '';
+            worksheet.Cells(row, 14).Value = pd.versicherungsnummer_kunde || email.vsnr || '';
+            worksheet.Cells(row, 15).Value = email.kommentar || '';
         }
 
         // JSON polyfill
