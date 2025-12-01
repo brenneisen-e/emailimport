@@ -267,6 +267,14 @@
             }
             document.getElementById('tabExport').className = 'tab-content' + (tab === 'export' ? ' active' : '');
             document.getElementById('tabImport').className = 'tab-content' + (tab === 'import' ? ' active' : '');
+
+            // If switching to import and Excel was already connected during export, reuse it
+            if (tab === 'import' && exportWorkbook && !targetWorkbook) {
+                excelApp = exportExcelApp;
+                targetWorkbook = exportWorkbook;
+                document.getElementById('excelStatus').value = "OK: " + targetWorkbook.Name + " (vom Export übernommen)";
+                checkImportReady();
+            }
         }
 
         // ============================================================================
@@ -506,6 +514,7 @@
             oldCount: 0,
             repliesFound: 0,
             duplicatesSkipped: 0,
+            duplicatesWithReplies: 0,
             cutoffDate: null
         };
 
@@ -527,6 +536,7 @@
                 exportState.oldCount = 0;
                 exportState.repliesFound = 0;
                 exportState.duplicatesSkipped = 0;
+                exportState.duplicatesWithReplies = 0;
 
                 // Phase 2: Cache sent items (async - will start Phase 3 when done)
                 document.getElementById('exportProgressText').innerText = 'Phase 2/3: Lade gesendete Emails...';
@@ -568,28 +578,46 @@
                     // Check for duplicates if Excel was connected
                     var hasExcelData = false;
                     for (var k in existingEmailKeys) { hasExcelData = true; break; }
+                    var isDuplicate = false;
                     if (hasExcelData) {
                         var dateKey = formatDateKey(emailData.datum);
                         var convKey = 'conv|' + (emailData.conversationId || '') + '|' + dateKey;
                         var emailKey = createExportEmailKey(emailData.datum, emailData.betreff);
                         // Check ConversationID+Date first (allows new replies), then date+subject
                         if ((emailData.conversationId && existingEmailKeys[convKey]) || existingEmailKeys[emailKey]) {
-                            exportState.duplicatesSkipped++;
-                            continue;  // Skip this email - already in Excel
+                            isDuplicate = true;
                         }
                     }
 
+                    // Always check for replies (even for duplicates - there might be new ones)
                     emailData.antworten = findReplies(emailData);
                     exportState.repliesFound += emailData.antworten.length;
-                    exportState.emails.push(emailData);
+
+                    if (isDuplicate) {
+                        // Duplicate - but include if there are new replies to update
+                        if (emailData.antworten && emailData.antworten.length > 0) {
+                            emailData.isDuplicateWithNewReplies = true;  // Flag for import
+                            exportState.duplicatesWithReplies++;
+                            exportState.emails.push(emailData);
+                        } else {
+                            exportState.duplicatesSkipped++;
+                        }
+                    } else {
+                        // New email - always include
+                        exportState.emails.push(emailData);
+                    }
                 } catch (e) {}
             }
 
             // Update UI
             var pct = 30 + Math.round((exportState.current / exportState.total) * 70);
             document.getElementById('exportProgressFill').style.width = pct + '%';
+            var newCount = exportState.emails.length - exportState.duplicatesWithReplies;
             var statusText = 'Phase 3/3: Email ' + exportState.current + '/' + exportState.total +
-                ' (' + exportState.emails.length + ' neu';
+                ' (' + newCount + ' neu';
+            if (exportState.duplicatesWithReplies > 0) {
+                statusText += ', ' + exportState.duplicatesWithReplies + ' Updates';
+            }
             if (exportState.duplicatesSkipped > 0) {
                 statusText += ', ' + exportState.duplicatesSkipped + ' Duplikate';
             }
@@ -606,10 +634,10 @@
 
         function finishExport() {
             if (exportState.emails.length === 0) {
-                showExportError("Keine Emails gefunden.");
+                showExportError("Keine neuen Emails gefunden.");
                 return;
             }
-            saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped);
+            saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies);
         }
 
         // State for async sent items caching
@@ -871,7 +899,7 @@
 
         function pad(n) { return n < 10 ? '0' + n : n; }
 
-        function saveExportFile(emails, totalReplies, duplicatesSkipped) {
+        function saveExportFile(emails, totalReplies, duplicatesSkipped, duplicatesWithReplies) {
             try {
                 var shell = new ActiveXObject("WScript.Shell");
                 var shellApp = new ActiveXObject("Shell.Application");
@@ -891,7 +919,11 @@
 
                 document.getElementById('exportProgress').style.display = 'none';
                 document.getElementById('exportSuccess').style.display = 'block';
-                var msg = '<strong>' + emails.length + ' neue Emails</strong> exportiert<br>';
+                var newCount = emails.length - (duplicatesWithReplies || 0);
+                var msg = '<strong>' + newCount + ' neue Emails</strong> exportiert<br>';
+                if (duplicatesWithReplies > 0) {
+                    msg += '<strong>' + duplicatesWithReplies + ' Updates</strong> (Duplikate mit neuen Antworten)<br>';
+                }
                 if (duplicatesSkipped > 0) {
                     msg += duplicatesSkipped + ' Duplikate übersprungen<br>';
                 }
