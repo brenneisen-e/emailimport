@@ -210,7 +210,7 @@
                 </button>
 
                 <label>Tabellenblatt</label>
-                <input type="text" id="sheetName" value="Ubersicht">
+                <input type="text" id="sheetName" value="Übersicht">
 
                 <button class="btn btn-success" id="importBtn" onclick="startImport()" disabled>
                     &#128200; In Excel importieren
@@ -914,7 +914,7 @@
         }
 
         function startImport() {
-            var sheetName = document.getElementById('sheetName').value || "Ubersicht";
+            var sheetName = document.getElementById('sheetName').value || "Übersicht";
 
             if (!jsonData || jsonData.length === 0) { alert("Keine JSON-Daten geladen!"); return; }
             if (!targetWorkbook) { alert("Keine Excel-Datei erkannt! Klicke 'Excel erkennen'."); return; }
@@ -930,8 +930,16 @@
         function doImport(sheetName) {
             try {
                 var worksheet;
-                try { worksheet = targetWorkbook.Worksheets(sheetName); }
-                catch (e) { worksheet = targetWorkbook.Worksheets(1); }
+                try {
+                    worksheet = targetWorkbook.Worksheets(sheetName);
+                } catch (e) {
+                    // Sheet not found - list available sheets for user
+                    var availableSheets = [];
+                    for (var s = 1; s <= targetWorkbook.Worksheets.Count; s++) {
+                        try { availableSheets.push(targetWorkbook.Worksheets(s).Name); } catch (ex) {}
+                    }
+                    throw new Error('Tabellenblatt "' + sheetName + '" nicht gefunden!\n\nVerfügbare Blätter: ' + availableSheets.join(', '));
+                }
 
                 // Read existing data for duplicate check
                 document.getElementById('importProgressText').innerText = 'Lese bestehende Daten...';
