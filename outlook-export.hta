@@ -353,66 +353,102 @@
 
         var sentItemsCache = [];
 
+        // Export state for async processing
+        var exportState = {
+            items: null,
+            emails: [],
+            total: 0,
+            current: 0,
+            oldCount: 0,
+            repliesFound: 0,
+            cutoffDate: null
+        };
+
         function doExport(folderId, days) {
             try {
                 // Phase 1: Get folder
                 document.getElementById('exportProgressText').innerText = 'Phase 1/3: Ordner wird geladen...';
-                updateExportProgress(0, 100, 0);
+                document.getElementById('exportProgressFill').style.width = '5%';
 
                 var folder = (folderId === 'inbox') ? selectedStore.GetDefaultFolder(6) : namespace.GetFolderFromID(folderId);
-                var items = folder.Items;
-                try { items.Sort("[ReceivedTime]", true); } catch (e) {}
+                exportState.items = folder.Items;
+                try { exportState.items.Sort("[ReceivedTime]", true); } catch (e) {}
 
-                var cutoffDate = new Date();
-                cutoffDate.setDate(cutoffDate.getDate() - days);
+                exportState.cutoffDate = new Date();
+                exportState.cutoffDate.setDate(exportState.cutoffDate.getDate() - days);
+                exportState.emails = [];
+                exportState.total = Math.min(exportState.items.Count, 500);
+                exportState.current = 1;
+                exportState.oldCount = 0;
+                exportState.repliesFound = 0;
 
-                // Phase 2: Cache sent items for reply matching
-                document.getElementById('exportProgressText').innerText = 'Phase 2/3: Lade gesendete Emails fur Antwort-Matching...';
-                updateExportProgress(10, 100, 0);
-                cacheSentItems(days);
+                // Phase 2: Cache sent items (with UI updates)
+                document.getElementById('exportProgressText').innerText = 'Phase 2/3: Lade gesendete Emails...';
+                document.getElementById('exportProgressFill').style.width = '10%';
 
-                // Phase 3: Process emails
-                document.getElementById('exportProgressText').innerText = 'Phase 3/3: Verarbeite Posteingang...';
-                var emails = [];
-                var total = Math.min(items.Count, 500);
-                var oldCount = 0;
-                var repliesFound = 0;
+                setTimeout(function() {
+                    cacheSentItems(days);
+                    // Start Phase 3 after a short delay
+                    setTimeout(function() {
+                        processEmailBatch();
+                    }, 50);
+                }, 50);
 
-                for (var i = 1; i <= total; i++) {
-                    // Update progress every email for better feedback
-                    if (i % 2 === 0 || i === 1) {
-                        var pct = 30 + Math.round((i / total) * 70);
-                        document.getElementById('exportProgressFill').style.width = pct + '%';
-                        document.getElementById('exportProgressText').innerText =
-                            'Phase 3/3: Email ' + i + '/' + total + ' (' + emails.length + ' gefunden, ' + repliesFound + ' Antworten)';
-                    }
-
-                    try {
-                        var item = items.Item(i);
-                        if (item.Class !== 43) continue;
-                        var receivedTime = new Date(item.ReceivedTime);
-                        if (receivedTime < cutoffDate) { oldCount++; if (oldCount >= 20) break; continue; }
-
-                        var emailData = extractEmail(item);
-                        // Find matching replies
-                        emailData.antworten = findReplies(emailData);
-                        repliesFound += emailData.antworten.length;
-                        emails.push(emailData);
-                    } catch (e) {}
-                }
-
-                if (emails.length === 0) { showExportError("Keine Emails gefunden."); return; }
-
-                // Count total replies found
-                var totalReplies = 0;
-                for (var r = 0; r < emails.length; r++) {
-                    if (emails[r].antworten) totalReplies += emails[r].antworten.length;
-                }
-
-                saveExportFile(emails, totalReplies);
             } catch (e) {
                 showExportError("Fehler: " + e.message);
             }
+        }
+
+        function processEmailBatch() {
+            var batchSize = 5; // Process 5 emails per batch
+            var processed = 0;
+
+            while (processed < batchSize && exportState.current <= exportState.total) {
+                var i = exportState.current;
+                exportState.current++;
+                processed++;
+
+                try {
+                    var item = exportState.items.Item(i);
+                    if (item.Class !== 43) continue;
+                    var receivedTime = new Date(item.ReceivedTime);
+                    if (receivedTime < exportState.cutoffDate) {
+                        exportState.oldCount++;
+                        if (exportState.oldCount >= 20) {
+                            exportState.current = exportState.total + 1; // Stop
+                            break;
+                        }
+                        continue;
+                    }
+
+                    var emailData = extractEmail(item);
+                    emailData.antworten = findReplies(emailData);
+                    exportState.repliesFound += emailData.antworten.length;
+                    exportState.emails.push(emailData);
+                } catch (e) {}
+            }
+
+            // Update UI
+            var pct = 30 + Math.round((exportState.current / exportState.total) * 70);
+            document.getElementById('exportProgressFill').style.width = pct + '%';
+            document.getElementById('exportProgressText').innerText =
+                'Phase 3/3: Email ' + exportState.current + '/' + exportState.total +
+                ' (' + exportState.emails.length + ' gefunden, ' + exportState.repliesFound + ' Antworten)';
+
+            // Continue or finish
+            if (exportState.current <= exportState.total) {
+                setTimeout(processEmailBatch, 10); // Small delay for UI update
+            } else {
+                finishExport();
+            }
+        }
+
+        function finishExport() {
+            if (exportState.emails.length === 0) {
+                showExportError("Keine Emails gefunden.");
+                return;
+            }
+            saveExportFile(exportState.emails, exportState.repliesFound);
         }
 
         function cacheSentItems(days) {
