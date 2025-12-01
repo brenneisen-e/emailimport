@@ -1150,9 +1150,22 @@
         // ============================================================================
         // MICROSOFT GRAPH CONFIGURATION
         // ============================================================================
+        // ┌─────────────────────────────────────────────────────────────────────────┐
+        // │  ADMIN: Trage hier EINMAL deine Azure AD Client ID ein!                 │
+        // │  Danach können alle User die App ohne Setup nutzen.                     │
+        // │                                                                          │
+        // │  So erstellst du die App:                                               │
+        // │  1. Azure Portal > App registrations > New registration                 │
+        // │  2. Name: "BGAV Hypercare Email Tool"                                   │
+        // │  3. Redirect URI (SPA): deine-cloudflare-url.pages.dev                  │
+        // │  4. API permissions: Mail.Read, User.Read (Delegated)                   │
+        // │  5. Kopiere die Application (client) ID hier unten                      │
+        // └─────────────────────────────────────────────────────────────────────────┘
+        const AZURE_CLIENT_ID = ""; // <-- HIER CLIENT ID EINTRAGEN
+
         const msalConfig = {
             auth: {
-                clientId: "your-client-id-here", // Will be configured
+                clientId: AZURE_CLIENT_ID,
                 authority: "https://login.microsoftonline.com/common",
                 redirectUri: window.location.origin + window.location.pathname
             },
@@ -1183,89 +1196,62 @@
         document.addEventListener('DOMContentLoaded', async () => {
             setupBatchEditCheckboxes();
 
-            // Check for existing Client ID in URL or localStorage
-            const urlParams = new URLSearchParams(window.location.search);
-            const clientIdFromUrl = urlParams.get('clientId');
-            const storedClientId = localStorage.getItem('msGraphClientId');
-
-            if (clientIdFromUrl) {
-                msalConfig.auth.clientId = clientIdFromUrl;
-                localStorage.setItem('msGraphClientId', clientIdFromUrl);
-            } else if (storedClientId) {
-                msalConfig.auth.clientId = storedClientId;
+            // Check if Admin has configured the Client ID
+            if (!AZURE_CLIENT_ID || AZURE_CLIENT_ID.trim() === '') {
+                showAdminSetupRequired();
+                return;
             }
 
             // Try to initialize MSAL
             try {
-                if (msalConfig.auth.clientId && msalConfig.auth.clientId !== 'your-client-id-here') {
-                    msalInstance = new msal.PublicClientApplication(msalConfig);
-                    await msalInstance.initialize();
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                await msalInstance.initialize();
 
-                    // Handle redirect response
-                    const response = await msalInstance.handleRedirectPromise();
-                    if (response) {
-                        await handleAuthResponse(response);
-                    } else {
-                        // Check for existing session
-                        const accounts = msalInstance.getAllAccounts();
-                        if (accounts.length > 0) {
-                            await silentLogin(accounts[0]);
-                        }
-                    }
+                // Handle redirect response
+                const response = await msalInstance.handleRedirectPromise();
+                if (response) {
+                    await handleAuthResponse(response);
                 } else {
-                    // Show configuration hint
-                    showConfigurationHint();
+                    // Check for existing session
+                    const accounts = msalInstance.getAllAccounts();
+                    if (accounts.length > 0) {
+                        await silentLogin(accounts[0]);
+                    }
                 }
             } catch (error) {
                 console.error("MSAL init error:", error);
-                showConfigurationHint();
+                showNotification('Authentifizierung fehlgeschlagen: ' + error.message, 'danger', 'Fehler');
             }
         });
 
-        function showConfigurationHint() {
+        function showAdminSetupRequired() {
             const loginCard = document.querySelector('.login-card');
             loginCard.innerHTML = `
-                <div class="login-icon">
+                <div class="login-icon" style="background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);">
                     <svg viewBox="0 0 24 24" fill="white">
-                        <path d="M11.5 3v8.5H3V3h8.5zm0 18H3v-8.5h8.5V21zm1-18H21v8.5h-8.5V3zm8.5 18h-8.5v-8.5H21V21z"/>
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                     </svg>
                 </div>
-                <h2 class="login-title">Konfiguration erforderlich</h2>
-                <p class="login-subtitle">Bitte gib deine Azure AD Client ID ein</p>
+                <h2 class="login-title">Setup durch Admin erforderlich</h2>
+                <p class="login-subtitle">Die App wurde noch nicht konfiguriert</p>
 
-                <div style="margin: 1.5rem 0;">
-                    <input type="text" id="clientIdInput" class="field-input" style="width: 100%; margin-bottom: 1rem;"
-                           placeholder="Azure AD Client ID eingeben...">
-                    <button class="btn btn-microsoft" style="width: 100%;" onclick="saveClientId()">
-                        Speichern & Anmelden
-                    </button>
+                <div style="background: var(--bg-tertiary); border-radius: var(--radius-md); padding: 1.5rem; margin: 1.5rem 0; text-align: left;">
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                        <strong>Für Administratoren:</strong>
+                    </p>
+                    <p style="font-size: 0.8125rem; color: var(--text-muted); line-height: 1.8;">
+                        Öffne <code style="background: var(--bg-primary); padding: 0.125rem 0.375rem; border-radius: 4px;">index.html</code>
+                        und trage die Azure AD Client ID in Zeile 1164 ein:
+                    </p>
+                    <pre style="background: var(--bg-primary); padding: 1rem; border-radius: var(--radius-sm); margin-top: 1rem; overflow-x: auto; font-size: 0.75rem; color: var(--primary-light);">const AZURE_CLIENT_ID = "deine-client-id-hier";</pre>
                 </div>
 
                 <div class="login-features" style="text-align: left;">
-                    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
-                        <strong>So erstellst du eine Azure AD App:</strong>
+                    <p style="font-size: 0.8125rem; color: var(--text-muted);">
+                        Nach einmaliger Konfiguration können alle Benutzer die App ohne weiteres Setup nutzen.
                     </p>
-                    <ol style="font-size: 0.8125rem; color: var(--text-muted); padding-left: 1.25rem; line-height: 1.8;">
-                        <li>Gehe zu <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" style="color: var(--primary);">Azure Portal > App Registrations</a></li>
-                        <li>Klicke "New registration"</li>
-                        <li>Name: "BGAV Hypercare"</li>
-                        <li>Redirect URI: <code style="background: var(--bg-primary); padding: 0.125rem 0.375rem; border-radius: 4px;">${window.location.origin}${window.location.pathname}</code></li>
-                        <li>Kopiere die "Application (client) ID"</li>
-                        <li>Unter "API permissions" > "Add permission" > "Microsoft Graph" > "Delegated" > <code>Mail.Read</code> und <code>User.Read</code></li>
-                    </ol>
                 </div>
             `;
-        }
-
-        function saveClientId() {
-            const clientId = document.getElementById('clientIdInput').value.trim();
-            if (!clientId) {
-                showNotification('Bitte eine Client ID eingeben!', 'warning', 'Fehler');
-                return;
-            }
-
-            localStorage.setItem('msGraphClientId', clientId);
-            window.location.href = window.location.origin + window.location.pathname + '?clientId=' + clientId;
         }
 
         // ============================================================================
