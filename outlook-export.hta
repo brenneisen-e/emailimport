@@ -554,7 +554,8 @@
                 exportState.current = 1;
                 exportState.oldCount = 0;
                 exportState.repliesFound = 0;
-                exportState.duplicatesSkipped = 0;
+                exportState.duplicatesSkipped = 0;      // Duplicates from Excel
+                exportState.batchDuplicates = 0;        // Duplicates within same export batch
                 exportState.duplicatesWithReplies = 0;
                 exportState.processedConvIds = {};  // Track ConversationIDs already processed in this export
 
@@ -598,7 +599,7 @@
                     // Skip if we already processed this ConversationID in this export batch
                     // (handles forwarded emails appearing multiple times in folder)
                     if (emailData.conversationId && exportState.processedConvIds[emailData.conversationId]) {
-                        exportState.duplicatesSkipped++;
+                        exportState.batchDuplicates++;
                         continue;
                     }
                     if (emailData.conversationId) {
@@ -664,7 +665,10 @@
                 statusText += ', ' + exportState.duplicatesWithReplies + ' Updates';
             }
             if (exportState.duplicatesSkipped > 0) {
-                statusText += ', ' + exportState.duplicatesSkipped + ' Duplikate';
+                statusText += ', ' + exportState.duplicatesSkipped + ' in Excel';
+            }
+            if (exportState.batchDuplicates > 0) {
+                statusText += ', ' + exportState.batchDuplicates + ' doppelt';
             }
             statusText += ', ' + exportState.repliesFound + ' Antworten)';
             document.getElementById('exportProgressText').innerText = statusText;
@@ -682,7 +686,7 @@
                 showExportError("Keine neuen Emails gefunden.");
                 return;
             }
-            saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies);
+            saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates);
         }
 
         // State for async sent items caching
@@ -983,7 +987,7 @@
 
         function pad(n) { return n < 10 ? '0' + n : n; }
 
-        function saveExportFile(emails, totalReplies, duplicatesSkipped, duplicatesWithReplies) {
+        function saveExportFile(emails, totalReplies, duplicatesSkipped, duplicatesWithReplies, batchDuplicates) {
             try {
                 var shell = new ActiveXObject("WScript.Shell");
                 var shellApp = new ActiveXObject("Shell.Application");
@@ -1006,10 +1010,13 @@
                 var newCount = emails.length - (duplicatesWithReplies || 0);
                 var msg = '<strong>' + newCount + ' neue Emails</strong> exportiert<br>';
                 if (duplicatesWithReplies > 0) {
-                    msg += '<strong>' + duplicatesWithReplies + ' Updates</strong> (Duplikate mit neuen Antworten)<br>';
+                    msg += '<strong>' + duplicatesWithReplies + ' Updates</strong> (mit neuen Antworten)<br>';
                 }
                 if (duplicatesSkipped > 0) {
-                    msg += duplicatesSkipped + ' Duplikate übersprungen<br>';
+                    msg += duplicatesSkipped + ' bereits in Excel<br>';
+                }
+                if (batchDuplicates > 0) {
+                    msg += batchDuplicates + ' doppelt im Ordner (gleiche Konversation)<br>';
                 }
                 msg += (totalReplies || 0) + ' Antworten gefunden<br>';
                 msg += 'Datei: <strong>' + filename + '</strong>';
@@ -1538,7 +1545,12 @@
                 .replace(/Ã®/g, 'î').replace(/Ã¯/g, 'ï')
                 .replace(/Ã´/g, 'ô').replace(/Ã¹/g, 'ù')
                 .replace(/Ã»/g, 'û').replace(/Ã§/g, 'ç')
-                .replace(/â‚¬/g, '€');
+                .replace(/â‚¬/g, '€')
+                // German quotation marks and dashes
+                .replace(/â€ž/g, '„').replace(/â€œ/g, '"')
+                .replace(/â€˜/g, ''').replace(/â€™/g, ''')
+                .replace(/â€"/g, '–').replace(/â€"/g, '—')
+                .replace(/â€¦/g, '…');
         }
 
         // JSON polyfill
