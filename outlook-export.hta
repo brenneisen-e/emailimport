@@ -275,10 +275,19 @@
 
             // If switching to import and Excel was already connected during export, reuse it
             if (tab === 'import' && exportWorkbook && !targetWorkbook) {
-                excelApp = exportExcelApp;
-                targetWorkbook = exportWorkbook;
-                document.getElementById('excelStatus').value = "OK: " + targetWorkbook.Name + " (vom Export übernommen)";
-                checkImportReady();
+                try {
+                    // Test if Excel connection is still valid
+                    var testName = exportWorkbook.Name;
+                    excelApp = exportExcelApp;
+                    targetWorkbook = exportWorkbook;
+                    document.getElementById('excelStatus').value = "OK: " + testName + " (vom Export übernommen)";
+                    checkImportReady();
+                } catch (e) {
+                    // Excel connection lost - reset
+                    exportWorkbook = null;
+                    exportExcelApp = null;
+                    document.getElementById('excelStatus').value = "Excel-Verbindung verloren - bitte neu verbinden";
+                }
             }
         }
 
