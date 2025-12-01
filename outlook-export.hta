@@ -548,9 +548,18 @@
             try {
                 var fso = new ActiveXObject("Scripting.FileSystemObject");
                 var shell = new ActiveXObject("WScript.Shell");
+                var shellApp = new ActiveXObject("Shell.Application");
 
-                // Save to Downloads folder
-                var downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+                // Get current user's Downloads folder correctly
+                // 0x0028 = Downloads folder GUID
+                var downloads;
+                try {
+                    var downloadsFolder = shellApp.NameSpace("shell:Downloads");
+                    downloads = downloadsFolder.Self.Path;
+                } catch (e) {
+                    // Fallback
+                    downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+                }
 
                 var filename = 'hypercare_emails_' + new Date().toISOString().slice(0, 10) + '.json';
                 var filepath = downloads + '\\' + filename;
@@ -578,7 +587,14 @@
 
         function openDownloads() {
             var shell = new ActiveXObject("WScript.Shell");
-            var downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+            var shellApp = new ActiveXObject("Shell.Application");
+            var downloads;
+            try {
+                var downloadsFolder = shellApp.NameSpace("shell:Downloads");
+                downloads = downloadsFolder.Self.Path;
+            } catch (e) {
+                downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+            }
             shell.Run('explorer.exe "' + downloads + '"');
         }
 
