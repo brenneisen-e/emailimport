@@ -190,31 +190,27 @@
                 <div class="header">
                     <div class="logo logo-import">&#128200;</div>
                     <h2>In Excel importieren</h2>
-                    <p class="subtitle">Bearbeitete JSON-Daten in Tracking-Excel schreiben</p>
+                    <p class="subtitle">JSON in geoffnete Hypercare-Excel schreiben</p>
                 </div>
 
                 <label>JSON-Datei (bearbeitet aus Web-App)</label>
                 <div class="row">
-                    <input type="text" id="jsonPath" readonly placeholder="JSON auswahlen..." style="flex:3">
-                    <button class="btn btn-secondary" onclick="selectJsonFile()" style="flex:1; margin-bottom:0.75rem;">...</button>
+                    <input type="text" id="jsonPath" readonly placeholder="Keine Datei ausgewahlt" style="flex:3">
+                    <button class="btn btn-secondary" onclick="selectJsonFile()" style="flex:1; margin-bottom:0.75rem;">Durchsuchen...</button>
                 </div>
 
-                <label>Excel-Datei (Tracking_Hypercare.xlsm)</label>
-                <div class="row">
-                    <input type="text" id="excelPath" placeholder="Excel-Pfad..." style="flex:3">
-                    <button class="btn btn-secondary" onclick="selectExcelFile()" style="flex:1; margin-bottom:0.75rem;">...</button>
-                </div>
+                <div class="status" id="jsonStatus" style="display:none; margin-bottom:0.75rem;"></div>
 
+                <label>Excel-Ziel</label>
                 <div class="row">
-                    <div>
-                        <label>Tabellenblatt</label>
-                        <input type="text" id="sheetName" value="Ubersicht">
-                    </div>
-                    <div>
-                        <label>Startzeile</label>
-                        <input type="number" id="startRow" value="0" min="0" placeholder="0 = auto">
-                    </div>
+                    <input type="text" id="excelStatus" readonly placeholder="Suche geoffnete Hypercare-Excel..." style="flex:1">
                 </div>
+                <button class="btn btn-secondary" onclick="detectExcel()" style="margin-bottom:0.75rem;">
+                    &#128269; Excel erkennen
+                </button>
+
+                <label>Tabellenblatt</label>
+                <input type="text" id="sheetName" value="Ubersicht">
 
                 <button class="btn btn-success" id="importBtn" onclick="startImport()" disabled>
                     &#128200; In Excel importieren
@@ -232,7 +228,7 @@
                 <div class="status error" id="importError"><span id="importErrorMsg"></span></div>
 
                 <div class="info-box">
-                    <strong>Spalten:</strong> ID, Datum, Kanal, Agentur, Kategorie, Status, Cluster, Betreff, Anfrage, Antwort, Vermittler, Vermittlernr., Kunde, Vers.Nr., Kommentar
+                    <strong>Hinweis:</strong> Offne zuerst die Tracking_Hypercare.xlsm in Excel, dann klicke "Excel erkennen"
                 </div>
             </div>
         </div>
@@ -474,14 +470,41 @@
         // ============================================================================
         // EXCEL IMPORT
         // ============================================================================
-        function selectJsonFile() {
-            var path = prompt("Pfad zur JSON-Datei (aus Downloads):", "");
-            if (path) loadJsonFile(path);
-        }
+        var excelApp = null;
+        var targetWorkbook = null;
 
-        function selectExcelFile() {
-            var path = prompt("Pfad zur Excel-Datei:", "");
-            if (path) document.getElementById('excelPath').value = path;
+        function selectJsonFile() {
+            try {
+                // Use Excel's FileDialog for file selection
+                var tempExcel = null;
+                try {
+                    tempExcel = GetObject("", "Excel.Application");
+                } catch (e) {
+                    tempExcel = new ActiveXObject("Excel.Application");
+                }
+
+                var fd = tempExcel.FileDialog(3); // msoFileDialogFilePicker = 3
+                fd.Title = "JSON-Datei auswahlen";
+                fd.Filters.Clear();
+                fd.Filters.Add("JSON Dateien", "*.json");
+                fd.AllowMultiSelect = false;
+
+                // Set initial folder to Downloads
+                try {
+                    var shellApp = new ActiveXObject("Shell.Application");
+                    var downloads = shellApp.NameSpace("shell:Downloads").Self.Path;
+                    fd.InitialFileName = downloads + "\\";
+                } catch (e) {}
+
+                if (fd.Show() === -1) {
+                    var selectedPath = fd.SelectedItems.Item(1);
+                    loadJsonFile(selectedPath);
+                }
+            } catch (e) {
+                alert("Fehler beim Dateidialog: " + e.message + "\n\nBitte Pfad manuell eingeben.");
+                var path = prompt("Pfad zur JSON-Datei:", "");
+                if (path) loadJsonFile(path);
+            }
         }
 
         function loadJsonFile(path) {
@@ -493,51 +516,83 @@
                 file.Close();
 
                 jsonData = JSON.parse(content);
-                document.getElementById('jsonPath').value = path;
-                document.getElementById('importBtn').disabled = false;
-                alert(jsonData.length + " Datensatze geladen!");
+
+                var filename = path.substring(path.lastIndexOf("\\") + 1);
+                document.getElementById('jsonPath').value = filename;
+
+                var statusEl = document.getElementById('jsonStatus');
+                statusEl.style.display = 'block';
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '<strong>' + jsonData.length + ' Datensatze</strong> geladen';
+
+                checkImportReady();
             } catch (e) {
-                alert("Fehler: " + e.message);
+                var statusEl = document.getElementById('jsonStatus');
+                statusEl.style.display = 'block';
+                statusEl.className = 'status error';
+                statusEl.innerText = 'Fehler: ' + e.message;
             }
         }
 
-        function startImport() {
-            var excelPath = document.getElementById('excelPath').value;
-            var sheetName = document.getElementById('sheetName').value || "Ubersicht";
-            var startRow = parseInt(document.getElementById('startRow').value) || 0;
+        function detectExcel() {
+            try {
+                try {
+                    excelApp = GetObject("", "Excel.Application");
+                } catch (e) {
+                    document.getElementById('excelStatus').value = "Keine Excel-Instanz gefunden";
+                    return;
+                }
 
-            if (!jsonData || jsonData.length === 0) { alert("Keine JSON-Daten!"); return; }
-            if (!excelPath) { alert("Excel-Pfad fehlt!"); return; }
+                targetWorkbook = null;
+                for (var i = 1; i <= excelApp.Workbooks.Count; i++) {
+                    var wb = excelApp.Workbooks(i);
+                    if (wb.Name.toLowerCase().indexOf('hypercare') !== -1 ||
+                        wb.Name.toLowerCase().indexOf('tracking') !== -1) {
+                        targetWorkbook = wb;
+                        break;
+                    }
+                }
+
+                if (targetWorkbook) {
+                    document.getElementById('excelStatus').value = targetWorkbook.Name;
+                    checkImportReady();
+                } else {
+                    document.getElementById('excelStatus').value = "Keine Hypercare-Excel offen";
+                }
+            } catch (e) {
+                document.getElementById('excelStatus').value = "Fehler: " + e.message;
+            }
+        }
+
+        function checkImportReady() {
+            var ready = jsonData && jsonData.length > 0 && targetWorkbook;
+            document.getElementById('importBtn').disabled = !ready;
+        }
+
+        function startImport() {
+            var sheetName = document.getElementById('sheetName').value || "Ubersicht";
+
+            if (!jsonData || jsonData.length === 0) { alert("Keine JSON-Daten geladen!"); return; }
+            if (!targetWorkbook) { alert("Keine Excel-Datei erkannt! Klicke 'Excel erkennen'."); return; }
 
             document.getElementById('importProgress').style.display = 'block';
             document.getElementById('importBtn').disabled = true;
             document.getElementById('importSuccess').style.display = 'none';
             document.getElementById('importError').style.display = 'none';
 
-            setTimeout(function() { doImport(excelPath, sheetName, startRow); }, 100);
+            setTimeout(function() { doImport(sheetName); }, 100);
         }
 
-        function doImport(excelPath, sheetName, startRow) {
-            var excelApp = null;
+        function doImport(sheetName) {
             try {
-                excelApp = new ActiveXObject("Excel.Application");
-                excelApp.Visible = true;
-                excelApp.DisplayAlerts = false;
-
-                var fso = new ActiveXObject("Scripting.FileSystemObject");
-                if (!fso.FileExists(excelPath)) { throw new Error("Excel-Datei nicht gefunden!"); }
-
-                var workbook = excelApp.Workbooks.Open(excelPath);
                 var worksheet;
-                try { worksheet = workbook.Worksheets(sheetName); }
-                catch (e) { worksheet = workbook.Worksheets(1); }
+                try { worksheet = targetWorkbook.Worksheets(sheetName); }
+                catch (e) { worksheet = targetWorkbook.Worksheets(1); }
 
-                // Auto-detect last row if startRow is 0
-                if (startRow <= 0) {
-                    var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
-                    if (lastRow === 1 && !worksheet.Cells(1, 1).Value) lastRow = 0;
-                    startRow = lastRow + 1;
-                }
+                // Auto-detect last row
+                var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
+                if (lastRow === 1 && !worksheet.Cells(1, 1).Value) lastRow = 0;
+                var startRow = lastRow + 1;
 
                 var total = jsonData.length;
                 for (var i = 0; i < total; i++) {
@@ -576,7 +631,7 @@
                 }
 
                 updateImportProgress(total, total);
-                workbook.Save();
+                targetWorkbook.Save();
 
                 document.getElementById('importProgress').style.display = 'none';
                 document.getElementById('importSuccess').style.display = 'block';
@@ -588,7 +643,6 @@
                 document.getElementById('importError').style.display = 'block';
                 document.getElementById('importErrorMsg').innerText = e.message;
                 document.getElementById('importBtn').disabled = false;
-                if (excelApp) { try { excelApp.Quit(); } catch (ex) {} }
             }
         }
 
