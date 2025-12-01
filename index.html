@@ -594,8 +594,8 @@
             <button class="btn btn-white" id="btnNewFile" style="display: none;" onclick="resetApp()">
                 📁 Neue Datei
             </button>
-            <button class="btn btn-white" id="btnExport" style="display: none;" onclick="copyToClipboard()">
-                📋 In Zwischenablage kopieren
+            <button class="btn btn-white" id="btnExport" style="display: none;" onclick="saveAsJson()">
+                💾 JSON speichern
             </button>
         </div>
     </header>
@@ -1181,46 +1181,42 @@
         }
 
         // ============================================================================
-        // COPY TO CLIPBOARD (for pasting into Excel)
+        // SAVE AS JSON (for Excel Import HTA)
         // ============================================================================
-        function copyToClipboard() {
-            // Headers
-            const headers = ['Datum', 'Von Email', 'Von Name', 'Betreff', 'Kategorie', 'Status', 'Cluster', 'Agentur', 'Vermittlernr', 'Versicherungsnr', 'Anfrage', 'Antwort', 'Kommentar', 'Provision'];
+        async function saveAsJson() {
+            const jsonData = JSON.stringify(emails, null, 2);
+            const filename = 'hypercare_bearbeitet_' + new Date().toISOString().slice(0, 10) + '.json';
 
-            // Data rows
-            const rows = emails.map(e => [
-                e.datum,
-                e.von_email,
-                e.von_name,
-                e.betreff.replace(/\t/g, ' ').replace(/\n/g, ' '),
-                e.kategorie,
-                e.status,
-                e.clusters.join(', '),
-                e.agentur,
-                e.vermittlernr,
-                e.vsnr,
-                (e.anfrage || '').replace(/\t/g, ' ').replace(/\n/g, ' '),
-                (e.antwort || '').replace(/\t/g, ' ').replace(/\n/g, ' '),
-                (e.kommentar || '').replace(/\t/g, ' ').replace(/\n/g, ' '),
-                e.isProvision ? 'Ja' : 'Nein'
-            ]);
+            // Try modern File System Access API (saves to Downloads directly)
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: filename,
+                        startIn: 'downloads',
+                        types: [{
+                            description: 'JSON Dateien',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(jsonData);
+                    await writable.close();
+                    showNotification(emails.length + ' Emails gespeichert - jetzt mit excel-import.hta in Excel importieren', 'success');
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                }
+            }
 
-            // Create tab-separated text
-            const tsv = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
-
-            // Copy to clipboard
-            navigator.clipboard.writeText(tsv).then(() => {
-                showNotification(emails.length + ' Emails in Zwischenablage kopiert - jetzt in Excel einfügen (Strg+V)', 'success');
-            }).catch(err => {
-                // Fallback for older browsers
-                const textarea = document.createElement('textarea');
-                textarea.value = tsv;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showNotification(emails.length + ' Emails kopiert - in Excel einfügen (Strg+V)', 'success');
-            });
+            // Fallback: Download file
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification(emails.length + ' Emails gespeichert - jetzt mit excel-import.hta in Excel importieren', 'success');
         }
 
         // ============================================================================

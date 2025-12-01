@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>BGAV Excel Import</title>
+    <HTA:APPLICATION
+        ID="BGAV_Excel_Import"
+        APPLICATIONNAME="BGAV Excel Import"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="no"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container { max-width: 550px; margin: 0 auto; }
+        .card {
+            background: rgba(30, 30, 50, 0.9);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1rem;
+        }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .logo {
+            width: 60px; height: 60px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.5rem;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .subtitle { color: #94a3b8; font-size: 0.875rem; }
+        label {
+            display: block; margin-bottom: 0.5rem;
+            font-weight: 500; color: #94a3b8; font-size: 0.875rem;
+        }
+        input, select {
+            width: 100%; padding: 0.75rem 1rem;
+            background: #252542; border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; color: #f1f5f9; font-size: 0.9375rem;
+            margin-bottom: 1rem;
+        }
+        input:focus, select:focus { outline: none; border-color: #10b981; }
+        .btn {
+            width: 100%; padding: 1rem; border: none; border-radius: 8px;
+            font-size: 1rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; margin-bottom: 0.75rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        .btn-secondary {
+            background: #252542; color: #94a3b8;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .progress-container { display: none; margin: 1.5rem 0; }
+        .progress-bar {
+            height: 8px; background: #252542;
+            border-radius: 4px; overflow: hidden; margin-bottom: 0.75rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #34d399);
+            border-radius: 4px; width: 0%; transition: width 0.3s;
+        }
+        .progress-text { font-size: 0.875rem; color: #94a3b8; text-align: center; }
+        .status {
+            padding: 1rem; border-radius: 8px; margin-top: 1rem; display: none;
+        }
+        .status.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981; color: #10b981;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444; color: #ef4444;
+        }
+        .file-path {
+            background: #252542; padding: 0.5rem 0.75rem;
+            border-radius: 4px; font-size: 0.75rem;
+            color: #94a3b8; word-break: break-all; margin-top: 0.5rem;
+        }
+        .info-box {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px; padding: 1rem; margin-top: 1rem;
+            font-size: 0.8125rem; color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">&#128200;</div>
+                <h1>In Excel importieren</h1>
+                <p class="subtitle">JSON-Daten in Tracking_Hypercare.xlsm schreiben</p>
+            </div>
+
+            <div id="step1">
+                <label>1. JSON-Datei auswahlen</label>
+                <input type="text" id="jsonPath" readonly placeholder="Klicken um JSON auszuwahlen..." onclick="selectJsonFile()">
+
+                <label>2. Excel-Datei (Tracking_Hypercare.xlsm)</label>
+                <input type="text" id="excelPath" value="" placeholder="Pfad zur Excel-Datei...">
+                <button class="btn btn-secondary" onclick="selectExcelFile()">Excel-Datei auswahlen</button>
+
+                <label>3. Tabellenblatt</label>
+                <input type="text" id="sheetName" value="Daten" placeholder="Name des Tabellenblatts">
+
+                <label>4. Startzeile (erste freie Zeile)</label>
+                <input type="number" id="startRow" value="2" min="1">
+
+                <button class="btn btn-success" id="importBtn" onclick="startImport()" disabled>
+                    &#128229; In Excel importieren
+                </button>
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Importiere...</div>
+            </div>
+
+            <div class="status success" id="successStatus">
+                <strong>&#10003; Import erfolgreich!</strong><br>
+                <span id="successMessage"></span>
+            </div>
+
+            <div class="status error" id="errorStatus">
+                <strong>&#10007; Fehler</strong><br>
+                <span id="errorMessage"></span>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Spalten-Zuordnung (wie alte HTA):</strong><br>
+            A: ID, B: Datum, C: Kanal, D: Agentur, E: Kategorie, F: Status, G: Cluster, H: Betreff, I: Anfrage, J: Antwort, K: Vermittler, L: Vermittlernr., M: Kunde, N: Vers.Nr., O: Kommentar
+        </div>
+    </div>
+
+    <script>
+        var jsonData = null;
+        var excelApp = null;
+
+        function selectJsonFile() {
+            try {
+                var shell = new ActiveXObject("Shell.Application");
+                var folder = shell.BrowseForFolder(0, "JSON-Datei auswahlen", 0x4000, "shell:Downloads");
+                if (folder) {
+                    // Use file dialog instead
+                    var fso = new ActiveXObject("Scripting.FileSystemObject");
+                    var shellObj = new ActiveXObject("WScript.Shell");
+                    var downloads = shellObj.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+
+                    // Create a simple file selection dialog using mshta
+                    var dialog = new ActiveXObject("MSComDlg.CommonDialog");
+                    dialog.Filter = "JSON Files (*.json)|*.json";
+                    dialog.InitDir = downloads;
+                    dialog.ShowOpen();
+                    if (dialog.FileName) {
+                        loadJsonFile(dialog.FileName);
+                    }
+                }
+            } catch (e) {
+                // Fallback: manual input or use input type file simulation
+                var path = prompt("Pfad zur JSON-Datei eingeben:", "");
+                if (path) loadJsonFile(path);
+            }
+        }
+
+        function selectExcelFile() {
+            try {
+                var dialog = new ActiveXObject("MSComDlg.CommonDialog");
+                dialog.Filter = "Excel Files (*.xls;*.xlsx;*.xlsm)|*.xls;*.xlsx;*.xlsm";
+                dialog.ShowOpen();
+                if (dialog.FileName) {
+                    document.getElementById('excelPath').value = dialog.FileName;
+                }
+            } catch (e) {
+                var path = prompt("Pfad zur Excel-Datei eingeben:", "");
+                if (path) document.getElementById('excelPath').value = path;
+            }
+        }
+
+        function loadJsonFile(path) {
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                if (!fso.FileExists(path)) {
+                    alert("Datei nicht gefunden: " + path);
+                    return;
+                }
+                var file = fso.OpenTextFile(path, 1, false, -1); // UTF-8
+                var content = file.ReadAll();
+                file.Close();
+
+                jsonData = JSON.parse(content);
+                document.getElementById('jsonPath').value = path;
+                document.getElementById('importBtn').disabled = false;
+
+                alert(jsonData.length + " Datensatze geladen!");
+            } catch (e) {
+                alert("Fehler beim Laden der JSON-Datei:\n" + e.message);
+            }
+        }
+
+        function startImport() {
+            var excelPath = document.getElementById('excelPath').value;
+            var sheetName = document.getElementById('sheetName').value || "Daten";
+            var startRow = parseInt(document.getElementById('startRow').value) || 2;
+
+            if (!jsonData || jsonData.length === 0) {
+                alert("Keine Daten zum Importieren!");
+                return;
+            }
+
+            if (!excelPath) {
+                alert("Bitte Excel-Datei auswahlen!");
+                return;
+            }
+
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('importBtn').disabled = true;
+
+            setTimeout(function() {
+                doImport(excelPath, sheetName, startRow);
+            }, 100);
+        }
+
+        function doImport(excelPath, sheetName, startRow) {
+            try {
+                // Open Excel
+                excelApp = new ActiveXObject("Excel.Application");
+                excelApp.Visible = true;
+                excelApp.DisplayAlerts = false;
+
+                var workbook;
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+                if (fso.FileExists(excelPath)) {
+                    workbook = excelApp.Workbooks.Open(excelPath);
+                } else {
+                    alert("Excel-Datei nicht gefunden: " + excelPath);
+                    excelApp.Quit();
+                    return;
+                }
+
+                // Get or create worksheet
+                var worksheet;
+                try {
+                    worksheet = workbook.Worksheets(sheetName);
+                } catch (e) {
+                    worksheet = workbook.Worksheets.Add();
+                    worksheet.Name = sheetName;
+                }
+
+                // Find next empty row if startRow is "auto"
+                if (startRow <= 1) startRow = 2;
+
+                // Column mapping
+                var columns = ['datum', 'von_email', 'von_name', 'betreff', 'kategorie', 'status', 'clusters', 'agentur', 'vermittlernr', 'vsnr', 'anfrage', 'antwort', 'kommentar', 'isProvision'];
+
+                // Write data - same columns as old HTA
+                var total = jsonData.length;
+                for (var i = 0; i < total; i++) {
+                    var row = startRow + i;
+                    var email = jsonData[i];
+
+                    // Update progress
+                    if (i % 5 === 0) {
+                        updateProgress(i, total);
+                    }
+
+                    // Get provision data if exists
+                    var pd = email.provisionData || {};
+                    var vermittlerName = pd.vorname_vermittler ? (pd.vorname_vermittler + ' ' + (pd.nachname_vermittler || '')) : '';
+                    var kundeName = pd.vorname_kunde ? (pd.vorname_kunde + ' ' + (pd.nachname_kunde || '')) : '';
+
+                    // Build replies text
+                    var repliesText = '';
+                    if (email.antworten && email.antworten.length > 0) {
+                        for (var r = 0; r < email.antworten.length; r++) {
+                            var reply = email.antworten[r];
+                            repliesText += '[' + (reply.datum || '') + '] ' + (reply.text || '') + '\n\n';
+                        }
+                    }
+
+                    // Column mapping like old HTA:
+                    // A=ID, B=Datum, C=Kanal, D=Agentur, E=Kategorie, F=Status, G=Cluster,
+                    // H=Betreff, I=Anfrage, J=Antwort, K=Vermittler, L=Vermittlernr, M=Kunde, N=VersNr, O=Kommentar
+                    worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);
+                    worksheet.Cells(row, 2).Value = email.datum || '';
+                    worksheet.Cells(row, 3).Value = 'Email';
+                    worksheet.Cells(row, 4).Value = email.agentur || '';
+                    worksheet.Cells(row, 5).Value = email.kategorie || '';
+                    worksheet.Cells(row, 6).Value = email.status || 'Neu';
+                    worksheet.Cells(row, 7).Value = (email.clusters || []).join(', ');
+                    worksheet.Cells(row, 8).Value = email.betreff || '';
+                    worksheet.Cells(row, 9).Value = email.text || email.anfrage || '';
+                    worksheet.Cells(row, 10).Value = repliesText || email.antwort || '';
+                    worksheet.Cells(row, 11).Value = vermittlerName || '';
+                    worksheet.Cells(row, 12).Value = pd.vermittlernummer_vermittler || email.vermittlernr || '';
+                    worksheet.Cells(row, 13).Value = kundeName || '';
+                    worksheet.Cells(row, 14).Value = pd.versicherungsnummer_kunde || email.vsnr || '';
+                    worksheet.Cells(row, 15).Value = email.kommentar || '';
+                }
+
+                updateProgress(total, total);
+
+                // Save
+                workbook.Save();
+
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('successStatus').style.display = 'block';
+                document.getElementById('successMessage').innerHTML =
+                    total + ' Datensatze importiert (Zeile ' + startRow + ' bis ' + (startRow + total - 1) + ')';
+
+            } catch (e) {
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('errorStatus').style.display = 'block';
+                document.getElementById('errorMessage').innerText = e.message;
+
+                if (excelApp) {
+                    try { excelApp.Quit(); } catch (ex) {}
+                }
+            }
+        }
+
+        function updateProgress(current, total) {
+            var percent = Math.round((current / total) * 100);
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').innerText =
+                'Importiere ' + current + ' / ' + total + '...';
+        }
+
+        // JSON polyfill
+        if (!window.JSON) {
+            window.JSON = {
+                parse: function(text) {
+                    return eval('(' + text + ')');
+                }
+            };
+        }
+    </script>
+</body>
+</html>
