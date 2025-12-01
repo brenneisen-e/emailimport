@@ -1111,17 +1111,31 @@
 
         function parseProvisionData(text) {
             const data = {};
-            const fields = [
+            const simpleFields = [
                 'vermittlernummer_vermittler', 'vorname_vermittler', 'nachname_vermittler',
                 'versicherungsnummer_kunde', 'vorname_kunde', 'nachname_kunde',
-                'reklamation_provision', 'reklamation_absatz', 'datenschutz', 'nachricht'
+                'reklamation_provision', 'reklamation_absatz', 'datenschutz'
             ];
 
-            fields.forEach(field => {
+            // Parse simple single-line fields
+            simpleFields.forEach(field => {
                 const regex = new RegExp(field + '\\s*:\\s*(.+?)(?=\\n|$)', 'i');
                 const match = text.match(regex);
                 if (match) data[field] = match[1].trim();
             });
+
+            // Parse 'nachricht' specially - it's multiline
+            // Extract from "nachricht :" until "datenschutz" or signature
+            const nachrichtMatch = text.match(/nachricht\s*:\s*([\s\S]*?)(?=datenschutz\s*:|_{5,}|Datenschutzhinweise|Vertraulichkeitshinweis|Confidentiality|________________________________|$)/i);
+            if (nachrichtMatch) {
+                let nachricht = nachrichtMatch[1].trim();
+                // Clean up extra whitespace and remove any trailing signature parts
+                nachricht = nachricht
+                    .replace(/\n{3,}/g, '\n\n')  // Reduce multiple newlines
+                    .replace(/[\r\n]+$/g, '')     // Remove trailing newlines
+                    .trim();
+                if (nachricht) data.nachricht = nachricht;
+            }
 
             return Object.keys(data).length > 0 ? data : null;
         }
