@@ -255,6 +255,7 @@
         var exportExcelApp = null;
         var exportWorkbook = null;
         var existingEmailKeys = {};  // Keys of emails already in Excel
+        var existingReplies = {};    // Existing replies text per email key (for filtering new replies)
         var lastExportedEmails = null;  // Store for direct import
 
         // ============================================================================
@@ -367,6 +368,7 @@
         function detectExcelForExport() {
             document.getElementById('exportExcelStatus').value = "Suche Excel...";
             existingEmailKeys = {};
+            existingReplies = {};
 
             try {
                 // Try to connect to running Excel
@@ -414,21 +416,25 @@
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 var count = 0;
 
-                // Read ConversationID (col 21), date (col 2), and subject (col 11) for duplicate detection
+                // Read ConversationID (col 21), date (col 2), subject (col 11), and replies (col 13) for duplicate detection
                 for (var row = 2; row <= lastRow; row++) {
                     var conversationId = worksheet.Cells(row, 21).Value || '';
                     var datum = worksheet.Cells(row, 2).Value || '';
                     var betreff = worksheet.Cells(row, 11).Value || '';
+                    var antworten = worksheet.Cells(row, 13).Value || '';  // Existing replies
 
                     // Primary key: ConversationID + Date (allows new replies in same conversation)
                     if (conversationId && datum) {
                         var dateStr = formatDateKey(datum);
-                        existingEmailKeys['conv|' + conversationId + '|' + dateStr] = true;
+                        var convKey = 'conv|' + conversationId + '|' + dateStr;
+                        existingEmailKeys[convKey] = true;
+                        if (antworten) existingReplies[convKey] = antworten;
                     }
                     // Fallback key: date + subject (for older entries without ConversationID)
                     if (datum || betreff) {
                         var key = createExportEmailKey(datum, betreff);
                         existingEmailKeys[key] = true;
+                        if (antworten) existingReplies[key] = antworten;
                     }
                     if (conversationId || datum || betreff) count++;
                 }
@@ -583,31 +589,46 @@
                     var hasExcelData = false;
                     for (var k in existingEmailKeys) { hasExcelData = true; break; }
                     var isDuplicate = false;
+                    var existingReplyText = '';
+                    var convKey = '';
+                    var emailKey = '';
                     if (hasExcelData) {
                         var dateKey = formatDateKey(emailData.datum);
-                        var convKey = 'conv|' + (emailData.conversationId || '') + '|' + dateKey;
-                        var emailKey = createExportEmailKey(emailData.datum, emailData.betreff);
+                        convKey = 'conv|' + (emailData.conversationId || '') + '|' + dateKey;
+                        emailKey = createExportEmailKey(emailData.datum, emailData.betreff);
                         // Check ConversationID+Date first (allows new replies), then date+subject
                         if ((emailData.conversationId && existingEmailKeys[convKey]) || existingEmailKeys[emailKey]) {
                             isDuplicate = true;
+                            // Get existing replies for comparison
+                            existingReplyText = existingReplies[convKey] || existingReplies[emailKey] || '';
                         }
                     }
 
                     // Always check for replies (even for duplicates - there might be new ones)
-                    emailData.antworten = findReplies(emailData);
-                    exportState.repliesFound += emailData.antworten.length;
+                    var allReplies = findReplies(emailData);
+                    exportState.repliesFound += allReplies.length;
 
                     if (isDuplicate) {
-                        // Duplicate - but include if there are new replies to update
-                        if (emailData.antworten && emailData.antworten.length > 0) {
-                            emailData.isDuplicateWithNewReplies = true;  // Flag for import
+                        // Filter to only truly new replies (not already in Excel)
+                        var newReplies = filterNewReplies(allReplies, existingReplyText);
+
+                        if (newReplies.length > 0) {
+                            // Has new replies - include for update
+                            emailData.antworten = newReplies;  // Only new replies for import
+                            emailData.alleAntworten = allReplies;  // All replies for web tool display
+                            emailData.existingReplies = existingReplyText;  // Mark what already exists
+                            emailData.isDuplicateWithNewReplies = true;
                             exportState.duplicatesWithReplies++;
                             exportState.emails.push(emailData);
                         } else {
                             exportState.duplicatesSkipped++;
                         }
                     } else {
-                        // New email - always include
+                        // New email - include all replies
+                        emailData.antworten = allReplies;
+                        for (var r = 0; r < allReplies.length; r++) {
+                            allReplies[r].isNew = true;  // Mark all as new for new emails
+                        }
                         exportState.emails.push(emailData);
                     }
                 } catch (e) {}
@@ -800,6 +821,44 @@
             } catch (e) {}
 
             return replies;
+        }
+
+        // Filter replies to only include ones that are not already in Excel
+        function filterNewReplies(allReplies, existingReplyText) {
+            if (!allReplies || allReplies.length === 0) return [];
+            if (!existingReplyText) {
+                // No existing replies - all are new
+                for (var i = 0; i < allReplies.length; i++) {
+                    allReplies[i].isNew = true;
+                }
+                return allReplies;
+            }
+
+            var newReplies = [];
+            var existingLower = existingReplyText.toLowerCase();
+
+            for (var j = 0; j < allReplies.length; j++) {
+                var reply = allReplies[j];
+                var replyText = (reply.text || '').trim();
+
+                // Skip empty replies
+                if (!replyText) continue;
+
+                // Check if this reply is already in Excel
+                // Use first 80 chars for matching (handles minor formatting differences)
+                var checkText = replyText.substring(0, 80).toLowerCase().trim();
+                if (checkText.length < 10) checkText = replyText.toLowerCase().trim();
+
+                if (existingLower.indexOf(checkText) === -1) {
+                    // Not found in existing - this is new
+                    reply.isNew = true;
+                    newReplies.push(reply);
+                } else {
+                    reply.isNew = false;
+                }
+            }
+
+            return newReplies;
         }
 
         function removeEmailQuotes(text) {
