@@ -1007,6 +1007,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             const savedName = localStorage.getItem('bearbeiterName') || '';
             document.getElementById('bearbeiterName').value = savedName;
+
+            // Auto-open file picker after short delay
+            setTimeout(function() {
+                openFilePicker();
+            }, 500);
         });
 
         function saveBearbeiterName() {
