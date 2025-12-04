@@ -1917,7 +1917,9 @@
             }
 
             // Email text with keyword highlighting
-            document.getElementById('detailText').innerHTML = highlightKeywords(email.text);
+            // Prefer anfrage field (corrected text) over raw text (may contain full thread)
+            const displayText = email.anfrage || email.text;
+            document.getElementById('detailText').innerHTML = highlightKeywords(displayText);
 
             // Update step indicator to "Kategorisieren"
             updateStepIndicator(2);
