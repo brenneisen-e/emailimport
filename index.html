@@ -1595,6 +1595,39 @@
         // ============================================================================
         // EMAIL PROCESSING
         // ============================================================================
+
+        // Remove email quotes and signatures from text
+        function removeEmailQuotes(text) {
+            if (!text) return '';
+
+            // Find where quoted content starts and cut it off
+            const patterns = [
+                /_{5,}\s*\r?\n\s*Von:/i,
+                /\r?\n\s*Von:\s+.+\r?\n\s*Gesendet:/im,
+                /-{3,}\s*Urspr[uü]ngliche\s+Nachricht/i,
+                /-{3,}\s*Original\s*Message/i,
+                /-{3,}\s*Weitergeleitete\s+Nachricht/i,
+                /_{5,}\s*\r?\n\s*From:/i,
+                /\r?\n\s*From:\s+.+\r?\n\s*Sent:/im,
+                /\r?\n\s*Am\s+\d.+\s+schrieb\s+.+:/im,
+                /\r?\n\s*On\s+.+\s+wrote:/im
+            ];
+
+            let result = text;
+            for (const pattern of patterns) {
+                const match = result.search(pattern);
+                if (match > 0) {
+                    result = result.substring(0, match);
+                    break;
+                }
+            }
+
+            // Remove trailing signature
+            result = result.replace(/\r?\n--\s*\r?\n[\s\S]*$/, '');
+
+            return result.trim();
+        }
+
         function processEmails(rawEmails) {
             emails = rawEmails.map(email => {
                 const text = email.text || email.body || '';
@@ -1635,7 +1668,8 @@
                     agentur: agentur,
                     vermittlernr: vermittlernr,
                     vsnr: vsnr,
-                    anfrage: email.anfrage || '',
+                    // anfrage: prefer existing, then provisionData.nachricht, then cleaned text
+                    anfrage: email.anfrage || (provisionData?.nachricht) || removeEmailQuotes(text),
                     antwort: email.antwort || '',
                     kommentar: email.kommentar || '',
                     bearbeiter: email.bearbeiter || getBearbeiterName(),  // Default to logged-in user
