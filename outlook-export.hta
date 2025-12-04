@@ -414,6 +414,7 @@
         var existingReplyIds = {};   // ReplyIDs per email key - comma-separated EntryIDs of already imported replies
         var existingAnfragen = {};   // Original request text per conversation (to avoid duplicating)
         var existingDates = {};      // Original request date per conversation
+        var existingSubjects = {};   // Original subject per conversation
         var lastExportedEmails = null;  // Store for direct import
 
         // Step tracking
@@ -730,6 +731,7 @@
             existingReplyIds = {};
             existingAnfragen = {};
             existingDates = {};
+            existingSubjects = {};
 
             try {
                 // Try to connect to running Excel
@@ -796,6 +798,7 @@
                         if (replyIds) existingReplyIds[convKey] = replyIds;
                         if (anfrage) existingAnfragen[convKey] = anfrage;  // Track original request
                         if (datum) existingDates[convKey] = datum;  // Track original date
+                        if (betreff) existingSubjects[convKey] = betreff;  // Track original subject
                     }
                     // Fallback key: date + subject (for older entries without ConversationID)
                     if (datum || betreff) {
@@ -805,6 +808,7 @@
                         if (replyIds) existingReplyIds[key] = replyIds;
                         if (anfrage) existingAnfragen[key] = anfrage;  // Also track for fallback
                         if (datum) existingDates[key] = datum;  // Also track for fallback
+                        if (betreff) existingSubjects[key] = betreff;  // Also track for fallback
                     }
                     // Track emailId for precise duplicate detection
                     if (emailId) {
@@ -826,6 +830,7 @@
                 existingReplyIds = {};
                 existingAnfragen = {};
                 existingDates = {};
+                existingSubjects = {};
                 exportWorkbook = null;
                 checkExportReady();
             }
@@ -1104,6 +1109,20 @@
                             }
                         }
 
+                        // IMPORTANT: Use original SUBJECT - priority:
+                        // 1. From Excel (if already saved)
+                        // 2. From Outlook Conversation API (originalSubject)
+                        // 3. Strip prefixes from current subject (fallback)
+                        var originalSubject = existingSubjects[convKey] || existingSubjects[emailKey] || '';
+                        if (originalSubject) {
+                            emailData.betreff = originalSubject;  // Keep the original subject from Excel
+                        } else if (emailData.originalSubject) {
+                            emailData.betreff = emailData.originalSubject;  // Use Outlook's conversation original subject
+                        } else {
+                            // Fallback: strip AW:/RE:/etc. prefixes
+                            emailData.betreff = stripSubjectPrefixes(emailData.betreff);
+                        }
+
                         emailData.antworten = allNewReplies;
                         emailData.alleAntworten = allReplies;
                         emailData.existingReplies = existingReplyText;
@@ -1132,6 +1151,14 @@
                                     pad(quotedDate.getMinutes()) + ':' +
                                     pad(quotedDate.getSeconds());
                             }
+                        }
+
+                        // Use original subject if available, otherwise strip prefixes
+                        if (emailData.originalSubject) {
+                            emailData.betreff = emailData.originalSubject;
+                        } else {
+                            // Strip AW:/RE:/etc. prefixes
+                            emailData.betreff = stripSubjectPrefixes(emailData.betreff);
                         }
 
                         exportState.emails.push(emailData);
@@ -1444,6 +1471,58 @@
             return null;
         }
 
+        // Get the original subject from conversation root item
+        function getConversationOriginalSubject(item) {
+            try {
+                var conv = item.GetConversation();
+                if (conv) {
+                    var rootItems = conv.GetRootItems();
+                    if (rootItems && rootItems.Count > 0) {
+                        // Find the oldest root item and get its subject
+                        var oldestDate = null;
+                        var originalSubject = null;
+                        for (var i = 1; i <= rootItems.Count; i++) {
+                            var rootItem = rootItems.Item(i);
+                            try {
+                                var itemDate = rootItem.ReceivedTime || rootItem.SentOn;
+                                var itemSubject = rootItem.Subject;
+                                if (itemDate) {
+                                    var d = new Date(itemDate);
+                                    if (!isNaN(d.getTime())) {
+                                        if (!oldestDate || d < oldestDate) {
+                                            oldestDate = d;
+                                            originalSubject = itemSubject;
+                                        }
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                        return originalSubject;
+                    }
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        // Strip reply prefixes (AW:, RE:, Antwort:, WG:, FW:, Fwd:) from subject
+        function stripSubjectPrefixes(subject) {
+            if (!subject) return subject;
+            var s = String(subject).trim();
+            // Remove common reply/forward prefixes repeatedly (handles "AW: AW: RE: ...")
+            var changed = true;
+            while (changed) {
+                changed = false;
+                var patterns = [/^AW:\s*/i, /^RE:\s*/i, /^Antwort:\s*/i, /^WG:\s*/i, /^FW:\s*/i, /^Fwd:\s*/i];
+                for (var i = 0; i < patterns.length; i++) {
+                    if (patterns[i].test(s)) {
+                        s = s.replace(patterns[i], '');
+                        changed = true;
+                    }
+                }
+            }
+            return s.trim();
+        }
+
         // Extract the oldest date from quoted email headers in the text
         // Looks for patterns like "Gesendet: Montag, 1. Dezember 2025 12:50"
         function extractOldestDateFromQuotes(text) {
@@ -1601,9 +1680,16 @@
                 convStartDate = getConversationStartDate(item);
             } catch (e) {}
 
+            // Try to get the original subject from conversation root
+            var convOriginalSubject = null;
+            try {
+                convOriginalSubject = getConversationOriginalSubject(item);
+            } catch (e) {}
+
             return {
                 datum: formatDate(item.ReceivedTime),
                 conversationStartDate: convStartDate ? formatDate(convStartDate) : null,
+                originalSubject: convOriginalSubject,
                 von_email: senderEmail,
                 von_name: item.SenderName || 'Unbekannt',
                 betreff: item.Subject || '(Kein Betreff)',
