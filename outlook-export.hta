@@ -800,6 +800,7 @@
                         existingEmailKeys[key] = true;
                         if (antworten) existingReplies[key] = antworten;
                         if (replyIds) existingReplyIds[key] = replyIds;
+                        if (anfrage) existingAnfragen[key] = anfrage;  // Also track for fallback
                     }
                     // Track emailId for precise duplicate detection
                     if (emailId) {
@@ -1065,9 +1066,12 @@
                         }
 
                         // IMPORTANT: Use original request text from Excel, not the new email's text!
-                        var originalAnfrage = existingAnfragen[convKey] || '';
+                        var originalAnfrage = existingAnfragen[convKey] || existingAnfragen[emailKey] || '';
                         if (originalAnfrage) {
                             emailData.text = originalAnfrage;  // Keep the original request
+                        } else {
+                            // Fallback: at least remove email quotes from the new email
+                            emailData.text = removeEmailQuotes(emailData.text);
                         }
 
                         emailData.antworten = allNewReplies;
