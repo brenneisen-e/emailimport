@@ -415,6 +415,8 @@
         var existingAnfragen = {};   // Original request text per conversation (to avoid duplicating)
         var existingDates = {};      // Original request date per conversation
         var existingSubjects = {};   // Original subject per conversation
+        var existingExcelRows = {};  // ConversationID → row number mapping (for auto-erledigt)
+        var foundInInbox = {};       // Track which ConversationIDs were found in Inbox
         var lastExportedEmails = null;  // Store for direct import
 
         // Step tracking
@@ -732,6 +734,8 @@
             existingAnfragen = {};
             existingDates = {};
             existingSubjects = {};
+            existingExcelRows = {};
+            foundInInbox = {};
 
             try {
                 // Try to connect to running Excel
@@ -780,7 +784,7 @@
                 var count = 0;
 
                 // Read ConversationID (col 22), date (col 2), subject (col 12), replies (col 14),
-                // emailId (col 23), replyIds (col 24) for duplicate detection
+                // emailId (col 23), replyIds (col 24), status (col 9) for duplicate detection
                 for (var row = 2; row <= lastRow; row++) {
                     var conversationId = worksheet.Cells(row, 22).Value || '';
                     var datum = worksheet.Cells(row, 2).Value || '';
@@ -789,6 +793,7 @@
                     var emailId = worksheet.Cells(row, 23).Value || '';    // Email's unique EntryID
                     var replyIds = worksheet.Cells(row, 24).Value || '';   // Comma-separated reply EntryIDs
                     var anfrage = worksheet.Cells(row, 13).Value || '';    // Original request text
+                    var status = worksheet.Cells(row, 9).Value || '';      // Current status
 
                     // Primary key: ConversationID ONLY (new emails in same conversation are replies!)
                     if (conversationId) {
@@ -799,6 +804,10 @@
                         if (anfrage) existingAnfragen[convKey] = anfrage;  // Track original request
                         if (datum) existingDates[convKey] = datum;  // Track original date
                         if (betreff) existingSubjects[convKey] = betreff;  // Track original subject
+                        // Track row for auto-erledigt (only if not already erledigt)
+                        if (status.toLowerCase() !== 'erledigt') {
+                            existingExcelRows[conversationId] = row;
+                        }
                     }
                     // Fallback key: date + subject (for older entries without ConversationID)
                     if (datum || betreff) {
@@ -831,6 +840,8 @@
                 existingAnfragen = {};
                 existingDates = {};
                 existingSubjects = {};
+                existingExcelRows = {};
+                foundInInbox = {};
                 exportWorkbook = null;
                 checkExportReady();
             }
@@ -1004,6 +1015,8 @@
                     }
                     if (emailData.conversationId) {
                         exportState.processedConvIds[emailData.conversationId] = true;
+                        // Mark as found in Inbox (for auto-erledigt feature)
+                        foundInInbox[emailData.conversationId] = true;
                     }
 
                     // Check for duplicates if Excel was connected
@@ -1702,6 +1715,16 @@
                 convOriginalSubject = getConversationOriginalSubject(item);
             } catch (e) {}
 
+            // Get Outlook category (used as Bearbeiter)
+            var category = '';
+            try {
+                var cats = item.Categories || '';
+                if (cats) {
+                    // Categories can be comma-separated, take the first one
+                    category = cats.split(',')[0].trim();
+                }
+            } catch (e) {}
+
             return {
                 datum: formatDate(item.ReceivedTime),
                 conversationStartDate: convStartDate ? formatDate(convStartDate) : null,
@@ -1713,6 +1736,7 @@
                 anhaenge: attachments,
                 conversationId: convId,
                 emailId: entryId,  // Unique ID for duplicate detection
+                kategorie: category,  // Outlook category → Bearbeiter
                 antworten: []
             };
         }
@@ -2180,16 +2204,39 @@
                     }
                 }
 
+                // Auto-Erledigt: Mark entries as "Erledigt" if they were in Excel but not found in Inbox
+                currentStep = 'Auto-Erledigt prüfen';
+                var erledigtCount = 0;
+                try {
+                    for (var convId in existingExcelRows) {
+                        if (existingExcelRows.hasOwnProperty(convId) && !foundInInbox[convId]) {
+                            // This conversation was in Excel but not found in Inbox → mark as Erledigt
+                            var erledigtRow = existingExcelRows[convId];
+                            try {
+                                worksheet.Cells(erledigtRow, 9).Value = 'Erledigt';  // Status = col 9
+                                erledigtCount++;
+                            } catch (erlErr) {
+                                // Non-critical, continue
+                            }
+                        }
+                    }
+                } catch (autoErr) {
+                    // Non-critical, continue with save
+                }
+
                 currentStep = 'Speichern';
                 updateImportProgress(total, total);
                 targetWorkbook.Save();
 
                 document.getElementById('importProgress').style.display = 'none';
                 document.getElementById('importSuccess').style.display = 'block';
-                document.getElementById('importSuccessMsg').innerHTML =
-                    '<strong>' + newCount + '</strong> neue Vorgange importiert<br>' +
+                var successMsg = '<strong>' + newCount + '</strong> neue Vorgange importiert<br>' +
                     '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
                     '<strong>' + skipCount + '</strong> Duplikate ubersprungen';
+                if (erledigtCount > 0) {
+                    successMsg += '<br><strong>' + erledigtCount + '</strong> Vorgange auf Erledigt gesetzt';
+                }
+                document.getElementById('importSuccessMsg').innerHTML = successMsg;
                 document.getElementById('btnImport').disabled = false;
 
                 // Step 5 completed - Import done
@@ -2451,10 +2498,15 @@
             _writeRowCurrentField = 'Kommentar erstellen';
             var kommentar = fixEncoding(email.kommentar || '');
 
-            // Bearbeiter - simple string, no encoding needed
+            // Bearbeiter - from email.bearbeiter OR Outlook category
             _writeRowCurrentField = 'Bearbeiter erstellen';
             var bearbeiter = '';
-            if (email.bearbeiter) bearbeiter = '' + email.bearbeiter;
+            if (email.bearbeiter) {
+                bearbeiter = '' + email.bearbeiter;
+            } else if (email.kategorie) {
+                // Use Outlook category as Bearbeiter
+                bearbeiter = '' + email.kategorie;
+            }
 
             // Combine user's manual answer with automatic replies
             _writeRowCurrentField = 'Antwort-Text erstellen';
