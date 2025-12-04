@@ -97,8 +97,52 @@
         .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; }
         .btn-success { background: linear-gradient(135deg, #10b981, #059669); color: white; }
         .btn-secondary { background: #252542; color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
-        .btn:hover:not(:disabled) { transform: translateY(-1px); }
+        .btn:hover:not(:disabled):not(.btn-inactive-step) { transform: translateY(-1px); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Active step button - pulsing highlight */
+        .btn-active-step {
+            animation: btnPulse 2s ease-in-out infinite;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            position: relative;
+        }
+        .btn-active-step::before {
+            content: '►';
+            position: absolute;
+            left: 0.75rem;
+            animation: arrowBounce 1s ease-in-out infinite;
+        }
+        @keyframes btnPulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.7); }
+        }
+        @keyframes arrowBounce {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(5px); }
+        }
+
+        /* Inactive step button - grayed out */
+        .btn-inactive-step {
+            opacity: 0.35 !important;
+            cursor: not-allowed !important;
+            transform: none !important;
+            filter: grayscale(100%);
+        }
+
+        /* Active select - pulsing border */
+        .select-active-step {
+            animation: selectPulse 2s ease-in-out infinite;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+        }
+        @keyframes selectPulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(99, 102, 241, 0.3); border-color: #6366f1; }
+            50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.6); border-color: #818cf8; }
+        }
+
+        /* Inactive select */
+        .select-inactive-step {
+            opacity: 0.35 !important;
+        }
 
         .progress-container { display: none; margin: 1rem 0; }
         .progress-bar {
@@ -276,7 +320,7 @@
                 <div class="row">
                     <input type="text" id="exportExcelStatus" readonly placeholder="Tracking_Hypercare.xlsm öffnen, dann verbinden" style="flex:1">
                 </div>
-                <button class="btn btn-primary" onclick="detectExcelForExport()" style="margin-bottom:0.75rem;">
+                <button class="btn btn-primary" id="btnExcelConnect" onclick="detectExcelForExport()" style="margin-bottom:0.75rem;">
                     &#128269; Excel verbinden
                 </button>
 
@@ -297,7 +341,7 @@
                 <div class="status error" id="exportError"><span id="exportErrorMsg"></span></div>
 
                 <div class="action-buttons" id="exportActions">
-                    <button class="btn btn-success" onclick="openWebApp()">&#127760; Web-App öffnen (bearbeiten)</button>
+                    <button class="btn btn-success" id="btnWebApp" onclick="openWebApp()">&#127760; Web-App öffnen (bearbeiten)</button>
                     <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads öffnen</button>
                 </div>
 
@@ -333,7 +377,7 @@
                 <label>Tabellenblatt</label>
                 <input type="text" id="sheetName" value="Übersicht">
 
-                <button class="btn btn-success" id="importBtn" onclick="startImport()" disabled>
+                <button class="btn btn-success" id="btnImport" onclick="startImport()" disabled>
                     &#128200; In Excel importieren
                 </button>
 
@@ -372,7 +416,7 @@
         var currentStep = 1;
         var completedSteps = {};
 
-        // Update step indicator UI
+        // Update step indicator UI and button states
         function updateStepIndicator(stepNumber, markCompleted) {
             // Mark the specified step as completed if requested
             if (markCompleted && stepNumber > 0 && stepNumber <= 5) {
@@ -393,6 +437,74 @@
                         stepEl.className += ' active';
                     }
                 }
+            }
+
+            // Update button/select states based on current step
+            updateButtonStates();
+        }
+
+        // Update button states based on current step
+        function updateButtonStates() {
+            // Step 1: Excel verbinden
+            var btnExcel = document.getElementById('btnExcelConnect');
+            // Step 2: Postfach auswählen
+            var selectMailbox = document.getElementById('mailboxSelect');
+            var selectFolder = document.getElementById('folderSelect');
+            // Step 3: Emails exportieren
+            var btnExport = document.getElementById('exportBtn');
+            // Step 4: Web-App öffnen
+            var btnWebApp = document.getElementById('btnWebApp');
+            // Step 5: In Excel importieren
+            var btnImport = document.getElementById('btnImport');
+
+            // Remove all step classes first
+            var allElements = [btnExcel, selectMailbox, selectFolder, btnExport, btnWebApp, btnImport];
+            for (var i = 0; i < allElements.length; i++) {
+                if (allElements[i]) {
+                    allElements[i].className = allElements[i].className
+                        .replace(/\s*btn-active-step/g, '')
+                        .replace(/\s*btn-inactive-step/g, '')
+                        .replace(/\s*select-active-step/g, '')
+                        .replace(/\s*select-inactive-step/g, '');
+                }
+            }
+
+            // Step 1: Excel verbinden
+            if (currentStep === 1 && !completedSteps[1]) {
+                if (btnExcel) btnExcel.className += ' btn-active-step';
+                if (selectMailbox) selectMailbox.className += ' select-inactive-step';
+                if (btnExport) btnExport.className += ' btn-inactive-step';
+            } else if (!completedSteps[1]) {
+                if (btnExcel) btnExcel.className += ' btn-inactive-step';
+            }
+
+            // Step 2: Postfach/Ordner auswählen
+            if (currentStep === 2 && !completedSteps[2]) {
+                if (selectMailbox) selectMailbox.className += ' select-active-step';
+                if (selectFolder) selectFolder.className += ' select-active-step';
+                if (btnExport) btnExport.className += ' btn-inactive-step';
+            } else if (!completedSteps[2] && currentStep !== 2) {
+                if (selectMailbox) selectMailbox.className += ' select-inactive-step';
+                if (selectFolder) selectFolder.className += ' select-inactive-step';
+            }
+
+            // Step 3: Emails exportieren
+            if (currentStep === 3 && !completedSteps[3]) {
+                if (btnExport) btnExport.className += ' btn-active-step';
+            } else if (!completedSteps[3] && currentStep !== 3) {
+                if (btnExport) btnExport.className += ' btn-inactive-step';
+            }
+
+            // Step 4: Web-App öffnen
+            if (currentStep === 4 && !completedSteps[4]) {
+                if (btnWebApp) btnWebApp.className += ' btn-active-step';
+            }
+
+            // Step 5: In Excel importieren
+            if (currentStep === 5 && !completedSteps[5]) {
+                if (btnImport) btnImport.className += ' btn-active-step';
+            } else if (!completedSteps[5] && currentStep !== 5) {
+                if (btnImport) btnImport.className += ' btn-inactive-step';
             }
         }
 
@@ -418,6 +530,8 @@
         // ============================================================================
         window.onload = function() {
             initOutlook();
+            // Initialize button states
+            updateButtonStates();
         };
 
         function switchTab(tab) {
@@ -1465,7 +1579,7 @@
 
         function checkImportReady() {
             var ready = jsonData && jsonData.length > 0 && targetWorkbook;
-            document.getElementById('importBtn').disabled = !ready;
+            document.getElementById('btnImport').disabled = !ready;
         }
 
         function startImport() {
@@ -1475,7 +1589,7 @@
             if (!targetWorkbook) { alert("Keine Excel-Datei erkannt! Klicke 'Excel erkennen'."); return; }
 
             document.getElementById('importProgress').style.display = 'block';
-            document.getElementById('importBtn').disabled = true;
+            document.getElementById('btnImport').disabled = true;
             document.getElementById('importSuccess').style.display = 'none';
             document.getElementById('importError').style.display = 'none';
 
@@ -1558,7 +1672,7 @@
                     '<strong>' + newCount + '</strong> neue Vorgange importiert<br>' +
                     '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
                     '<strong>' + skipCount + '</strong> Duplikate ubersprungen';
-                document.getElementById('importBtn').disabled = false;
+                document.getElementById('btnImport').disabled = false;
 
                 // Step 5 completed - Import done
                 completeStep(5);
@@ -1567,7 +1681,7 @@
                 document.getElementById('importProgress').style.display = 'none';
                 document.getElementById('importError').style.display = 'block';
                 document.getElementById('importErrorMsg').innerText = e.message;
-                document.getElementById('importBtn').disabled = false;
+                document.getElementById('btnImport').disabled = false;
             }
         }
 
