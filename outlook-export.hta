@@ -1863,37 +1863,50 @@
 
         // Format replies array to text (newest first, timestamps prominent)
         function formatReplies(antworten) {
-            if (!antworten || antworten.length === 0) return '';
+            if (!antworten) return '';
 
             try {
-                // Sort by date descending (newest first)
-                var sorted = [];
-                for (var i = 0; i < antworten.length; i++) {
-                    if (antworten[i]) sorted.push(antworten[i]);
-                }
-                sorted.sort(function(a, b) {
-                    var dateA = new Date(a.datum || 0);
-                    var dateB = new Date(b.datum || 0);
-                    return dateB - dateA;  // Descending
-                });
+                // Check if it's actually an array-like object
+                var len = 0;
+                try { len = antworten.length || 0; } catch (e) { return ''; }
+                if (len === 0) return '';
 
+                // Don't sort - just process in order (sorting can cause issues with eval-parsed objects)
                 var text = '';
-                for (var r = 0; r < sorted.length; r++) {
-                    var reply = sorted[r];
-                    if (!reply) continue;
-                    // Get reply text safely
-                    var replyText = '';
+                for (var r = 0; r < len && r < 20; r++) {  // Max 20 replies
                     try {
-                        replyText = String(reply.text || '');
-                    } catch (e) {
-                        replyText = '[Fehler beim Lesen]';
+                        var reply = antworten[r];
+                        if (!reply) continue;
+
+                        // Safely extract datum
+                        var replyDatum = '';
+                        try {
+                            if (reply.datum !== undefined && reply.datum !== null) {
+                                replyDatum = '' + reply.datum;
+                            }
+                        } catch (e) { replyDatum = ''; }
+
+                        // Safely extract text
+                        var replyText = '';
+                        try {
+                            if (reply.text !== undefined && reply.text !== null) {
+                                replyText = '' + reply.text;
+                            }
+                        } catch (e) { replyText = '[Fehler]'; }
+
+                        // Limit each reply to 2000 chars
+                        if (replyText.length > 2000) {
+                            replyText = replyText.substring(0, 2000) + '...';
+                        }
+
+                        text += '=== ' + replyDatum + ' ===\n' + replyText + '\n\n';
+                    } catch (replyErr) {
+                        text += '=== [Fehler beim Lesen dieser Antwort] ===\n\n';
                     }
-                    // Prominent timestamp format
-                    text += '=== ' + (reply.datum || '') + ' ===\n' + replyText + '\n\n';
                 }
                 return text.trim();
             } catch (e) {
-                return '[Fehler beim Formatieren der Antworten: ' + e.message + ']';
+                return '[Fehler: ' + (e.message || e) + ']';
             }
         }
 
@@ -1992,7 +2005,17 @@
             // Combine user's manual answer with automatic replies
             _writeRowCurrentField = 'Antwort-Text erstellen';
             var antwortText = '';
-            var userAntwort = fixEncoding(email.antwort || '');
+            var userAntwort = '';
+            try {
+                // Safely get user answer
+                if (email.antwort) {
+                    userAntwort = String(email.antwort);
+                    userAntwort = fixEncoding(userAntwort);
+                }
+            } catch (e) {
+                userAntwort = '[Fehler beim Lesen der Benutzerantwort]';
+            }
+
             if (userAntwort && repliesText) {
                 antwortText = userAntwort + '\n\n--- Gefundene Antworten ---\n\n' + repliesText;
             } else {
@@ -2047,16 +2070,22 @@
                 safeAntwort = fixEncoding(antwortText);
                 _writeRowCurrentField = 'Spalte 13 (Antwort) - sanitize';
                 safeAntwort = sanitizeForExcel(safeAntwort);
+
+                // Set cell format to text first
+                _writeRowCurrentField = 'Spalte 13 (Antwort) - Format';
+                worksheet.Cells(row, 13).NumberFormat = '@';
+
                 _writeRowCurrentField = 'Spalte 13 (Antwort) - schreiben (' + safeAntwort.length + ' Zeichen)';
 
                 // Try writing - if fails, try progressively simpler text
                 try {
                     worksheet.Cells(row, 13).Value = safeAntwort;
                 } catch (writeErr1) {
-                    // First fallback: only basic ASCII characters
+                    // First fallback: only basic ASCII characters, max 3000 chars
                     _writeRowCurrentField = 'Spalte 13 (Antwort) - Fallback ASCII';
                     var asciiOnly = '';
-                    for (var c = 0; c < safeAntwort.length && c < 5000; c++) {
+                    var maxLen = Math.min(safeAntwort.length, 3000);
+                    for (var c = 0; c < maxLen; c++) {
                         var code = safeAntwort.charCodeAt(c);
                         // Only basic printable ASCII + newline/carriage return
                         if ((code >= 32 && code < 127) || code === 10 || code === 13) {
@@ -2066,11 +2095,11 @@
                         }
                     }
                     try {
-                        worksheet.Cells(row, 13).Value = asciiOnly + '\n\n[Sonderzeichen entfernt wegen Fehler: ' + writeErr1.message + ']';
+                        worksheet.Cells(row, 13).Value = asciiOnly;
                     } catch (writeErr2) {
-                        // Second fallback: just error message
+                        // Second fallback: just a simple test message
                         try {
-                            worksheet.Cells(row, 13).Value = '[FEHLER: ' + writeErr1.message + ']';
+                            worksheet.Cells(row, 13).Value = '[Antwort konnte nicht geschrieben werden - ' + (email.antworten ? email.antworten.length : 0) + ' Antworten vorhanden]';
                         } catch (e3) {
                             // Skip this cell entirely
                         }
@@ -2080,7 +2109,7 @@
                 // Error in preparation - write error message
                 _writeRowCurrentField = 'Spalte 13 (Antwort) - Fehler';
                 try {
-                    worksheet.Cells(row, 13).Value = '[FEHLER beim Vorbereiten: ' + antwortErr.message + ']';
+                    worksheet.Cells(row, 13).Value = '[FEHLER: ' + antwortErr.message + ']';
                 } catch (e2) {
                     // Can't even write error - skip
                 }
