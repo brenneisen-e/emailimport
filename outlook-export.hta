@@ -873,6 +873,7 @@
         }
 
         var sentItemsCache = [];
+        var sentItemsByConvId = {};  // Lookup map for O(1) access by ConversationID
 
         // Export state for async processing
         var exportState = {
@@ -923,7 +924,7 @@
         }
 
         function processEmailBatch() {
-            var batchSize = 5; // Process 5 emails per batch
+            var batchSize = 20; // Process 20 emails per batch (faster with lookup map)
             var processed = 0;
 
             while (processed < batchSize && exportState.current <= exportState.total) {
@@ -1052,6 +1053,7 @@
 
         function cacheSentItems(days) {
             sentItemsCache = [];
+            sentItemsByConvId = {};  // Clear lookup map
             sentCacheState.days = days;
             sentCacheState.cutoffDate = new Date();
             sentCacheState.cutoffDate.setDate(sentCacheState.cutoffDate.getDate() - (days + 30));
@@ -1111,7 +1113,7 @@
         }
 
         function processSentBatch() {
-            var batchSize = 20;  // Increased batch size for faster processing
+            var batchSize = 50;  // Large batch size for faster sent items loading
             var processed = 0;
 
             while (processed < batchSize && sentCacheState.itemIdx <= sentCacheState.maxItems) {
@@ -1138,12 +1140,21 @@
                     var convId = '';
                     try { convId = item.ConversationID || ''; } catch (e) {}
 
-                    sentItemsCache.push({
+                    var sentItem = {
                         sentDate: sentDate,
                         conversationId: convId,
                         body: removeEmailQuotes(body),
                         to: toRecipient
-                    });
+                    };
+                    sentItemsCache.push(sentItem);
+
+                    // Add to lookup map for fast access
+                    if (convId) {
+                        if (!sentItemsByConvId[convId]) {
+                            sentItemsByConvId[convId] = [];
+                        }
+                        sentItemsByConvId[convId].push(sentItem);
+                    }
                 } catch (e) {}
             }
 
@@ -1169,7 +1180,6 @@
 
         function findReplies(originalEmail) {
             var replies = [];
-            if (!sentItemsCache || sentItemsCache.length === 0) return replies;
 
             try {
                 var originalConvId = originalEmail.conversationId || '';
@@ -1177,20 +1187,18 @@
                 // No ConversationID = can't match reliably
                 if (!originalConvId) return replies;
 
-                for (var i = 0; i < sentItemsCache.length; i++) {
-                    var cached = sentItemsCache[i];
+                // Use lookup map for O(1) access instead of iterating entire cache
+                var matchingItems = sentItemsByConvId[originalConvId];
+                if (!matchingItems || matchingItems.length === 0) return replies;
 
-                    // Match by ConversationID (Outlook's built-in thread tracking)
-                    // All replies in the same conversation are relevant, regardless of date
-                    // (handles forwarded emails where the newest forward might be processed first)
-                    if (cached.conversationId && cached.conversationId === originalConvId) {
-                        if (cached.body && cached.body.trim() !== '') {
-                            replies.push({
-                                datum: formatDate(cached.sentDate),
-                                an: cached.to || '',
-                                text: cached.body.trim()
-                            });
-                        }
+                for (var i = 0; i < matchingItems.length; i++) {
+                    var cached = matchingItems[i];
+                    if (cached.body && cached.body.trim() !== '') {
+                        replies.push({
+                            datum: formatDate(cached.sentDate),
+                            an: cached.to || '',
+                            text: cached.body.trim()
+                        });
                     }
                 }
             } catch (e) {}
