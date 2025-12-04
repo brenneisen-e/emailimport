@@ -474,7 +474,10 @@
                 if (btnExcel) btnExcel.className += ' btn-active-step';
                 if (selectMailbox) selectMailbox.className += ' select-inactive-step';
                 if (btnExport) btnExport.className += ' btn-inactive-step';
-            } else if (!completedSteps[1]) {
+            } else if (completedSteps[1]) {
+                // Step 1 completed - gray out the button (already connected)
+                if (btnExcel) btnExcel.className += ' btn-inactive-step';
+            } else {
                 if (btnExcel) btnExcel.className += ' btn-inactive-step';
             }
 
@@ -483,7 +486,11 @@
                 if (selectMailbox) selectMailbox.className += ' select-active-step';
                 if (selectFolder) selectFolder.className += ' select-active-step';
                 if (btnExport) btnExport.className += ' btn-inactive-step';
-            } else if (!completedSteps[2] && currentStep !== 2) {
+            } else if (completedSteps[2]) {
+                // Step 2 completed - gray out selects
+                if (selectMailbox) selectMailbox.className += ' select-inactive-step';
+                if (selectFolder) selectFolder.className += ' select-inactive-step';
+            } else {
                 if (selectMailbox) selectMailbox.className += ' select-inactive-step';
                 if (selectFolder) selectFolder.className += ' select-inactive-step';
             }
@@ -491,19 +498,28 @@
             // Step 3: Emails exportieren
             if (currentStep === 3 && !completedSteps[3]) {
                 if (btnExport) btnExport.className += ' btn-active-step';
-            } else if (!completedSteps[3] && currentStep !== 3) {
+            } else if (completedSteps[3]) {
+                // Step 3 completed - gray out export button
+                if (btnExport) btnExport.className += ' btn-inactive-step';
+            } else {
                 if (btnExport) btnExport.className += ' btn-inactive-step';
             }
 
             // Step 4: Web-App öffnen
             if (currentStep === 4 && !completedSteps[4]) {
                 if (btnWebApp) btnWebApp.className += ' btn-active-step';
+            } else if (completedSteps[4]) {
+                // Step 4 completed - gray out web app button
+                if (btnWebApp) btnWebApp.className += ' btn-inactive-step';
             }
 
             // Step 5: In Excel importieren
             if (currentStep === 5 && !completedSteps[5]) {
                 if (btnImport) btnImport.className += ' btn-active-step';
-            } else if (!completedSteps[5] && currentStep !== 5) {
+            } else if (completedSteps[5]) {
+                // Step 5 completed - gray out import button
+                if (btnImport) btnImport.className += ' btn-inactive-step';
+            } else {
                 if (btnImport) btnImport.className += ' btn-inactive-step';
             }
         }
