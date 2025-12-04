@@ -2146,33 +2146,71 @@
             _writeRowCurrentField = 'Fertig';
         }
 
-        // Fix UTF-8 encoding issues (Ã¼ -> ü, ÃŸ -> ß, etc.)
+        // Fix UTF-8 encoding issues (mojibake: Ã¼ -> ü, ÃŸ -> ß, etc.)
         function fixEncoding(text) {
             if (!text) return '';
-            // Use string split/join for reliable replacement in JScript
             var result = String(text);
+
+            // Method 1: Direct string replacements (most reliable for common patterns)
+            // German umlauts and ß
+            result = result.split('Ã¤').join('ä');
+            result = result.split('Ã„').join('Ä');
+            result = result.split('Ã¶').join('ö');
+            result = result.split('Ã–').join('Ö');
+            result = result.split('Ã¼').join('ü');
+            result = result.split('Ãœ').join('Ü');
+            result = result.split('ÃŸ').join('ß');
+            result = result.split('Ã\u009F').join('ß');  // Alternative encoding
+
+            // Other common characters
+            result = result.split('Ã©').join('é');
+            result = result.split('Ã¨').join('è');
+            result = result.split('Ã ').join('à');
+            result = result.split('Ã¡').join('á');
+            result = result.split('Ã¢').join('â');
+            result = result.split('Ã£').join('ã');
+            result = result.split('Ã§').join('ç');
+            result = result.split('Ã±').join('ñ');
+
+            // Smart quotes and special punctuation (â€ sequences)
+            result = result.split('â€œ').join('"');
+            result = result.split('â€').join('"');
+            result = result.split('â€˜').join("'");
+            result = result.split('â€™').join("'");
+            result = result.split('â€"').join('–');
+            result = result.split('â€"').join('—');
+            result = result.split('â€¦').join('...');
+            result = result.split('â€ž').join('„');
+
+            // Section symbol and other
+            result = result.split('Â§').join('§');
+            result = result.split('Â°').join('°');
+            result = result.split('Â®').join('®');
+            result = result.split('Â©').join('©');
+            result = result.split('Â»').join('»');
+            result = result.split('Â«').join('«');
+            result = result.split('Â´').join("'");
+            result = result.split('Â ').join(' ');  // Non-breaking space issue
+
+            // Euro symbol
+            result = result.split('â‚¬').join('€');
+
+            // Method 2: fromCharCode for any remaining patterns
             var replacements = [
-                [String.fromCharCode(195, 164), String.fromCharCode(228)],  // Ã¤ -> ä
-                [String.fromCharCode(195, 132), String.fromCharCode(196)],  // Ã„ -> Ä
-                [String.fromCharCode(195, 182), String.fromCharCode(246)],  // Ã¶ -> ö
-                [String.fromCharCode(195, 150), String.fromCharCode(214)],  // Ã– -> Ö
-                [String.fromCharCode(195, 188), String.fromCharCode(252)],  // Ã¼ -> ü
-                [String.fromCharCode(195, 156), String.fromCharCode(220)],  // Ãœ -> Ü
-                [String.fromCharCode(195, 159), String.fromCharCode(223)],  // ÃŸ -> ß
-                [String.fromCharCode(195, 169), String.fromCharCode(233)],  // Ã© -> é
-                [String.fromCharCode(195, 168), String.fromCharCode(232)],  // Ã¨ -> è
-                [String.fromCharCode(226, 130, 172), String.fromCharCode(8364)],  // € symbol
-                [String.fromCharCode(226, 128, 158), String.fromCharCode(8222)],  // „
-                [String.fromCharCode(226, 128, 156), String.fromCharCode(8220)],  // "
-                [String.fromCharCode(226, 128, 152), String.fromCharCode(8216)],  // '
-                [String.fromCharCode(226, 128, 153), String.fromCharCode(8217)],  // '
-                [String.fromCharCode(226, 128, 147), String.fromCharCode(8211)],  // –
-                [String.fromCharCode(226, 128, 148), String.fromCharCode(8212)],  // —
-                [String.fromCharCode(226, 128, 166), String.fromCharCode(8230)]   // …
+                [String.fromCharCode(195, 164), String.fromCharCode(228)],  // ä
+                [String.fromCharCode(195, 132), String.fromCharCode(196)],  // Ä
+                [String.fromCharCode(195, 182), String.fromCharCode(246)],  // ö
+                [String.fromCharCode(195, 150), String.fromCharCode(214)],  // Ö
+                [String.fromCharCode(195, 188), String.fromCharCode(252)],  // ü
+                [String.fromCharCode(195, 156), String.fromCharCode(220)],  // Ü
+                [String.fromCharCode(195, 159), String.fromCharCode(223)],  // ß
+                [String.fromCharCode(195, 169), String.fromCharCode(233)],  // é
+                [String.fromCharCode(195, 168), String.fromCharCode(232)]   // è
             ];
             for (var i = 0; i < replacements.length; i++) {
                 result = result.split(replacements[i][0]).join(replacements[i][1]);
             }
+
             return result;
         }
 
