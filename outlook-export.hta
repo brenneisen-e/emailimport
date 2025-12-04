@@ -1343,33 +1343,36 @@
                 var content = '';
                 var loaded = false;
 
-                // Method 1: Try system default encoding (works for most UTF-8 files)
+                // Method 1: Use ADODB.Stream for proper UTF-8 reading (from web app)
+                if (!loaded) {
+                    try {
+                        var stream = new ActiveXObject("ADODB.Stream");
+                        stream.CharSet = "utf-8";
+                        stream.Open();
+                        stream.LoadFromFile(path);
+                        content = stream.ReadText();
+                        stream.Close();
+                        if (content.indexOf('[') >= 0 || content.indexOf('{') >= 0) loaded = true;
+                    } catch (e) {}
+                }
+
+                // Method 2: Try Unicode (UTF-16) for files from this HTA
+                if (!loaded) {
+                    try {
+                        var file = fso.OpenTextFile(path, 1, false, -1); // -1 = TristateTrue (Unicode)
+                        content = file.ReadAll();
+                        file.Close();
+                        if (content.indexOf('[') >= 0 || content.indexOf('{') >= 0) loaded = true;
+                    } catch (e) {}
+                }
+
+                // Method 3: Try system default encoding
                 if (!loaded) {
                     try {
                         var file = fso.OpenTextFile(path, 1, false, -2); // -2 = TristateUseDefault
                         content = file.ReadAll();
                         file.Close();
                         if (content.indexOf('[') >= 0 || content.indexOf('{') >= 0) loaded = true;
-                    } catch (e) {}
-                }
-
-                // Method 2: Try ASCII
-                if (!loaded) {
-                    try {
-                        var file = fso.OpenTextFile(path, 1, false, 0); // 0 = ASCII
-                        content = file.ReadAll();
-                        file.Close();
-                        if (content.indexOf('[') >= 0 || content.indexOf('{') >= 0) loaded = true;
-                    } catch (e) {}
-                }
-
-                // Method 3: Try Unicode (UTF-16) for files from this HTA
-                if (!loaded) {
-                    try {
-                        var file = fso.OpenTextFile(path, 1, false, -1); // -1 = TristateTrue (Unicode)
-                        content = file.ReadAll();
-                        file.Close();
-                        loaded = true;
                     } catch (e) {}
                 }
 
@@ -1773,7 +1776,13 @@
                     }
                     return (arr ? '[' : '{') + String(json) + (arr ? ']' : '}');
                 },
-                parse: function(text) { return eval('(' + text + ')'); }
+                parse: function(text) {
+                    // Escape characters that are valid in JSON but cause syntax errors in eval()
+                    // U+2028 (Line Separator) and U+2029 (Paragraph Separator)
+                    text = text.split('\u2028').join('\\u2028');
+                    text = text.split('\u2029').join('\\u2029');
+                    return eval('(' + text + ')');
+                }
             };
         }
     </script>
