@@ -1096,7 +1096,19 @@
 
         function openWebApp() {
             var shell = new ActiveXObject("WScript.Shell");
-            shell.Run('https://emailimport.pages.dev/');
+            var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+            // Try to open local index.html first
+            var scriptPath = document.location.pathname.replace(/^\//, '').replace(/\//g, '\\');
+            var scriptDir = fso.GetParentFolderName(scriptPath);
+            var localIndex = scriptDir + '\\index.html';
+
+            if (fso.FileExists(localIndex)) {
+                shell.Run('"' + localIndex + '"');
+            } else {
+                // Fallback to hosted version
+                shell.Run('https://emailimport.pages.dev/');
+            }
         }
 
         function openDownloads() {
