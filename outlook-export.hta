@@ -2181,6 +2181,10 @@
             result = result.split('â€"').join('—');
             result = result.split('â€¦').join('...');
             result = result.split('â€ž').join('„');
+            result = result.split('"ž').join('„');  // Alternative pattern for „
+            result = result.split('"œ').join('"');  // Alternative pattern for "
+            result = result.split("'").join("'");   // Curly apostrophe
+            result = result.split('Â´').join("'");  // Acute accent as apostrophe
 
             // Section symbol and other
             result = result.split('Â§').join('§');
