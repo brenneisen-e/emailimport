@@ -928,30 +928,9 @@
             sentCacheState.folders = [];
             sentCacheState.folderIdx = 0;
 
-            // Collect all sent folders - prioritize selected store
-            // Method 1: Selected store's default sent folder
+            // Collect all sent folders
             try { sentCacheState.folders.push(selectedStore.GetDefaultFolder(5)); } catch (e) {}
 
-            // Method 2: Search for "Gesendete Elemente" or "Sent Items" in selected store's root
-            try {
-                var rootFolder = selectedStore.GetRootFolder();
-                var subFolders = rootFolder.Folders;
-                for (var f = 1; f <= subFolders.Count; f++) {
-                    try {
-                        var folder = subFolders.Item(f);
-                        var folderName = folder.Name.toLowerCase();
-                        if (folderName.indexOf('gesendet') !== -1 || folderName.indexOf('sent') !== -1) {
-                            var isDup = false;
-                            for (var d = 0; d < sentCacheState.folders.length; d++) {
-                                try { if (sentCacheState.folders[d].EntryID === folder.EntryID) isDup = true; } catch (e) {}
-                            }
-                            if (!isDup) sentCacheState.folders.push(folder);
-                        }
-                    } catch (e) {}
-                }
-            } catch (e) {}
-
-            // Method 3: Default namespace sent folder
             try {
                 var defaultSent = namespace.GetDefaultFolder(5);
                 var isDup = false;
@@ -961,7 +940,6 @@
                 if (!isDup) sentCacheState.folders.push(defaultSent);
             } catch (e) {}
 
-            // Method 4: All stores' sent folders
             try {
                 for (var s = 1; s <= namespace.Stores.Count; s++) {
                     try {
@@ -1065,7 +1043,6 @@
 
             try {
                 var originalConvId = originalEmail.conversationId || '';
-                var originalDate = new Date(originalEmail.datum);
 
                 // No ConversationID = can't match reliably
                 if (!originalConvId) return replies;
@@ -1074,10 +1051,9 @@
                     var cached = sentItemsCache[i];
 
                     // Match by ConversationID (Outlook's built-in thread tracking)
+                    // All replies in the same conversation are relevant, regardless of date
+                    // (handles forwarded emails where the newest forward might be processed first)
                     if (cached.conversationId && cached.conversationId === originalConvId) {
-                        // Reply must be after original email
-                        if (cached.sentDate <= originalDate) continue;
-
                         if (cached.body && cached.body.trim() !== '') {
                             replies.push({
                                 datum: formatDate(cached.sentDate),
