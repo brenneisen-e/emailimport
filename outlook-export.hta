@@ -1847,24 +1847,36 @@
         function formatReplies(antworten) {
             if (!antworten || antworten.length === 0) return '';
 
-            // Sort by date descending (newest first)
-            var sorted = [];
-            for (var i = 0; i < antworten.length; i++) {
-                sorted.push(antworten[i]);
-            }
-            sorted.sort(function(a, b) {
-                var dateA = new Date(a.datum || 0);
-                var dateB = new Date(b.datum || 0);
-                return dateB - dateA;  // Descending
-            });
+            try {
+                // Sort by date descending (newest first)
+                var sorted = [];
+                for (var i = 0; i < antworten.length; i++) {
+                    if (antworten[i]) sorted.push(antworten[i]);
+                }
+                sorted.sort(function(a, b) {
+                    var dateA = new Date(a.datum || 0);
+                    var dateB = new Date(b.datum || 0);
+                    return dateB - dateA;  // Descending
+                });
 
-            var text = '';
-            for (var r = 0; r < sorted.length; r++) {
-                var reply = sorted[r];
-                // Prominent timestamp format
-                text += '=== ' + (reply.datum || '') + ' ===\n' + (reply.text || '') + '\n\n';
+                var text = '';
+                for (var r = 0; r < sorted.length; r++) {
+                    var reply = sorted[r];
+                    if (!reply) continue;
+                    // Get reply text safely
+                    var replyText = '';
+                    try {
+                        replyText = String(reply.text || '');
+                    } catch (e) {
+                        replyText = '[Fehler beim Lesen]';
+                    }
+                    // Prominent timestamp format
+                    text += '=== ' + (reply.datum || '') + ' ===\n' + replyText + '\n\n';
+                }
+                return text.trim();
+            } catch (e) {
+                return '[Fehler beim Formatieren der Antworten: ' + e.message + ']';
             }
-            return text.trim();
         }
 
         // Global for tracking current field being written (for error debugging)
@@ -1998,10 +2010,10 @@
             worksheet.Cells(row, 11).Value = betreff;                    // Betreff
 
             _writeRowCurrentField = 'Spalte 12 (Anfrage)';
-            worksheet.Cells(row, 12).Value = anfrage;                    // Anfrage
+            worksheet.Cells(row, 12).Value = sanitizeForExcel(anfrage);  // Anfrage
 
             _writeRowCurrentField = 'Spalte 13 (Antwort)';
-            worksheet.Cells(row, 13).Value = fixEncoding(antwortText);   // Antwort
+            worksheet.Cells(row, 13).Value = sanitizeForExcel(fixEncoding(antwortText));   // Antwort
 
             _writeRowCurrentField = 'Spalte 14-19 (Leere Felder)';
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
@@ -2047,6 +2059,34 @@
             for (var i = 0; i < replacements.length; i++) {
                 result = result.split(replacements[i][0]).join(replacements[i][1]);
             }
+            return result;
+        }
+
+        // Sanitize text for safe Excel writing - removes problematic characters
+        function sanitizeForExcel(text) {
+            if (!text) return '';
+            var result = String(text);
+
+            // Remove null characters
+            result = result.split(String.fromCharCode(0)).join('');
+
+            // Remove other control characters (except newline, carriage return, tab)
+            var cleaned = '';
+            for (var i = 0; i < result.length; i++) {
+                var code = result.charCodeAt(i);
+                // Allow printable ASCII (32+), extended chars (128+), newline (10), carriage return (13), tab (9)
+                if (code >= 32 || code === 10 || code === 13 || code === 9) {
+                    cleaned += result.charAt(i);
+                }
+                // Skip control characters 0-8, 11-12, 14-31
+            }
+            result = cleaned;
+
+            // Limit length to prevent Excel issues (32767 is Excel cell limit)
+            if (result.length > 30000) {
+                result = result.substring(0, 30000) + '\n\n[... gekürzt ...]';
+            }
+
             return result;
         }
 
