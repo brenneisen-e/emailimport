@@ -899,6 +899,70 @@
             font-family: 'Consolas', 'Monaco', monospace;
         }
 
+        /* Keyword Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 700px;
+            max-height: 80vh;
+            width: 90%;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 1;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            color: var(--text-secondary);
+        }
+
+        .modal-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
         /* SVG Icons */
         .icon {
             width: 1em;
@@ -988,6 +1052,13 @@
                 </svg>
                 JSON speichern
             </button>
+            <button class="btn btn-white" id="btnKeywords" style="display: none;" onclick="showKeywordModal()">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                    <line x1="7" y1="7" x2="7.01" y2="7"/>
+                </svg>
+                Schlagwörter
+            </button>
         </div>
     </header>
 
@@ -1010,17 +1081,6 @@
                     </svg>
                     Datei auswählen
                 </button>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label class="form-label">In Bearbeitung von</label>
-                <select class="form-select" id="bearbeiterName" onchange="saveBearbeiterName()" style="text-align: center;">
-                    <option value="">-- Bitte auswählen --</option>
-                    <option value="Meike Bauer">Meike Bauer</option>
-                    <option value="Sarina Ebert">Sarina Ebert</option>
-                    <option value="Nicole Rotter">Nicole Rotter</option>
-                    <option value="Kristin Kreisel">Kristin Kreisel</option>
-                </select>
             </div>
 
             <div class="upload-info">
@@ -1107,13 +1167,6 @@
                                 </svg>
                                 Antworten <span class="tab-badge" id="replyCount" style="display: none;">0</span>
                             </div>
-                            <div class="content-tab" id="tabSchlagworte" onclick="switchContentTab('schlagworte')">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                                    <line x1="7" y1="7" x2="7.01" y2="7"/>
-                                </svg>
-                                Schlagwörter
-                            </div>
                         </div>
 
                         <div class="email-content-tabbed">
@@ -1126,91 +1179,6 @@
                             <!-- Tab: Antworten -->
                             <div class="tab-content-area" id="contentAntworten">
                                 <div id="repliesList"></div>
-                            </div>
-
-                            <!-- Tab: Schlagwortverzeichnis -->
-                            <div class="tab-content-area" id="contentSchlagworte">
-                                <div class="keyword-reference">
-                                    <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
-                                        Diese Schlagwörter werden automatisch erkannt und führen zur Zuordnung der entsprechenden Cluster:
-                                    </p>
-                                    <div class="keyword-category">
-                                        <div class="keyword-category-header">
-                                            <span class="keyword-category-color" style="background: #22c55e;"></span>
-                                            KV (Krankenversicherung)
-                                        </div>
-                                        <div class="keyword-list">
-                                            <span class="keyword-item keyword-highlight" data-cluster="KV">kv</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="KV">kranken</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="KV">gesundheit</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="KV">pflege</span>
-                                        </div>
-                                    </div>
-                                    <div class="keyword-category">
-                                        <div class="keyword-category-header">
-                                            <span class="keyword-category-color" style="background: #3b82f6;"></span>
-                                            KFZ (Kraftfahrzeug)
-                                        </div>
-                                        <div class="keyword-list">
-                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">kfz</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">auto</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">fahrzeug</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">kasko</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">haftpflicht</span>
-                                        </div>
-                                    </div>
-                                    <div class="keyword-category">
-                                        <div class="keyword-category-header">
-                                            <span class="keyword-category-color" style="background: #f97316;"></span>
-                                            SHUK (Sach/Haftpflicht/Unfall/Komposit)
-                                        </div>
-                                        <div class="keyword-list">
-                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">shuk</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">sach</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">haft</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">unfall</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">hausrat</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">wohngebäude</span>
-                                        </div>
-                                    </div>
-                                    <div class="keyword-category">
-                                        <div class="keyword-category-header">
-                                            <span class="keyword-category-color" style="background: #8b5cf6;"></span>
-                                            LV (Lebensversicherung)
-                                        </div>
-                                        <div class="keyword-list">
-                                            <span class="keyword-item keyword-highlight" data-cluster="LV">lv</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="LV">leben</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="LV">rente</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="LV">vorsorge</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="LV">altersvorsorge</span>
-                                        </div>
-                                    </div>
-                                    <div class="keyword-category">
-                                        <div class="keyword-category-header">
-                                            <span class="keyword-category-color" style="background: #eab308;"></span>
-                                            Provisionierung
-                                        </div>
-                                        <div class="keyword-list">
-                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">provision</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">vergütung</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">courtage</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">abrechnung</span>
-                                        </div>
-                                    </div>
-                                    <div class="keyword-category">
-                                        <div class="keyword-category-header">
-                                            <span class="keyword-category-color" style="background: #ec4899;"></span>
-                                            Produktzuordnung
-                                        </div>
-                                        <div class="keyword-list">
-                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">produkt</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">tarif</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">angebot</span>
-                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">deckung</span>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1262,7 +1230,7 @@
                             <div class="form-section-title">Details</div>
 
                             <div class="form-group">
-                                <label class="form-label">Agentur</label>
+                                <label class="form-label">Vermittler</label>
                                 <input type="text" class="form-input" id="formAgentur" onchange="updateField('agentur')">
                             </div>
 
@@ -1298,6 +1266,146 @@
 
     <!-- Notifications -->
     <div class="notification-container" id="notificationContainer"></div>
+
+    <!-- Keyword Modal -->
+    <div class="modal-overlay" id="keywordModal" onclick="closeKeywordModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                        <line x1="7" y1="7" x2="7.01" y2="7"/>
+                    </svg>
+                    Schlagwortverzeichnis
+                </div>
+                <button class="modal-close" onclick="closeKeywordModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    Diese Schlagwörter werden automatisch erkannt und führen zur Zuordnung der entsprechenden Cluster:
+                </p>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #22c55e;"></span>
+                        KV (Krankenversicherung)
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">kv</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">kranken</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">gesundheit</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">pflege</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">auslandsreise</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">reisekranken</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">bkk</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">zahnzusatz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">krankenzusatz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">ambulant</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">stationär</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">krankentagegeld</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #3b82f6;"></span>
+                        KFZ (Kraftfahrzeug)
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">kfz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">auto</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">fahrzeug</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">kasko</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">vollkasko</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">teilkasko</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">pkw</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">kennzeichen</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">motorrad</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">anhänger</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #f97316;"></span>
+                        SHUK (Sach/Haftpflicht/Unfall/Komposit)
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">shuk</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">sach</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">haftpflicht</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">unfall</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">hausrat</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">wohngebäude</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">gebäude</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">rechtsschutz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">tierhalter</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">hund</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">pferd</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">gewässer</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">photovoltaik</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #8b5cf6;"></span>
+                        LV (Lebensversicherung)
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">lv</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">leben</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">rente</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">altersvorsorge</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">riester</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">rürup</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">bav</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">betrieblich</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">sterbegeld</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">berufsunfähigkeit</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">bu</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #eab308;"></span>
+                        Provisionierung
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">provision</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">vergütung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">courtage</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">abrechnung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">storno</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">dynamisierung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">bestandspflege</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">absatz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">bestand</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #ec4899;"></span>
+                        Produktzuordnung
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">zuordnung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">produkt</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">tarif</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">umstellung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">migration</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">tarifwechsel</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // ============================================================================
@@ -1368,26 +1476,18 @@
 
         // Load bearbeiter name from localStorage on page load
         document.addEventListener('DOMContentLoaded', function() {
-            const savedName = localStorage.getItem('bearbeiterName') || '';
-            document.getElementById('bearbeiterName').value = savedName;
-
             // Auto-open file picker after short delay
             setTimeout(function() {
                 openFilePicker();
             }, 500);
         });
 
-        function saveBearbeiterName() {
-            const name = document.getElementById('bearbeiterName').value;
-            localStorage.setItem('bearbeiterName', name);
-            // Update all emails with the new bearbeiter name
-            emails.forEach(email => {
-                email.bearbeiter = name;
-            });
-        }
-
         function getBearbeiterName() {
             return localStorage.getItem('bearbeiterName') || '';
+        }
+
+        function saveBearbeiterToLocalStorage(name) {
+            localStorage.setItem('bearbeiterName', name);
         }
 
         // ============================================================================
@@ -1452,7 +1552,10 @@
                 const clusters = identifyClusters(subject, text);
                 const isProvision = isProvisionEmail(subject, text, fromEmail);
                 const provisionData = isProvision ? parseProvisionData(text) : null;
-                const agentur = extractAgentur(fromName, subject);
+                // Vermittler: prefer provisionData's vermittler name, fallback to extracted
+                const vermittlerName = provisionData ?
+                    ((provisionData.vorname_vermittler || '') + ' ' + (provisionData.nachname_vermittler || '')).trim() : '';
+                const agentur = vermittlerName || extractAgentur(fromName, subject);
                 const vermittlernr = provisionData?.vermittlernummer_vermittler || extractVermittlernr(text);
                 const vsnr = provisionData?.versicherungsnummer_kunde || extractVsnr(text);
 
@@ -1495,6 +1598,7 @@
             document.getElementById('headerStats').style.display = 'flex';
             document.getElementById('btnNewFile').style.display = 'flex';
             document.getElementById('btnExport').style.display = 'flex';
+            document.getElementById('btnKeywords').style.display = 'flex';
             document.getElementById('stepIndicator').style.display = 'flex';
 
             // Initialize step indicator to step 1 (Auswählen)
@@ -1538,12 +1642,18 @@
             const t = text.toLowerCase();
             const combined = s + ' ' + t;
 
-            if (combined.match(/\bkv\b|kranken|gesundheit|pflege/)) clusters.push('KV');
-            if (combined.match(/\bkfz\b|auto|fahrzeug|kasko|haftpflicht/)) clusters.push('KFZ');
-            if (combined.match(/\bshuk\b|sach|haft|unfall|hausrat|wohngebäude/)) clusters.push('SHUK');
-            if (combined.match(/\blv\b|leben|rente|vorsorge|altersvorsorge/)) clusters.push('LV');
-            if (combined.match(/provision|vergütung|courtage|abrechnung/)) clusters.push('Provisionierung');
-            if (combined.match(/produkt|tarif|angebot|deckung/)) clusters.push('Produktzuordnung');
+            // KV - Krankenversicherung (erweitert)
+            if (combined.match(/\bkv\b|kranken|gesundheit|pflege|auslandsreise|reisekranken|\bbkk\b|zahnzusatz|krankenzusatz|ambulant|stationär|krankentagegeld/)) clusters.push('KV');
+            // KFZ - Kraftfahrzeug (erweitert)
+            if (combined.match(/\bkfz\b|auto|fahrzeug|kasko|vollkasko|teilkasko|\bpkw\b|kennzeichen|motorrad|anhänger/)) clusters.push('KFZ');
+            // SHUK - Sach/Haftpflicht/Unfall/Komposit (erweitert)
+            if (combined.match(/\bshuk\b|sach|haftpflicht|unfall|hausrat|wohngebäude|gebäude|rechtsschutz|tierhalter|\bhund\b|pferd|gewässer|photovoltaik/)) clusters.push('SHUK');
+            // LV - Lebensversicherung (erweitert)
+            if (combined.match(/\blv\b|leben|rente|altersvorsorge|riester|rürup|\bbav\b|betrieblich|sterbegeld|berufsunfähigkeit|\bbu\b/)) clusters.push('LV');
+            // Provisionierung (erweitert)
+            if (combined.match(/provision|vergütung|courtage|abrechnung|storno|dynamisierung|bestandspflege|absatz|bestand/)) clusters.push('Provisionierung');
+            // Produktzuordnung (erweitert)
+            if (combined.match(/zuordnung|produkt|tarif|umstellung|migration|tarifwechsel/)) clusters.push('Produktzuordnung');
 
             return clusters.length > 0 ? clusters : ['Allgemein'];
         }
@@ -1982,6 +2092,19 @@
         }
 
         // ============================================================================
+        // KEYWORD MODAL
+        // ============================================================================
+        function showKeywordModal() {
+            document.getElementById('keywordModal').classList.add('active');
+        }
+
+        function closeKeywordModal(event) {
+            if (!event || event.target === document.getElementById('keywordModal')) {
+                document.getElementById('keywordModal').classList.remove('active');
+            }
+        }
+
+        // ============================================================================
         // RESET
         // ============================================================================
         function resetApp() {
@@ -1996,6 +2119,7 @@
             document.getElementById('headerStats').style.display = 'none';
             document.getElementById('btnNewFile').style.display = 'none';
             document.getElementById('btnExport').style.display = 'none';
+            document.getElementById('btnKeywords').style.display = 'none';
         }
 
         // ============================================================================

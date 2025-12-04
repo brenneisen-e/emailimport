@@ -1821,6 +1821,10 @@
                                 var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
                                 worksheet.Cells(existingRow, 13).Value = combinedReplies;  // Antwort = col 13
 
+                                // Bold timestamps in reply cell
+                                currentStep = 'Email ' + (i+1) + ' Timestamps fetten';
+                                boldTimestamps(worksheet.Cells(existingRow, 13));
+
                                 // Also update ReplyIDs (col 23) - append new reply IDs
                                 currentStep = 'Email ' + (i+1) + ' ReplyIDs aktualisieren';
                                 try {
@@ -2026,6 +2030,33 @@
         // Global for tracking current field being written (for error debugging)
         var _writeRowCurrentField = '';
 
+        // Bold timestamp patterns (=== 2025-12-04T12:34:56 ===) in a cell
+        function boldTimestamps(cell) {
+            try {
+                var text = cell.Value || '';
+                if (!text || typeof text !== 'string') return;
+
+                // Find all "=== ... ===" patterns and make them bold
+                var pattern = /===[^=]+===/g;
+                var match;
+                var regex = new RegExp('===[^=]+===', 'g');
+
+                // Get all matches with their positions
+                var lastIndex = 0;
+                while ((match = regex.exec(text)) !== null) {
+                    var start = match.index + 1;  // Excel Characters is 1-based
+                    var length = match[0].length;
+                    try {
+                        cell.Characters(start, length).Font.Bold = true;
+                    } catch (e) {
+                        // Non-critical, continue
+                    }
+                }
+            } catch (e) {
+                // Non-critical formatting error, ignore
+            }
+        }
+
         // Write a single email row to Excel
         // Columns: ID, Datum, Kanal, BD-Nummer, Agentur, Absender, Kategorie, Status, In Bearbeitung von,
         //          Cluster, Betreff, Anfrage, Antwort, Diagnose, Workaround, Nächste Schritte,
@@ -2140,7 +2171,23 @@
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
 
             _writeRowCurrentField = 'Spalte 2 (Datum)';
-            worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
+            // Format date as German date (DD.MM.YYYY HH:MM)
+            try {
+                var datumValue = email.datum || '';
+                if (datumValue) {
+                    var d = new Date(datumValue);
+                    if (!isNaN(d.getTime())) {
+                        worksheet.Cells(row, 2).Value = d;
+                        worksheet.Cells(row, 2).NumberFormat = 'DD.MM.YYYY HH:MM';
+                    } else {
+                        worksheet.Cells(row, 2).Value = datumValue;
+                    }
+                } else {
+                    worksheet.Cells(row, 2).Value = '';
+                }
+            } catch (dateErr) {
+                worksheet.Cells(row, 2).Value = email.datum || '';
+            }
 
             _writeRowCurrentField = 'Spalte 3 (Kanal)';
             worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
@@ -2231,6 +2278,10 @@
                     // Can't even write error - skip
                 }
             }
+
+            // Bold the timestamps in reply cell (=== 2025-12-04T12:34:56 ===)
+            _writeRowCurrentField = 'Spalte 13 (Antwort) - Timestamps fetten';
+            boldTimestamps(worksheet.Cells(row, 13));
 
             _writeRowCurrentField = 'Spalte 14-19 (Leere Felder)';
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
