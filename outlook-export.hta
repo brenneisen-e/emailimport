@@ -1738,11 +1738,29 @@
                     } else {
                         // New email - add to Excel
                         currentStep = 'Email ' + (i+1) + ' schreiben (Zeile ' + nextRow + ')';
-                        writeEmailRow(worksheet, nextRow, email);
-                        // Add to existing data cache to prevent duplicates within same import
-                        existingData[emailKey] = nextRow;
-                        nextRow++;
-                        newCount++;
+                        try {
+                            writeEmailRow(worksheet, nextRow, email);
+                            // Add to existing data cache to prevent duplicates within same import
+                            existingData[emailKey] = nextRow;
+                            nextRow++;
+                            newCount++;
+                        } catch (writeErr) {
+                            // Log error but continue with next email
+                            currentStep = 'Email ' + (i+1) + ' FEHLER - übersprungen';
+                            // Write minimal error row so we know there was an issue
+                            try {
+                                worksheet.Cells(nextRow, 1).Value = 'HC-' + (nextRow - 1);
+                                worksheet.Cells(nextRow, 2).Value = email.datum || '';
+                                worksheet.Cells(nextRow, 11).Value = email.betreff || '';
+                                worksheet.Cells(nextRow, 12).Value = '[FEHLER beim Import: ' + writeErr.message + ']';
+                                existingData[emailKey] = nextRow;
+                                nextRow++;
+                                skipCount++;  // Count as skipped
+                            } catch (e2) {
+                                // Even minimal write failed - just skip
+                                skipCount++;
+                            }
+                        }
                     }
                 }
 
