@@ -129,6 +129,90 @@
 
         .row { display: flex; gap: 0.75rem; }
         .row > * { flex: 1; }
+
+        /* Step Indicator Styles */
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .step-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            opacity: 0.4;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .step-circle.step-1 { background: #FFB5BA; } /* Pastel Pink */
+        .step-circle.step-2 { background: #FFDAB3; } /* Pastel Orange */
+        .step-circle.step-3 { background: #B5EAD7; } /* Pastel Green */
+        .step-circle.step-4 { background: #C7CEEA; } /* Pastel Blue */
+        .step-circle.step-5 { background: #E2B6CF; } /* Pastel Purple */
+
+        .step-circle.active {
+            opacity: 1;
+            transform: scale(1.15);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            animation: stepPulse 1.5s ease-in-out infinite;
+        }
+        .step-circle.completed {
+            opacity: 0.8;
+            transform: scale(1);
+        }
+        .step-circle.completed::after {
+            content: '\2713';
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+            width: 20px;
+            height: 20px;
+            background: #10b981;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .step-arrow {
+            color: #4a5568;
+            font-size: 1.25rem;
+            opacity: 0.5;
+        }
+        .step-label {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 0.25rem;
+            max-width: 60px;
+            line-height: 1.1;
+        }
+        .step-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        @keyframes stepPulse {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+                transform: scale(1.15);
+            }
+            50% {
+                box-shadow: 0 0 25px rgba(255, 255, 255, 0.5);
+                transform: scale(1.2);
+            }
+        }
     </style>
 </head>
 <body>
@@ -147,6 +231,34 @@
                     <p class="subtitle">Emails der letzten Tage als JSON speichern</p>
                 </div>
 
+                <!-- Step Indicator -->
+                <div class="step-indicator" id="stepIndicator">
+                    <div class="step-wrapper">
+                        <div class="step-circle step-1 active" id="step1">1</div>
+                        <div class="step-label">Excel verbinden</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle step-2" id="step2">2</div>
+                        <div class="step-label">Postfach auswählen</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle step-3" id="step3">3</div>
+                        <div class="step-label">Emails exportieren</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle step-4" id="step4">4</div>
+                        <div class="step-label">Web-App</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle step-5" id="step5">5</div>
+                        <div class="step-label">Excel Import</div>
+                    </div>
+                </div>
+
                 <label>Postfach</label>
                 <select id="mailboxSelect" onchange="loadFolders()">
                     <option value="">-- Postfach wahlen --</option>
@@ -160,7 +272,7 @@
                 <label>Zeitraum (Tage)</label>
                 <input type="number" id="daysInput" value="7" min="1" max="30">
 
-                <label>① Excel verbinden (Pflicht)</label>
+                <label>Excel verbinden (Pflicht)</label>
                 <div class="row">
                     <input type="text" id="exportExcelStatus" readonly placeholder="Tracking_Hypercare.xlsm öffnen, dann verbinden" style="flex:1">
                 </div>
@@ -168,7 +280,7 @@
                     &#128269; Excel verbinden
                 </button>
 
-                <label>② Emails exportieren</label>
+                <label>Emails exportieren</label>
                 <button class="btn btn-success" id="exportBtn" onclick="startExport()" disabled>
                     &#128229; Emails exportieren
                 </button>
@@ -185,12 +297,12 @@
                 <div class="status error" id="exportError"><span id="exportErrorMsg"></span></div>
 
                 <div class="action-buttons" id="exportActions">
-                    <button class="btn btn-success" onclick="openWebApp()">③ Web-App öffnen (bearbeiten)</button>
+                    <button class="btn btn-success" onclick="openWebApp()">&#127760; Web-App öffnen (bearbeiten)</button>
                     <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads öffnen</button>
                 </div>
 
                 <div class="info-box">
-                    <strong>Workflow:</strong> ① Excel verbinden → ② Export → ③ Web-App → ④ Import
+                    <strong>Workflow:</strong> Siehe Schritte oben - die Kreise zeigen den aktuellen Schritt
                 </div>
             </div>
 
@@ -198,7 +310,7 @@
             <div class="tab-content" id="tabImport">
                 <div class="header">
                     <div class="logo logo-import">&#128200;</div>
-                    <h2>④ In Excel importieren</h2>
+                    <h2>In Excel importieren</h2>
                     <p class="subtitle">Bearbeitete JSON in Hypercare-Excel schreiben</p>
                 </div>
 
@@ -222,7 +334,7 @@
                 <input type="text" id="sheetName" value="Übersicht">
 
                 <button class="btn btn-success" id="importBtn" onclick="startImport()" disabled>
-                    ④ In Excel importieren
+                    &#128200; In Excel importieren
                 </button>
 
                 <div class="progress-container" id="importProgress">
@@ -256,6 +368,51 @@
         var existingReplies = {};    // Existing replies text per email key (for filtering new replies)
         var lastExportedEmails = null;  // Store for direct import
 
+        // Step tracking
+        var currentStep = 1;
+        var completedSteps = {};
+
+        // Update step indicator UI
+        function updateStepIndicator(stepNumber, markCompleted) {
+            // Mark the specified step as completed if requested
+            if (markCompleted && stepNumber > 0 && stepNumber <= 5) {
+                completedSteps[stepNumber] = true;
+            }
+
+            // Update all step circles
+            for (var i = 1; i <= 5; i++) {
+                var stepEl = document.getElementById('step' + i);
+                if (stepEl) {
+                    // Remove all state classes
+                    stepEl.className = 'step-circle step-' + i;
+
+                    if (completedSteps[i]) {
+                        stepEl.className += ' completed';
+                    }
+                    if (i === currentStep && !completedSteps[i]) {
+                        stepEl.className += ' active';
+                    }
+                }
+            }
+        }
+
+        // Advance to next step
+        function advanceToStep(stepNumber) {
+            if (stepNumber > currentStep) {
+                currentStep = stepNumber;
+                updateStepIndicator(0, false);
+            }
+        }
+
+        // Complete a step and advance to next
+        function completeStep(stepNumber) {
+            completedSteps[stepNumber] = true;
+            if (stepNumber >= currentStep && stepNumber < 5) {
+                currentStep = stepNumber + 1;
+            }
+            updateStepIndicator(stepNumber, true);
+        }
+
         // ============================================================================
         // INITIALIZATION
         // ============================================================================
@@ -270,6 +427,12 @@
             }
             document.getElementById('tabExport').className = 'tab-content' + (tab === 'export' ? ' active' : '');
             document.getElementById('tabImport').className = 'tab-content' + (tab === 'import' ? ' active' : '');
+
+            // When switching to import tab, advance to step 5 if step 4 is completed
+            if (tab === 'import' && completedSteps[4]) {
+                currentStep = 5;
+                updateStepIndicator(0, false);
+            }
 
             // If switching to import and Excel was already connected during export, reuse it
             if (tab === 'import' && exportWorkbook && !targetWorkbook) {
@@ -378,6 +541,9 @@
                 addSubfolders(rootFolder.Folders, folderSelect, '');
                 folderSelect.disabled = false;
                 checkExportReady();
+
+                // Step 2 completed - Mailbox selected
+                completeStep(2);
             } catch (e) {
                 showExportError("Fehler: " + e.message);
             }
@@ -498,6 +664,9 @@
 
                 document.getElementById('exportExcelStatus').value = "OK: " + exportWorkbook.Name + " (" + count + " Einträge)";
                 checkExportReady();
+
+                // Step 1 completed - Excel connected
+                completeStep(1);
 
             } catch (e) {
                 document.getElementById('exportExcelStatus').value = "Fehler: " + e.message;
@@ -1077,6 +1246,9 @@
 
                 // Store emails for reference
                 lastExportedEmails = emails;
+
+                // Step 3 completed - Export done
+                completeStep(3);
             } catch (e) {
                 showExportError("Speichern fehlgeschlagen: " + e.message);
             }
@@ -1109,6 +1281,9 @@
                 // Fallback to hosted version
                 shell.Run('https://emailimport.pages.dev/');
             }
+
+            // Step 4 completed - Web App opened
+            completeStep(4);
         }
 
         function openDownloads() {
@@ -1381,6 +1556,9 @@
                     '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
                     '<strong>' + skipCount + '</strong> Duplikate ubersprungen';
                 document.getElementById('importBtn').disabled = false;
+
+                // Step 5 completed - Import done
+                completeStep(5);
 
             } catch (e) {
                 document.getElementById('importProgress').style.display = 'none';
