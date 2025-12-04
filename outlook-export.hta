@@ -1555,12 +1555,9 @@
             var status = fixEncoding(email.status || 'Neu');
             var clusters = fixEncoding((email.clusters || []).join(', '));
             var kommentar = fixEncoding(email.kommentar || '');
+            // Bearbeiter - simple string, no encoding needed
             var bearbeiter = '';
-            try {
-                bearbeiter = fixEncoding(String(email.bearbeiter || ''));
-            } catch (e) {
-                bearbeiter = '';
-            }
+            if (email.bearbeiter) bearbeiter = '' + email.bearbeiter;
 
             // Combine user's manual answer with automatic replies
             var antwortText = '';
