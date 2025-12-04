@@ -289,6 +289,37 @@
                     document.getElementById('excelStatus').value = "Excel-Verbindung verloren - bitte neu verbinden";
                 }
             }
+
+            // Auto-load today's JSON file when switching to import tab
+            if (tab === 'import' && !jsonData) {
+                autoLoadTodayJson();
+            }
+        }
+
+        // Auto-load today's bearbeitet JSON file
+        function autoLoadTodayJson() {
+            try {
+                var shell = new ActiveXObject("WScript.Shell");
+                var shellApp = new ActiveXObject("Shell.Application");
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+                var downloads;
+                try { downloads = shellApp.NameSpace("shell:Downloads").Self.Path; }
+                catch (e) { downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads"; }
+
+                // Build today's filename
+                var today = new Date();
+                var dateStr = today.getFullYear() + '-' +
+                    (today.getMonth() + 1 < 10 ? '0' : '') + (today.getMonth() + 1) + '-' +
+                    (today.getDate() < 10 ? '0' : '') + today.getDate();
+                var expectedFile = downloads + '\\hypercare_bearbeitet_' + dateStr + '.json';
+
+                if (fso.FileExists(expectedFile)) {
+                    loadJsonFile(expectedFile);
+                }
+            } catch (e) {
+                // Silently fail - user can manually browse
+            }
         }
 
         // ============================================================================
@@ -1555,12 +1586,9 @@
             var status = fixEncoding(email.status || 'Neu');
             var clusters = fixEncoding((email.clusters || []).join(', '));
             var kommentar = fixEncoding(email.kommentar || '');
+            // Bearbeiter - simple string, no encoding needed
             var bearbeiter = '';
-            try {
-                bearbeiter = fixEncoding(String(email.bearbeiter || ''));
-            } catch (e) {
-                bearbeiter = '';
-            }
+            if (email.bearbeiter) bearbeiter = '' + email.bearbeiter;
 
             // Combine user's manual answer with automatic replies
             var antwortText = '';
