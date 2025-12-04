@@ -1886,11 +1886,13 @@
                             }
                         } catch (e) { replyDatum = ''; }
 
-                        // Safely extract text
+                        // Safely extract text and fix encoding
                         var replyText = '';
                         try {
                             if (reply.text !== undefined && reply.text !== null) {
                                 replyText = '' + reply.text;
+                                // Apply encoding fix to each reply
+                                replyText = fixEncoding(replyText);
                             }
                         } catch (e) { replyText = '[Fehler]'; }
 
@@ -2081,27 +2083,31 @@
                 try {
                     worksheet.Cells(row, 13).Value = safeAntwort;
                 } catch (writeErr1) {
-                    // First fallback: only basic ASCII characters, max 3000 chars
-                    _writeRowCurrentField = 'Spalte 13 (Antwort) - Fallback ASCII';
-                    var asciiOnly = '';
-                    var maxLen = Math.min(safeAntwort.length, 3000);
+                    // First fallback: remove only control characters, keep umlauts
+                    _writeRowCurrentField = 'Spalte 13 (Antwort) - Fallback (ohne Steuerzeichen)';
+                    var cleanText = '';
+                    var maxLen = Math.min(safeAntwort.length, 10000);
                     for (var c = 0; c < maxLen; c++) {
                         var code = safeAntwort.charCodeAt(c);
-                        // Only basic printable ASCII + newline/carriage return
-                        if ((code >= 32 && code < 127) || code === 10 || code === 13) {
-                            asciiOnly += safeAntwort.charAt(c);
-                        } else {
-                            asciiOnly += ' ';  // Replace with space
+                        // Keep printable ASCII (32-126), extended Latin (128-255), newline, CR, tab
+                        if ((code >= 32 && code <= 255) || code === 10 || code === 13 || code === 9) {
+                            cleanText += safeAntwort.charAt(c);
                         }
+                        // Skip control chars 0-8, 11-12, 14-31 and chars > 255
                     }
                     try {
-                        worksheet.Cells(row, 13).Value = asciiOnly;
+                        worksheet.Cells(row, 13).Value = cleanText;
                     } catch (writeErr2) {
-                        // Second fallback: just a simple test message
+                        // Second fallback: shorter text
                         try {
-                            worksheet.Cells(row, 13).Value = '[Antwort konnte nicht geschrieben werden - ' + (email.antworten ? email.antworten.length : 0) + ' Antworten vorhanden]';
-                        } catch (e3) {
-                            // Skip this cell entirely
+                            worksheet.Cells(row, 13).Value = cleanText.substring(0, 2000);
+                        } catch (writeErr3) {
+                            // Third fallback: just a message
+                            try {
+                                worksheet.Cells(row, 13).Value = '[Antwort konnte nicht geschrieben werden - ' + (email.antworten ? email.antworten.length : 0) + ' Antworten]';
+                            } catch (e3) {
+                                // Skip
+                            }
                         }
                     }
                 }
