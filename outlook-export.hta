@@ -413,6 +413,7 @@
         var existingEmailIds = {};   // EmailIDs (EntryIDs) already in Excel - for precise duplicate detection
         var existingReplyIds = {};   // ReplyIDs per email key - comma-separated EntryIDs of already imported replies
         var existingAnfragen = {};   // Original request text per conversation (to avoid duplicating)
+        var existingDates = {};      // Original request date per conversation
         var lastExportedEmails = null;  // Store for direct import
 
         // Step tracking
@@ -728,6 +729,7 @@
             existingEmailIds = {};
             existingReplyIds = {};
             existingAnfragen = {};
+            existingDates = {};
 
             try {
                 // Try to connect to running Excel
@@ -793,6 +795,7 @@
                         if (antworten) existingReplies[convKey] = antworten;
                         if (replyIds) existingReplyIds[convKey] = replyIds;
                         if (anfrage) existingAnfragen[convKey] = anfrage;  // Track original request
+                        if (datum) existingDates[convKey] = datum;  // Track original date
                     }
                     // Fallback key: date + subject (for older entries without ConversationID)
                     if (datum || betreff) {
@@ -801,6 +804,7 @@
                         if (antworten) existingReplies[key] = antworten;
                         if (replyIds) existingReplyIds[key] = replyIds;
                         if (anfrage) existingAnfragen[key] = anfrage;  // Also track for fallback
+                        if (datum) existingDates[key] = datum;  // Also track for fallback
                     }
                     // Track emailId for precise duplicate detection
                     if (emailId) {
@@ -821,6 +825,7 @@
                 existingEmailIds = {};
                 existingReplyIds = {};
                 existingAnfragen = {};
+                existingDates = {};
                 exportWorkbook = null;
                 checkExportReady();
             }
@@ -1074,6 +1079,30 @@
                             emailData.text = removeEmailQuotes(emailData.text);
                         }
 
+                        // IMPORTANT: Use original request DATE from Excel, or find oldest date from replies
+                        var originalDate = existingDates[convKey] || existingDates[emailKey] || '';
+                        if (originalDate) {
+                            emailData.datum = originalDate;  // Keep the original date
+                        } else if (allReplies.length > 0) {
+                            // Find the oldest date from all replies as the original request date
+                            var oldestDate = new Date(emailData.datum);
+                            for (var od = 0; od < allReplies.length; od++) {
+                                if (allReplies[od].datum) {
+                                    var replyDate = new Date(allReplies[od].datum);
+                                    if (!isNaN(replyDate.getTime()) && replyDate < oldestDate) {
+                                        oldestDate = replyDate;
+                                    }
+                                }
+                            }
+                            // Format as ISO string
+                            emailData.datum = oldestDate.getFullYear() + '-' +
+                                pad(oldestDate.getMonth() + 1) + '-' +
+                                pad(oldestDate.getDate()) + 'T' +
+                                pad(oldestDate.getHours()) + ':' +
+                                pad(oldestDate.getMinutes()) + ':' +
+                                pad(oldestDate.getSeconds());
+                        }
+
                         emailData.antworten = allNewReplies;
                         emailData.alleAntworten = allReplies;
                         emailData.existingReplies = existingReplyText;
@@ -1088,6 +1117,27 @@
                         for (var r = 0; r < allReplies.length; r++) {
                             allReplies[r].isNew = true;
                         }
+
+                        // If there are replies, use the oldest date as the request date
+                        if (allReplies.length > 0) {
+                            var oldestDate = new Date(emailData.datum);
+                            for (var od = 0; od < allReplies.length; od++) {
+                                if (allReplies[od].datum) {
+                                    var replyDate = new Date(allReplies[od].datum);
+                                    if (!isNaN(replyDate.getTime()) && replyDate < oldestDate) {
+                                        oldestDate = replyDate;
+                                    }
+                                }
+                            }
+                            // Format as ISO string
+                            emailData.datum = oldestDate.getFullYear() + '-' +
+                                pad(oldestDate.getMonth() + 1) + '-' +
+                                pad(oldestDate.getDate()) + 'T' +
+                                pad(oldestDate.getHours()) + ':' +
+                                pad(oldestDate.getMinutes()) + ':' +
+                                pad(oldestDate.getSeconds());
+                        }
+
                         exportState.emails.push(emailData);
                     }
                 } catch (e) {}
