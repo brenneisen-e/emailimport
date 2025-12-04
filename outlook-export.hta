@@ -1589,6 +1589,22 @@
             return oldestDate;
         }
 
+        // Remove problematic Unicode characters (emojis, etc.) that JScript can't handle
+        function sanitizeText(text) {
+            if (!text) return '';
+            var result = '';
+            for (var i = 0; i < text.length; i++) {
+                var code = text.charCodeAt(i);
+                // Keep only characters in the Basic Multilingual Plane that are safe
+                // Skip surrogate pairs (emojis, etc.) which are 0xD800-0xDFFF
+                // Skip other problematic ranges
+                if (code < 0xD800 || (code > 0xDFFF && code < 0xFFFE)) {
+                    result += text.charAt(i);
+                }
+            }
+            return result;
+        }
+
         function removeEmailQuotes(text) {
             if (!text) return '';
 
@@ -2102,6 +2118,8 @@
                                 // New replies go on TOP (newest first)
                                 currentStep = 'Email ' + (i+1) + ' Antworten schreiben';
                                 var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
+                                // Sanitize to remove emojis and problematic Unicode
+                                combinedReplies = sanitizeText(combinedReplies);
                                 worksheet.Cells(existingRow, 13).Value = combinedReplies;  // Antwort = col 13
 
                                 // Bold timestamps in reply cell
@@ -2284,13 +2302,14 @@
                             }
                         } catch (e) { replyDatum = ''; }
 
-                        // Safely extract text and fix encoding
+                        // Safely extract text, fix encoding, and sanitize
                         var replyText = '';
                         try {
                             if (reply.text !== undefined && reply.text !== null) {
                                 replyText = '' + reply.text;
-                                // Apply encoding fix to each reply
+                                // Apply encoding fix and sanitize (remove emojis)
                                 replyText = fixEncoding(replyText);
+                                replyText = sanitizeText(replyText);
                             }
                         } catch (e) { replyText = '[Fehler]'; }
 
@@ -2734,10 +2753,18 @@
             // Remove null characters
             result = result.split(String.fromCharCode(0)).join('');
 
-            // Remove other control characters (except newline, carriage return, tab)
+            // Remove control characters and problematic Unicode (emojis, etc.)
             var cleaned = '';
             for (var i = 0; i < result.length; i++) {
                 var code = result.charCodeAt(i);
+                // Skip surrogate pairs (emojis) - 0xD800-0xDFFF
+                if (code >= 0xD800 && code <= 0xDFFF) {
+                    continue;
+                }
+                // Skip other problematic Unicode ranges
+                if (code >= 0xFFFE) {
+                    continue;
+                }
                 // Allow printable ASCII (32+), extended chars (128+), newline (10), carriage return (13), tab (9)
                 if (code >= 32 || code === 10 || code === 13 || code === 9) {
                     cleaned += result.charAt(i);
