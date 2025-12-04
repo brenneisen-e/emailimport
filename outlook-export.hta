@@ -1663,7 +1663,12 @@
         }
 
         function doImport(sheetName) {
+            var currentEmailIndex = -1;
+            var currentEmailBetreff = '';
+            var currentStep = '';
+
             try {
+                currentStep = 'Worksheet öffnen';
                 var worksheet;
                 try {
                     worksheet = targetWorkbook.Worksheets(sheetName);
@@ -1677,9 +1682,11 @@
                 }
 
                 // Read existing data for duplicate check
+                currentStep = 'Bestehende Daten lesen';
                 document.getElementById('importProgressText').innerText = 'Lese bestehende Daten...';
                 var existingData = readExistingData(worksheet);
 
+                currentStep = 'Letzte Zeile finden';
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 if (lastRow === 1 && !worksheet.Cells(1, 1).Value) lastRow = 0;
                 var nextRow = lastRow + 1;
@@ -1690,7 +1697,11 @@
                 var updateCount = 0;
 
                 for (var i = 0; i < total; i++) {
+                    currentEmailIndex = i;
+                    currentStep = 'Email ' + (i+1) + ' laden';
                     var email = jsonData[i];
+                    currentEmailBetreff = email.betreff || '(kein Betreff)';
+
                     if (i % 3 === 0) {
                         updateImportProgress(i, total);
                         document.getElementById('importProgressText').innerText =
@@ -1698,18 +1709,23 @@
                     }
 
                     // Create unique key from date + subject
+                    currentStep = 'Email ' + (i+1) + ' Key erstellen';
                     var emailKey = createEmailKey(email.datum, email.betreff);
                     var existingRow = existingData[emailKey];
 
                     if (existingRow) {
                         // Email exists - check if we have new replies to add
+                        currentStep = 'Email ' + (i+1) + ' Antworten prüfen';
                         if (email.antworten && email.antworten.length > 0) {
                             var currentReplies = worksheet.Cells(existingRow, 13).Value || '';  // Antwort = col 13
+
+                            currentStep = 'Email ' + (i+1) + ' Antworten formatieren';
                             var newRepliesText = formatReplies(email.antworten);
 
                             // Only update if we have new content
                             if (newRepliesText && currentReplies.indexOf(newRepliesText.substring(0, 50)) === -1) {
                                 // New replies go on TOP (newest first)
+                                currentStep = 'Email ' + (i+1) + ' Antworten schreiben';
                                 var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
                                 worksheet.Cells(existingRow, 13).Value = combinedReplies;  // Antwort = col 13
                                 updateCount++;
@@ -1721,6 +1737,7 @@
                         }
                     } else {
                         // New email - add to Excel
+                        currentStep = 'Email ' + (i+1) + ' schreiben (Zeile ' + nextRow + ')';
                         writeEmailRow(worksheet, nextRow, email);
                         // Add to existing data cache to prevent duplicates within same import
                         existingData[emailKey] = nextRow;
@@ -1729,6 +1746,7 @@
                     }
                 }
 
+                currentStep = 'Speichern';
                 updateImportProgress(total, total);
                 targetWorkbook.Save();
 
@@ -1746,7 +1764,40 @@
             } catch (e) {
                 document.getElementById('importProgress').style.display = 'none';
                 document.getElementById('importError').style.display = 'block';
-                document.getElementById('importErrorMsg').innerText = e.message;
+
+                // Detailed error message with context
+                var errorDetails = 'Fehler bei: ' + currentStep + '\n';
+                if (_writeRowCurrentField) {
+                    errorDetails += 'Letztes Feld: ' + _writeRowCurrentField + '\n';
+                }
+                errorDetails += 'Email-Index: ' + (currentEmailIndex + 1) + ' von ' + (jsonData ? jsonData.length : 0) + '\n';
+                errorDetails += 'Betreff: ' + currentEmailBetreff + '\n\n';
+                errorDetails += 'Fehlermeldung: ' + e.message + '\n';
+                if (e.number) errorDetails += 'Fehlernummer: ' + e.number + '\n';
+
+                // Try to get email data for debugging
+                if (currentEmailIndex >= 0 && jsonData && jsonData[currentEmailIndex]) {
+                    var debugEmail = jsonData[currentEmailIndex];
+                    errorDetails += '\n=== Email-Daten ===\n';
+                    errorDetails += 'Datum: ' + (debugEmail.datum || '') + '\n';
+                    errorDetails += 'Von: ' + (debugEmail.von_name || debugEmail.von_email || '') + '\n';
+                    errorDetails += 'Betreff: ' + (debugEmail.betreff || '') + '\n';
+                    errorDetails += 'Kategorie: ' + (debugEmail.kategorie || '') + '\n';
+                    errorDetails += 'Clusters: ' + ((debugEmail.clusters || []).join(', ')) + '\n';
+                    errorDetails += 'Text-Länge: ' + (debugEmail.text ? debugEmail.text.length : 0) + ' Zeichen\n';
+                    errorDetails += 'Antworten: ' + (debugEmail.antworten ? debugEmail.antworten.length : 0) + '\n';
+
+                    // Show first 200 chars of text to check for problematic characters
+                    if (debugEmail.text) {
+                        errorDetails += '\n=== Text-Anfang (200 Zeichen) ===\n';
+                        errorDetails += debugEmail.text.substring(0, 200) + '\n';
+                    }
+                }
+
+                document.getElementById('importErrorMsg').innerHTML =
+                    '<textarea readonly style="width:100%;height:250px;font-size:11px;background:#1a1a2e;color:#ef4444;border:1px solid #ef4444;padding:8px;font-family:monospace;" onclick="this.select()">' +
+                    errorDetails.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                    '</textarea><br><small>Klicken zum Kopieren</small>';
                 document.getElementById('btnImport').disabled = false;
             }
         }
@@ -1816,14 +1867,20 @@
             return text.trim();
         }
 
+        // Global for tracking current field being written (for error debugging)
+        var _writeRowCurrentField = '';
+
         // Write a single email row to Excel
         // Columns: ID, Datum, Kanal, BD-Nummer, Agentur, Absender, Kategorie, Status, In Bearbeitung von,
         //          Cluster, Betreff, Anfrage, Antwort, Diagnose, Workaround, Nächste Schritte,
         //          Lösung, JIRA, Kommunikation, Kommentar, ConversationID (21 columns)
         function writeEmailRow(worksheet, row, email) {
+            _writeRowCurrentField = 'Start';
+
             // Copy formatting from row above (if exists and row > 2)
             if (row > 2) {
                 try {
+                    _writeRowCurrentField = 'Format kopieren';
                     var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 21));
                     var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 21));
                     sourceRange.Copy();
@@ -1834,10 +1891,14 @@
                 }
             }
 
+            _writeRowCurrentField = 'Antworten formatieren';
             var repliesText = formatReplies(email.antworten);
+
+            _writeRowCurrentField = 'provisionData lesen';
             var pd = email.provisionData || {};
 
             // Absender: Bei Provisionsreklamation den Vermittlernamen nehmen
+            _writeRowCurrentField = 'Absender erstellen';
             var absender = email.von_name || email.von_email || '';
             if (pd.vorname_vermittler || pd.nachname_vermittler) {
                 absender = ((pd.vorname_vermittler || '') + ' ' + (pd.nachname_vermittler || '')).trim();
@@ -1845,9 +1906,11 @@
             absender = fixEncoding(absender);  // Fix encoding for names
 
             // Agentur mit Encoding-Fix
+            _writeRowCurrentField = 'Agentur erstellen';
             var agentur = fixEncoding(email.agentur || '');
 
             // Anfrage/Zusammenfassung: User-edited content has priority
+            _writeRowCurrentField = 'Anfrage erstellen';
             var anfrage = '';
             if (email.anfrage && email.anfrage.trim()) {
                 // User edited the summary in web app - use that
@@ -1861,21 +1924,33 @@
             }
 
             // BD-Nummer: Aus provisionData oder email
+            _writeRowCurrentField = 'BD-Nummer erstellen';
             var bdNummer = pd.vermittlernummer_vermittler || email.vermittlernr || '';
 
             // Betreff mit Encoding-Fix
+            _writeRowCurrentField = 'Betreff erstellen';
             var betreff = fixEncoding(email.betreff || '');
 
             // Apply fixEncoding to all text fields
+            _writeRowCurrentField = 'Kategorie erstellen';
             var kategorie = fixEncoding(email.kategorie || '');
+
+            _writeRowCurrentField = 'Status erstellen';
             var status = fixEncoding(email.status || 'Neu');
+
+            _writeRowCurrentField = 'Clusters erstellen';
             var clusters = fixEncoding((email.clusters || []).join(', '));
+
+            _writeRowCurrentField = 'Kommentar erstellen';
             var kommentar = fixEncoding(email.kommentar || '');
+
             // Bearbeiter - simple string, no encoding needed
+            _writeRowCurrentField = 'Bearbeiter erstellen';
             var bearbeiter = '';
             if (email.bearbeiter) bearbeiter = '' + email.bearbeiter;
 
             // Combine user's manual answer with automatic replies
+            _writeRowCurrentField = 'Antwort-Text erstellen';
             var antwortText = '';
             var userAntwort = fixEncoding(email.antwort || '');
             if (userAntwort && repliesText) {
@@ -1884,29 +1959,65 @@
                 antwortText = userAntwort || repliesText || '';
             }
 
+            // Write each cell with error tracking
+            _writeRowCurrentField = 'Spalte 1 (ID)';
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
+
+            _writeRowCurrentField = 'Spalte 2 (Datum)';
             worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
+
+            _writeRowCurrentField = 'Spalte 3 (Kanal)';
             worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
+
             // BD-Nummer als Text speichern (führende Nullen erhalten)
+            _writeRowCurrentField = 'Spalte 4 (BD-Nummer Format)';
             worksheet.Cells(row, 4).NumberFormat = '@';
+
+            _writeRowCurrentField = 'Spalte 4 (BD-Nummer Wert)';
             worksheet.Cells(row, 4).Value = bdNummer;                    // BD-Nummer
+
+            _writeRowCurrentField = 'Spalte 5 (Agentur)';
             worksheet.Cells(row, 5).Value = agentur;                     // Agentur
+
+            _writeRowCurrentField = 'Spalte 6 (Absender)';
             worksheet.Cells(row, 6).Value = absender;                    // Absender
+
+            _writeRowCurrentField = 'Spalte 7 (Kategorie)';
             worksheet.Cells(row, 7).Value = kategorie;                   // Kategorie
+
+            _writeRowCurrentField = 'Spalte 8 (Status)';
             worksheet.Cells(row, 8).Value = status;                      // Status
+
+            _writeRowCurrentField = 'Spalte 9 (Bearbeiter)';
             worksheet.Cells(row, 9).Value = bearbeiter;                  // In Bearbeitung von
+
+            _writeRowCurrentField = 'Spalte 10 (Cluster)';
             worksheet.Cells(row, 10).Value = clusters;                   // Cluster
+
+            _writeRowCurrentField = 'Spalte 11 (Betreff)';
             worksheet.Cells(row, 11).Value = betreff;                    // Betreff
+
+            _writeRowCurrentField = 'Spalte 12 (Anfrage)';
             worksheet.Cells(row, 12).Value = anfrage;                    // Anfrage
+
+            _writeRowCurrentField = 'Spalte 13 (Antwort)';
             worksheet.Cells(row, 13).Value = fixEncoding(antwortText);   // Antwort
+
+            _writeRowCurrentField = 'Spalte 14-19 (Leere Felder)';
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
             worksheet.Cells(row, 15).Value = '';                         // Workaround
             worksheet.Cells(row, 16).Value = '';                         // Nächste Schritte
             worksheet.Cells(row, 17).Value = '';                         // Lösung
             worksheet.Cells(row, 18).Value = '';                         // JIRA
             worksheet.Cells(row, 19).Value = '';                         // Kommunikation
+
+            _writeRowCurrentField = 'Spalte 20 (Kommentar)';
             worksheet.Cells(row, 20).Value = kommentar;                  // Kommentar
+
+            _writeRowCurrentField = 'Spalte 21 (ConversationID)';
             worksheet.Cells(row, 21).Value = email.conversationId || ''; // ConversationID für Duplikatsprüfung
+
+            _writeRowCurrentField = 'Fertig';
         }
 
         // Fix UTF-8 encoding issues (Ã¼ -> ü, ÃŸ -> ß, etc.)
