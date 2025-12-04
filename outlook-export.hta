@@ -2234,7 +2234,14 @@
                 if (datumValue) {
                     var d = new Date(datumValue);
                     if (!isNaN(d.getTime())) {
-                        worksheet.Cells(row, 2).Value = d;
+                        // Format as ISO-like string that Excel recognizes: YYYY-MM-DD HH:MM:SS
+                        var excelDateStr = d.getFullYear() + '-' +
+                            pad(d.getMonth() + 1) + '-' +
+                            pad(d.getDate()) + ' ' +
+                            pad(d.getHours()) + ':' +
+                            pad(d.getMinutes()) + ':' +
+                            pad(d.getSeconds());
+                        worksheet.Cells(row, 2).Value = excelDateStr;
                         worksheet.Cells(row, 2).NumberFormat = 'DD.MM.YYYY HH:MM';
                     } else {
                         worksheet.Cells(row, 2).Value = datumValue;
