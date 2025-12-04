@@ -1059,6 +1059,13 @@
                 </svg>
                 Schlagwörter
             </button>
+            <button class="btn btn-white" id="btnReloadLast" style="display: none;" onclick="reloadLastFile()" title="Letzte Datei neu laden">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                Neu laden
+            </button>
         </div>
     </header>
 
@@ -1474,12 +1481,9 @@
             return result;
         }
 
-        // Load bearbeiter name from localStorage on page load
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Auto-open file picker after short delay
-            setTimeout(function() {
-                openFilePicker();
-            }, 500);
+            // Nothing to auto-load - user can drag & drop or click button
         });
 
         function getBearbeiterName() {
@@ -1493,6 +1497,9 @@
         // ============================================================================
         // FILE HANDLING
         // ============================================================================
+        let lastFileHandle = null;  // Remember last file for quick reload
+        let lastFileName = '';
+
         async function openFilePicker() {
             // Try modern File System Access API (opens in Downloads directly)
             if ('showOpenFilePicker' in window) {
@@ -1504,8 +1511,11 @@
                             accept: { 'application/json': ['.json'] }
                         }]
                     });
+                    lastFileHandle = handle;
+                    lastFileName = handle.name;
                     const file = await handle.getFile();
                     loadFile(file);
+                    updateLastFileButton();
                     return;
                 } catch (err) {
                     if (err.name === 'AbortError') return; // User cancelled
@@ -1518,10 +1528,51 @@
             input.accept = '.json';
             input.onchange = (e) => {
                 if (e.target.files.length > 0) {
+                    lastFileName = e.target.files[0].name;
                     loadFile(e.target.files[0]);
+                    updateLastFileButton();
                 }
             };
             input.click();
+        }
+
+        // Quick reload last file (if File System Access API available)
+        async function reloadLastFile() {
+            if (!lastFileHandle) {
+                showNotification('Keine vorherige Datei gespeichert', 'warning');
+                return;
+            }
+            try {
+                // Request permission to read the file again
+                const permission = await lastFileHandle.queryPermission({ mode: 'read' });
+                if (permission !== 'granted') {
+                    const newPermission = await lastFileHandle.requestPermission({ mode: 'read' });
+                    if (newPermission !== 'granted') {
+                        showNotification('Zugriff auf Datei verweigert', 'error');
+                        return;
+                    }
+                }
+                const file = await lastFileHandle.getFile();
+                loadFile(file);
+                showNotification('Datei neu geladen: ' + lastFileName, 'success');
+            } catch (err) {
+                showNotification('Fehler beim Laden: ' + err.message, 'error');
+                // File might have been moved/deleted - clear handle
+                lastFileHandle = null;
+                updateLastFileButton();
+            }
+        }
+
+        function updateLastFileButton() {
+            const btn = document.getElementById('btnReloadLast');
+            if (btn) {
+                if (lastFileName) {
+                    btn.style.display = 'flex';
+                    btn.title = 'Letzte Datei: ' + lastFileName;
+                } else {
+                    btn.style.display = 'none';
+                }
+            }
         }
 
         function loadFile(file) {
@@ -2120,6 +2171,8 @@
             document.getElementById('btnNewFile').style.display = 'none';
             document.getElementById('btnExport').style.display = 'none';
             document.getElementById('btnKeywords').style.display = 'none';
+            // Keep btnReloadLast visible if we have a file handle (for quick reload)
+            updateLastFileButton();
         }
 
         // ============================================================================
