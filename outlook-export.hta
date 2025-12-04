@@ -1053,6 +1053,9 @@
                         }
                     } else if (isConversationContinuation) {
                         // NEW incoming email in EXISTING conversation = treat as new reply!
+                        // Save original text for date extraction BEFORE modifying
+                        var originalRawText = emailData.text;
+
                         // The email's text becomes a new reply, not a new Anfrage
                         var incomingReply = {
                             datum: emailData.datum,
@@ -1076,31 +1079,29 @@
                             emailData.text = originalAnfrage;  // Keep the original request
                         } else {
                             // Fallback: at least remove email quotes from the new email
-                            emailData.text = removeEmailQuotes(emailData.text);
+                            emailData.text = removeEmailQuotes(originalRawText);
                         }
 
-                        // IMPORTANT: Use original request DATE from Excel, or find oldest date from replies
+                        // IMPORTANT: Use original request DATE - priority:
+                        // 1. From Excel (if already saved)
+                        // 2. From Outlook Conversation API (conversationStartDate)
+                        // 3. From quoted email headers (fallback)
                         var originalDate = existingDates[convKey] || existingDates[emailKey] || '';
                         if (originalDate) {
-                            emailData.datum = originalDate;  // Keep the original date
-                        } else if (allReplies.length > 0) {
-                            // Find the oldest date from all replies as the original request date
-                            var oldestDate = new Date(emailData.datum);
-                            for (var od = 0; od < allReplies.length; od++) {
-                                if (allReplies[od].datum) {
-                                    var replyDate = new Date(allReplies[od].datum);
-                                    if (!isNaN(replyDate.getTime()) && replyDate < oldestDate) {
-                                        oldestDate = replyDate;
-                                    }
-                                }
+                            emailData.datum = originalDate;  // Keep the original date from Excel
+                        } else if (emailData.conversationStartDate) {
+                            emailData.datum = emailData.conversationStartDate;  // Use Outlook's conversation start date
+                        } else {
+                            // Fallback: try to extract from quoted email headers (use ORIGINAL raw text!)
+                            var quotedDate = extractOldestDateFromQuotes(originalRawText);
+                            if (quotedDate) {
+                                emailData.datum = quotedDate.getFullYear() + '-' +
+                                    pad(quotedDate.getMonth() + 1) + '-' +
+                                    pad(quotedDate.getDate()) + 'T' +
+                                    pad(quotedDate.getHours()) + ':' +
+                                    pad(quotedDate.getMinutes()) + ':' +
+                                    pad(quotedDate.getSeconds());
                             }
-                            // Format as ISO string
-                            emailData.datum = oldestDate.getFullYear() + '-' +
-                                pad(oldestDate.getMonth() + 1) + '-' +
-                                pad(oldestDate.getDate()) + 'T' +
-                                pad(oldestDate.getHours()) + ':' +
-                                pad(oldestDate.getMinutes()) + ':' +
-                                pad(oldestDate.getSeconds());
                         }
 
                         emailData.antworten = allNewReplies;
@@ -1118,24 +1119,19 @@
                             allReplies[r].isNew = true;
                         }
 
-                        // If there are replies, use the oldest date as the request date
-                        if (allReplies.length > 0) {
-                            var oldestDate = new Date(emailData.datum);
-                            for (var od = 0; od < allReplies.length; od++) {
-                                if (allReplies[od].datum) {
-                                    var replyDate = new Date(allReplies[od].datum);
-                                    if (!isNaN(replyDate.getTime()) && replyDate < oldestDate) {
-                                        oldestDate = replyDate;
-                                    }
-                                }
+                        // Use conversation start date if available, otherwise try quoted headers
+                        if (emailData.conversationStartDate) {
+                            emailData.datum = emailData.conversationStartDate;
+                        } else {
+                            var quotedDate = extractOldestDateFromQuotes(emailData.text);
+                            if (quotedDate) {
+                                emailData.datum = quotedDate.getFullYear() + '-' +
+                                    pad(quotedDate.getMonth() + 1) + '-' +
+                                    pad(quotedDate.getDate()) + 'T' +
+                                    pad(quotedDate.getHours()) + ':' +
+                                    pad(quotedDate.getMinutes()) + ':' +
+                                    pad(quotedDate.getSeconds());
                             }
-                            // Format as ISO string
-                            emailData.datum = oldestDate.getFullYear() + '-' +
-                                pad(oldestDate.getMonth() + 1) + '-' +
-                                pad(oldestDate.getDate()) + 'T' +
-                                pad(oldestDate.getHours()) + ':' +
-                                pad(oldestDate.getMinutes()) + ':' +
-                                pad(oldestDate.getSeconds());
                         }
 
                         exportState.emails.push(emailData);
@@ -1419,6 +1415,101 @@
             return newReplies;
         }
 
+        // Get the conversation start date from Outlook using GetConversation API
+        function getConversationStartDate(item) {
+            try {
+                var conv = item.GetConversation();
+                if (conv) {
+                    var rootItems = conv.GetRootItems();
+                    if (rootItems && rootItems.Count > 0) {
+                        var oldestDate = null;
+                        for (var i = 1; i <= rootItems.Count; i++) {
+                            var rootItem = rootItems.Item(i);
+                            try {
+                                var itemDate = rootItem.ReceivedTime || rootItem.SentOn;
+                                if (itemDate) {
+                                    var d = new Date(itemDate);
+                                    if (!isNaN(d.getTime())) {
+                                        if (!oldestDate || d < oldestDate) {
+                                            oldestDate = d;
+                                        }
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                        return oldestDate;
+                    }
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        // Extract the oldest date from quoted email headers in the text
+        // Looks for patterns like "Gesendet: Montag, 1. Dezember 2025 12:50"
+        function extractOldestDateFromQuotes(text) {
+            if (!text) return null;
+
+            var oldestDate = null;
+
+            // German months mapping
+            var germanMonths = {
+                'januar': 0, 'februar': 1, 'märz': 2, 'maerz': 2, 'april': 3,
+                'mai': 4, 'juni': 5, 'juli': 6, 'august': 7, 'september': 8,
+                'oktober': 9, 'november': 10, 'dezember': 11
+            };
+
+            // Pattern: "Gesendet: Wochentag, DD. Monat YYYY HH:MM"
+            // Example: "Gesendet: Montag, 1. Dezember 2025 12:50"
+            var pattern = /Gesendet:\s*\w+,\s*(\d{1,2})\.\s*(\w+)\s+(\d{4})\s+(\d{1,2}):(\d{2})/gi;
+            var match;
+
+            while ((match = pattern.exec(text)) !== null) {
+                var day = parseInt(match[1], 10);
+                var monthName = match[2].toLowerCase();
+                var year = parseInt(match[3], 10);
+                var hour = parseInt(match[4], 10);
+                var minute = parseInt(match[5], 10);
+
+                var month = germanMonths[monthName];
+                if (month === undefined) continue;
+
+                var date = new Date(year, month, day, hour, minute, 0);
+                if (!isNaN(date.getTime())) {
+                    if (!oldestDate || date < oldestDate) {
+                        oldestDate = date;
+                    }
+                }
+            }
+
+            // Also try English pattern: "Sent: Day, Month DD, YYYY HH:MM"
+            var englishMonths = {
+                'january': 0, 'february': 1, 'march': 2, 'april': 3,
+                'may': 4, 'june': 5, 'july': 6, 'august': 7, 'september': 8,
+                'october': 9, 'november': 10, 'december': 11
+            };
+
+            var englishPattern = /Sent:\s*\w+,\s*(\w+)\s+(\d{1,2}),\s*(\d{4})\s+(\d{1,2}):(\d{2})/gi;
+            while ((match = englishPattern.exec(text)) !== null) {
+                var monthName = match[1].toLowerCase();
+                var day = parseInt(match[2], 10);
+                var year = parseInt(match[3], 10);
+                var hour = parseInt(match[4], 10);
+                var minute = parseInt(match[5], 10);
+
+                var month = englishMonths[monthName];
+                if (month === undefined) continue;
+
+                var date = new Date(year, month, day, hour, minute, 0);
+                if (!isNaN(date.getTime())) {
+                    if (!oldestDate || date < oldestDate) {
+                        oldestDate = date;
+                    }
+                }
+            }
+
+            return oldestDate;
+        }
+
         function removeEmailQuotes(text) {
             if (!text) return '';
 
@@ -1504,8 +1595,15 @@
             var entryId = '';
             try { entryId = item.EntryID || ''; } catch (e) {}
 
+            // Try to get the conversation start date (when the first email was sent/received)
+            var convStartDate = null;
+            try {
+                convStartDate = getConversationStartDate(item);
+            } catch (e) {}
+
             return {
                 datum: formatDate(item.ReceivedTime),
+                conversationStartDate: convStartDate ? formatDate(convStartDate) : null,
                 von_email: senderEmail,
                 von_name: item.SenderName || 'Unbekannt',
                 betreff: item.Subject || '(Kein Betreff)',
