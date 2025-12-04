@@ -412,6 +412,7 @@
         var existingReplies = {};    // Existing replies text per email key (for filtering new replies)
         var existingEmailIds = {};   // EmailIDs (EntryIDs) already in Excel - for precise duplicate detection
         var existingReplyIds = {};   // ReplyIDs per email key - comma-separated EntryIDs of already imported replies
+        var existingAnfragen = {};   // Original request text per conversation (to avoid duplicating)
         var lastExportedEmails = null;  // Store for direct import
 
         // Step tracking
@@ -726,6 +727,7 @@
             existingReplies = {};
             existingEmailIds = {};
             existingReplyIds = {};
+            existingAnfragen = {};
 
             try {
                 // Try to connect to running Excel
@@ -782,14 +784,15 @@
                     var antworten = worksheet.Cells(row, 13).Value || '';  // Existing replies
                     var emailId = worksheet.Cells(row, 22).Value || '';    // Email's unique EntryID
                     var replyIds = worksheet.Cells(row, 23).Value || '';   // Comma-separated reply EntryIDs
+                    var anfrage = worksheet.Cells(row, 12).Value || '';    // Original request text
 
-                    // Primary key: ConversationID + Date (allows new replies in same conversation)
-                    if (conversationId && datum) {
-                        var dateStr = formatDateKey(datum);
-                        var convKey = 'conv|' + conversationId + '|' + dateStr;
+                    // Primary key: ConversationID ONLY (new emails in same conversation are replies!)
+                    if (conversationId) {
+                        var convKey = 'conv|' + conversationId;
                         existingEmailKeys[convKey] = true;
                         if (antworten) existingReplies[convKey] = antworten;
                         if (replyIds) existingReplyIds[convKey] = replyIds;
+                        if (anfrage) existingAnfragen[convKey] = anfrage;  // Track original request
                     }
                     // Fallback key: date + subject (for older entries without ConversationID)
                     if (datum || betreff) {
@@ -816,6 +819,7 @@
                 existingEmailKeys = {};
                 existingEmailIds = {};
                 existingReplyIds = {};
+                existingAnfragen = {};
                 exportWorkbook = null;
                 checkExportReady();
             }
@@ -995,49 +999,84 @@
                     var hasExcelData = false;
                     for (var k in existingEmailKeys) { hasExcelData = true; break; }
                     var isDuplicate = false;
+                    var isConversationContinuation = false;  // New email in existing conversation
                     var existingReplyText = '';
                     var existingReplyIdList = '';
                     var convKey = '';
                     var emailKey = '';
                     if (hasExcelData) {
-                        var dateKey = formatDateKey(emailData.datum);
-                        convKey = 'conv|' + (emailData.conversationId || '') + '|' + dateKey;
+                        // Primary: Check ConversationID ONLY (any new email in same conversation = reply!)
+                        convKey = 'conv|' + (emailData.conversationId || '');
                         emailKey = createExportEmailKey(emailData.datum, emailData.betreff);
-                        // Check ConversationID+Date first (allows new replies), then date+subject
-                        if ((emailData.conversationId && existingEmailKeys[convKey]) || existingEmailKeys[emailKey]) {
-                            isDuplicate = true;
-                            // Get existing replies for comparison
-                            existingReplyText = existingReplies[convKey] || existingReplies[emailKey] || '';
-                            existingReplyIdList = existingReplyIds[convKey] || existingReplyIds[emailKey] || '';
+
+                        if (emailData.conversationId && existingEmailKeys[convKey]) {
+                            // Check if this exact email is already imported (by EntryID)
+                            if (emailData.emailId && existingEmailIds[emailData.emailId]) {
+                                isDuplicate = true;  // Exact same email
+                            } else {
+                                // Same conversation, but NEW email = this is a continuation/reply!
+                                isConversationContinuation = true;
+                            }
+                            existingReplyText = existingReplies[convKey] || '';
+                            existingReplyIdList = existingReplyIds[convKey] || '';
+                        } else if (existingEmailKeys[emailKey]) {
+                            isDuplicate = true;  // Fallback: date+subject match
+                            existingReplyText = existingReplies[emailKey] || '';
+                            existingReplyIdList = existingReplyIds[emailKey] || '';
                         }
                     }
 
-                    // Always check for replies (even for duplicates - there might be new ones)
+                    // Always check for replies from sent items
                     var allReplies = findReplies(emailData);
                     exportState.repliesFound += allReplies.length;
 
                     if (isDuplicate) {
-                        // Filter to only truly new replies (not already in Excel)
-                        // Pass existing reply IDs for precise matching
+                        // Exact duplicate - check for new sent replies only
                         var newReplies = filterNewReplies(allReplies, existingReplyText, existingReplyIdList);
 
                         if (newReplies.length > 0) {
-                            // Has new replies - include for update
-                            emailData.antworten = newReplies;  // Only new replies for import
-                            emailData.alleAntworten = allReplies;  // All replies for web tool display
-                            emailData.existingReplies = existingReplyText;  // Mark what already exists
-                            emailData.existingReplyIds = existingReplyIdList;  // Existing reply IDs to append to
+                            emailData.antworten = newReplies;
+                            emailData.alleAntworten = allReplies;
+                            emailData.existingReplies = existingReplyText;
+                            emailData.existingReplyIds = existingReplyIdList;
                             emailData.isDuplicateWithNewReplies = true;
                             exportState.duplicatesWithReplies++;
                             exportState.emails.push(emailData);
                         } else {
                             exportState.duplicatesSkipped++;
                         }
+                    } else if (isConversationContinuation) {
+                        // NEW incoming email in EXISTING conversation = treat as new reply!
+                        // The email's text becomes a new reply, not a new Anfrage
+                        var incomingReply = {
+                            datum: emailData.datum,
+                            an: '',  // Incoming email, no "An"
+                            text: removeEmailQuotes(emailData.text),
+                            replyId: emailData.emailId,
+                            isNew: true,
+                            isIncoming: true  // Mark as incoming (not from sent items)
+                        };
+
+                        // Combine with any sent replies
+                        var allNewReplies = [incomingReply];
+                        var filteredSentReplies = filterNewReplies(allReplies, existingReplyText, existingReplyIdList);
+                        for (var sr = 0; sr < filteredSentReplies.length; sr++) {
+                            allNewReplies.push(filteredSentReplies[sr]);
+                        }
+
+                        emailData.antworten = allNewReplies;
+                        emailData.alleAntworten = allReplies;
+                        emailData.existingReplies = existingReplyText;
+                        emailData.existingReplyIds = existingReplyIdList;
+                        emailData.isDuplicateWithNewReplies = true;
+                        emailData.isConversationContinuation = true;  // Flag for import
+                        exportState.duplicatesWithReplies++;
+                        exportState.emails.push(emailData);
                     } else {
-                        // New email - include all replies
+                        // Completely new email - include all replies
                         emailData.antworten = allReplies;
                         for (var r = 0; r < allReplies.length; r++) {
-                            allReplies[r].isNew = true;  // Mark all as new for new emails
+                            allReplies[r].isNew = true;
                         }
                         exportState.emails.push(emailData);
                     }
@@ -2016,7 +2055,15 @@
                             replyText = replyText.substring(0, 2000) + '...';
                         }
 
-                        text += '=== ' + replyDatum + ' ===\n' + replyText + '\n\n';
+                        // Format: show direction (incoming vs outgoing)
+                        var direction = '';
+                        if (reply.isIncoming) {
+                            direction = '[Eingehend]';
+                        } else if (reply.an) {
+                            direction = '[An: ' + reply.an + ']';
+                        }
+
+                        text += '=== ' + replyDatum + ' ' + direction + ' ===\n' + replyText + '\n\n';
                     } catch (replyErr) {
                         text += '=== [Fehler beim Lesen dieser Antwort] ===\n\n';
                     }
