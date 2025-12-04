@@ -1218,7 +1218,8 @@
             }
 
             var newReplies = [];
-            var existingLower = existingReplyText.toLowerCase();
+            // Normalize both texts with fixEncoding to handle encoding differences
+            var existingNormalized = fixEncoding(existingReplyText).toLowerCase();
 
             for (var j = 0; j < allReplies.length; j++) {
                 var reply = allReplies[j];
@@ -1227,12 +1228,15 @@
                 // Skip empty replies
                 if (!replyText) continue;
 
+                // Normalize reply text with fixEncoding too
+                var normalizedReply = fixEncoding(replyText);
+
                 // Check if this reply is already in Excel
                 // Use first 80 chars for matching (handles minor formatting differences)
-                var checkText = replyText.substring(0, 80).toLowerCase().trim();
-                if (checkText.length < 10) checkText = replyText.toLowerCase().trim();
+                var checkText = normalizedReply.substring(0, 80).toLowerCase().trim();
+                if (checkText.length < 10) checkText = normalizedReply.toLowerCase().trim();
 
-                if (existingLower.indexOf(checkText) === -1) {
+                if (existingNormalized.indexOf(checkText) === -1) {
                     // Not found in existing - this is new
                     reply.isNew = true;
                     newReplies.push(reply);
@@ -1730,8 +1734,12 @@
                             currentStep = 'Email ' + (i+1) + ' Antworten formatieren';
                             var newRepliesText = formatReplies(email.antworten);
 
+                            // Normalize both for comparison (handle encoding differences)
+                            var normalizedCurrent = fixEncoding(currentReplies).toLowerCase();
+                            var normalizedNew = fixEncoding(newRepliesText).toLowerCase();
+
                             // Only update if we have new content
-                            if (newRepliesText && currentReplies.indexOf(newRepliesText.substring(0, 50)) === -1) {
+                            if (newRepliesText && normalizedCurrent.indexOf(normalizedNew.substring(0, 50)) === -1) {
                                 // New replies go on TOP (newest first)
                                 currentStep = 'Email ' + (i+1) + ' Antworten schreiben';
                                 var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
