@@ -1592,23 +1592,31 @@
         // Fix UTF-8 encoding issues (Ã¼ -> ü, ÃŸ -> ß, etc.)
         function fixEncoding(text) {
             if (!text) return '';
-            // Common UTF-8 decoded as Latin-1 patterns (using Unicode escapes for reliable matching)
-            return text
-                .replace(/\u00C3\u00A4/g, 'ä').replace(/\u00C3\u0084/g, 'Ä')
-                .replace(/\u00C3\u00B6/g, 'ö').replace(/\u00C3\u0096/g, 'Ö')
-                .replace(/\u00C3\u00BC/g, 'ü').replace(/\u00C3\u009C/g, 'Ü')
-                .replace(/\u00C3\u009F/g, 'ß')
-                .replace(/\u00C3\u00A9/g, 'é').replace(/\u00C3\u00A8/g, 'è')
-                .replace(/\u00C3\u00A0/g, 'à').replace(/\u00C3\u00A2/g, 'â')
-                .replace(/\u00C3\u00AE/g, 'î').replace(/\u00C3\u00AF/g, 'ï')
-                .replace(/\u00C3\u00B4/g, 'ô').replace(/\u00C3\u00B9/g, 'ù')
-                .replace(/\u00C3\u00BB/g, 'û').replace(/\u00C3\u00A7/g, 'ç')
-                .replace(/\u00E2\u0082\u00AC/g, '\u20AC')
-                // German quotation marks and dashes
-                .replace(/\u00E2\u0080\u009E/g, '\u201E').replace(/\u00E2\u0080\u009C/g, '\u201C')
-                .replace(/\u00E2\u0080\u0098/g, '\u2018').replace(/\u00E2\u0080\u0099/g, '\u2019')
-                .replace(/\u00E2\u0080\u0093/g, '\u2013').replace(/\u00E2\u0080\u0094/g, '\u2014')
-                .replace(/\u00E2\u0080\u00A6/g, '\u2026');
+            // Use string split/join for reliable replacement in JScript
+            var result = String(text);
+            var replacements = [
+                [String.fromCharCode(195, 164), String.fromCharCode(228)],  // Ã¤ -> ä
+                [String.fromCharCode(195, 132), String.fromCharCode(196)],  // Ã„ -> Ä
+                [String.fromCharCode(195, 182), String.fromCharCode(246)],  // Ã¶ -> ö
+                [String.fromCharCode(195, 150), String.fromCharCode(214)],  // Ã– -> Ö
+                [String.fromCharCode(195, 188), String.fromCharCode(252)],  // Ã¼ -> ü
+                [String.fromCharCode(195, 156), String.fromCharCode(220)],  // Ãœ -> Ü
+                [String.fromCharCode(195, 159), String.fromCharCode(223)],  // ÃŸ -> ß
+                [String.fromCharCode(195, 169), String.fromCharCode(233)],  // Ã© -> é
+                [String.fromCharCode(195, 168), String.fromCharCode(232)],  // Ã¨ -> è
+                [String.fromCharCode(226, 130, 172), String.fromCharCode(8364)],  // € symbol
+                [String.fromCharCode(226, 128, 158), String.fromCharCode(8222)],  // „
+                [String.fromCharCode(226, 128, 156), String.fromCharCode(8220)],  // "
+                [String.fromCharCode(226, 128, 152), String.fromCharCode(8216)],  // '
+                [String.fromCharCode(226, 128, 153), String.fromCharCode(8217)],  // '
+                [String.fromCharCode(226, 128, 147), String.fromCharCode(8211)],  // –
+                [String.fromCharCode(226, 128, 148), String.fromCharCode(8212)],  // —
+                [String.fromCharCode(226, 128, 166), String.fromCharCode(8230)]   // …
+            ];
+            for (var i = 0; i < replacements.length; i++) {
+                result = result.split(replacements[i][0]).join(replacements[i][1]);
+            }
+            return result;
         }
 
         // JSON polyfill
