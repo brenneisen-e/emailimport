@@ -764,13 +764,164 @@
         ::-webkit-scrollbar-track { background: var(--bg-tertiary); }
         ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* Step Indicator */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            margin-right: 1rem;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.5);
+            transition: all 0.3s ease;
+        }
+
+        .step-item.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            animation: stepPulse 2s ease-in-out infinite;
+        }
+
+        .step-item.completed {
+            background: rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .step-item .step-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .step-arrow {
+            color: rgba(255,255,255,0.3);
+            font-size: 0.75rem;
+        }
+
+        @keyframes stepPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Keyword Highlight */
+        .keyword-highlight {
+            background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
+            padding: 0.1rem 0.25rem;
+            border-radius: 3px;
+            font-weight: 500;
+            cursor: help;
+            border-bottom: 2px solid #eab308;
+        }
+
+        .keyword-highlight[data-cluster="KV"] {
+            background: linear-gradient(120deg, #bbf7d0 0%, #86efac 100%);
+            border-bottom-color: #22c55e;
+        }
+
+        .keyword-highlight[data-cluster="KFZ"] {
+            background: linear-gradient(120deg, #bfdbfe 0%, #93c5fd 100%);
+            border-bottom-color: #3b82f6;
+        }
+
+        .keyword-highlight[data-cluster="SHUK"] {
+            background: linear-gradient(120deg, #fed7aa 0%, #fdba74 100%);
+            border-bottom-color: #f97316;
+        }
+
+        .keyword-highlight[data-cluster="LV"] {
+            background: linear-gradient(120deg, #ddd6fe 0%, #c4b5fd 100%);
+            border-bottom-color: #8b5cf6;
+        }
+
+        .keyword-highlight[data-cluster="Provisionierung"] {
+            background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
+            border-bottom-color: #eab308;
+        }
+
+        .keyword-highlight[data-cluster="Produktzuordnung"] {
+            background: linear-gradient(120deg, #fbcfe8 0%, #f9a8d4 100%);
+            border-bottom-color: #ec4899;
+        }
+
+        /* Schlagwortverzeichnis Tab */
+        .keyword-reference {
+            padding: 1rem;
+        }
+
+        .keyword-category {
+            margin-bottom: 1.5rem;
+        }
+
+        .keyword-category-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .keyword-category-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .keyword-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        .keyword-item {
+            padding: 0.25rem 0.625rem;
+            border-radius: 4px;
+            font-size: 0.8125rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        /* SVG Icons */
+        .icon {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            vertical-align: middle;
+            fill: currentColor;
+        }
+
+        .icon-lg { width: 1.5em; height: 1.5em; }
+        .icon-xl { width: 2em; height: 2em; }
     </style>
 </head>
 <body>
     <!-- Header -->
     <header class="header">
         <div class="header-brand">
-            <div class="header-logo">📧</div>
+            <div class="header-logo">
+                <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </div>
             <div>
                 <div class="header-title">BGAV Hypercare</div>
                 <div class="header-subtitle">Email Review Tool</div>
@@ -778,6 +929,39 @@
         </div>
 
         <div class="header-actions">
+            <!-- Step Indicator -->
+            <div class="step-indicator" id="stepIndicator" style="display: none;">
+                <div class="step-item active" id="step1">
+                    <span class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                    </span>
+                    <span>Auswählen</span>
+                </div>
+                <span class="step-arrow">→</span>
+                <div class="step-item" id="step2">
+                    <span class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </span>
+                    <span>Kategorisieren</span>
+                </div>
+                <span class="step-arrow">→</span>
+                <div class="step-item" id="step3">
+                    <span class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                    </span>
+                    <span>Speichern</span>
+                </div>
+            </div>
+
             <div class="header-stats" id="headerStats" style="display: none;">
                 <div class="stat-item">
                     <div class="stat-value" id="statTotal">0</div>
@@ -790,10 +974,19 @@
             </div>
 
             <button class="btn btn-white" id="btnNewFile" style="display: none;" onclick="resetApp()">
-                📁 Neue Datei
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+                    <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+                Neue Datei
             </button>
             <button class="btn btn-white" id="btnExport" style="display: none;" onclick="saveAsJson()">
-                💾 JSON speichern
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                </svg>
+                JSON speichern
             </button>
         </div>
     </header>
@@ -801,13 +994,21 @@
     <!-- Upload Screen -->
     <div class="upload-screen" id="uploadScreen">
         <div class="upload-card">
-            <div class="upload-icon">📂</div>
+            <div class="upload-icon">
+                <svg class="icon icon-xl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
             <h1 class="upload-title">Emails importieren</h1>
             <p class="upload-subtitle">JSON-Datei aus dem Outlook Export laden</p>
 
             <div class="upload-buttons">
                 <button class="btn btn-primary upload-btn" onclick="openFilePicker()">
-                    📁 Datei auswählen
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    Datei auswählen
                 </button>
             </div>
 
@@ -839,7 +1040,11 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="search-box">
-                    <span class="search-icon">🔍</span>
+                    <span class="search-icon">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </span>
                     <input type="text" placeholder="Suchen..." id="searchInput" oninput="applyFilters()">
                 </div>
             </div>
@@ -866,7 +1071,12 @@
         <main class="detail-panel">
             <div class="detail-empty" id="detailEmpty">
                 <div>
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">📧</div>
+                    <div style="margin-bottom: 1rem; color: var(--text-muted);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="64" height="64">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                    </div>
                     <p>Email auswählen um Details anzuzeigen</p>
                 </div>
             </div>
@@ -885,10 +1095,24 @@
                     <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
                         <div class="content-tabs">
                             <div class="content-tab active" id="tabAnfrage" onclick="switchContentTab('anfrage')">
-                                📥 Anfrage
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+                                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                                </svg>
+                                Anfrage
                             </div>
                             <div class="content-tab" id="tabAntworten" onclick="switchContentTab('antworten')">
-                                📤 Antworten <span class="tab-badge" id="replyCount" style="display: none;">0</span>
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                                Antworten <span class="tab-badge" id="replyCount" style="display: none;">0</span>
+                            </div>
+                            <div class="content-tab" id="tabSchlagworte" onclick="switchContentTab('schlagworte')">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                                    <line x1="7" y1="7" x2="7.01" y2="7"/>
+                                </svg>
+                                Schlagwörter
                             </div>
                         </div>
 
@@ -902,6 +1126,91 @@
                             <!-- Tab: Antworten -->
                             <div class="tab-content-area" id="contentAntworten">
                                 <div id="repliesList"></div>
+                            </div>
+
+                            <!-- Tab: Schlagwortverzeichnis -->
+                            <div class="tab-content-area" id="contentSchlagworte">
+                                <div class="keyword-reference">
+                                    <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
+                                        Diese Schlagwörter werden automatisch erkannt und führen zur Zuordnung der entsprechenden Cluster:
+                                    </p>
+                                    <div class="keyword-category">
+                                        <div class="keyword-category-header">
+                                            <span class="keyword-category-color" style="background: #22c55e;"></span>
+                                            KV (Krankenversicherung)
+                                        </div>
+                                        <div class="keyword-list">
+                                            <span class="keyword-item keyword-highlight" data-cluster="KV">kv</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="KV">kranken</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="KV">gesundheit</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="KV">pflege</span>
+                                        </div>
+                                    </div>
+                                    <div class="keyword-category">
+                                        <div class="keyword-category-header">
+                                            <span class="keyword-category-color" style="background: #3b82f6;"></span>
+                                            KFZ (Kraftfahrzeug)
+                                        </div>
+                                        <div class="keyword-list">
+                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">kfz</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">auto</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">fahrzeug</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">kasko</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="KFZ">haftpflicht</span>
+                                        </div>
+                                    </div>
+                                    <div class="keyword-category">
+                                        <div class="keyword-category-header">
+                                            <span class="keyword-category-color" style="background: #f97316;"></span>
+                                            SHUK (Sach/Haftpflicht/Unfall/Komposit)
+                                        </div>
+                                        <div class="keyword-list">
+                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">shuk</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">sach</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">haft</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">unfall</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">hausrat</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="SHUK">wohngebäude</span>
+                                        </div>
+                                    </div>
+                                    <div class="keyword-category">
+                                        <div class="keyword-category-header">
+                                            <span class="keyword-category-color" style="background: #8b5cf6;"></span>
+                                            LV (Lebensversicherung)
+                                        </div>
+                                        <div class="keyword-list">
+                                            <span class="keyword-item keyword-highlight" data-cluster="LV">lv</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="LV">leben</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="LV">rente</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="LV">vorsorge</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="LV">altersvorsorge</span>
+                                        </div>
+                                    </div>
+                                    <div class="keyword-category">
+                                        <div class="keyword-category-header">
+                                            <span class="keyword-category-color" style="background: #eab308;"></span>
+                                            Provisionierung
+                                        </div>
+                                        <div class="keyword-list">
+                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">provision</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">vergütung</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">courtage</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">abrechnung</span>
+                                        </div>
+                                    </div>
+                                    <div class="keyword-category">
+                                        <div class="keyword-category-header">
+                                            <span class="keyword-category-color" style="background: #ec4899;"></span>
+                                            Produktzuordnung
+                                        </div>
+                                        <div class="keyword-list">
+                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">produkt</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">tarif</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">angebot</span>
+                                            <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">deckung</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1000,8 +1309,62 @@
         let selectedForExport = new Set();  // IDs der für Export ausgewählten Emails
         let currentFilter = 'all';
         let nextId = 1;
+        let currentStep = 1;  // 1: Auswählen, 2: Kategorisieren, 3: Speichern
 
         const allClusters = ['KV', 'KFZ', 'SHUK', 'LV', 'Provisionierung', 'Produktzuordnung', 'Allgemein'];
+
+        // Schlagwort-Cluster-Mapping für Highlighting
+        const keywordClusterMap = {
+            'KV': ['kv', 'kranken', 'gesundheit', 'pflege'],
+            'KFZ': ['kfz', 'auto', 'fahrzeug', 'kasko', 'haftpflicht'],
+            'SHUK': ['shuk', 'sach', 'haft', 'unfall', 'hausrat', 'wohngebäude'],
+            'LV': ['lv', 'leben', 'rente', 'vorsorge', 'altersvorsorge'],
+            'Provisionierung': ['provision', 'vergütung', 'courtage', 'abrechnung'],
+            'Produktzuordnung': ['produkt', 'tarif', 'angebot', 'deckung']
+        };
+
+        // ============================================================================
+        // STEP INDICATOR
+        // ============================================================================
+        function updateStepIndicator(step) {
+            currentStep = step;
+            const step1 = document.getElementById('step1');
+            const step2 = document.getElementById('step2');
+            const step3 = document.getElementById('step3');
+
+            // Reset all
+            [step1, step2, step3].forEach(s => {
+                s.classList.remove('active', 'completed');
+            });
+
+            // Set states
+            if (step >= 1) step1.classList.add(step > 1 ? 'completed' : 'active');
+            if (step >= 2) step2.classList.add(step > 2 ? 'completed' : 'active');
+            if (step >= 3) step3.classList.add('active');
+        }
+
+        // ============================================================================
+        // KEYWORD HIGHLIGHTING
+        // ============================================================================
+        function highlightKeywords(text) {
+            if (!text) return '';
+
+            // Escape HTML first
+            let result = escapeHtml(text);
+
+            // Build regex pattern for all keywords
+            for (const [cluster, keywords] of Object.entries(keywordClusterMap)) {
+                keywords.forEach(keyword => {
+                    // Case-insensitive word boundary match
+                    const regex = new RegExp(`(\\b)(${keyword})(\\w*)`, 'gi');
+                    result = result.replace(regex, (match, boundary, word, rest) => {
+                        return `${boundary}<span class="keyword-highlight" data-cluster="${cluster}" title="→ ${cluster}">${word}${rest}</span>`;
+                    });
+                });
+            }
+
+            return result;
+        }
 
         // Load bearbeiter name from localStorage on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -1132,6 +1495,10 @@
             document.getElementById('headerStats').style.display = 'flex';
             document.getElementById('btnNewFile').style.display = 'flex';
             document.getElementById('btnExport').style.display = 'flex';
+            document.getElementById('stepIndicator').style.display = 'flex';
+
+            // Initialize step indicator to step 1 (Auswählen)
+            updateStepIndicator(1);
 
             // Select all emails for export by default
             selectedForExport = new Set(emails.map(e => e.id));
@@ -1362,7 +1729,7 @@
                 const pd = email.provisionData;
                 provisionBox.innerHTML = `
                     <div class="provision-box">
-                        <div class="provision-box-title">💰 Provisionsreklamation - Extrahierte Daten</div>
+                        <div class="provision-box-title"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Provisionsreklamation - Extrahierte Daten</div>
                         <div class="provision-grid">
                             <div class="provision-field-small">
                                 <div class="provision-field-label">Vermittler</div>
@@ -1388,8 +1755,11 @@
                 provisionBox.innerHTML = '';
             }
 
-            // Email text
-            document.getElementById('detailText').textContent = email.text;
+            // Email text with keyword highlighting
+            document.getElementById('detailText').innerHTML = highlightKeywords(email.text);
+
+            // Update step indicator to "Kategorisieren"
+            updateStepIndicator(2);
 
             // Fill form
             document.getElementById('formKategorie').value = email.kategorie;
@@ -1561,6 +1931,9 @@
         // SAVE AS JSON (for Excel Import HTA)
         // ============================================================================
         async function saveAsJson() {
+            // Update step indicator to "Speichern"
+            updateStepIndicator(3);
+
             // Export only selected emails, or all if none selected
             let emailsToExport = emails;
             if (selectedForExport.size > 0) {
@@ -1569,6 +1942,7 @@
 
             if (emailsToExport.length === 0) {
                 showNotification('Keine Emails zum Exportieren ausgewählt', 'error');
+                updateStepIndicator(2);  // Go back to step 2
                 return;
             }
 
@@ -1649,10 +2023,12 @@
             // Update tab buttons
             document.getElementById('tabAnfrage').classList.toggle('active', tab === 'anfrage');
             document.getElementById('tabAntworten').classList.toggle('active', tab === 'antworten');
+            document.getElementById('tabSchlagworte').classList.toggle('active', tab === 'schlagworte');
 
             // Update content areas
             document.getElementById('contentAnfrage').classList.toggle('active', tab === 'anfrage');
             document.getElementById('contentAntworten').classList.toggle('active', tab === 'antworten');
+            document.getElementById('contentSchlagworte').classList.toggle('active', tab === 'schlagworte');
         }
 
         // ============================================================================

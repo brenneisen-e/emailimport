@@ -1707,6 +1707,8 @@
             worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);           // ID
             worksheet.Cells(row, 2).Value = email.datum || '';           // Datum
             worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
+            // BD-Nummer als Text speichern (führende Nullen erhalten)
+            worksheet.Cells(row, 4).NumberFormat = '@';
             worksheet.Cells(row, 4).Value = bdNummer;                    // BD-Nummer
             worksheet.Cells(row, 5).Value = agentur;                     // Agentur
             worksheet.Cells(row, 6).Value = absender;                    // Absender
