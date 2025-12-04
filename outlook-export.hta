@@ -1064,6 +1064,12 @@
                             allNewReplies.push(filteredSentReplies[sr]);
                         }
 
+                        // IMPORTANT: Use original request text from Excel, not the new email's text!
+                        var originalAnfrage = existingAnfragen[convKey] || '';
+                        if (originalAnfrage) {
+                            emailData.text = originalAnfrage;  // Keep the original request
+                        }
+
                         emailData.antworten = allNewReplies;
                         emailData.alleAntworten = allReplies;
                         emailData.existingReplies = existingReplyText;
