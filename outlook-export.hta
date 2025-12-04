@@ -1904,7 +1904,17 @@
             }
 
             _writeRowCurrentField = 'Antworten formatieren';
-            var repliesText = formatReplies(email.antworten);
+            var repliesText = '';
+            try {
+                repliesText = formatReplies(email.antworten);
+                // Limit replies to 15000 chars to leave room for user answer
+                if (repliesText.length > 15000) {
+                    repliesText = repliesText.substring(0, 15000) + '\n\n[... weitere Antworten gekürzt ...]';
+                }
+            } catch (repliesErr) {
+                repliesText = '[Fehler: ' + repliesErr.message + ']';
+            }
+            _writeRowCurrentField = 'Antworten formatiert (' + repliesText.length + ' Zeichen)';
 
             _writeRowCurrentField = 'provisionData lesen';
             var pd = email.provisionData || {};
@@ -2012,8 +2022,26 @@
             _writeRowCurrentField = 'Spalte 12 (Anfrage)';
             worksheet.Cells(row, 12).Value = sanitizeForExcel(anfrage);  // Anfrage
 
-            _writeRowCurrentField = 'Spalte 13 (Antwort)';
-            worksheet.Cells(row, 13).Value = sanitizeForExcel(fixEncoding(antwortText));   // Antwort
+            _writeRowCurrentField = 'Spalte 13 (Antwort) - Vorbereiten';
+            var safeAntwort = '';
+            try {
+                _writeRowCurrentField = 'Spalte 13 (Antwort) - fixEncoding';
+                safeAntwort = fixEncoding(antwortText);
+                _writeRowCurrentField = 'Spalte 13 (Antwort) - sanitize';
+                safeAntwort = sanitizeForExcel(safeAntwort);
+                _writeRowCurrentField = 'Spalte 13 (Antwort) - schreiben (' + safeAntwort.length + ' Zeichen)';
+                worksheet.Cells(row, 13).Value = safeAntwort;
+            } catch (antwortErr) {
+                // If writing fails, try with just first 1000 chars
+                _writeRowCurrentField = 'Spalte 13 (Antwort) - Fallback';
+                try {
+                    var fallback = safeAntwort.substring(0, 1000);
+                    worksheet.Cells(row, 13).Value = fallback + '\n\n[FEHLER: Rest konnte nicht geschrieben werden]';
+                } catch (e2) {
+                    // Last resort - just put error message
+                    worksheet.Cells(row, 13).Value = '[FEHLER beim Schreiben: ' + antwortErr.message + ']';
+                }
+            }
 
             _writeRowCurrentField = 'Spalte 14-19 (Leere Felder)';
             worksheet.Cells(row, 14).Value = '';                         // Diagnose
