@@ -1157,7 +1157,8 @@
                     <div class="detail-subject" id="detailSubject"></div>
                     <div class="detail-meta">
                         <span><strong>Von:</strong> <span id="detailFrom"></span></span>
-                        <span><strong>Datum:</strong> <span id="detailDate"></span></span>
+                        <span><strong>Anfrage:</strong> <span id="detailDate"></span></span>
+                        <span><strong>Letzte Antwort:</strong> <span id="detailLastReplyDate">-</span></span>
                     </div>
                 </div>
 
@@ -1921,6 +1922,23 @@
             document.getElementById('detailSubject').textContent = email.betreff;
             document.getElementById('detailFrom').textContent = email.von_name + ' <' + email.von_email + '>';
             document.getElementById('detailDate').textContent = new Date(email.datum).toLocaleString('de-DE');
+
+            // Calculate and show latest reply date
+            let latestReplyDate = null;
+            const allReplies = email.alleAntworten || email.antworten || [];
+            for (const reply of allReplies) {
+                if (reply.datum) {
+                    const replyDate = new Date(reply.datum);
+                    if (!isNaN(replyDate.getTime())) {
+                        if (!latestReplyDate || replyDate > latestReplyDate) {
+                            latestReplyDate = replyDate;
+                        }
+                    }
+                }
+            }
+            document.getElementById('detailLastReplyDate').textContent = latestReplyDate
+                ? latestReplyDate.toLocaleString('de-DE')
+                : '-';
 
             // Provision box
             const provisionBox = document.getElementById('provisionBox');

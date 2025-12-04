@@ -775,16 +775,16 @@
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 var count = 0;
 
-                // Read ConversationID (col 21), date (col 2), subject (col 11), replies (col 13),
-                // emailId (col 22), replyIds (col 23) for duplicate detection
+                // Read ConversationID (col 22), date (col 2), subject (col 12), replies (col 14),
+                // emailId (col 23), replyIds (col 24) for duplicate detection
                 for (var row = 2; row <= lastRow; row++) {
-                    var conversationId = worksheet.Cells(row, 21).Value || '';
+                    var conversationId = worksheet.Cells(row, 22).Value || '';
                     var datum = worksheet.Cells(row, 2).Value || '';
-                    var betreff = worksheet.Cells(row, 11).Value || '';
-                    var antworten = worksheet.Cells(row, 13).Value || '';  // Existing replies
-                    var emailId = worksheet.Cells(row, 22).Value || '';    // Email's unique EntryID
-                    var replyIds = worksheet.Cells(row, 23).Value || '';   // Comma-separated reply EntryIDs
-                    var anfrage = worksheet.Cells(row, 12).Value || '';    // Original request text
+                    var betreff = worksheet.Cells(row, 12).Value || '';
+                    var antworten = worksheet.Cells(row, 14).Value || '';  // Existing replies
+                    var emailId = worksheet.Cells(row, 23).Value || '';    // Email's unique EntryID
+                    var replyIds = worksheet.Cells(row, 24).Value || '';   // Comma-separated reply EntryIDs
+                    var anfrage = worksheet.Cells(row, 13).Value || '';    // Original request text
 
                     // Primary key: ConversationID ONLY (new emails in same conversation are replies!)
                     if (conversationId) {
@@ -1996,10 +1996,10 @@
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 if (lastRow <= 1) return data;
 
-                // Read date (col 2) and subject (col 11) to create unique keys
+                // Read date (col 2) and subject (col 12) to create unique keys
                 for (var row = 2; row <= lastRow; row++) {
                     var datum = worksheet.Cells(row, 2).Value || '';
-                    var betreff = worksheet.Cells(row, 11).Value || '';  // Betreff = col 11
+                    var betreff = worksheet.Cells(row, 12).Value || '';  // Betreff = col 12
 
                     if (datum || betreff) {
                         var key = createEmailKey(datum, betreff);
@@ -2125,8 +2125,8 @@
             if (row > 2) {
                 try {
                     _writeRowCurrentField = 'Format kopieren';
-                    var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 23));
-                    var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 23));
+                    var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 24));
+                    var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 24));
                     sourceRange.Copy();
                     targetRange.PasteSpecial(-4122); // xlPasteFormats = -4122
                     try { worksheet.Application.CutCopyMode = false; } catch(e) {}
@@ -2253,60 +2253,97 @@
                 worksheet.Cells(row, 2).Value = email.datum || '';
             }
 
-            _writeRowCurrentField = 'Spalte 3 (Kanal)';
-            worksheet.Cells(row, 3).Value = 'Email';                     // Kanal
+            // Spalte 3: Datum neuste Antwort
+            _writeRowCurrentField = 'Spalte 3 (Datum neuste Antwort)';
+            try {
+                var latestReplyDate = '';
+                if (email.antworten && email.antworten.length > 0) {
+                    // Find the newest reply date
+                    var newestDate = null;
+                    for (var rd = 0; rd < email.antworten.length; rd++) {
+                        var replyDatum = email.antworten[rd].datum;
+                        if (replyDatum) {
+                            var replyD = new Date(replyDatum);
+                            if (!isNaN(replyD.getTime())) {
+                                if (!newestDate || replyD > newestDate) {
+                                    newestDate = replyD;
+                                }
+                            }
+                        }
+                    }
+                    if (newestDate) {
+                        var replyDateStr = newestDate.getFullYear() + '-' +
+                            pad(newestDate.getMonth() + 1) + '-' +
+                            pad(newestDate.getDate()) + ' ' +
+                            pad(newestDate.getHours()) + ':' +
+                            pad(newestDate.getMinutes()) + ':' +
+                            pad(newestDate.getSeconds());
+                        worksheet.Cells(row, 3).Value = replyDateStr;
+                        worksheet.Cells(row, 3).NumberFormat = 'DD.MM.YYYY HH:MM';
+                    } else {
+                        worksheet.Cells(row, 3).Value = '';
+                    }
+                } else {
+                    worksheet.Cells(row, 3).Value = '';
+                }
+            } catch (replyDateErr) {
+                worksheet.Cells(row, 3).Value = '';
+            }
+
+            _writeRowCurrentField = 'Spalte 4 (Kanal)';
+            worksheet.Cells(row, 4).Value = 'Email';                     // Kanal
 
             // BD-Nummer als Text speichern (führende Nullen erhalten)
-            _writeRowCurrentField = 'Spalte 4 (BD-Nummer Format)';
-            worksheet.Cells(row, 4).NumberFormat = '@';
+            _writeRowCurrentField = 'Spalte 5 (BD-Nummer Format)';
+            worksheet.Cells(row, 5).NumberFormat = '@';
 
-            _writeRowCurrentField = 'Spalte 4 (BD-Nummer Wert)';
-            worksheet.Cells(row, 4).Value = bdNummer;                    // BD-Nummer
+            _writeRowCurrentField = 'Spalte 5 (BD-Nummer Wert)';
+            worksheet.Cells(row, 5).Value = bdNummer;                    // BD-Nummer
 
-            _writeRowCurrentField = 'Spalte 5 (Agentur)';
-            worksheet.Cells(row, 5).Value = agentur;                     // Agentur
+            _writeRowCurrentField = 'Spalte 6 (Agentur)';
+            worksheet.Cells(row, 6).Value = agentur;                     // Agentur
 
-            _writeRowCurrentField = 'Spalte 6 (Absender)';
-            worksheet.Cells(row, 6).Value = absender;                    // Absender
+            _writeRowCurrentField = 'Spalte 7 (Absender)';
+            worksheet.Cells(row, 7).Value = absender;                    // Absender
 
-            _writeRowCurrentField = 'Spalte 7 (Kategorie)';
-            worksheet.Cells(row, 7).Value = kategorie;                   // Kategorie
+            _writeRowCurrentField = 'Spalte 8 (Kategorie)';
+            worksheet.Cells(row, 8).Value = kategorie;                   // Kategorie
 
-            _writeRowCurrentField = 'Spalte 8 (Status)';
-            worksheet.Cells(row, 8).Value = status;                      // Status
+            _writeRowCurrentField = 'Spalte 9 (Status)';
+            worksheet.Cells(row, 9).Value = status;                      // Status
 
-            _writeRowCurrentField = 'Spalte 9 (Bearbeiter)';
-            worksheet.Cells(row, 9).Value = bearbeiter;                  // In Bearbeitung von
+            _writeRowCurrentField = 'Spalte 10 (Bearbeiter)';
+            worksheet.Cells(row, 10).Value = bearbeiter;                 // In Bearbeitung von
 
-            _writeRowCurrentField = 'Spalte 10 (Cluster)';
-            worksheet.Cells(row, 10).Value = clusters;                   // Cluster
+            _writeRowCurrentField = 'Spalte 11 (Cluster)';
+            worksheet.Cells(row, 11).Value = clusters;                   // Cluster
 
-            _writeRowCurrentField = 'Spalte 11 (Betreff)';
-            worksheet.Cells(row, 11).Value = betreff;                    // Betreff
+            _writeRowCurrentField = 'Spalte 12 (Betreff)';
+            worksheet.Cells(row, 12).Value = betreff;                    // Betreff
 
-            _writeRowCurrentField = 'Spalte 12 (Anfrage)';
-            worksheet.Cells(row, 12).Value = sanitizeForExcel(anfrage);  // Anfrage
+            _writeRowCurrentField = 'Spalte 13 (Anfrage)';
+            worksheet.Cells(row, 13).Value = sanitizeForExcel(anfrage);  // Anfrage
 
-            _writeRowCurrentField = 'Spalte 13 (Antwort) - Vorbereiten';
+            _writeRowCurrentField = 'Spalte 14 (Antwort) - Vorbereiten';
             var safeAntwort = '';
             try {
-                _writeRowCurrentField = 'Spalte 13 (Antwort) - fixEncoding';
+                _writeRowCurrentField = 'Spalte 14 (Antwort) - fixEncoding';
                 safeAntwort = fixEncoding(antwortText);
-                _writeRowCurrentField = 'Spalte 13 (Antwort) - sanitize';
+                _writeRowCurrentField = 'Spalte 14 (Antwort) - sanitize';
                 safeAntwort = sanitizeForExcel(safeAntwort);
 
                 // Set cell format to text first
-                _writeRowCurrentField = 'Spalte 13 (Antwort) - Format';
-                worksheet.Cells(row, 13).NumberFormat = '@';
+                _writeRowCurrentField = 'Spalte 14 (Antwort) - Format';
+                worksheet.Cells(row, 14).NumberFormat = '@';
 
-                _writeRowCurrentField = 'Spalte 13 (Antwort) - schreiben (' + safeAntwort.length + ' Zeichen)';
+                _writeRowCurrentField = 'Spalte 14 (Antwort) - schreiben (' + safeAntwort.length + ' Zeichen)';
 
                 // Try writing - if fails, try progressively simpler text
                 try {
-                    worksheet.Cells(row, 13).Value = safeAntwort;
+                    worksheet.Cells(row, 14).Value = safeAntwort;
                 } catch (writeErr1) {
                     // First fallback: remove only control characters, keep umlauts
-                    _writeRowCurrentField = 'Spalte 13 (Antwort) - Fallback (ohne Steuerzeichen)';
+                    _writeRowCurrentField = 'Spalte 14 (Antwort) - Fallback (ohne Steuerzeichen)';
                     var cleanText = '';
                     var maxLen = Math.min(safeAntwort.length, 10000);
                     for (var c = 0; c < maxLen; c++) {
@@ -2318,15 +2355,15 @@
                         // Skip control chars 0-8, 11-12, 14-31 and chars > 255
                     }
                     try {
-                        worksheet.Cells(row, 13).Value = cleanText;
+                        worksheet.Cells(row, 14).Value = cleanText;
                     } catch (writeErr2) {
                         // Second fallback: shorter text
                         try {
-                            worksheet.Cells(row, 13).Value = cleanText.substring(0, 2000);
+                            worksheet.Cells(row, 14).Value = cleanText.substring(0, 2000);
                         } catch (writeErr3) {
                             // Third fallback: just a message
                             try {
-                                worksheet.Cells(row, 13).Value = '[Antwort konnte nicht geschrieben werden - ' + (email.antworten ? email.antworten.length : 0) + ' Antworten]';
+                                worksheet.Cells(row, 14).Value = '[Antwort konnte nicht geschrieben werden - ' + (email.antworten ? email.antworten.length : 0) + ' Antworten]';
                             } catch (e3) {
                                 // Skip
                             }
@@ -2335,37 +2372,37 @@
                 }
             } catch (antwortErr) {
                 // Error in preparation - write error message
-                _writeRowCurrentField = 'Spalte 13 (Antwort) - Fehler';
+                _writeRowCurrentField = 'Spalte 14 (Antwort) - Fehler';
                 try {
-                    worksheet.Cells(row, 13).Value = '[FEHLER: ' + antwortErr.message + ']';
+                    worksheet.Cells(row, 14).Value = '[FEHLER: ' + antwortErr.message + ']';
                 } catch (e2) {
                     // Can't even write error - skip
                 }
             }
 
             // Bold the timestamps in reply cell (=== 2025-12-04T12:34:56 ===)
-            _writeRowCurrentField = 'Spalte 13 (Antwort) - Timestamps fetten';
-            boldTimestamps(worksheet.Cells(row, 13));
+            _writeRowCurrentField = 'Spalte 14 (Antwort) - Timestamps fetten';
+            boldTimestamps(worksheet.Cells(row, 14));
 
-            _writeRowCurrentField = 'Spalte 14-19 (Leere Felder)';
-            worksheet.Cells(row, 14).Value = '';                         // Diagnose
-            worksheet.Cells(row, 15).Value = '';                         // Workaround
-            worksheet.Cells(row, 16).Value = '';                         // Nächste Schritte
-            worksheet.Cells(row, 17).Value = '';                         // Lösung
-            worksheet.Cells(row, 18).Value = '';                         // JIRA
-            worksheet.Cells(row, 19).Value = '';                         // Kommunikation
+            _writeRowCurrentField = 'Spalte 15-20 (Leere Felder)';
+            worksheet.Cells(row, 15).Value = '';                         // Diagnose
+            worksheet.Cells(row, 16).Value = '';                         // Workaround
+            worksheet.Cells(row, 17).Value = '';                         // Nächste Schritte
+            worksheet.Cells(row, 18).Value = '';                         // Lösung
+            worksheet.Cells(row, 19).Value = '';                         // JIRA
+            worksheet.Cells(row, 20).Value = '';                         // Kommunikation
 
-            _writeRowCurrentField = 'Spalte 20 (Kommentar)';
-            worksheet.Cells(row, 20).Value = kommentar;                  // Kommentar
+            _writeRowCurrentField = 'Spalte 21 (Kommentar)';
+            worksheet.Cells(row, 21).Value = kommentar;                  // Kommentar
 
-            _writeRowCurrentField = 'Spalte 21 (ConversationID)';
-            worksheet.Cells(row, 21).Value = email.conversationId || ''; // ConversationID für Duplikatsprüfung
+            _writeRowCurrentField = 'Spalte 22 (ConversationID)';
+            worksheet.Cells(row, 22).Value = email.conversationId || ''; // ConversationID für Duplikatsprüfung
 
-            _writeRowCurrentField = 'Spalte 22 (EmailID)';
-            worksheet.Cells(row, 22).Value = email.emailId || '';        // Unique EntryID for precise duplicate detection
+            _writeRowCurrentField = 'Spalte 23 (EmailID)';
+            worksheet.Cells(row, 23).Value = email.emailId || '';        // Unique EntryID for precise duplicate detection
 
             // Collect all reply IDs (new ones being added)
-            _writeRowCurrentField = 'Spalte 23 (ReplyIDs)';
+            _writeRowCurrentField = 'Spalte 24 (ReplyIDs)';
             var replyIdList = '';
             try {
                 var replyIds = [];
@@ -2378,7 +2415,7 @@
                 }
                 replyIdList = replyIds.join(',');
             } catch (e) {}
-            worksheet.Cells(row, 23).Value = replyIdList;                // Comma-separated reply EntryIDs
+            worksheet.Cells(row, 24).Value = replyIdList;                // Comma-separated reply EntryIDs
 
             _writeRowCurrentField = 'Fertig';
         }
