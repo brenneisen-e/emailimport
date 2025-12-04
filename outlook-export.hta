@@ -410,6 +410,8 @@
         var exportWorkbook = null;
         var existingEmailKeys = {};  // Keys of emails already in Excel
         var existingReplies = {};    // Existing replies text per email key (for filtering new replies)
+        var existingEmailIds = {};   // EmailIDs (EntryIDs) already in Excel - for precise duplicate detection
+        var existingReplyIds = {};   // ReplyIDs per email key - comma-separated EntryIDs of already imported replies
         var lastExportedEmails = null;  // Store for direct import
 
         // Step tracking
@@ -722,6 +724,8 @@
             document.getElementById('exportExcelStatus').value = "Suche Excel...";
             existingEmailKeys = {};
             existingReplies = {};
+            existingEmailIds = {};
+            existingReplyIds = {};
 
             try {
                 // Try to connect to running Excel
@@ -769,12 +773,15 @@
                 var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
                 var count = 0;
 
-                // Read ConversationID (col 21), date (col 2), subject (col 11), and replies (col 13) for duplicate detection
+                // Read ConversationID (col 21), date (col 2), subject (col 11), replies (col 13),
+                // emailId (col 22), replyIds (col 23) for duplicate detection
                 for (var row = 2; row <= lastRow; row++) {
                     var conversationId = worksheet.Cells(row, 21).Value || '';
                     var datum = worksheet.Cells(row, 2).Value || '';
                     var betreff = worksheet.Cells(row, 11).Value || '';
                     var antworten = worksheet.Cells(row, 13).Value || '';  // Existing replies
+                    var emailId = worksheet.Cells(row, 22).Value || '';    // Email's unique EntryID
+                    var replyIds = worksheet.Cells(row, 23).Value || '';   // Comma-separated reply EntryIDs
 
                     // Primary key: ConversationID + Date (allows new replies in same conversation)
                     if (conversationId && datum) {
@@ -782,12 +789,18 @@
                         var convKey = 'conv|' + conversationId + '|' + dateStr;
                         existingEmailKeys[convKey] = true;
                         if (antworten) existingReplies[convKey] = antworten;
+                        if (replyIds) existingReplyIds[convKey] = replyIds;
                     }
                     // Fallback key: date + subject (for older entries without ConversationID)
                     if (datum || betreff) {
                         var key = createExportEmailKey(datum, betreff);
                         existingEmailKeys[key] = true;
                         if (antworten) existingReplies[key] = antworten;
+                        if (replyIds) existingReplyIds[key] = replyIds;
+                    }
+                    // Track emailId for precise duplicate detection
+                    if (emailId) {
+                        existingEmailIds[emailId] = true;
                     }
                     if (conversationId || datum || betreff) count++;
                 }
@@ -801,6 +814,8 @@
             } catch (e) {
                 document.getElementById('exportExcelStatus').value = "Fehler: " + e.message;
                 existingEmailKeys = {};
+                existingEmailIds = {};
+                existingReplyIds = {};
                 exportWorkbook = null;
                 checkExportReady();
             }
@@ -888,6 +903,15 @@
             cutoffDate: null
         };
 
+        // Format date for Outlook Restrict() filter (mm/dd/yyyy format)
+        function formatDateForRestrict(date) {
+            var d = new Date(date);
+            var month = d.getMonth() + 1;
+            var day = d.getDate();
+            var year = d.getFullYear();
+            return month + '/' + day + '/' + year;
+        }
+
         function doExport(folderId, days) {
             try {
                 // Phase 1: Get folder
@@ -895,11 +919,21 @@
                 document.getElementById('exportProgressFill').style.width = '5%';
 
                 var folder = (folderId === 'inbox') ? selectedStore.GetDefaultFolder(6) : namespace.GetFolderFromID(folderId);
-                exportState.items = folder.Items;
-                try { exportState.items.Sort("[ReceivedTime]", true); } catch (e) {}
 
+                // Calculate cutoff date
                 exportState.cutoffDate = new Date();
                 exportState.cutoffDate.setDate(exportState.cutoffDate.getDate() - days);
+
+                // Use Restrict() to filter emails at the Outlook server level (MUCH faster)
+                var dateFilter = "[ReceivedTime] >= '" + formatDateForRestrict(exportState.cutoffDate) + "'";
+                try {
+                    exportState.items = folder.Items.Restrict(dateFilter);
+                } catch (restrictErr) {
+                    // Fallback to all items if Restrict fails
+                    exportState.items = folder.Items;
+                }
+                try { exportState.items.Sort("[ReceivedTime]", true); } catch (e) {}
+
                 exportState.emails = [];
                 exportState.total = Math.min(exportState.items.Count, 500);
                 exportState.current = 1;
@@ -962,6 +996,7 @@
                     for (var k in existingEmailKeys) { hasExcelData = true; break; }
                     var isDuplicate = false;
                     var existingReplyText = '';
+                    var existingReplyIdList = '';
                     var convKey = '';
                     var emailKey = '';
                     if (hasExcelData) {
@@ -973,6 +1008,7 @@
                             isDuplicate = true;
                             // Get existing replies for comparison
                             existingReplyText = existingReplies[convKey] || existingReplies[emailKey] || '';
+                            existingReplyIdList = existingReplyIds[convKey] || existingReplyIds[emailKey] || '';
                         }
                     }
 
@@ -982,13 +1018,15 @@
 
                     if (isDuplicate) {
                         // Filter to only truly new replies (not already in Excel)
-                        var newReplies = filterNewReplies(allReplies, existingReplyText);
+                        // Pass existing reply IDs for precise matching
+                        var newReplies = filterNewReplies(allReplies, existingReplyText, existingReplyIdList);
 
                         if (newReplies.length > 0) {
                             // Has new replies - include for update
                             emailData.antworten = newReplies;  // Only new replies for import
                             emailData.alleAntworten = allReplies;  // All replies for web tool display
                             emailData.existingReplies = existingReplyText;  // Mark what already exists
+                            emailData.existingReplyIds = existingReplyIdList;  // Existing reply IDs to append to
                             emailData.isDuplicateWithNewReplies = true;
                             exportState.duplicatesWithReplies++;
                             exportState.emails.push(emailData);
@@ -1100,7 +1138,16 @@
             }
 
             try {
-                sentCacheState.items = sentCacheState.folders[sentCacheState.folderIdx].Items;
+                var folder = sentCacheState.folders[sentCacheState.folderIdx];
+
+                // Use Restrict() to filter sent items by date at the Outlook server level (MUCH faster)
+                var dateFilter = "[SentOn] >= '" + formatDateForRestrict(sentCacheState.cutoffDate) + "'";
+                try {
+                    sentCacheState.items = folder.Items.Restrict(dateFilter);
+                } catch (restrictErr) {
+                    // Fallback to all items if Restrict fails
+                    sentCacheState.items = folder.Items;
+                }
                 try { sentCacheState.items.Sort("[SentOn]", true); } catch (e) {}
                 // Increased limit for group mailboxes with many sent items
                 sentCacheState.maxItems = Math.min(sentCacheState.items.Count, 1000);
@@ -1140,9 +1187,13 @@
                     var convId = '';
                     try { convId = item.ConversationID || ''; } catch (e) {}
 
+                    var entryId = '';
+                    try { entryId = item.EntryID || ''; } catch (e) {}
+
                     var sentItem = {
                         sentDate: sentDate,
                         conversationId: convId,
+                        entryId: entryId,  // Unique ID for reply duplicate detection
                         body: removeEmailQuotes(body),
                         to: toRecipient
                     };
@@ -1197,7 +1248,8 @@
                         replies.push({
                             datum: formatDate(cached.sentDate),
                             an: cached.to || '',
-                            text: cached.body.trim()
+                            text: cached.body.trim(),
+                            replyId: cached.entryId || ''  // Unique ID for this reply
                         });
                     }
                 }
@@ -1207,10 +1259,22 @@
         }
 
         // Filter replies to only include ones that are not already in Excel
-        function filterNewReplies(allReplies, existingReplyText) {
+        // Uses ReplyID (EntryID) for precise matching, falls back to text matching if no IDs available
+        function filterNewReplies(allReplies, existingReplyText, existingReplyIdList) {
             if (!allReplies || allReplies.length === 0) return [];
-            if (!existingReplyText) {
-                // No existing replies - all are new
+
+            // Parse existing reply IDs into a lookup set
+            var existingIdSet = {};
+            if (existingReplyIdList) {
+                var idParts = String(existingReplyIdList).split(',');
+                for (var p = 0; p < idParts.length; p++) {
+                    var id = idParts[p].trim();
+                    if (id) existingIdSet[id] = true;
+                }
+            }
+
+            // If no existing data at all - all are new
+            if (!existingReplyText && !existingReplyIdList) {
                 for (var i = 0; i < allReplies.length; i++) {
                     allReplies[i].isNew = true;
                 }
@@ -1218,8 +1282,8 @@
             }
 
             var newReplies = [];
-            // Normalize both texts with fixEncoding to handle encoding differences
-            var existingNormalized = fixEncoding(existingReplyText).toLowerCase();
+            // Normalize text for fallback matching
+            var existingNormalized = existingReplyText ? fixEncoding(existingReplyText).toLowerCase() : '';
 
             for (var j = 0; j < allReplies.length; j++) {
                 var reply = allReplies[j];
@@ -1228,21 +1292,29 @@
                 // Skip empty replies
                 if (!replyText) continue;
 
-                // Normalize reply text with fixEncoding too
-                var normalizedReply = fixEncoding(replyText);
-
-                // Check if this reply is already in Excel
-                // Use first 80 chars for matching (handles minor formatting differences)
-                var checkText = normalizedReply.substring(0, 80).toLowerCase().trim();
-                if (checkText.length < 10) checkText = normalizedReply.toLowerCase().trim();
-
-                if (existingNormalized.indexOf(checkText) === -1) {
-                    // Not found in existing - this is new
-                    reply.isNew = true;
-                    newReplies.push(reply);
-                } else {
+                // Primary check: Use ReplyID if available (precise matching)
+                if (reply.replyId && existingIdSet[reply.replyId]) {
+                    // Already in Excel by ID
                     reply.isNew = false;
+                    continue;
                 }
+
+                // Fallback check: Text matching (for older data without IDs)
+                if (existingNormalized) {
+                    var normalizedReply = fixEncoding(replyText);
+                    var checkText = normalizedReply.substring(0, 80).toLowerCase().trim();
+                    if (checkText.length < 10) checkText = normalizedReply.toLowerCase().trim();
+
+                    if (existingNormalized.indexOf(checkText) !== -1) {
+                        // Found in existing by text
+                        reply.isNew = false;
+                        continue;
+                    }
+                }
+
+                // Not found - this is new
+                reply.isNew = true;
+                newReplies.push(reply);
             }
 
             return newReplies;
@@ -1330,6 +1402,9 @@
             var convId = '';
             try { convId = item.ConversationID || ''; } catch (e) {}
 
+            var entryId = '';
+            try { entryId = item.EntryID || ''; } catch (e) {}
+
             return {
                 datum: formatDate(item.ReceivedTime),
                 von_email: senderEmail,
@@ -1338,6 +1413,7 @@
                 text: body,
                 anhaenge: attachments,
                 conversationId: convId,
+                emailId: entryId,  // Unique ID for duplicate detection
                 antworten: []
             };
         }
@@ -1744,6 +1820,25 @@
                                 currentStep = 'Email ' + (i+1) + ' Antworten schreiben';
                                 var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
                                 worksheet.Cells(existingRow, 13).Value = combinedReplies;  // Antwort = col 13
+
+                                // Also update ReplyIDs (col 23) - append new reply IDs
+                                currentStep = 'Email ' + (i+1) + ' ReplyIDs aktualisieren';
+                                try {
+                                    var currentReplyIds = worksheet.Cells(existingRow, 23).Value || '';
+                                    var newReplyIds = [];
+                                    for (var nr = 0; nr < email.antworten.length; nr++) {
+                                        if (email.antworten[nr].replyId) {
+                                            newReplyIds.push(email.antworten[nr].replyId);
+                                        }
+                                    }
+                                    if (newReplyIds.length > 0) {
+                                        var combinedIds = currentReplyIds ? currentReplyIds + ',' + newReplyIds.join(',') : newReplyIds.join(',');
+                                        worksheet.Cells(existingRow, 23).Value = combinedIds;
+                                    }
+                                } catch (replyIdErr) {
+                                    // Non-critical, continue
+                                }
+
                                 updateCount++;
                             } else {
                                 skipCount++;
@@ -1942,8 +2037,8 @@
             if (row > 2) {
                 try {
                     _writeRowCurrentField = 'Format kopieren';
-                    var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 21));
-                    var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 21));
+                    var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 23));
+                    var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 23));
                     sourceRange.Copy();
                     targetRange.PasteSpecial(-4122); // xlPasteFormats = -4122
                     try { worksheet.Application.CutCopyMode = false; } catch(e) {}
@@ -2150,6 +2245,25 @@
 
             _writeRowCurrentField = 'Spalte 21 (ConversationID)';
             worksheet.Cells(row, 21).Value = email.conversationId || ''; // ConversationID für Duplikatsprüfung
+
+            _writeRowCurrentField = 'Spalte 22 (EmailID)';
+            worksheet.Cells(row, 22).Value = email.emailId || '';        // Unique EntryID for precise duplicate detection
+
+            // Collect all reply IDs (new ones being added)
+            _writeRowCurrentField = 'Spalte 23 (ReplyIDs)';
+            var replyIdList = '';
+            try {
+                var replyIds = [];
+                if (email.antworten && email.antworten.length > 0) {
+                    for (var ri = 0; ri < email.antworten.length; ri++) {
+                        if (email.antworten[ri].replyId) {
+                            replyIds.push(email.antworten[ri].replyId);
+                        }
+                    }
+                }
+                replyIdList = replyIds.join(',');
+            } catch (e) {}
+            worksheet.Cells(row, 23).Value = replyIdList;                // Comma-separated reply EntryIDs
 
             _writeRowCurrentField = 'Fertig';
         }
