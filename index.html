@@ -812,9 +812,14 @@
             </div>
 
             <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label class="form-label">Dein Name (für "In Bearbeitung von")</label>
-                <input type="text" class="form-input" id="bearbeiterName" placeholder="Max Mustermann"
-                       onchange="saveBearbeiterName()" style="text-align: center;">
+                <label class="form-label">In Bearbeitung von</label>
+                <select class="form-select" id="bearbeiterName" onchange="saveBearbeiterName()" style="text-align: center;">
+                    <option value="">-- Bitte auswählen --</option>
+                    <option value="Meike Bauer">Meike Bauer</option>
+                    <option value="Sarina Ebert">Sarina Ebert</option>
+                    <option value="Nicole Rotter">Nicole Rotter</option>
+                    <option value="Kristin Kreisel">Kristin Kreisel</option>
+                </select>
             </div>
 
             <div class="upload-info">
@@ -999,8 +1004,12 @@
         });
 
         function saveBearbeiterName() {
-            const name = document.getElementById('bearbeiterName').value.trim();
+            const name = document.getElementById('bearbeiterName').value;
             localStorage.setItem('bearbeiterName', name);
+            // Update all emails with the new bearbeiter name
+            emails.forEach(email => {
+                email.bearbeiter = name;
+            });
         }
 
         function getBearbeiterName() {

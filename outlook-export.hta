@@ -1101,7 +1101,8 @@
                                 var currentReplies = worksheet.Cells(existingRow, 13).Value || '';
                                 var newRepliesText = formatReplies(email.antworten);
                                 if (newRepliesText && currentReplies.indexOf(newRepliesText.substring(0, 50)) === -1) {
-                                    var combinedReplies = currentReplies ? currentReplies + '\n\n' + newRepliesText : newRepliesText;
+                                    // New replies go on TOP (newest first)
+                                    var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
                                     worksheet.Cells(existingRow, 13).Value = combinedReplies;
                                     updateCount++;
                                 } else {
@@ -1395,7 +1396,8 @@
 
                             // Only update if we have new content
                             if (newRepliesText && currentReplies.indexOf(newRepliesText.substring(0, 50)) === -1) {
-                                var combinedReplies = currentReplies ? currentReplies + '\n\n' + newRepliesText : newRepliesText;
+                                // New replies go on TOP (newest first)
+                                var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
                                 worksheet.Cells(existingRow, 13).Value = combinedReplies;  // Antwort = col 13
                                 updateCount++;
                             } else {
@@ -1474,13 +1476,26 @@
             return dateStr + '|' + subjectStr;
         }
 
-        // Format replies array to text
+        // Format replies array to text (newest first, timestamps prominent)
         function formatReplies(antworten) {
             if (!antworten || antworten.length === 0) return '';
+
+            // Sort by date descending (newest first)
+            var sorted = [];
+            for (var i = 0; i < antworten.length; i++) {
+                sorted.push(antworten[i]);
+            }
+            sorted.sort(function(a, b) {
+                var dateA = new Date(a.datum || 0);
+                var dateB = new Date(b.datum || 0);
+                return dateB - dateA;  // Descending
+            });
+
             var text = '';
-            for (var r = 0; r < antworten.length; r++) {
-                var reply = antworten[r];
-                text += '[' + (reply.datum || '') + '] ' + (reply.text || '') + '\n\n';
+            for (var r = 0; r < sorted.length; r++) {
+                var reply = sorted[r];
+                // Prominent timestamp format
+                text += '=== ' + (reply.datum || '') + ' ===\n' + (reply.text || '') + '\n\n';
             }
             return text.trim();
         }
