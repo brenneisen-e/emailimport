@@ -349,6 +349,22 @@
         .badge-question { background: var(--purple-light); color: var(--purple); }
         .badge-cluster { background: var(--bg-tertiary); color: var(--text-secondary); }
         .badge-update { background: #dbeafe; color: #1d4ed8; }
+        .badge-reply { background: #d1fae5; color: #065f46; }
+
+        /* Day Header */
+        .day-header {
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
 
         /* Detail Panel */
         .detail-panel {
@@ -1697,9 +1713,13 @@
             // LV - Lebensversicherung (erweitert)
             if (combined.match(/\blv\b|leben|rente|altersvorsorge|riester|rürup|\bbav\b|betrieblich|sterbegeld|berufsunfähigkeit|\bbu\b/)) clusters.push('LV');
             // Provisionierung (erweitert)
-            if (combined.match(/provision|vergütung|courtage|abrechnung|storno|dynamisierung|bestandspflege|absatz|bestand/)) clusters.push('Provisionierung');
+            if (combined.match(/provision|vergütung|courtage|abrechnung|storno|dynamisierung|bestandspflege/)) clusters.push('Provisionierung');
             // Produktzuordnung (erweitert)
             if (combined.match(/zuordnung|produkt|tarif|umstellung|migration|tarifwechsel/)) clusters.push('Produktzuordnung');
+            // Bestand
+            if (combined.match(/\bbestand\b|bestandskunde|bestandsvertrag|bestandsdaten/)) clusters.push('Bestand');
+            // Absatzeinheiten (AE)
+            if (combined.match(/\bae\b|absatzeinheit|absatzeinheiten/)) clusters.push('Absatzeinheiten');
 
             return clusters.length > 0 ? clusters : ['Allgemein'];
         }
@@ -1786,31 +1806,54 @@
                 return;
             }
 
+            // Sort by date descending (newest first)
+            filteredEmails.sort((a, b) => new Date(b.datum) - new Date(a.datum));
+
             // Show select-all row
             document.getElementById('selectAllRow').style.display = 'flex';
             updateSelectedCount();
 
-            list.innerHTML = filteredEmails.map(email => {
+            // Group emails by day
+            let currentDay = null;
+            let html = '';
+
+            filteredEmails.forEach(email => {
                 const date = new Date(email.datum);
-                const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                const dayKey = date.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                // Add day header if new day
+                if (dayKey !== currentDay) {
+                    currentDay = dayKey;
+                    html += `<div class="day-header">${dayKey}</div>`;
+                }
+
+                const dateStr = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
                 const preview = (email.text || '').substring(0, 60).replace(/\n/g, ' ') + '...';
                 const selectedClass = email.id === selectedEmailId ? ' selected' : '';
                 const isChecked = selectedForExport.has(email.id) ? 'checked' : '';
 
+                // Count replies
+                const replyCount = (email.antworten?.length || 0) + (email.alleAntworten?.length || 0);
+                const uniqueReplyCount = email.alleAntworten?.length || email.antworten?.length || 0;
+
                 let badges = '';
+                // Show reply count badge
+                if (uniqueReplyCount > 0) {
+                    badges += '<span class="badge badge-reply">' + uniqueReplyCount + ' Antw.</span>';
+                }
                 // Show update badge for duplicates with new replies
                 if (email.isDuplicateWithNewReplies) {
-                    badges += '<span class="badge badge-update">🔄 Update</span>';
+                    badges += '<span class="badge badge-update">Update</span>';
                 }
-                if (email.isProvision) badges += '<span class="badge badge-provision">€ Provision</span>';
-                else if (email.kategorie.includes('Incident')) badges += '<span class="badge badge-incident">! Incident</span>';
-                else if (email.kategorie === 'Fachliche Rückfrage') badges += '<span class="badge badge-question">? Frage</span>';
+                if (email.isProvision) badges += '<span class="badge badge-provision">Provision</span>';
+                else if (email.kategorie.includes('Incident')) badges += '<span class="badge badge-incident">Incident</span>';
+                else if (email.kategorie === 'Fachliche Rückfrage') badges += '<span class="badge badge-question">Frage</span>';
 
                 email.clusters.slice(0, 2).forEach(c => {
                     badges += '<span class="badge badge-cluster">' + c + '</span>';
                 });
 
-                return `
+                html += `
                     <div class="email-item${selectedClass}">
                         <input type="checkbox" class="email-checkbox" ${isChecked}
                                onclick="event.stopPropagation(); toggleEmailSelection(${email.id})">
@@ -1825,7 +1868,9 @@
                         </div>
                     </div>
                 `;
-            }).join('');
+            });
+
+            list.innerHTML = html;
         }
 
         function toggleEmailSelection(id) {
@@ -2081,12 +2126,36 @@
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
             filteredEmails = emails.filter(email => {
-                // Search
-                const matchesSearch = !searchTerm ||
-                    email.betreff.toLowerCase().includes(searchTerm) ||
-                    email.von_name.toLowerCase().includes(searchTerm) ||
-                    email.von_email.toLowerCase().includes(searchTerm) ||
-                    email.text.toLowerCase().includes(searchTerm);
+                // Search - including replies and all text fields
+                let matchesSearch = !searchTerm;
+                if (searchTerm) {
+                    // Basic fields
+                    matchesSearch = email.betreff.toLowerCase().includes(searchTerm) ||
+                        email.von_name.toLowerCase().includes(searchTerm) ||
+                        email.von_email.toLowerCase().includes(searchTerm) ||
+                        email.text.toLowerCase().includes(searchTerm) ||
+                        (email.anfrage || '').toLowerCase().includes(searchTerm) ||
+                        (email.antwort || '').toLowerCase().includes(searchTerm) ||
+                        (email.kommentar || '').toLowerCase().includes(searchTerm);
+
+                    // Search in replies array (antworten)
+                    if (!matchesSearch && email.antworten && email.antworten.length > 0) {
+                        matchesSearch = email.antworten.some(reply => {
+                            const replyText = (reply.text || reply.body || '').toLowerCase();
+                            const replySubject = (reply.betreff || reply.subject || '').toLowerCase();
+                            return replyText.includes(searchTerm) || replySubject.includes(searchTerm);
+                        });
+                    }
+
+                    // Search in all replies (alleAntworten)
+                    if (!matchesSearch && email.alleAntworten && email.alleAntworten.length > 0) {
+                        matchesSearch = email.alleAntworten.some(reply => {
+                            const replyText = (reply.text || reply.body || '').toLowerCase();
+                            const replySubject = (reply.betreff || reply.subject || '').toLowerCase();
+                            return replyText.includes(searchTerm) || replySubject.includes(searchTerm);
+                        });
+                    }
+                }
 
                 // Filter
                 let matchesFilter = true;
