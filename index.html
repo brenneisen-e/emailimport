@@ -437,6 +437,16 @@
             background: white;
         }
 
+        .reply-html-frame {
+            width: 100%;
+            min-height: 200px;
+            height: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: white;
+            margin-top: 0.5rem;
+        }
+
         /* Provision Data Box */
         .provision-box {
             background: var(--warning-light);
@@ -2078,9 +2088,13 @@
             const tabAntworten = document.getElementById('tabAntworten');
 
             // Use alleAntworten for display (shows all), antworten for import (only new)
-            const displayReplies = email.alleAntworten && email.alleAntworten.length > 0
-                ? email.alleAntworten
-                : (email.antworten || []);
+            let displayReplies = email.alleAntworten && email.alleAntworten.length > 0
+                ? [...email.alleAntworten]
+                : [...(email.antworten || [])];
+
+            // Sort replies chronologically (oldest first)
+            displayReplies.sort((a, b) => new Date(a.datum || a.date) - new Date(b.datum || b.date));
+
             const newRepliesCount = (email.antworten || []).filter(r => r.isNew).length;
 
             if (displayReplies.length > 0) {
@@ -2094,7 +2108,7 @@
                 tabAntworten.classList.remove('disabled');
 
                 // Render replies in card format with new/existing indicator and search highlighting
-                repliesList.innerHTML = displayReplies.map(reply => {
+                repliesList.innerHTML = displayReplies.map((reply, idx) => {
                     const replyDate = new Date(reply.datum || reply.date);
                     const dateStr = replyDate.toLocaleString('de-DE');
                     const replyText = reply.text || reply.body || '';
@@ -2102,19 +2116,63 @@
                     const statusClass = isNew ? 'reply-new' : (email.isDuplicateWithNewReplies ? 'reply-existing' : '');
                     const statusLabel = isNew ? '<span class="reply-status-new">NEU</span>' :
                         (email.isDuplicateWithNewReplies ? '<span class="reply-status-existing">Bereits importiert</span>' : '');
-                    // Use highlightKeywords to show search term highlighting in replies
-                    const highlightedText = highlightKeywords(replyText);
+
+                    // Check if reply has HTML content
+                    const hasReplyHtml = reply.htmlBody && (
+                        reply.htmlBody.toLowerCase().includes('<table') ||
+                        reply.htmlBody.toLowerCase().includes('<div') ||
+                        reply.htmlBody.toLowerCase().includes('<br') ||
+                        reply.htmlBody.toLowerCase().includes('<p>')
+                    );
+
+                    // Direction indicator
+                    const isIncoming = reply.isIncoming === true;
+                    const directionLabel = isIncoming ? 'Von' : 'An';
+                    const personName = isIncoming ? (reply.von || reply.from || 'Unbekannt') : (reply.an || reply.to || 'Unbekannt');
+
+                    let contentHtml;
+                    if (hasReplyHtml) {
+                        contentHtml = `<iframe class="reply-html-frame" id="replyFrame${idx}" srcdoc=""></iframe>`;
+                    } else {
+                        contentHtml = `<div class="reply-card-text">${highlightKeywords(replyText)}</div>`;
+                    }
+
                     return `
                         <div class="reply-card ${statusClass}">
                             <div class="reply-card-header">
-                                <span class="reply-card-from">An: ${escapeHtml(reply.an || reply.to || 'Unbekannt')}</span>
+                                <span class="reply-card-from">${directionLabel}: ${escapeHtml(personName)}</span>
                                 ${statusLabel}
                                 <span class="reply-card-date">${dateStr}</span>
                             </div>
-                            <div class="reply-card-text">${highlightedText}</div>
+                            ${contentHtml}
                         </div>
                     `;
                 }).join('');
+
+                // Set iframe srcdoc after DOM is updated (for HTML replies)
+                displayReplies.forEach((reply, idx) => {
+                    const hasReplyHtml = reply.htmlBody && (
+                        reply.htmlBody.toLowerCase().includes('<table') ||
+                        reply.htmlBody.toLowerCase().includes('<div') ||
+                        reply.htmlBody.toLowerCase().includes('<br') ||
+                        reply.htmlBody.toLowerCase().includes('<p>')
+                    );
+                    if (hasReplyHtml) {
+                        const iframe = document.getElementById(`replyFrame${idx}`);
+                        if (iframe) {
+                            const wrappedHtml = `<!DOCTYPE html>
+                                <html><head><meta charset="UTF-8">
+                                <style>
+                                    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; margin: 10px; }
+                                    table { border-collapse: collapse; width: 100%; }
+                                    td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                    th { background-color: #f5f5f5; }
+                                    tr:nth-child(even) { background-color: #fafafa; }
+                                </style></head><body>${reply.htmlBody}</body></html>`;
+                            iframe.srcdoc = wrappedHtml;
+                        }
+                    }
+                });
             } else {
                 // Hide reply count badge and show empty state
                 replyCountBadge.style.display = 'none';
