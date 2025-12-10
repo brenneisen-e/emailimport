@@ -350,6 +350,8 @@
         .badge-cluster { background: var(--bg-tertiary); color: var(--text-secondary); }
         .badge-update { background: #dbeafe; color: #1d4ed8; }
         .badge-reply { background: #d1fae5; color: #065f46; }
+        .badge-unread { background: #fef3c7; color: #92400e; font-weight: 600; }
+        .badge-read { background: var(--bg-tertiary); color: var(--text-muted); }
 
         /* Day Header */
         .day-header {
@@ -1440,6 +1442,7 @@
         let filteredEmails = [];
         let selectedEmailId = null;
         let selectedForExport = new Set();  // IDs der für Export ausgewählten Emails
+        let readEmails = new Set();  // IDs der gelesenen Emails
         let currentFilter = 'all';
         let nextId = 1;
         let currentStep = 1;  // 1: Auswählen, 2: Kategorisieren, 3: Speichern
@@ -1839,6 +1842,12 @@
                 const uniqueReplyCount = email.alleAntworten?.length || email.antworten?.length || 0;
 
                 let badges = '';
+                // Show read/unread badge
+                if (readEmails.has(email.id)) {
+                    badges += '<span class="badge badge-read">Gelesen</span>';
+                } else {
+                    badges += '<span class="badge badge-unread">Ungelesen</span>';
+                }
                 // Show reply count badge
                 if (uniqueReplyCount > 0) {
                     badges += '<span class="badge badge-reply">' + uniqueReplyCount + ' Antw.</span>';
@@ -1913,6 +1922,9 @@
             selectedEmailId = id;
             const email = emails.find(e => e.id === id);
             if (!email) return;
+
+            // Mark as read
+            readEmails.add(id);
 
             // Update list
             renderEmailList();
