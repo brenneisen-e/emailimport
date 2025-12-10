@@ -1444,7 +1444,7 @@
         let nextId = 1;
         let currentStep = 1;  // 1: Auswählen, 2: Kategorisieren, 3: Speichern
 
-        const allClusters = ['KV', 'KFZ', 'SHUK', 'LV', 'Provisionierung', 'Produktzuordnung', 'Allgemein'];
+        const allClusters = ['KV', 'KFZ', 'SHUK', 'LV', 'Provisionierung', 'Produktzuordnung', 'Bestand', 'Absatzeinheiten', 'Allgemein'];
 
         // Schlagwort-Cluster-Mapping für Highlighting
         const keywordClusterMap = {
@@ -1452,8 +1452,10 @@
             'KFZ': ['kfz', 'auto', 'fahrzeug', 'kasko', 'vollkasko', 'teilkasko', 'pkw', 'kennzeichen', 'motorrad', 'anhänger'],
             'SHUK': ['shuk', 'sach', 'haft', 'unfall', 'hausrat', 'wohngebäude', 'gebäude', 'rechtsschutz', 'tierhalter', 'hund', 'pferd', 'gewässer', 'photovoltaik'],
             'LV': ['lv', 'leben', 'rente', 'vorsorge', 'altersvorsorge', 'riester', 'rürup', 'bav', 'betrieblich', 'sterbegeld', 'berufsunfähigkeit', 'bu'],
-            'Provisionierung': ['provision', 'vergütung', 'courtage', 'abrechnung', 'storno', 'dynamisierung', 'bestandspflege', 'absatz', 'bestand'],
-            'Produktzuordnung': ['produkt', 'tarif', 'angebot', 'deckung', 'zuordnung', 'umstellung', 'migration', 'tarifwechsel']
+            'Provisionierung': ['provision', 'vergütung', 'courtage', 'abrechnung', 'storno', 'dynamisierung', 'bestandspflege'],
+            'Produktzuordnung': ['produkt', 'tarif', 'angebot', 'deckung', 'zuordnung', 'umstellung', 'migration', 'tarifwechsel'],
+            'Bestand': ['bestand', 'bestandskunde', 'bestandsvertrag', 'bestandsdaten'],
+            'Absatzeinheiten': ['ae', 'absatzeinheit', 'absatzeinheiten']
         };
 
         // ============================================================================

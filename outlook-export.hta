@@ -1145,16 +1145,64 @@
                         exportState.duplicatesWithReplies++;
                         exportState.emails.push(emailData);
                     } else {
-                        // Completely new email - include all replies
-                        emailData.antworten = allReplies;
-                        for (var r = 0; r < allReplies.length; r++) {
-                            allReplies[r].isNew = true;
+                        // Completely new email - check if a sent item started this conversation
+                        var inboxDate = new Date(emailData.datum);
+                        var oldestSentItem = null;
+                        var oldestSentDate = null;
+
+                        // Find the oldest sent item in this conversation
+                        for (var si = 0; si < allReplies.length; si++) {
+                            var replyDate = new Date(allReplies[si].datum);
+                            if (!oldestSentDate || replyDate < oldestSentDate) {
+                                oldestSentDate = replyDate;
+                                oldestSentItem = allReplies[si];
+                            }
+                        }
+
+                        // If a sent item is older than the inbox email, it's the actual "Anfrage"
+                        if (oldestSentItem && oldestSentDate < inboxDate) {
+                            // The sent item is the Anfrage, inbox email becomes a reply
+                            var inboxAsReply = {
+                                datum: emailData.datum,
+                                an: '',  // Incoming email
+                                text: removeEmailQuotes(emailData.text),
+                                replyId: emailData.emailId,
+                                isNew: true,
+                                isIncoming: true
+                            };
+
+                            // Build replies: all sent items except the oldest (which is Anfrage)
+                            var repliesWithoutOldest = [];
+                            for (var ri = 0; ri < allReplies.length; ri++) {
+                                if (allReplies[ri] !== oldestSentItem) {
+                                    allReplies[ri].isNew = true;
+                                    repliesWithoutOldest.push(allReplies[ri]);
+                                }
+                            }
+                            // Add the inbox email as a reply
+                            repliesWithoutOldest.push(inboxAsReply);
+
+                            // Use the oldest sent item as the Anfrage
+                            emailData.text = oldestSentItem.text;
+                            emailData.datum = oldestSentItem.datum;
+                            emailData.antworten = repliesWithoutOldest;
+                        } else {
+                            // Inbox email is the oldest - normal case
+                            emailData.antworten = allReplies;
+                            for (var r = 0; r < allReplies.length; r++) {
+                                allReplies[r].isNew = true;
+                            }
                         }
 
                         // Use conversation start date if available, otherwise try quoted headers
                         if (emailData.conversationStartDate) {
-                            emailData.datum = emailData.conversationStartDate;
-                        } else {
+                            // Only override if we haven't already set it from sent item
+                            var convStartDate = new Date(emailData.conversationStartDate);
+                            var currentDate = new Date(emailData.datum);
+                            if (convStartDate < currentDate) {
+                                emailData.datum = emailData.conversationStartDate;
+                            }
+                        } else if (!oldestSentItem || oldestSentDate >= inboxDate) {
                             var quotedDate = extractOldestDateFromQuotes(emailData.text);
                             if (quotedDate) {
                                 emailData.datum = quotedDate.getFullYear() + '-' +
