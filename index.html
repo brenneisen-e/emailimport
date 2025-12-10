@@ -350,6 +350,8 @@
         .badge-cluster { background: var(--bg-tertiary); color: var(--text-secondary); }
         .badge-update { background: #dbeafe; color: #1d4ed8; }
         .badge-reply { background: #d1fae5; color: #065f46; }
+        .badge-unread { background: #fef3c7; color: #92400e; font-weight: 600; }
+        .badge-read { background: var(--bg-tertiary); color: var(--text-muted); }
 
         /* Day Header */
         .day-header {
@@ -424,6 +426,15 @@
             font-size: 0.9375rem;
             line-height: 1.7;
             color: var(--text-secondary);
+        }
+
+        .html-email-frame {
+            width: 100%;
+            min-height: 400px;
+            height: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
         }
 
         /* Provision Data Box */
@@ -834,6 +845,16 @@
             50% { opacity: 0.7; }
         }
 
+        /* Search Highlight */
+        .search-highlight {
+            background: #ff6b6b;
+            color: white;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(255, 107, 107, 0.4);
+        }
+
         /* Keyword Highlight */
         .keyword-highlight {
             background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
@@ -1125,9 +1146,8 @@
 
             <div class="filter-bar">
                 <span class="filter-chip active" data-filter="all" onclick="setFilter('all')">Alle</span>
-                <span class="filter-chip" data-filter="open" onclick="setFilter('open')">Offen</span>
-                <span class="filter-chip" data-filter="provision" onclick="setFilter('provision')">Provision</span>
-                <span class="filter-chip" data-filter="incident" onclick="setFilter('incident')">Incident</span>
+                <span class="filter-chip" data-filter="unread" onclick="setFilter('unread')">Ungelesen</span>
+                <span class="filter-chip" data-filter="read" onclick="setFilter('read')">Gelesen</span>
             </div>
 
             <div class="select-all-row" id="selectAllRow" style="display: none;">
@@ -1440,6 +1460,7 @@
         let filteredEmails = [];
         let selectedEmailId = null;
         let selectedForExport = new Set();  // IDs der für Export ausgewählten Emails
+        let readEmails = new Set();  // IDs der gelesenen Emails
         let currentFilter = 'all';
         let nextId = 1;
         let currentStep = 1;  // 1: Auswählen, 2: Kategorisieren, 3: Speichern
@@ -1481,11 +1502,21 @@
         // ============================================================================
         // KEYWORD HIGHLIGHTING
         // ============================================================================
-        function highlightKeywords(text) {
+        function highlightKeywords(text, includeSearchTerm = true) {
             if (!text) return '';
 
             // Escape HTML first
             let result = escapeHtml(text);
+
+            // Highlight search term first (if exists)
+            if (includeSearchTerm) {
+                const searchTerm = document.getElementById('searchInput')?.value?.trim();
+                if (searchTerm && searchTerm.length >= 2) {
+                    const escapedSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const searchRegex = new RegExp(`(${escapedSearch})`, 'gi');
+                    result = result.replace(searchRegex, '<mark class="search-highlight">$1</mark>');
+                }
+            }
 
             // Build regex pattern for all keywords
             for (const [cluster, keywords] of Object.entries(keywordClusterMap)) {
@@ -1706,22 +1737,22 @@
             const t = text.toLowerCase();
             const combined = s + ' ' + t;
 
-            // KV - Krankenversicherung (erweitert)
-            if (combined.match(/\bkv\b|kranken|gesundheit|pflege|auslandsreise|reisekranken|\bbkk\b|zahnzusatz|krankenzusatz|ambulant|stationär|krankentagegeld/)) clusters.push('KV');
-            // KFZ - Kraftfahrzeug (erweitert)
-            if (combined.match(/\bkfz\b|auto|fahrzeug|kasko|vollkasko|teilkasko|\bpkw\b|kennzeichen|motorrad|anhänger/)) clusters.push('KFZ');
-            // SHUK - Sach/Haftpflicht/Unfall/Komposit (erweitert)
-            if (combined.match(/\bshuk\b|sach|haftpflicht|unfall|hausrat|wohngebäude|gebäude|rechtsschutz|tierhalter|\bhund\b|pferd|gewässer|photovoltaik/)) clusters.push('SHUK');
-            // LV - Lebensversicherung (erweitert)
-            if (combined.match(/\blv\b|leben|rente|altersvorsorge|riester|rürup|\bbav\b|betrieblich|sterbegeld|berufsunfähigkeit|\bbu\b/)) clusters.push('LV');
-            // Provisionierung (erweitert)
-            if (combined.match(/provision|vergütung|courtage|abrechnung|storno|dynamisierung|bestandspflege/)) clusters.push('Provisionierung');
-            // Produktzuordnung (erweitert)
-            if (combined.match(/zuordnung|produkt|tarif|umstellung|migration|tarifwechsel/)) clusters.push('Produktzuordnung');
-            // Bestand
-            if (combined.match(/\bbestand\b|bestandskunde|bestandsvertrag|bestandsdaten/)) clusters.push('Bestand');
+            // KV - Krankenversicherung (präzise Wortgrenzen)
+            if (combined.match(/\bkv\b|\bkrankenversicherung\b|\bkrankenkasse\b|\bgesundheit\b|\bpflegeversicherung\b|\bauslandsreise\b|\breisekranken\b|\bbkk\b|\bzahnzusatz\b|\bkrankenzusatz\b|\bambulant\b|\bstationär\b|\bkrankentagegeld\b/)) clusters.push('KV');
+            // KFZ - Kraftfahrzeug (präzise Wortgrenzen)
+            if (combined.match(/\bkfz\b|\bkraftfahrzeug\b|\bfahrzeugversicherung\b|\bkasko\b|\bvollkasko\b|\bteilkasko\b|\bpkw\b|\bkennzeichen\b|\bmotorrad\b|\banhängerversicherung\b/)) clusters.push('KFZ');
+            // SHUK - Sach/Haftpflicht/Unfall/Komposit (präzise Wortgrenzen)
+            if (combined.match(/\bshuk\b|\bsachversicherung\b|\bhaftpflicht\b|\bunfallversicherung\b|\bhausrat\b|\bwohngebäude\b|\brechtsschutz\b|\btierhalter\b|\bgewässerschaden\b|\bphotovoltaik\b/)) clusters.push('SHUK');
+            // LV - Lebensversicherung (präzise Wortgrenzen)
+            if (combined.match(/\blv\b|\blebensversicherung\b|\brentenversicherung\b|\baltersvorsorge\b|\briester\b|\brürup\b|\bbav\b|\bsterbegeld\b|\bberufsunfähigkeit\b|\bbu-versicherung\b/)) clusters.push('LV');
+            // Provisionierung (präzise Wortgrenzen)
+            if (combined.match(/\bprovision\b|\bprovisionsreklamation\b|\bvergütung\b|\bcourtage\b|\bstorno\b|\bdynamisierung\b|\bbestandspflege\b/)) clusters.push('Provisionierung');
+            // Produktzuordnung (präzise Wortgrenzen)
+            if (combined.match(/\bproduktzuordnung\b|\btarifwechsel\b|\bmigration\b|\bumstellung\b/)) clusters.push('Produktzuordnung');
+            // Bestand (präzise Wortgrenzen)
+            if (combined.match(/\bbestand\b|\bbestandskunde\b|\bbestandsvertrag\b|\bbestandsdaten\b/)) clusters.push('Bestand');
             // Absatzeinheiten (AE)
-            if (combined.match(/\bae\b|absatzeinheit|absatzeinheiten/)) clusters.push('Absatzeinheiten');
+            if (combined.match(/\bae\b|\babsatzeinheit\b|\babsatzeinheiten\b/)) clusters.push('Absatzeinheiten');
 
             return clusters.length > 0 ? clusters : ['Allgemein'];
         }
@@ -1839,6 +1870,12 @@
                 const uniqueReplyCount = email.alleAntworten?.length || email.antworten?.length || 0;
 
                 let badges = '';
+                // Show read/unread badge
+                if (readEmails.has(email.id)) {
+                    badges += '<span class="badge badge-read">Gelesen</span>';
+                } else {
+                    badges += '<span class="badge badge-unread">Ungelesen</span>';
+                }
                 // Show reply count badge
                 if (uniqueReplyCount > 0) {
                     badges += '<span class="badge badge-reply">' + uniqueReplyCount + ' Antw.</span>';
@@ -1914,6 +1951,9 @@
             const email = emails.find(e => e.id === id);
             if (!email) return;
 
+            // Mark as read
+            readEmails.add(id);
+
             // Update list
             renderEmailList();
 
@@ -1976,9 +2016,16 @@
             }
 
             // Email text with keyword highlighting
-            // Prefer anfrage field (corrected text) over raw text (may contain full thread)
-            const displayText = email.anfrage || email.text;
-            document.getElementById('detailText').innerHTML = highlightKeywords(displayText);
+            // Check if HTML body is available and contains tables
+            const detailTextEl = document.getElementById('detailText');
+            if (email.htmlBody && email.htmlBody.includes('<table')) {
+                // Display HTML content in iframe for safety and proper table rendering
+                detailTextEl.innerHTML = `<iframe class="html-email-frame" srcdoc="${escapeHtml(email.htmlBody)}" sandbox="allow-same-origin"></iframe>`;
+            } else {
+                // Prefer anfrage field (corrected text) over raw text (may contain full thread)
+                const displayText = email.anfrage || email.text;
+                detailTextEl.innerHTML = highlightKeywords(displayText);
+            }
 
             // Update step indicator to "Kategorisieren"
             updateStepIndicator(2);
@@ -2020,23 +2067,25 @@
                 replyCountBadge.style.display = 'inline';
                 tabAntworten.classList.remove('disabled');
 
-                // Render replies in card format with new/existing indicator
+                // Render replies in card format with new/existing indicator and search highlighting
                 repliesList.innerHTML = displayReplies.map(reply => {
                     const replyDate = new Date(reply.datum || reply.date);
                     const dateStr = replyDate.toLocaleString('de-DE');
                     const replyText = reply.text || reply.body || '';
                     const isNew = reply.isNew === true;
                     const statusClass = isNew ? 'reply-new' : (email.isDuplicateWithNewReplies ? 'reply-existing' : '');
-                    const statusLabel = isNew ? '<span class="reply-status-new">✨ NEU</span>' :
-                        (email.isDuplicateWithNewReplies ? '<span class="reply-status-existing">📋 Bereits importiert</span>' : '');
+                    const statusLabel = isNew ? '<span class="reply-status-new">NEU</span>' :
+                        (email.isDuplicateWithNewReplies ? '<span class="reply-status-existing">Bereits importiert</span>' : '');
+                    // Use highlightKeywords to show search term highlighting in replies
+                    const highlightedText = highlightKeywords(replyText);
                     return `
                         <div class="reply-card ${statusClass}">
                             <div class="reply-card-header">
-                                <span class="reply-card-from">📤 An: ${escapeHtml(reply.an || reply.to || 'Unbekannt')}</span>
+                                <span class="reply-card-from">An: ${escapeHtml(reply.an || reply.to || 'Unbekannt')}</span>
                                 ${statusLabel}
                                 <span class="reply-card-date">${dateStr}</span>
                             </div>
-                            <div class="reply-card-text">${escapeHtml(replyText)}</div>
+                            <div class="reply-card-text">${highlightedText}</div>
                         </div>
                     `;
                 }).join('');
@@ -2161,9 +2210,8 @@
 
                 // Filter
                 let matchesFilter = true;
-                if (currentFilter === 'open') matchesFilter = email.status !== 'Erledigt';
-                else if (currentFilter === 'provision') matchesFilter = email.isProvision;
-                else if (currentFilter === 'incident') matchesFilter = email.kategorie.includes('Incident');
+                if (currentFilter === 'unread') matchesFilter = !readEmails.has(email.id);
+                else if (currentFilter === 'read') matchesFilter = readEmails.has(email.id);
 
                 return matchesSearch && matchesFilter;
             });

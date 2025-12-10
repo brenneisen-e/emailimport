@@ -1007,6 +1007,12 @@
 
                     var emailData = extractEmail(item);
 
+                    // Filter out emails with specific subjects that are not relevant
+                    var subjectLower = (emailData.betreff || '').toLowerCase();
+                    if (subjectLower.indexOf('online-abschluss vermittlerzuordnung ändern') !== -1) {
+                        continue;  // Skip this email
+                    }
+
                     // Skip if we already processed this ConversationID in this export batch
                     // (handles forwarded emails appearing multiple times in folder)
                     if (emailData.conversationId && exportState.processedConvIds[emailData.conversationId]) {
@@ -1186,6 +1192,12 @@
                             emailData.text = oldestSentItem.text;
                             emailData.datum = oldestSentItem.datum;
                             emailData.antworten = repliesWithoutOldest;
+
+                            // Use recipient name as "von" since we initiated the conversation
+                            if (oldestSentItem.to) {
+                                emailData.von_name = 'An: ' + oldestSentItem.to;
+                                emailData.von_email = '';
+                            }
                         } else {
                             // Inbox email is the oldest - normal case
                             emailData.antworten = allReplies;
@@ -1757,6 +1769,9 @@
             var body = '';
             try { body = item.Body || ''; if (body.length > 50000) body = body.substring(0, 50000) + '...'; } catch (e) {}
 
+            var htmlBody = '';
+            try { htmlBody = item.HTMLBody || ''; if (htmlBody.length > 100000) htmlBody = ''; } catch (e) {}  // Only include if not too large
+
             var attachments = [];
             try { for (var a = 1; a <= item.Attachments.Count; a++) { attachments.push(item.Attachments.Item(a).FileName); } } catch (e) {}
 
@@ -1796,6 +1811,7 @@
                 von_name: item.SenderName || 'Unbekannt',
                 betreff: item.Subject || '(Kein Betreff)',
                 text: body,
+                htmlBody: htmlBody,  // HTML version for tables/formatting
                 anhaenge: attachments,
                 conversationId: convId,
                 emailId: entryId,  // Unique ID for duplicate detection
