@@ -1750,21 +1750,11 @@
             var htmlBody = '';
             try {
                 htmlBody = item.HTMLBody || '';
-                // Clean up Outlook HTML - remove unnecessary MS Office markup to reduce size
-                if (htmlBody.length > 0) {
-                    // Remove MS Office conditional comments
-                    htmlBody = htmlBody.replace(/<!--\[if[^\]]*\][\s\S]*?<!\[endif\]-->/gi, '');
-                    // Remove MS Office XML namespace declarations
-                    htmlBody = htmlBody.replace(/<o:[^>]*>[\s\S]*?<\/o:[^>]*>/gi, '');
-                    htmlBody = htmlBody.replace(/<w:[^>]*>[\s\S]*?<\/w:[^>]*>/gi, '');
-                    // Remove class attributes with mso- prefixes
-                    htmlBody = htmlBody.replace(/class="[^"]*Mso[^"]*"/gi, '');
-                    // Remove MS Office style properties
-                    htmlBody = htmlBody.replace(/mso-[^;":]+:[^;":]+;?/gi, '');
-                    // If still too large, truncate but keep it
-                    if (htmlBody.length > 500000) htmlBody = '';
-                }
-            } catch (e) {}
+                // Skip if too large
+                if (htmlBody.length > 500000) htmlBody = '';
+            } catch (e) {
+                htmlBody = '';
+            }
 
             var attachments = [];
             try { for (var a = 1; a <= item.Attachments.Count; a++) { attachments.push(item.Attachments.Item(a).FileName); } } catch (e) {}
