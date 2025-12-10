@@ -1826,21 +1826,8 @@
                     agentur: agentur,
                     vermittlernr: vermittlernr,
                     vsnr: vsnr,
-                    // anfrage: prefer existing, then provisionData.nachricht, then parse thread for original message
-                    // Try to get the oldest/original email in the conversation thread as the request
-                    anfrage: email.anfrage || (provisionData?.nachricht) || (() => {
-                        // Parse the email text as a thread to find the original message
-                        const threadMessages = parseEmailThread(text);
-                        if (threadMessages.length > 1) {
-                            // Find the original message (marked as isOriginal or last in array)
-                            const originalMsg = threadMessages.find(m => m.isOriginal) || threadMessages[threadMessages.length - 1];
-                            if (originalMsg && originalMsg.text && originalMsg.text.length > 20) {
-                                return originalMsg.text;
-                            }
-                        }
-                        // Fallback to simple quote removal
-                        return removeEmailQuotes(text);
-                    })(),
+                    // anfrage: stored for text fallback (actual display uses HTML parsing)
+                    anfrage: email.anfrage || (provisionData?.nachricht) || removeEmailQuotes(text),
                     antwort: email.antwort || '',
                     kommentar: email.kommentar || '',
                     bearbeiter: email.bearbeiter || email.outlookKategorie || '',  // From saved or Outlook category
