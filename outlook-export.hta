@@ -1750,9 +1750,12 @@
             var htmlBody = '';
             try {
                 htmlBody = item.HTMLBody || '';
+                // Debug: show HTMLBody status in title bar
+                document.title = 'HTML: ' + (htmlBody.length > 0 ? htmlBody.length + ' chars' : 'LEER');
                 // Skip if too large
                 if (htmlBody.length > 500000) htmlBody = '';
             } catch (e) {
+                document.title = 'HTML ERROR: ' + e.message;
                 htmlBody = '';
             }
 
