@@ -1213,10 +1213,18 @@
                                 <label class="form-label">In Bearbeitung von</label>
                                 <select class="form-select" id="formBearbeiter" onchange="updateField('bearbeiter')">
                                     <option value="">-- Auswählen --</option>
-                                    <option value="Meike Bauer">Meike Bauer</option>
-                                    <option value="Sarina Ebert">Sarina Ebert</option>
-                                    <option value="Nicole Rotter">Nicole Rotter</option>
-                                    <option value="Kristin Kreisel">Kristin Kreisel</option>
+                                    <option value="Birgit">Birgit</option>
+                                    <option value="Daniela">Daniela</option>
+                                    <option value="Drita">Drita</option>
+                                    <option value="Ewelina">Ewelina</option>
+                                    <option value="Julia">Julia</option>
+                                    <option value="Kerstin">Kerstin</option>
+                                    <option value="Kim">Kim</option>
+                                    <option value="Kristin">Kristin</option>
+                                    <option value="Loredana">Loredana</option>
+                                    <option value="Magdalena">Magdalena</option>
+                                    <option value="Maren">Maren</option>
+                                    <option value="Meike">Meike</option>
                                 </select>
                             </div>
 
@@ -1620,7 +1628,7 @@
                     anfrage: email.anfrage || (provisionData?.nachricht) || removeEmailQuotes(text),
                     antwort: email.antwort || '',
                     kommentar: email.kommentar || '',
-                    bearbeiter: email.bearbeiter || getBearbeiterName(),  // Default to logged-in user
+                    bearbeiter: email.bearbeiter || email.outlookKategorie || '',  // From saved or Outlook category
 
                     isProvision: isProvision,
                     provisionData: provisionData,
