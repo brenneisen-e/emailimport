@@ -1288,35 +1288,13 @@
             sentItemsCache = [];
             sentItemsByConvId = {};  // Clear lookup map
             sentCacheState.days = days;
-            sentCacheState.cutoffDate = new Date();
-            sentCacheState.cutoffDate.setDate(sentCacheState.cutoffDate.getDate() - (days + 30));
+            // Use same cutoff date as inbox - replies can't exist before the emails
+            sentCacheState.cutoffDate = exportState.cutoffDate;
             sentCacheState.folders = [];
             sentCacheState.folderIdx = 0;
 
-            // Collect all sent folders
+            // Only search sent folder of selected mailbox (faster)
             try { sentCacheState.folders.push(selectedStore.GetDefaultFolder(5)); } catch (e) {}
-
-            try {
-                var defaultSent = namespace.GetDefaultFolder(5);
-                var isDup = false;
-                for (var f = 0; f < sentCacheState.folders.length; f++) {
-                    try { if (sentCacheState.folders[f].EntryID === defaultSent.EntryID) isDup = true; } catch (e) {}
-                }
-                if (!isDup) sentCacheState.folders.push(defaultSent);
-            } catch (e) {}
-
-            try {
-                for (var s = 1; s <= namespace.Stores.Count; s++) {
-                    try {
-                        var storeSent = namespace.Stores.Item(s).GetDefaultFolder(5);
-                        var isDup = false;
-                        for (var f = 0; f < sentCacheState.folders.length; f++) {
-                            try { if (sentCacheState.folders[f].EntryID === storeSent.EntryID) isDup = true; } catch (e) {}
-                        }
-                        if (!isDup) sentCacheState.folders.push(storeSent);
-                    } catch (e) {}
-                }
-            } catch (e) {}
 
             // Start first folder
             startNextSentFolder();
@@ -1344,8 +1322,8 @@
                     sentCacheState.items = folder.Items;
                 }
                 try { sentCacheState.items.Sort("[SentOn]", true); } catch (e) {}
-                // Increased limit for group mailboxes with many sent items
-                sentCacheState.maxItems = Math.min(sentCacheState.items.Count, 1000);
+                // Limit sent items - only need recent ones matching inbox timeframe
+                sentCacheState.maxItems = Math.min(sentCacheState.items.Count, 300);
                 sentCacheState.itemIdx = 1;
                 setTimeout(processSentBatch, 10);
             } catch (e) {
