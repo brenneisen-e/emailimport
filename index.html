@@ -1638,81 +1638,106 @@
             return result.trim();
         }
 
-        // Parse email thread into individual messages (for display as separate replies)
-        function parseEmailThread(text) {
-            if (!text) return [];
+        // Parse HTML email thread into individual messages
+        // Splits at Outlook quote separators and extracts each email with metadata
+        function parseEmailThreadHtml(html) {
+            if (!html) return [];
 
-            // Split pattern: "Von: Name <email>\nGesendet: Datum" or "From: ... Sent:"
-            const splitPattern = /(?=\r?\n\s*Von:\s+[^\n]+(?:<[^>]+>)?\s*\r?\n\s*Gesendet:)|(?=\r?\n\s*From:\s+[^\n]+(?:<[^>]+>)?\s*\r?\n\s*Sent:)/gi;
-            const parts = text.split(splitPattern).filter(p => p.trim());
-
-            if (parts.length <= 1) {
-                // No thread structure found, return single message
-                return [{
-                    text: removeEmailQuotes(text),
-                    von: null,
-                    datum: null,
-                    isOriginal: true
-                }];
+            // Find all separator positions: <div style="border:none;border-top:solid #E1E1E1...">
+            const separatorRegex = /<div[^>]*style=['"][^'"]*border(?:-top)?:\s*(?:none;border-top:)?solid[^'"]*['"][^>]*>/gi;
+            const separatorPositions = [];
+            let match;
+            while ((match = separatorRegex.exec(html)) !== null) {
+                separatorPositions.push(match.index);
             }
 
+            if (separatorPositions.length === 0) {
+                // No thread structure found - single email
+                return [];
+            }
+
+            // Split HTML into parts
+            const parts = [];
+
+            // First part: from start to first separator (newest email - no header)
+            if (separatorPositions[0] > 100) {
+                parts.push({
+                    html: html.substring(0, separatorPositions[0]),
+                    hasHeader: false
+                });
+            }
+
+            // Remaining parts: from each separator to the next
+            for (let i = 0; i < separatorPositions.length; i++) {
+                const start = separatorPositions[i];
+                const end = i < separatorPositions.length - 1 ? separatorPositions[i + 1] : html.length;
+                parts.push({
+                    html: html.substring(start, end),
+                    hasHeader: true
+                });
+            }
+
+            // Parse each part
+            const germanMonths = {
+                'januar': 0, 'februar': 1, 'märz': 2, 'april': 3, 'mai': 4, 'juni': 5,
+                'juli': 6, 'august': 7, 'september': 8, 'oktober': 9, 'november': 10, 'dezember': 11
+            };
+
             const messages = parts.map((part, idx) => {
-                // Check if this part starts with a header block (Von:...Gesendet:)
-                const hasHeader = /^\s*Von:\s+.+\r?\n\s*Gesendet:/im.test(part) ||
-                                  /^\s*From:\s+.+\r?\n\s*Sent:/im.test(part);
+                const partHtml = part.html;
 
-                // Extract sender and date from header
-                const vonMatch = part.match(/Von:\s*([^\n<]+)(?:<[^>]+>)?/i) ||
-                                 part.match(/From:\s*([^\n<]+)(?:<[^>]+>)?/i);
-                const datumMatch = part.match(/Gesendet:\s*([^\n]+)/i) ||
-                                   part.match(/Sent:\s*([^\n]+)/i);
+                // Extract sender
+                const vonMatch = partHtml.match(/<b>\s*Von:\s*<\/b>\s*<\/span>([^<]+)/i) ||
+                                 partHtml.match(/Von:\s*<\/span>\s*([^<]+)/i) ||
+                                 partHtml.match(/<b>Von:<\/b>([^<]+)/i);
 
-                // Remove the header block to get just the message body
-                let body = part;
-                if (hasHeader) {
-                    const betreffMatch = body.search(/Betreff:|Subject:/i);
-                    if (betreffMatch > 0) {
-                        // Find the end of the header (double newline after Betreff)
-                        const afterBetreff = body.substring(betreffMatch);
-                        const headerEnd = afterBetreff.search(/\r?\n\s*\r?\n/);
-                        if (headerEnd > 0) {
-                            body = afterBetreff.substring(headerEnd).trim();
-                        }
-                    }
-                }
+                // Extract date
+                const datumMatch = partHtml.match(/<b>\s*Gesendet:\s*<\/b>\s*([^<]+)/i) ||
+                                   partHtml.match(/Gesendet:\s*<\/b>\s*([^<]+)/i) ||
+                                   partHtml.match(/<b>Gesendet:<\/b>([^<]+)/i);
 
-                // Remove signature from body
-                body = body.replace(/\r?\n--\s*\r?\n[\s\S]*$/, '').trim();
-                // Also remove common signature patterns
-                body = body.replace(/\r?\nViele Grüße\r?\n[\s\S]*$/i, '\nViele Grüße').trim();
-                body = body.replace(/\r?\nHerzliche Grüße\r?\n[\s\S]*$/i, '\nHerzliche Grüße').trim();
-                body = body.replace(/\r?\nBeste Grüße\r?\n[\s\S]*$/i, '\nBeste Grüße').trim();
-
-                // Parse date
                 let parsedDate = null;
                 if (datumMatch) {
                     const dateStr = datumMatch[1].trim();
-                    // Try to parse German date format "Mittwoch, 10. Dezember 2025 14:40"
-                    const germanMonths = {
-                        'januar': 0, 'februar': 1, 'märz': 2, 'april': 3, 'mai': 4, 'juni': 5,
-                        'juli': 6, 'august': 7, 'september': 8, 'oktober': 9, 'november': 10, 'dezember': 11
-                    };
                     const dateMatch2 = dateStr.match(/(\d{1,2})\.\s*(\w+)\s*(\d{4})\s*(\d{1,2}):(\d{2})/i);
                     if (dateMatch2) {
                         const month = germanMonths[dateMatch2[2].toLowerCase()];
                         if (month !== undefined) {
-                            parsedDate = new Date(dateMatch2[3], month, dateMatch2[1], dateMatch2[4], dateMatch2[5]);
+                            parsedDate = new Date(parseInt(dateMatch2[3]), month, parseInt(dateMatch2[1]), parseInt(dateMatch2[4]), parseInt(dateMatch2[5]));
                         }
                     }
                 }
 
+                // Clean the HTML: remove the header block for display
+                let cleanHtml = partHtml;
+                if (part.hasHeader) {
+                    // Find end of header (after Betreff line)
+                    const betreffEnd = cleanHtml.search(/<\/p>\s*<\/div>\s*<\/div>\s*<p/i);
+                    if (betreffEnd > 0) {
+                        cleanHtml = cleanHtml.substring(betreffEnd);
+                    }
+                }
+
                 return {
-                    text: body,
-                    von: vonMatch ? vonMatch[1].trim() : null,
+                    html: cleanHtml,
+                    von: vonMatch ? vonMatch[1].replace(/&lt;.*$/, '').replace(/<[^>]+>/g, '').trim() : null,
                     datum: parsedDate,
-                    isOriginal: idx === parts.length - 1  // Last part is the original message
+                    isOriginal: false
                 };
-            }).filter(m => m.text && m.text.length > 10);  // Filter out empty messages
+            }).filter(m => m.html && m.html.length > 100);
+
+            // Sort by date (oldest first)
+            messages.sort((a, b) => {
+                if (!a.datum && !b.datum) return 0;
+                if (!a.datum) return 1;
+                if (!b.datum) return -1;
+                return a.datum.getTime() - b.datum.getTime();
+            });
+
+            // Mark oldest as original
+            if (messages.length > 0) {
+                messages[0].isOriginal = true;
+            }
 
             return messages;
         }
@@ -2156,32 +2181,43 @@
             }
 
             // Email text with keyword highlighting
-            // Check if HTML body is available (contains HTML tags like tables, divs, etc.)
             const detailTextEl = document.getElementById('detailText');
 
-            // First check if we have a parsed anfrage (from thread parsing)
-            // If anfrage differs significantly from a simple removeEmailQuotes result,
-            // it means we parsed a thread and should show the original message as text
-            const simpleCleanedText = removeEmailQuotes(email.text || '');
-            const hasThreadParsedContent = email.anfrage &&
-                email.anfrage.length > 20 &&
-                email.anfrage.substring(0, 100).toLowerCase() !== simpleCleanedText.substring(0, 100).toLowerCase();
+            // Parse HTML thread to get individual messages
+            const parsedThread = email.htmlBody ? parseEmailThreadHtml(email.htmlBody) : [];
+            // Store parsed thread on email object for use in replies tab
+            email._parsedThread = parsedThread;
 
-            const hasHtmlContent = !hasThreadParsedContent && email.htmlBody && (
-                email.htmlBody.toLowerCase().includes('<table') ||
-                email.htmlBody.toLowerCase().includes('<div') ||
-                email.htmlBody.toLowerCase().includes('<br') ||
-                email.htmlBody.toLowerCase().includes('<p>')
-            );
+            // Find original message (oldest) from parsed thread
+            const originalMessage = parsedThread.find(m => m.isOriginal);
 
-            if (hasHtmlContent) {
-                // Display HTML content in iframe using srcdoc for maximum compatibility
+            if (originalMessage && originalMessage.html) {
+                // Display the original (oldest) email from thread as HTML
                 const iframe = document.createElement('iframe');
                 iframe.className = 'html-email-frame';
                 detailTextEl.innerHTML = '';
 
-                // Wrap HTML with proper styling for better display
-                // Remove quoted content from HTML for the main request
+                const wrappedHtml = `<!DOCTYPE html>
+                    <html><head><meta charset="UTF-8">
+                    <style>
+                        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; margin: 10px; }
+                        table { border-collapse: collapse; width: 100%; }
+                        td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        tr:nth-child(even) { background-color: #fafafa; }
+                    </style></head><body>${originalMessage.html}</body></html>`;
+
+                iframe.srcdoc = wrappedHtml;
+                detailTextEl.appendChild(iframe);
+            } else if (email.htmlBody && (
+                email.htmlBody.toLowerCase().includes('<table') ||
+                email.htmlBody.toLowerCase().includes('<div')
+            )) {
+                // No thread parsed, show full HTML with quotes removed
+                const iframe = document.createElement('iframe');
+                iframe.className = 'html-email-frame';
+                detailTextEl.innerHTML = '';
+
                 const cleanedHtmlBody = removeEmailQuotesHtml(email.htmlBody);
                 const wrappedHtml = `<!DOCTYPE html>
                     <html><head><meta charset="UTF-8">
@@ -2193,13 +2229,11 @@
                         tr:nth-child(even) { background-color: #fafafa; }
                     </style></head><body>${cleanedHtmlBody}</body></html>`;
 
-                // Use srcdoc attribute for inline HTML content
                 iframe.srcdoc = wrappedHtml;
-
                 detailTextEl.appendChild(iframe);
             } else {
-                // Prefer anfrage field (corrected/parsed text) over raw text
-                const displayText = email.anfrage || email.text;
+                // Plain text display
+                const displayText = email.anfrage || removeEmailQuotes(email.text || '');
                 detailTextEl.innerHTML = highlightKeywords(displayText);
             }
 
@@ -2227,46 +2261,34 @@
             const replyCountBadge = document.getElementById('replyCount');
             const tabAntworten = document.getElementById('tabAntworten');
 
-            // Parse the full email thread to extract individual messages
-            // This handles cases where replies contain the full thread history
+            // Use the parsed HTML thread (stored earlier) for replies
             let displayReplies = [];
 
-            // First, try to parse the main email text as a thread
-            const threadMessages = parseEmailThread(email.text || '');
-
-            if (threadMessages.length > 1) {
-                // Thread was successfully parsed - use the parsed messages
-                // Skip the last one (original message) as it's shown in Anfrage tab
-                // Reverse to show oldest first (after the original)
-                displayReplies = threadMessages
-                    .filter(m => !m.isOriginal)  // Skip original message
+            if (email._parsedThread && email._parsedThread.length > 1) {
+                // Use HTML-parsed thread - show all except original, sorted by date
+                displayReplies = email._parsedThread
+                    .filter(m => !m.isOriginal)
                     .map(m => ({
-                        text: m.text,
+                        html: m.html,
                         von: m.von,
                         datum: m.datum,
                         isNew: false,
                         isIncoming: true,
-                        isParsedFromThread: true
-                    }))
-                    .reverse();  // Oldest replies first
+                        isParsedFromHtml: true
+                    }));
             } else {
-                // Fallback to original antworten/alleAntworten logic
+                // Fallback to antworten/alleAntworten
                 displayReplies = email.alleAntworten && email.alleAntworten.length > 0
                     ? [...email.alleAntworten]
                     : [...(email.antworten || [])];
 
-                // Sort replies chronologically (oldest first)
+                // Sort and deduplicate
                 displayReplies.sort((a, b) => new Date(a.datum || a.date) - new Date(b.datum || b.date));
-
-                // Remove duplicate replies and apply removeEmailQuotes
                 const mainRequestText = removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 200);
                 const seenTexts = new Set();
                 displayReplies = displayReplies.filter(reply => {
                     const cleanedText = removeEmailQuotes(reply.text || reply.body || '').trim().toLowerCase().substring(0, 200);
-                    if (!cleanedText || seenTexts.has(cleanedText)) {
-                        return false;
-                    }
-                    if (cleanedText === mainRequestText) {
+                    if (!cleanedText || seenTexts.has(cleanedText) || cleanedText === mainRequestText) {
                         return false;
                     }
                     seenTexts.add(cleanedText);
@@ -2286,36 +2308,26 @@
                 replyCountBadge.style.display = 'inline';
                 tabAntworten.classList.remove('disabled');
 
-                // Render replies in card format with new/existing indicator and search highlighting
+                // Render replies in card format
                 repliesList.innerHTML = displayReplies.map((reply, idx) => {
                     const replyDate = new Date(reply.datum || reply.date);
                     const dateStr = replyDate && !isNaN(replyDate) ? replyDate.toLocaleString('de-DE') : '';
-                    // For parsed thread messages, text is already cleaned; otherwise apply removeEmailQuotes
-                    const replyText = reply.isParsedFromThread
-                        ? (reply.text || '')
-                        : removeEmailQuotes(reply.text || reply.body || '');
                     const isNew = reply.isNew === true;
-                    const statusClass = isNew ? 'reply-new' : (email.isDuplicateWithNewReplies ? 'reply-existing' : '');
-                    const statusLabel = isNew ? '<span class="reply-status-new">NEU</span>' :
-                        (email.isDuplicateWithNewReplies ? '<span class="reply-status-existing">Bereits importiert</span>' : '');
+                    const statusClass = isNew ? 'reply-new' : '';
+                    const statusLabel = isNew ? '<span class="reply-status-new">NEU</span>' : '';
 
-                    // Check if reply has HTML content
-                    const hasReplyHtml = reply.htmlBody && (
-                        reply.htmlBody.toLowerCase().includes('<table') ||
-                        reply.htmlBody.toLowerCase().includes('<div') ||
-                        reply.htmlBody.toLowerCase().includes('<br') ||
-                        reply.htmlBody.toLowerCase().includes('<p>')
-                    );
+                    // Direction indicator
+                    const directionLabel = 'Von';
+                    const personName = reply.von || reply.from || 'Unbekannt';
 
-                    // Direction indicator - for parsed replies, always show "Von" with the extracted sender
-                    const isIncoming = reply.isIncoming === true;
-                    const directionLabel = isIncoming ? 'Von' : 'An';
-                    const personName = reply.von || (isIncoming ? (reply.from || 'Unbekannt') : (reply.an || reply.to || 'Unbekannt'));
+                    // Use iframe for HTML-parsed replies or replies with htmlBody
+                    const useIframe = reply.isParsedFromHtml || (reply.htmlBody && reply.htmlBody.includes('<'));
 
                     let contentHtml;
-                    if (hasReplyHtml) {
+                    if (useIframe) {
                         contentHtml = `<iframe class="reply-html-frame" id="replyFrame${idx}" srcdoc=""></iframe>`;
                     } else {
+                        const replyText = removeEmailQuotes(reply.text || reply.body || '');
                         contentHtml = `<div class="reply-card-text">${highlightKeywords(replyText)}</div>`;
                     }
 
@@ -2333,28 +2345,29 @@
 
                 // Set iframe srcdoc after DOM is updated (for HTML replies)
                 displayReplies.forEach((reply, idx) => {
-                    const hasReplyHtml = reply.htmlBody && (
-                        reply.htmlBody.toLowerCase().includes('<table') ||
-                        reply.htmlBody.toLowerCase().includes('<div') ||
-                        reply.htmlBody.toLowerCase().includes('<br') ||
-                        reply.htmlBody.toLowerCase().includes('<p>')
-                    );
-                    if (hasReplyHtml) {
-                        const iframe = document.getElementById(`replyFrame${idx}`);
-                        if (iframe) {
-                            // Remove quoted content from HTML
-                            const cleanedHtml = removeEmailQuotesHtml(reply.htmlBody);
-                            const wrappedHtml = `<!DOCTYPE html>
-                                <html><head><meta charset="UTF-8">
-                                <style>
-                                    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; margin: 10px; }
-                                    table { border-collapse: collapse; width: 100%; }
-                                    td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                                    th { background-color: #f5f5f5; }
-                                    tr:nth-child(even) { background-color: #fafafa; }
-                                </style></head><body>${cleanedHtml}</body></html>`;
-                            iframe.srcdoc = wrappedHtml;
-                        }
+                    const iframe = document.getElementById(`replyFrame${idx}`);
+                    if (!iframe) return;
+
+                    let htmlContent = '';
+                    if (reply.isParsedFromHtml && reply.html) {
+                        // Use pre-parsed HTML from thread
+                        htmlContent = reply.html;
+                    } else if (reply.htmlBody) {
+                        // Use htmlBody with quotes removed
+                        htmlContent = removeEmailQuotesHtml(reply.htmlBody);
+                    }
+
+                    if (htmlContent) {
+                        const wrappedHtml = `<!DOCTYPE html>
+                            <html><head><meta charset="UTF-8">
+                            <style>
+                                body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; margin: 10px; }
+                                table { border-collapse: collapse; width: 100%; }
+                                td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                th { background-color: #f5f5f5; }
+                                tr:nth-child(even) { background-color: #fafafa; }
+                            </style></head><body>${htmlContent}</body></html>`;
+                        iframe.srcdoc = wrappedHtml;
                     }
                 });
             } else {
