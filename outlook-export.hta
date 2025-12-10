@@ -1048,6 +1048,8 @@
                             // Move existing replies to new email
                             emailData.antworten = existingEmail.antworten || [];
                             emailData.antworten.push(existingAsReply);
+                            // Clean the Anfrage text too
+                            emailData.text = removeEmailQuotes(emailData.text);
                             // Replace in array
                             exportState.emails[existingIdx] = emailData;
                         } else {
@@ -1111,6 +1113,8 @@
                             emailData.existingReplyIds = existingReplyIdList;
                             emailData.isDuplicateWithNewReplies = true;
                             exportState.duplicatesWithReplies++;
+                            // Clean email text before export
+                            emailData.text = removeEmailQuotes(emailData.text);
                             exportState.emails.push(emailData);
                         } else {
                             exportState.duplicatesSkipped++;
@@ -1189,6 +1193,8 @@
                         emailData.isDuplicateWithNewReplies = true;
                         emailData.isConversationContinuation = true;  // Flag for import
                         exportState.duplicatesWithReplies++;
+                        // Clean email text before export
+                        emailData.text = removeEmailQuotes(emailData.text);
                         exportState.emails.push(emailData);
                     } else {
                         // Completely new email - check if a sent item started this conversation
@@ -1274,6 +1280,8 @@
                             emailData.betreff = stripSubjectPrefixes(emailData.betreff);
                         }
 
+                        // Clean email text before export
+                        emailData.text = removeEmailQuotes(emailData.text);
                         exportState.emails.push(emailData);
                     }
                 } catch (e) {}
@@ -1720,30 +1728,47 @@
         function removeEmailQuotes(text) {
             if (!text) return '';
 
-            // Find where quoted content starts and cut it off
-            // Multiple patterns for German and English Outlook
+            // Normalize line endings first (Windows uses \r\n)
+            text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            // Simple string-based search for quote markers (more reliable than regex in JScript)
+            var markers = [
+                '\nVon: ',           // German: Von: Name <email>
+                '\nFrom: ',          // English: From: Name <email>
+                '\n-----Urspr',      // -----Ursprüngliche Nachricht
+                '\n_____',           // _____ separator line
+                '\n-----Original',   // -----Original Message
+                '\n-----Weiter',     // -----Weitergeleitete Nachricht
+                '\nAm ',             // Am [Datum] schrieb
+                '\nOn '              // On [date] wrote
+            ];
+
+            var cutPos = -1;
+            for (var i = 0; i < markers.length; i++) {
+                var pos = text.indexOf(markers[i]);
+                if (pos > 0) {
+                    // For "Von: " and "From: " - check if it's an email header (has < and > or followed by Gesendet:/Sent:)
+                    if (markers[i] === '\nVon: ' || markers[i] === '\nFrom: ') {
+                        var section = text.substring(pos, Math.min(pos + 300, text.length));
+                        // Check for email format: <email@domain.com> and Gesendet:/Sent: on next lines
+                        if ((section.indexOf('<') > 0 && section.indexOf('>') > section.indexOf('<')) &&
+                            (section.indexOf('Gesendet:') > 0 || section.indexOf('Sent:') > 0 || section.indexOf('An:') > 0 || section.indexOf('To:') > 0)) {
+                            if (cutPos === -1 || pos < cutPos) cutPos = pos;
+                        }
+                    } else {
+                        if (cutPos === -1 || pos < cutPos) cutPos = pos;
+                    }
+                }
+            }
+
+            if (cutPos > 0) {
+                text = text.substring(0, cutPos);
+            }
+
+            // Regex patterns as fallback
             var patterns = [
-                // German Outlook patterns (including UTF-8 mojibake versions)
-                /_{5,}\s*\r?\n\s*Von:/i,
-                /\r?\n\s*Von:\s+.+\r?\n\s*Gesendet:/im,
-                /\r?\n\s*Von:\s+.+\r?\n\s*An:/im,
-                /-{3,}\s*Urspr[uü]ngliche\s+Nachricht/i,
-                /-{3,}\s*UrsprÃ¼ngliche\s+Nachricht/i,  // UTF-8 mojibake
-                /-{3,}\s*Original\s*Message/i,
-                /-{3,}\s*Weitergeleitete\s+Nachricht/i,
-                /-{3,}\s*Weitergeleite\s+Nachricht/i,
-                // English Outlook patterns
-                /_{5,}\s*\r?\n\s*From:/i,
-                /\r?\n\s*From:\s+.+\r?\n\s*Sent:/im,
-                /\r?\n\s*From:\s+.+\r?\n\s*To:/im,
-                // Quote headers
-                /\r?\n\s*Am\s+\d.+\s+schrieb\s+.+:/im,
-                /\r?\n\s*On\s+.+\s+wrote:/im,
-                /\r?\n\s*>+\s*Von:/im,
-                /\r?\n\s*>+\s*From:/im,
-                // Line of underscores/dashes followed by email header
-                /\r?\n_{10,}\r?\n/,
-                /\r?\n-{10,}\r?\n/
+                /\r?\n\s*Von:\s+[^<\n]+<[^>]+>\s*\r?\n\s*Gesendet:/im,
+                /\r?\n\s*From:\s+[^<\n]+<[^>]+>\s*\r?\n\s*Sent:/im
             ];
 
             for (var i = 0; i < patterns.length; i++) {
