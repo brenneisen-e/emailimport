@@ -1736,7 +1736,7 @@
                 anhaenge: attachments,
                 conversationId: convId,
                 emailId: entryId,  // Unique ID for duplicate detection
-                kategorie: category,  // Outlook category → Bearbeiter
+                outlookKategorie: category,  // Outlook category → Bearbeiter
                 antworten: []
             };
         }
@@ -2503,9 +2503,9 @@
             var bearbeiter = '';
             if (email.bearbeiter) {
                 bearbeiter = '' + email.bearbeiter;
-            } else if (email.kategorie) {
+            } else if (email.outlookKategorie) {
                 // Use Outlook category as Bearbeiter
-                bearbeiter = '' + email.kategorie;
+                bearbeiter = '' + email.outlookKategorie;
             }
 
             // Combine user's manual answer with automatic replies
