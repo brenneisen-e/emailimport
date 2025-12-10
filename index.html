@@ -1146,9 +1146,8 @@
 
             <div class="filter-bar">
                 <span class="filter-chip active" data-filter="all" onclick="setFilter('all')">Alle</span>
-                <span class="filter-chip" data-filter="open" onclick="setFilter('open')">Offen</span>
-                <span class="filter-chip" data-filter="provision" onclick="setFilter('provision')">Provision</span>
-                <span class="filter-chip" data-filter="incident" onclick="setFilter('incident')">Incident</span>
+                <span class="filter-chip" data-filter="unread" onclick="setFilter('unread')">Ungelesen</span>
+                <span class="filter-chip" data-filter="read" onclick="setFilter('read')">Gelesen</span>
             </div>
 
             <div class="select-all-row" id="selectAllRow" style="display: none;">
@@ -2211,9 +2210,8 @@
 
                 // Filter
                 let matchesFilter = true;
-                if (currentFilter === 'open') matchesFilter = email.status !== 'Erledigt';
-                else if (currentFilter === 'provision') matchesFilter = email.isProvision;
-                else if (currentFilter === 'incident') matchesFilter = email.kategorie.includes('Incident');
+                if (currentFilter === 'unread') matchesFilter = !readEmails.has(email.id);
+                else if (currentFilter === 'read') matchesFilter = readEmails.has(email.id);
 
                 return matchesSearch && matchesFilter;
             });
