@@ -2158,7 +2158,16 @@
             // Email text with keyword highlighting
             // Check if HTML body is available (contains HTML tags like tables, divs, etc.)
             const detailTextEl = document.getElementById('detailText');
-            const hasHtmlContent = email.htmlBody && (
+
+            // First check if we have a parsed anfrage (from thread parsing)
+            // If anfrage differs significantly from a simple removeEmailQuotes result,
+            // it means we parsed a thread and should show the original message as text
+            const simpleCleanedText = removeEmailQuotes(email.text || '');
+            const hasThreadParsedContent = email.anfrage &&
+                email.anfrage.length > 20 &&
+                email.anfrage.substring(0, 100).toLowerCase() !== simpleCleanedText.substring(0, 100).toLowerCase();
+
+            const hasHtmlContent = !hasThreadParsedContent && email.htmlBody && (
                 email.htmlBody.toLowerCase().includes('<table') ||
                 email.htmlBody.toLowerCase().includes('<div') ||
                 email.htmlBody.toLowerCase().includes('<br') ||
@@ -2189,7 +2198,7 @@
 
                 detailTextEl.appendChild(iframe);
             } else {
-                // Prefer anfrage field (corrected text) over raw text (may contain full thread)
+                // Prefer anfrage field (corrected/parsed text) over raw text
                 const displayText = email.anfrage || email.text;
                 detailTextEl.innerHTML = highlightKeywords(displayText);
             }
