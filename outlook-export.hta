@@ -2092,6 +2092,17 @@
                     throw new Error('Tabellenblatt "' + sheetName + '" nicht gefunden!\n\nVerfügbare Blätter: ' + availableSheets.join(', '));
                 }
 
+                // Check if worksheet has a ListObject (table)
+                currentStep = 'Excel-Tabelle suchen';
+                var listObject = null;
+                try {
+                    if (worksheet.ListObjects.Count > 0) {
+                        listObject = worksheet.ListObjects(1);
+                    }
+                } catch (e) {
+                    // No table found, will write to cells directly
+                }
+
                 // Read existing data for duplicate check
                 currentStep = 'Bestehende Daten lesen';
                 document.getElementById('importProgressText').innerText = 'Lese bestehende Daten...';
@@ -2179,6 +2190,14 @@
                         // New email - add to Excel
                         currentStep = 'Email ' + (i+1) + ' schreiben (Zeile ' + nextRow + ')';
                         try {
+                            // If there's a table, add a new row to extend it
+                            if (listObject) {
+                                try {
+                                    listObject.ListRows.Add();
+                                } catch (addErr) {
+                                    // Table might be at max size or other issue, continue anyway
+                                }
+                            }
                             writeEmailRow(worksheet, nextRow, email);
                             // Add to existing data cache to prevent duplicates within same import
                             existingData[emailKey] = nextRow;
@@ -2189,6 +2208,9 @@
                             currentStep = 'Email ' + (i+1) + ' FEHLER - übersprungen';
                             // Write minimal error row so we know there was an issue
                             try {
+                                if (listObject) {
+                                    try { listObject.ListRows.Add(); } catch (e3) {}
+                                }
                                 worksheet.Cells(nextRow, 1).Value = 'HC-' + (nextRow - 1);
                                 worksheet.Cells(nextRow, 2).Value = email.datum || '';
                                 worksheet.Cells(nextRow, 11).Value = email.betreff || '';
