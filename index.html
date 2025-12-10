@@ -836,6 +836,16 @@
             50% { opacity: 0.7; }
         }
 
+        /* Search Highlight */
+        .search-highlight {
+            background: #ff6b6b;
+            color: white;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(255, 107, 107, 0.4);
+        }
+
         /* Keyword Highlight */
         .keyword-highlight {
             background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
@@ -1484,11 +1494,21 @@
         // ============================================================================
         // KEYWORD HIGHLIGHTING
         // ============================================================================
-        function highlightKeywords(text) {
+        function highlightKeywords(text, includeSearchTerm = true) {
             if (!text) return '';
 
             // Escape HTML first
             let result = escapeHtml(text);
+
+            // Highlight search term first (if exists)
+            if (includeSearchTerm) {
+                const searchTerm = document.getElementById('searchInput')?.value?.trim();
+                if (searchTerm && searchTerm.length >= 2) {
+                    const escapedSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const searchRegex = new RegExp(`(${escapedSearch})`, 'gi');
+                    result = result.replace(searchRegex, '<mark class="search-highlight">$1</mark>');
+                }
+            }
 
             // Build regex pattern for all keywords
             for (const [cluster, keywords] of Object.entries(keywordClusterMap)) {
@@ -2032,23 +2052,25 @@
                 replyCountBadge.style.display = 'inline';
                 tabAntworten.classList.remove('disabled');
 
-                // Render replies in card format with new/existing indicator
+                // Render replies in card format with new/existing indicator and search highlighting
                 repliesList.innerHTML = displayReplies.map(reply => {
                     const replyDate = new Date(reply.datum || reply.date);
                     const dateStr = replyDate.toLocaleString('de-DE');
                     const replyText = reply.text || reply.body || '';
                     const isNew = reply.isNew === true;
                     const statusClass = isNew ? 'reply-new' : (email.isDuplicateWithNewReplies ? 'reply-existing' : '');
-                    const statusLabel = isNew ? '<span class="reply-status-new">✨ NEU</span>' :
-                        (email.isDuplicateWithNewReplies ? '<span class="reply-status-existing">📋 Bereits importiert</span>' : '');
+                    const statusLabel = isNew ? '<span class="reply-status-new">NEU</span>' :
+                        (email.isDuplicateWithNewReplies ? '<span class="reply-status-existing">Bereits importiert</span>' : '');
+                    // Use highlightKeywords to show search term highlighting in replies
+                    const highlightedText = highlightKeywords(replyText);
                     return `
                         <div class="reply-card ${statusClass}">
                             <div class="reply-card-header">
-                                <span class="reply-card-from">📤 An: ${escapeHtml(reply.an || reply.to || 'Unbekannt')}</span>
+                                <span class="reply-card-from">An: ${escapeHtml(reply.an || reply.to || 'Unbekannt')}</span>
                                 ${statusLabel}
                                 <span class="reply-card-date">${dateStr}</span>
                             </div>
-                            <div class="reply-card-text">${escapeHtml(replyText)}</div>
+                            <div class="reply-card-text">${highlightedText}</div>
                         </div>
                     `;
                 }).join('');
