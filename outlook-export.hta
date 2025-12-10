@@ -1013,56 +1013,8 @@
                         continue;  // Skip this email
                     }
 
-                    // Handle multiple emails with same ConversationID - add as replies, oldest = Anfrage
-                    if (emailData.conversationId && exportState.processedConvIds[emailData.conversationId] !== undefined) {
-                        // This ConversationID was already seen - add this email as reply or swap if older
-                        var existingIdx = exportState.processedConvIds[emailData.conversationId];
-                        var existingEmail = exportState.emails[existingIdx];
-                        var existingDate = new Date(existingEmail.datum);
-                        var newDate = new Date(emailData.datum);
-
-                        // Create reply object with htmlBody
-                        var inboxReply = {
-                            datum: emailData.datum,
-                            von: emailData.von_name,
-                            vonEmail: emailData.von_email,
-                            text: removeEmailQuotes(emailData.text),
-                            htmlBody: emailData.htmlBody || '',
-                            replyId: emailData.emailId,
-                            isNew: true,
-                            isIncoming: true
-                        };
-
-                        if (newDate < existingDate) {
-                            // New email is OLDER - it becomes the Anfrage, existing becomes reply
-                            var existingAsReply = {
-                                datum: existingEmail.datum,
-                                von: existingEmail.von_name,
-                                vonEmail: existingEmail.von_email,
-                                text: removeEmailQuotes(existingEmail.text),
-                                htmlBody: existingEmail.htmlBody || '',
-                                replyId: existingEmail.emailId,
-                                isNew: true,
-                                isIncoming: true
-                            };
-                            // Move existing replies to new email
-                            emailData.antworten = existingEmail.antworten || [];
-                            emailData.antworten.push(existingAsReply);
-                            // Clean the Anfrage text too
-                            emailData.text = removeEmailQuotes(emailData.text);
-                            // Replace in array
-                            exportState.emails[existingIdx] = emailData;
-                        } else {
-                            // New email is NEWER - add as reply to existing
-                            if (!existingEmail.antworten) existingEmail.antworten = [];
-                            existingEmail.antworten.push(inboxReply);
-                        }
-                        exportState.repliesFound++;
-                        continue;
-                    }
+                    // Collect all emails - grouping by ConversationID happens at the end
                     if (emailData.conversationId) {
-                        // Store index for later lookup
-                        exportState.processedConvIds[emailData.conversationId] = exportState.emails.length;
                         // Mark as found in Inbox (for auto-erledigt feature)
                         foundInInbox[emailData.conversationId] = true;
                     }
@@ -1318,7 +1270,97 @@
                 showExportError("Keine neuen Emails gefunden.");
                 return;
             }
-            saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates);
+
+            // Group emails by ConversationID and merge: oldest = Anfrage, rest = Antworten
+            var groupedEmails = groupEmailsByConversation(exportState.emails);
+
+            saveExportFile(groupedEmails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates);
+        }
+
+        // Group emails by ConversationID: oldest email = Anfrage, all others = Antworten
+        function groupEmailsByConversation(emails) {
+            var convGroups = {};  // ConversationID -> array of emails
+            var noConvEmails = []; // Emails without ConversationID
+
+            // Group by ConversationID
+            for (var i = 0; i < emails.length; i++) {
+                var email = emails[i];
+                if (email.conversationId) {
+                    if (!convGroups[email.conversationId]) {
+                        convGroups[email.conversationId] = [];
+                    }
+                    convGroups[email.conversationId].push(email);
+                } else {
+                    noConvEmails.push(email);
+                }
+            }
+
+            var result = [];
+
+            // Process each conversation group
+            for (var convId in convGroups) {
+                var group = convGroups[convId];
+
+                if (group.length === 1) {
+                    // Single email - just clean it and add
+                    var singleEmail = group[0];
+                    singleEmail.text = removeEmailQuotes(singleEmail.text);
+                    // Also add sent replies
+                    var sentReplies = findReplies(singleEmail);
+                    if (sentReplies.length > 0) {
+                        singleEmail.antworten = (singleEmail.antworten || []).concat(sentReplies);
+                    }
+                    result.push(singleEmail);
+                } else {
+                    // Multiple emails - sort by date, oldest = Anfrage
+                    group.sort(function(a, b) {
+                        return new Date(a.datum) - new Date(b.datum);
+                    });
+
+                    var anfrage = group[0];  // Oldest email
+                    anfrage.text = removeEmailQuotes(anfrage.text);
+
+                    // All other emails become replies
+                    var antworten = [];
+                    for (var j = 1; j < group.length; j++) {
+                        var replyEmail = group[j];
+                        antworten.push({
+                            datum: replyEmail.datum,
+                            von: replyEmail.von_name,
+                            vonEmail: replyEmail.von_email,
+                            text: removeEmailQuotes(replyEmail.text),
+                            htmlBody: replyEmail.htmlBody || '',
+                            replyId: replyEmail.emailId,
+                            isNew: true,
+                            isIncoming: true
+                        });
+                    }
+
+                    // Add sent replies too
+                    var sentReplies = findReplies(anfrage);
+                    for (var k = 0; k < sentReplies.length; k++) {
+                        antworten.push(sentReplies[k]);
+                    }
+
+                    // Sort all replies by date
+                    antworten.sort(function(a, b) {
+                        return new Date(a.datum) - new Date(b.datum);
+                    });
+
+                    anfrage.antworten = antworten;
+                    exportState.repliesFound += antworten.length;
+                    result.push(anfrage);
+                }
+            }
+
+            // Add emails without ConversationID
+            for (var m = 0; m < noConvEmails.length; m++) {
+                var email = noConvEmails[m];
+                email.text = removeEmailQuotes(email.text);
+                result.push(email);
+            }
+
+            return result;
         }
 
         // State for async sent items caching
