@@ -1773,52 +1773,57 @@
             // Normalize line endings first (Windows uses \r\n)
             text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-            // Simple string-based search for quote markers (more reliable than regex in JScript)
-            var markers = [
-                '\nVon: ',           // German: Von: Name <email>
-                '\nFrom: ',          // English: From: Name <email>
-                '\n-----Urspr',      // -----Ursprüngliche Nachricht
-                '\n_____',           // _____ separator line
-                '\n-----Original',   // -----Original Message
-                '\n-----Weiter',     // -----Weitergeleitete Nachricht
-                '\nAm ',             // Am [Datum] schrieb
-                '\nOn '              // On [date] wrote
-            ];
+            // Split into lines and find where quote starts
+            var lines = text.split('\n');
+            var cutLineIdx = -1;
 
-            var cutPos = -1;
-            for (var i = 0; i < markers.length; i++) {
-                var pos = text.indexOf(markers[i]);
-                if (pos > 0) {
-                    // For "Von: " and "From: " - check if it's an email header (has < and > or followed by Gesendet:/Sent:)
-                    if (markers[i] === '\nVon: ' || markers[i] === '\nFrom: ') {
-                        var section = text.substring(pos, Math.min(pos + 300, text.length));
-                        // Check for email format: <email@domain.com> and Gesendet:/Sent: on next lines
-                        if ((section.indexOf('<') > 0 && section.indexOf('>') > section.indexOf('<')) &&
-                            (section.indexOf('Gesendet:') > 0 || section.indexOf('Sent:') > 0 || section.indexOf('An:') > 0 || section.indexOf('To:') > 0)) {
-                            if (cutPos === -1 || pos < cutPos) cutPos = pos;
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+
+                // Check for email header: "Von: Name <email>" or "From: Name <email>"
+                if ((line.indexOf('Von:') === 0 || line.indexOf('From:') === 0) &&
+                    line.indexOf('<') > 0 && line.indexOf('>') > line.indexOf('<') && line.indexOf('@') > 0) {
+                    // Look ahead for "Gesendet:" or "Sent:" or "An:" in next few lines
+                    var hasFollowup = false;
+                    for (var j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                        var nextLine = lines[j].trim();
+                        if (nextLine.indexOf('Gesendet:') === 0 || nextLine.indexOf('Sent:') === 0 ||
+                            nextLine.indexOf('An:') === 0 || nextLine.indexOf('To:') === 0 ||
+                            nextLine.indexOf('Cc:') === 0 || nextLine.indexOf('Betreff:') === 0 ||
+                            nextLine.indexOf('Subject:') === 0) {
+                            hasFollowup = true;
+                            break;
                         }
-                    } else {
-                        if (cutPos === -1 || pos < cutPos) cutPos = pos;
+                    }
+                    if (hasFollowup) {
+                        cutLineIdx = i;
+                        break;
                     }
                 }
-            }
 
-            if (cutPos > 0) {
-                text = text.substring(0, cutPos);
-            }
-
-            // Regex patterns as fallback
-            var patterns = [
-                /\r?\n\s*Von:\s+[^<\n]+<[^>]+>\s*\r?\n\s*Gesendet:/im,
-                /\r?\n\s*From:\s+[^<\n]+<[^>]+>\s*\r?\n\s*Sent:/im
-            ];
-
-            for (var i = 0; i < patterns.length; i++) {
-                var match = text.search(patterns[i]);
-                if (match > 0) {
-                    text = text.substring(0, match);
+                // Check for separator lines
+                if (line.indexOf('-----Urspr') === 0 || line.indexOf('-----Original') === 0 ||
+                    line.indexOf('-----Weiter') === 0 || line.indexOf('_____') === 0) {
+                    cutLineIdx = i;
                     break;
                 }
+
+                // Check for "Am ... schrieb:" pattern
+                if (line.indexOf('Am ') === 0 && line.indexOf(' schrieb') > 0 && line.charAt(line.length - 1) === ':') {
+                    cutLineIdx = i;
+                    break;
+                }
+
+                // Check for "On ... wrote:" pattern
+                if (line.indexOf('On ') === 0 && line.indexOf(' wrote:') > 0) {
+                    cutLineIdx = i;
+                    break;
+                }
+            }
+
+            if (cutLineIdx > 0) {
+                // Keep only lines before the quote
+                text = lines.slice(0, cutLineIdx).join('\n');
             }
 
             // Remove trailing signature markers
