@@ -1638,6 +1638,85 @@
             return result.trim();
         }
 
+        // Parse email thread into individual messages (for display as separate replies)
+        function parseEmailThread(text) {
+            if (!text) return [];
+
+            // Split pattern: "Von: Name <email>\nGesendet: Datum" or "From: ... Sent:"
+            const splitPattern = /(?=\r?\n\s*Von:\s+[^\n]+(?:<[^>]+>)?\s*\r?\n\s*Gesendet:)|(?=\r?\n\s*From:\s+[^\n]+(?:<[^>]+>)?\s*\r?\n\s*Sent:)/gi;
+            const parts = text.split(splitPattern).filter(p => p.trim());
+
+            if (parts.length <= 1) {
+                // No thread structure found, return single message
+                return [{
+                    text: removeEmailQuotes(text),
+                    von: null,
+                    datum: null,
+                    isOriginal: true
+                }];
+            }
+
+            const messages = parts.map((part, idx) => {
+                // Check if this part starts with a header block (Von:...Gesendet:)
+                const hasHeader = /^\s*Von:\s+.+\r?\n\s*Gesendet:/im.test(part) ||
+                                  /^\s*From:\s+.+\r?\n\s*Sent:/im.test(part);
+
+                // Extract sender and date from header
+                const vonMatch = part.match(/Von:\s*([^\n<]+)(?:<[^>]+>)?/i) ||
+                                 part.match(/From:\s*([^\n<]+)(?:<[^>]+>)?/i);
+                const datumMatch = part.match(/Gesendet:\s*([^\n]+)/i) ||
+                                   part.match(/Sent:\s*([^\n]+)/i);
+
+                // Remove the header block to get just the message body
+                let body = part;
+                if (hasHeader) {
+                    const betreffMatch = body.search(/Betreff:|Subject:/i);
+                    if (betreffMatch > 0) {
+                        // Find the end of the header (double newline after Betreff)
+                        const afterBetreff = body.substring(betreffMatch);
+                        const headerEnd = afterBetreff.search(/\r?\n\s*\r?\n/);
+                        if (headerEnd > 0) {
+                            body = afterBetreff.substring(headerEnd).trim();
+                        }
+                    }
+                }
+
+                // Remove signature from body
+                body = body.replace(/\r?\n--\s*\r?\n[\s\S]*$/, '').trim();
+                // Also remove common signature patterns
+                body = body.replace(/\r?\nViele Grüße\r?\n[\s\S]*$/i, '\nViele Grüße').trim();
+                body = body.replace(/\r?\nHerzliche Grüße\r?\n[\s\S]*$/i, '\nHerzliche Grüße').trim();
+                body = body.replace(/\r?\nBeste Grüße\r?\n[\s\S]*$/i, '\nBeste Grüße').trim();
+
+                // Parse date
+                let parsedDate = null;
+                if (datumMatch) {
+                    const dateStr = datumMatch[1].trim();
+                    // Try to parse German date format "Mittwoch, 10. Dezember 2025 14:40"
+                    const germanMonths = {
+                        'januar': 0, 'februar': 1, 'märz': 2, 'april': 3, 'mai': 4, 'juni': 5,
+                        'juli': 6, 'august': 7, 'september': 8, 'oktober': 9, 'november': 10, 'dezember': 11
+                    };
+                    const dateMatch2 = dateStr.match(/(\d{1,2})\.\s*(\w+)\s*(\d{4})\s*(\d{1,2}):(\d{2})/i);
+                    if (dateMatch2) {
+                        const month = germanMonths[dateMatch2[2].toLowerCase()];
+                        if (month !== undefined) {
+                            parsedDate = new Date(dateMatch2[3], month, dateMatch2[1], dateMatch2[4], dateMatch2[5]);
+                        }
+                    }
+                }
+
+                return {
+                    text: body,
+                    von: vonMatch ? vonMatch[1].trim() : null,
+                    datum: parsedDate,
+                    isOriginal: idx === parts.length - 1  // Last part is the original message
+                };
+            }).filter(m => m.text && m.text.length > 10);  // Filter out empty messages
+
+            return messages;
+        }
+
         // Remove quoted email content from HTML body
         function removeEmailQuotesHtml(html) {
             if (!html) return '';
@@ -1722,20 +1801,19 @@
                     agentur: agentur,
                     vermittlernr: vermittlernr,
                     vsnr: vsnr,
-                    // anfrage: prefer existing, then provisionData.nachricht, then oldest reply text, then cleaned text
-                    // Try to get the oldest email in the conversation thread as the original request
+                    // anfrage: prefer existing, then provisionData.nachricht, then parse thread for original message
+                    // Try to get the oldest/original email in the conversation thread as the request
                     anfrage: email.anfrage || (provisionData?.nachricht) || (() => {
-                        const replies = email.antworten || [];
-                        if (replies.length > 0) {
-                            // Sort by date and get the oldest reply
-                            const sortedReplies = [...replies].sort((a, b) =>
-                                new Date(a.datum || a.date || 0) - new Date(b.datum || b.date || 0));
-                            const oldestReply = sortedReplies[0];
-                            const oldestText = removeEmailQuotes(oldestReply.text || oldestReply.body || '');
-                            if (oldestText && oldestText.length > 20) {
-                                return oldestText;
+                        // Parse the email text as a thread to find the original message
+                        const threadMessages = parseEmailThread(text);
+                        if (threadMessages.length > 1) {
+                            // Find the original message (marked as isOriginal or last in array)
+                            const originalMsg = threadMessages.find(m => m.isOriginal) || threadMessages[threadMessages.length - 1];
+                            if (originalMsg && originalMsg.text && originalMsg.text.length > 20) {
+                                return originalMsg.text;
                             }
                         }
+                        // Fallback to simple quote removal
                         return removeEmailQuotes(text);
                     })(),
                     antwort: email.antwort || '',
@@ -2140,31 +2218,52 @@
             const replyCountBadge = document.getElementById('replyCount');
             const tabAntworten = document.getElementById('tabAntworten');
 
-            // Use alleAntworten for display (shows all), antworten for import (only new)
-            let displayReplies = email.alleAntworten && email.alleAntworten.length > 0
-                ? [...email.alleAntworten]
-                : [...(email.antworten || [])];
+            // Parse the full email thread to extract individual messages
+            // This handles cases where replies contain the full thread history
+            let displayReplies = [];
 
-            // Sort replies chronologically (oldest first)
-            displayReplies.sort((a, b) => new Date(a.datum || a.date) - new Date(b.datum || b.date));
+            // First, try to parse the main email text as a thread
+            const threadMessages = parseEmailThread(email.text || '');
 
-            // Remove duplicate replies (same cleaned text) and keep only unique content
-            // Also skip replies that have the same content as the main request
-            const mainRequestText = removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 200);
-            const seenTexts = new Set();
-            displayReplies = displayReplies.filter(reply => {
-                const cleanedText = removeEmailQuotes(reply.text || reply.body || '').trim().toLowerCase().substring(0, 200);
-                // Skip if empty or duplicate
-                if (!cleanedText || seenTexts.has(cleanedText)) {
-                    return false;
-                }
-                // Skip if same as main request (it's already shown in Anfrage tab)
-                if (cleanedText === mainRequestText) {
-                    return false;
-                }
-                seenTexts.add(cleanedText);
-                return true;
-            });
+            if (threadMessages.length > 1) {
+                // Thread was successfully parsed - use the parsed messages
+                // Skip the last one (original message) as it's shown in Anfrage tab
+                // Reverse to show oldest first (after the original)
+                displayReplies = threadMessages
+                    .filter(m => !m.isOriginal)  // Skip original message
+                    .map(m => ({
+                        text: m.text,
+                        von: m.von,
+                        datum: m.datum,
+                        isNew: false,
+                        isIncoming: true,
+                        isParsedFromThread: true
+                    }))
+                    .reverse();  // Oldest replies first
+            } else {
+                // Fallback to original antworten/alleAntworten logic
+                displayReplies = email.alleAntworten && email.alleAntworten.length > 0
+                    ? [...email.alleAntworten]
+                    : [...(email.antworten || [])];
+
+                // Sort replies chronologically (oldest first)
+                displayReplies.sort((a, b) => new Date(a.datum || a.date) - new Date(b.datum || b.date));
+
+                // Remove duplicate replies and apply removeEmailQuotes
+                const mainRequestText = removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 200);
+                const seenTexts = new Set();
+                displayReplies = displayReplies.filter(reply => {
+                    const cleanedText = removeEmailQuotes(reply.text || reply.body || '').trim().toLowerCase().substring(0, 200);
+                    if (!cleanedText || seenTexts.has(cleanedText)) {
+                        return false;
+                    }
+                    if (cleanedText === mainRequestText) {
+                        return false;
+                    }
+                    seenTexts.add(cleanedText);
+                    return true;
+                });
+            }
 
             const newRepliesCount = (email.antworten || []).filter(r => r.isNew).length;
 
@@ -2181,8 +2280,11 @@
                 // Render replies in card format with new/existing indicator and search highlighting
                 repliesList.innerHTML = displayReplies.map((reply, idx) => {
                     const replyDate = new Date(reply.datum || reply.date);
-                    const dateStr = replyDate.toLocaleString('de-DE');
-                    const replyText = removeEmailQuotes(reply.text || reply.body || '');
+                    const dateStr = replyDate && !isNaN(replyDate) ? replyDate.toLocaleString('de-DE') : '';
+                    // For parsed thread messages, text is already cleaned; otherwise apply removeEmailQuotes
+                    const replyText = reply.isParsedFromThread
+                        ? (reply.text || '')
+                        : removeEmailQuotes(reply.text || reply.body || '');
                     const isNew = reply.isNew === true;
                     const statusClass = isNew ? 'reply-new' : (email.isDuplicateWithNewReplies ? 'reply-existing' : '');
                     const statusLabel = isNew ? '<span class="reply-status-new">NEU</span>' :
@@ -2196,10 +2298,10 @@
                         reply.htmlBody.toLowerCase().includes('<p>')
                     );
 
-                    // Direction indicator
+                    // Direction indicator - for parsed replies, always show "Von" with the extracted sender
                     const isIncoming = reply.isIncoming === true;
                     const directionLabel = isIncoming ? 'Von' : 'An';
-                    const personName = isIncoming ? (reply.von || reply.from || 'Unbekannt') : (reply.an || reply.to || 'Unbekannt');
+                    const personName = reply.von || (isIncoming ? (reply.from || 'Unbekannt') : (reply.an || reply.to || 'Unbekannt'));
 
                     let contentHtml;
                     if (hasReplyHtml) {
