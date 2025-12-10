@@ -1322,8 +1322,8 @@
                     sentCacheState.items = folder.Items;
                 }
                 try { sentCacheState.items.Sort("[SentOn]", true); } catch (e) {}
-                // Limit sent items - only need recent ones matching inbox timeframe
-                sentCacheState.maxItems = Math.min(sentCacheState.items.Count, 300);
+                // No artificial limit - date filter already restricts to relevant timeframe
+                sentCacheState.maxItems = sentCacheState.items.Count;
                 sentCacheState.itemIdx = 1;
                 setTimeout(processSentBatch, 10);
             } catch (e) {
