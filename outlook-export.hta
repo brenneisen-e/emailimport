@@ -1780,42 +1780,31 @@
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
 
-                // Check for email header: "Von: Name <email>" or "From: Name <email>"
-                if ((line.indexOf('Von:') === 0 || line.indexOf('From:') === 0) &&
-                    line.indexOf('<') > 0 && line.indexOf('>') > line.indexOf('<') && line.indexOf('@') > 0) {
-                    // Look ahead for "Gesendet:" or "Sent:" or "An:" in next few lines
-                    var hasFollowup = false;
-                    for (var j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-                        var nextLine = lines[j].trim();
-                        if (nextLine.indexOf('Gesendet:') === 0 || nextLine.indexOf('Sent:') === 0 ||
-                            nextLine.indexOf('An:') === 0 || nextLine.indexOf('To:') === 0 ||
-                            nextLine.indexOf('Cc:') === 0 || nextLine.indexOf('Betreff:') === 0 ||
-                            nextLine.indexOf('Subject:') === 0) {
-                            hasFollowup = true;
-                            break;
-                        }
-                    }
-                    if (hasFollowup) {
-                        cutLineIdx = i;
-                        break;
-                    }
-                }
-
-                // Check for separator lines
-                if (line.indexOf('-----Urspr') === 0 || line.indexOf('-----Original') === 0 ||
-                    line.indexOf('-----Weiter') === 0 || line.indexOf('_____') === 0) {
+                // AGGRESSIVE: Any line with "Von:" or "From:" AND an email pattern <...@...>
+                // Don't require it to be at line start - could have whitespace or special chars
+                var vonPos = line.indexOf('Von:');
+                var fromPos = line.indexOf('From:');
+                if ((vonPos >= 0 || fromPos >= 0) &&
+                    line.indexOf('<') > 0 && line.indexOf('@') > 0 && line.indexOf('>') > line.indexOf('@')) {
                     cutLineIdx = i;
                     break;
                 }
 
-                // Check for "Am ... schrieb:" pattern
-                if (line.indexOf('Am ') === 0 && line.indexOf(' schrieb') > 0 && line.charAt(line.length - 1) === ':') {
+                // Check for separator lines (anywhere in line)
+                if (line.indexOf('-----Urspr') >= 0 || line.indexOf('-----Original') >= 0 ||
+                    line.indexOf('-----Weiter') >= 0 || line.indexOf('_____') >= 0) {
+                    cutLineIdx = i;
+                    break;
+                }
+
+                // Check for "Am ... schrieb" pattern
+                if (line.indexOf('Am ') >= 0 && line.indexOf(' schrieb') > 0) {
                     cutLineIdx = i;
                     break;
                 }
 
                 // Check for "On ... wrote:" pattern
-                if (line.indexOf('On ') === 0 && line.indexOf(' wrote:') > 0) {
+                if (line.indexOf('On ') >= 0 && line.indexOf(' wrote:') > 0) {
                     cutLineIdx = i;
                     break;
                 }
