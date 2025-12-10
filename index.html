@@ -1196,6 +1196,7 @@
                                     <option value="Incident (Mittel)">Incident (Mittel)</option>
                                     <option value="Incident (Schwer)">Incident (Schwer)</option>
                                     <option value="Sonstiges">Sonstiges</option>
+                                    <option value="Keine BGAV Relevanz">Keine BGAV Relevanz</option>
                                 </select>
                             </div>
 
@@ -2055,7 +2056,13 @@
                 email[field] = element.value;
             }
 
-            if (field === 'status') updateStats();
+            // Auto-set status when "Keine BGAV Relevanz" category is selected
+            if (field === 'kategorie' && email.kategorie === 'Keine BGAV Relevanz') {
+                email.status = 'Keine BGAV Relevanz';
+                document.getElementById('formStatus').value = 'Keine BGAV Relevanz';
+            }
+
+            if (field === 'status' || field === 'kategorie') updateStats();
             renderEmailList();
         }
 
