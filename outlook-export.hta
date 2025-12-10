@@ -1007,6 +1007,12 @@
 
                     var emailData = extractEmail(item);
 
+                    // Filter out emails with specific subjects that are not relevant
+                    var subjectLower = (emailData.betreff || '').toLowerCase();
+                    if (subjectLower.indexOf('online-abschluss vermittlerzuordnung ändern') !== -1) {
+                        continue;  // Skip this email
+                    }
+
                     // Skip if we already processed this ConversationID in this export batch
                     // (handles forwarded emails appearing multiple times in folder)
                     if (emailData.conversationId && exportState.processedConvIds[emailData.conversationId]) {
