@@ -2020,7 +2020,24 @@
             const detailTextEl = document.getElementById('detailText');
             if (email.htmlBody && email.htmlBody.includes('<table')) {
                 // Display HTML content in iframe for safety and proper table rendering
-                detailTextEl.innerHTML = `<iframe class="html-email-frame" srcdoc="${escapeHtml(email.htmlBody)}" sandbox="allow-same-origin"></iframe>`;
+                const iframe = document.createElement('iframe');
+                iframe.className = 'html-email-frame';
+                iframe.sandbox = 'allow-same-origin';
+                detailTextEl.innerHTML = '';
+                detailTextEl.appendChild(iframe);
+                // Write HTML directly to iframe document
+                iframe.onload = function() {
+                    try {
+                        iframe.contentDocument.open();
+                        iframe.contentDocument.write(email.htmlBody);
+                        iframe.contentDocument.close();
+                    } catch(e) {
+                        // Fallback to plain text if iframe fails
+                        detailTextEl.innerHTML = highlightKeywords(email.text);
+                    }
+                };
+                // Trigger load for about:blank
+                iframe.src = 'about:blank';
             } else {
                 // Prefer anfrage field (corrected text) over raw text (may contain full thread)
                 const displayText = email.anfrage || email.text;
