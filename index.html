@@ -2016,10 +2016,17 @@
             }
 
             // Email text with keyword highlighting
-            // Check if HTML body is available and contains tables
+            // Check if HTML body is available (contains HTML tags like tables, divs, etc.)
             const detailTextEl = document.getElementById('detailText');
-            if (email.htmlBody && email.htmlBody.includes('<table')) {
-                // Display HTML content in iframe using Blob URL for reliable rendering
+            const hasHtmlContent = email.htmlBody && (
+                email.htmlBody.toLowerCase().includes('<table') ||
+                email.htmlBody.toLowerCase().includes('<div') ||
+                email.htmlBody.toLowerCase().includes('<br') ||
+                email.htmlBody.toLowerCase().includes('<p>')
+            );
+
+            if (hasHtmlContent) {
+                // Display HTML content in iframe using srcdoc for maximum compatibility
                 const iframe = document.createElement('iframe');
                 iframe.className = 'html-email-frame';
                 detailTextEl.innerHTML = '';
@@ -2035,15 +2042,8 @@
                         tr:nth-child(even) { background-color: #fafafa; }
                     </style></head><body>${email.htmlBody}</body></html>`;
 
-                // Create Blob URL for the HTML content
-                const blob = new Blob([wrappedHtml], { type: 'text/html' });
-                const blobUrl = URL.createObjectURL(blob);
-                iframe.src = blobUrl;
-
-                // Clean up Blob URL after iframe loads
-                iframe.onload = function() {
-                    URL.revokeObjectURL(blobUrl);
-                };
+                // Use srcdoc attribute for inline HTML content
+                iframe.srcdoc = wrappedHtml;
 
                 detailTextEl.appendChild(iframe);
             } else {
