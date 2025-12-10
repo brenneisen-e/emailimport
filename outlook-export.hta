@@ -2107,15 +2107,34 @@
                     throw new Error('Tabellenblatt "' + sheetName + '" nicht gefunden!\n\nVerfügbare Blätter: ' + availableSheets.join(', '));
                 }
 
-                // Check if worksheet has a ListObject (table)
+                // Check if worksheet has a ListObject (table) named "Übersicht"
                 currentStep = 'Excel-Tabelle suchen';
                 var listObject = null;
+                var tableLastRow = 0;
                 try {
-                    if (worksheet.ListObjects.Count > 0) {
-                        listObject = worksheet.ListObjects(1);
+                    // Try to find table by name first
+                    try {
+                        listObject = worksheet.ListObjects("Übersicht");
+                    } catch (e1) {
+                        // If not found by name, try first table
+                        if (worksheet.ListObjects.Count > 0) {
+                            listObject = worksheet.ListObjects(1);
+                        }
+                    }
+
+                    if (listObject) {
+                        // Get the last row of the table's data body
+                        var dataBodyRange = listObject.DataBodyRange;
+                        if (dataBodyRange) {
+                            tableLastRow = dataBodyRange.Row + dataBodyRange.Rows.Count - 1;
+                        } else {
+                            // Table has no data yet, start after header
+                            tableLastRow = listObject.HeaderRowRange.Row;
+                        }
                     }
                 } catch (e) {
                     // No table found, will write to cells directly
+                    listObject = null;
                 }
 
                 // Read existing data for duplicate check
@@ -2124,8 +2143,15 @@
                 var existingData = readExistingData(worksheet);
 
                 currentStep = 'Letzte Zeile finden';
-                var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
-                if (lastRow === 1 && !worksheet.Cells(1, 1).Value) lastRow = 0;
+                var lastRow;
+                if (listObject && tableLastRow > 0) {
+                    // Use table's last row
+                    lastRow = tableLastRow;
+                } else {
+                    // Fallback to worksheet's last row
+                    lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
+                    if (lastRow === 1 && !worksheet.Cells(1, 1).Value) lastRow = 0;
+                }
                 var nextRow = lastRow + 1;
 
                 var total = jsonData.length;
@@ -2206,32 +2232,39 @@
                         currentStep = 'Email ' + (i+1) + ' schreiben (Zeile ' + nextRow + ')';
                         try {
                             // If there's a table, add a new row to extend it
+                            var actualRow = nextRow;
                             if (listObject) {
                                 try {
-                                    listObject.ListRows.Add();
+                                    var newListRow = listObject.ListRows.Add();
+                                    // Get the actual row number from the new ListRow
+                                    actualRow = newListRow.Range.Row;
                                 } catch (addErr) {
-                                    // Table might be at max size or other issue, continue anyway
+                                    // Table might be at max size or other issue, use nextRow
                                 }
                             }
-                            writeEmailRow(worksheet, nextRow, email);
+                            writeEmailRow(worksheet, actualRow, email);
                             // Add to existing data cache to prevent duplicates within same import
-                            existingData[emailKey] = nextRow;
-                            nextRow++;
+                            existingData[emailKey] = actualRow;
+                            nextRow = actualRow + 1;
                             newCount++;
                         } catch (writeErr) {
                             // Log error but continue with next email
                             currentStep = 'Email ' + (i+1) + ' FEHLER - übersprungen';
                             // Write minimal error row so we know there was an issue
                             try {
+                                var errorRow = nextRow;
                                 if (listObject) {
-                                    try { listObject.ListRows.Add(); } catch (e3) {}
+                                    try {
+                                        var errListRow = listObject.ListRows.Add();
+                                        errorRow = errListRow.Range.Row;
+                                    } catch (e3) {}
                                 }
-                                worksheet.Cells(nextRow, 1).Value = 'HC-' + (nextRow - 1);
-                                worksheet.Cells(nextRow, 2).Value = email.datum || '';
-                                worksheet.Cells(nextRow, 11).Value = email.betreff || '';
-                                worksheet.Cells(nextRow, 12).Value = '[FEHLER beim Import: ' + writeErr.message + ']';
-                                existingData[emailKey] = nextRow;
-                                nextRow++;
+                                worksheet.Cells(errorRow, 1).Value = 'HC-' + (errorRow - 1);
+                                worksheet.Cells(errorRow, 2).Value = email.datum || '';
+                                worksheet.Cells(errorRow, 11).Value = email.betreff || '';
+                                worksheet.Cells(errorRow, 12).Value = '[FEHLER beim Import: ' + writeErr.message + ']';
+                                existingData[emailKey] = errorRow;
+                                nextRow = errorRow + 1;
                                 skipCount++;  // Count as skipped
                             } catch (e2) {
                                 // Even minimal write failed - just skip
