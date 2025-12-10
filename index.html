@@ -428,6 +428,15 @@
             color: var(--text-secondary);
         }
 
+        .html-email-frame {
+            width: 100%;
+            min-height: 400px;
+            height: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+        }
+
         /* Provision Data Box */
         .provision-box {
             background: var(--warning-light);
@@ -2008,9 +2017,16 @@
             }
 
             // Email text with keyword highlighting
-            // Prefer anfrage field (corrected text) over raw text (may contain full thread)
-            const displayText = email.anfrage || email.text;
-            document.getElementById('detailText').innerHTML = highlightKeywords(displayText);
+            // Check if HTML body is available and contains tables
+            const detailTextEl = document.getElementById('detailText');
+            if (email.htmlBody && email.htmlBody.includes('<table')) {
+                // Display HTML content in iframe for safety and proper table rendering
+                detailTextEl.innerHTML = `<iframe class="html-email-frame" srcdoc="${escapeHtml(email.htmlBody)}" sandbox="allow-same-origin"></iframe>`;
+            } else {
+                // Prefer anfrage field (corrected text) over raw text (may contain full thread)
+                const displayText = email.anfrage || email.text;
+                detailTextEl.innerHTML = highlightKeywords(displayText);
+            }
 
             // Update step indicator to "Kategorisieren"
             updateStepIndicator(2);
