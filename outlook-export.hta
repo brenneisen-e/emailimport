@@ -2965,15 +2965,18 @@
         if (!window.JSON) {
             window.JSON = {
                 stringify: function(obj, rep, space) {
+                    function escapeStr(s) {
+                        return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+                    }
                     var t = typeof obj;
                     if (t !== 'object' || obj === null) {
-                        if (t === 'string') obj = '"' + obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') + '"';
+                        if (t === 'string') obj = '"' + escapeStr(obj) + '"';
                         return String(obj);
                     }
                     var n, v, json = [], arr = (obj && obj.constructor === Array);
                     for (n in obj) {
                         v = obj[n]; t = typeof v;
-                        if (t === 'string') v = '"' + v.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') + '"';
+                        if (t === 'string') v = '"' + escapeStr(v) + '"';
                         else if (t === 'object' && v !== null) v = JSON.stringify(v);
                         else if (t === 'undefined') continue;
                         json.push((arr ? '' : '"' + n + '":') + String(v));

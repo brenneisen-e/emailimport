@@ -2018,12 +2018,19 @@
             // Email text with keyword highlighting
             // Check if HTML body is available (contains HTML tags like tables, divs, etc.)
             const detailTextEl = document.getElementById('detailText');
+
+            // Debug: Check htmlBody
+            console.log('htmlBody exists:', !!email.htmlBody, 'length:', email.htmlBody ? email.htmlBody.length : 0);
+            if (email.htmlBody) console.log('htmlBody preview:', email.htmlBody.substring(0, 200));
+
             const hasHtmlContent = email.htmlBody && (
                 email.htmlBody.toLowerCase().includes('<table') ||
                 email.htmlBody.toLowerCase().includes('<div') ||
                 email.htmlBody.toLowerCase().includes('<br') ||
                 email.htmlBody.toLowerCase().includes('<p>')
             );
+
+            console.log('hasHtmlContent:', hasHtmlContent);
 
             if (hasHtmlContent) {
                 // Display HTML content in iframe using srcdoc for maximum compatibility
