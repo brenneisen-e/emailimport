@@ -1608,12 +1608,27 @@
             var result = '';
             for (var i = 0; i < text.length; i++) {
                 var code = text.charCodeAt(i);
-                // Keep only characters in the Basic Multilingual Plane that are safe
                 // Skip surrogate pairs (emojis, etc.) which are 0xD800-0xDFFF
-                // Skip other problematic ranges
-                if (code < 0xD800 || (code > 0xDFFF && code < 0xFFFE)) {
-                    result += text.charAt(i);
+                if (code >= 0xD800 && code <= 0xDFFF) {
+                    continue;
                 }
+                // Skip control characters except newline, carriage return, tab
+                if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
+                    continue;
+                }
+                // Skip other problematic ranges
+                if (code >= 0xFFFE) {
+                    continue;
+                }
+                // Skip private use area
+                if (code >= 0xE000 && code <= 0xF8FF) {
+                    continue;
+                }
+                // Skip variation selectors and other modifiers that can cause issues
+                if (code >= 0xFE00 && code <= 0xFE0F) {
+                    continue;
+                }
+                result += text.charAt(i);
             }
             return result;
         }
@@ -2363,11 +2378,11 @@
                         var reply = antworten[r];
                         if (!reply) continue;
 
-                        // Safely extract datum
+                        // Safely extract datum and sanitize
                         var replyDatum = '';
                         try {
                             if (reply.datum !== undefined && reply.datum !== null) {
-                                replyDatum = '' + reply.datum;
+                                replyDatum = sanitizeText('' + reply.datum);
                             }
                         } catch (e) { replyDatum = ''; }
 
@@ -2387,12 +2402,12 @@
                             replyText = replyText.substring(0, 2000) + '...';
                         }
 
-                        // Format: show direction (incoming vs outgoing)
+                        // Format: show direction (incoming vs outgoing) - sanitize recipient name
                         var direction = '';
                         if (reply.isIncoming) {
                             direction = '[Eingehend]';
                         } else if (reply.an) {
-                            direction = '[An: ' + reply.an + ']';
+                            direction = '[An: ' + sanitizeText('' + reply.an) + ']';
                         }
 
                         text += '=== ' + replyDatum + ' ' + direction + ' ===\n' + replyText + '\n\n';
@@ -2400,7 +2415,7 @@
                         text += '=== [Fehler beim Lesen dieser Antwort] ===\n\n';
                     }
                 }
-                return text.trim();
+                return sanitizeText(text.trim());
             } catch (e) {
                 return '[Fehler: ' + (e.message || e) + ']';
             }
