@@ -1738,22 +1738,22 @@
             const t = text.toLowerCase();
             const combined = s + ' ' + t;
 
-            // KV - Krankenversicherung (erweitert)
-            if (combined.match(/\bkv\b|kranken|gesundheit|pflege|auslandsreise|reisekranken|\bbkk\b|zahnzusatz|krankenzusatz|ambulant|stationär|krankentagegeld/)) clusters.push('KV');
-            // KFZ - Kraftfahrzeug (erweitert)
-            if (combined.match(/\bkfz\b|auto|fahrzeug|kasko|vollkasko|teilkasko|\bpkw\b|kennzeichen|motorrad|anhänger/)) clusters.push('KFZ');
-            // SHUK - Sach/Haftpflicht/Unfall/Komposit (erweitert)
-            if (combined.match(/\bshuk\b|sach|haftpflicht|unfall|hausrat|wohngebäude|gebäude|rechtsschutz|tierhalter|\bhund\b|pferd|gewässer|photovoltaik/)) clusters.push('SHUK');
-            // LV - Lebensversicherung (erweitert)
-            if (combined.match(/\blv\b|leben|rente|altersvorsorge|riester|rürup|\bbav\b|betrieblich|sterbegeld|berufsunfähigkeit|\bbu\b/)) clusters.push('LV');
-            // Provisionierung (erweitert)
-            if (combined.match(/provision|vergütung|courtage|abrechnung|storno|dynamisierung|bestandspflege/)) clusters.push('Provisionierung');
-            // Produktzuordnung (erweitert)
-            if (combined.match(/zuordnung|produkt|tarif|umstellung|migration|tarifwechsel/)) clusters.push('Produktzuordnung');
-            // Bestand
-            if (combined.match(/\bbestand\b|bestandskunde|bestandsvertrag|bestandsdaten/)) clusters.push('Bestand');
+            // KV - Krankenversicherung (präzise Wortgrenzen)
+            if (combined.match(/\bkv\b|\bkrankenversicherung\b|\bkrankenkasse\b|\bgesundheit\b|\bpflegeversicherung\b|\bauslandsreise\b|\breisekranken\b|\bbkk\b|\bzahnzusatz\b|\bkrankenzusatz\b|\bambulant\b|\bstationär\b|\bkrankentagegeld\b/)) clusters.push('KV');
+            // KFZ - Kraftfahrzeug (präzise Wortgrenzen)
+            if (combined.match(/\bkfz\b|\bkraftfahrzeug\b|\bfahrzeugversicherung\b|\bkasko\b|\bvollkasko\b|\bteilkasko\b|\bpkw\b|\bkennzeichen\b|\bmotorrad\b|\banhängerversicherung\b/)) clusters.push('KFZ');
+            // SHUK - Sach/Haftpflicht/Unfall/Komposit (präzise Wortgrenzen)
+            if (combined.match(/\bshuk\b|\bsachversicherung\b|\bhaftpflicht\b|\bunfallversicherung\b|\bhausrat\b|\bwohngebäude\b|\brechtsschutz\b|\btierhalter\b|\bgewässerschaden\b|\bphotovoltaik\b/)) clusters.push('SHUK');
+            // LV - Lebensversicherung (präzise Wortgrenzen)
+            if (combined.match(/\blv\b|\blebensversicherung\b|\brentenversicherung\b|\baltersvorsorge\b|\briester\b|\brürup\b|\bbav\b|\bsterbegeld\b|\bberufsunfähigkeit\b|\bbu-versicherung\b/)) clusters.push('LV');
+            // Provisionierung (präzise Wortgrenzen)
+            if (combined.match(/\bprovision\b|\bprovisionsreklamation\b|\bvergütung\b|\bcourtage\b|\bstorno\b|\bdynamisierung\b|\bbestandspflege\b/)) clusters.push('Provisionierung');
+            // Produktzuordnung (präzise Wortgrenzen)
+            if (combined.match(/\bproduktzuordnung\b|\btarifwechsel\b|\bmigration\b|\bumstellung\b/)) clusters.push('Produktzuordnung');
+            // Bestand (präzise Wortgrenzen)
+            if (combined.match(/\bbestand\b|\bbestandskunde\b|\bbestandsvertrag\b|\bbestandsdaten\b/)) clusters.push('Bestand');
             // Absatzeinheiten (AE)
-            if (combined.match(/\bae\b|absatzeinheit|absatzeinheiten/)) clusters.push('Absatzeinheiten');
+            if (combined.match(/\bae\b|\babsatzeinheit\b|\babsatzeinheiten\b/)) clusters.push('Absatzeinheiten');
 
             return clusters.length > 0 ? clusters : ['Allgemein'];
         }
