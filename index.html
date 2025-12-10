@@ -1205,6 +1205,7 @@
                                     <option value="Neu">Neu</option>
                                     <option value="In Bearbeitung">In Bearbeitung</option>
                                     <option value="Erledigt">Erledigt</option>
+                                    <option value="Keine BGAV Relevanz">Keine BGAV Relevanz</option>
                                 </select>
                             </div>
 
@@ -1570,6 +1571,12 @@
         }
 
         function processEmails(rawEmails) {
+            // Filter out emails with subject containing "Online-Abschluss Vermittlerzuordnung ändern"
+            rawEmails = rawEmails.filter(email => {
+                const subject = (email.betreff || email.subject || '').toLowerCase();
+                return !subject.includes('online-abschluss vermittlerzuordnung ändern');
+            });
+
             emails = rawEmails.map(email => {
                 const text = email.text || email.body || '';
                 const subject = email.betreff || email.subject || '';
