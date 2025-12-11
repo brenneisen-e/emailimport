@@ -42,16 +42,14 @@ function loadJsonFile(path) {
             return;
         }
 
-        // Read file with UTF-16LE encoding
-        var stream = new ActiveXObject("ADODB.Stream");
-        stream.Type = 2; // adTypeText
-        stream.Charset = "UTF-16LE";
-        stream.Open();
-        stream.LoadFromFile(path);
-        var content = stream.ReadText();
-        stream.Close();
+        // Read file using FileSystemObject (works with network paths)
+        // OpenTextFile(path, iomode, create, format)
+        // iomode: 1=ForReading, format: -1=TristateTrue (Unicode/UTF-16LE)
+        var file = fso.OpenTextFile(path, 1, false, -1);
+        var content = file.ReadAll();
+        file.Close();
 
-        // Remove BOM if present
+        // Remove BOM if present (FSO may include it)
         if (content.charCodeAt(0) === 0xFEFF) {
             content = content.substring(1);
         }

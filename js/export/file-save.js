@@ -35,14 +35,12 @@ function saveExportFile(emails, repliesFound, duplicatesSkipped, duplicatesWithR
         // Build JSON string with proper formatting
         var jsonContent = buildJsonString(emails);
 
-        // Write as UTF-16LE (compatible with HTA/JScript)
-        var stream = new ActiveXObject("ADODB.Stream");
-        stream.Type = 2; // adTypeText
-        stream.Charset = "UTF-16LE";
-        stream.Open();
-        stream.WriteText(jsonContent);
-        stream.SaveToFile(filename, 2); // adSaveCreateOverWrite
-        stream.Close();
+        // Write using FileSystemObject (works with network paths)
+        // CreateTextFile(path, overwrite, unicode)
+        // unicode=true creates UTF-16LE file with BOM
+        var file = fso.CreateTextFile(filename, true, true);
+        file.Write(jsonContent);
+        file.Close();
 
         // Store for direct import
         lastExportedEmails = emails;
