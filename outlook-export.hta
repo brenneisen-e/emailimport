@@ -1069,8 +1069,17 @@
                             emailData.existingReplyIds = existingReplyIdList;
                             emailData.isDuplicateWithNewReplies = true;
                             exportState.duplicatesWithReplies++;
-                            // Clean email text before export
-                            emailData.text = removeEmailQuotes(emailData.text);
+                            // PHASE 3: Clean email text before export - use HTML extraction if possible
+                            if (emailData.htmlBody) {
+                                var dupContentResult = extractNewContentFromHtml(emailData.htmlBody);
+                                if (dupContentResult.newContent) {
+                                    emailData.text = dupContentResult.newContent;
+                                } else {
+                                    emailData.text = removeEmailQuotes(emailData.text);
+                                }
+                            } else {
+                                emailData.text = removeEmailQuotes(emailData.text);
+                            }
                             exportState.emails.push(emailData);
                         } else {
                             exportState.duplicatesSkipped++;
@@ -1080,14 +1089,32 @@
                         // Save original text for date extraction BEFORE modifying
                         var originalRawText = emailData.text;
 
+                        // PHASE 3: Extract only new content from HTML for incoming reply
+                        var incomingReplyText = '';
+                        if (emailData.htmlBody) {
+                            var incomingContentResult = extractNewContentFromHtml(emailData.htmlBody);
+                            if (incomingContentResult.newContent) {
+                                incomingReplyText = incomingContentResult.newContent;
+                            } else {
+                                incomingReplyText = removeEmailQuotes(emailData.text);
+                            }
+                        } else {
+                            incomingReplyText = removeEmailQuotes(emailData.text);
+                        }
+
                         // The email's text becomes a new reply, not a new Anfrage
                         var incomingReply = {
                             datum: emailData.datum,
                             an: '',  // Incoming email, no "An"
-                            text: removeEmailQuotes(emailData.text),
+                            text: incomingReplyText,
+                            fullText: originalRawText,  // Keep original for reference
                             replyId: emailData.emailId,
+                            internetMessageId: emailData.internetMessageId || '',
+                            inReplyTo: emailData.inReplyTo || '',
                             isNew: true,
-                            isIncoming: true  // Mark as incoming (not from sent items)
+                            isIncoming: true,  // Mark as incoming (not from sent items)
+                            threadDepth: 1,    // Default, will be recalculated if needed
+                            threadPosition: 0  // Will be set after sorting
                         };
 
                         // Combine with any sent replies
@@ -1149,8 +1176,18 @@
                         emailData.isDuplicateWithNewReplies = true;
                         emailData.isConversationContinuation = true;  // Flag for import
                         exportState.duplicatesWithReplies++;
-                        // Clean email text before export
-                        emailData.text = removeEmailQuotes(emailData.text);
+                        // PHASE 3: Clean email text before export
+                        // Note: text may already be set from Excel original, so only clean if not from Excel
+                        if (!originalAnfrage && emailData.htmlBody) {
+                            var contContentResult = extractNewContentFromHtml(emailData.htmlBody);
+                            if (contContentResult.newContent) {
+                                emailData.text = contContentResult.newContent;
+                            } else {
+                                emailData.text = removeEmailQuotes(emailData.text);
+                            }
+                        } else {
+                            emailData.text = removeEmailQuotes(emailData.text);
+                        }
                         exportState.emails.push(emailData);
                     } else {
                         // Completely new email - check if a sent item started this conversation
@@ -1169,14 +1206,32 @@
 
                         // If a sent item is older than the inbox email, it's the actual "Anfrage"
                         if (oldestSentItem && oldestSentDate < inboxDate) {
+                            // PHASE 3: Extract only new content from inbox email
+                            var inboxReplyText = '';
+                            if (emailData.htmlBody) {
+                                var inboxContentResult = extractNewContentFromHtml(emailData.htmlBody);
+                                if (inboxContentResult.newContent) {
+                                    inboxReplyText = inboxContentResult.newContent;
+                                } else {
+                                    inboxReplyText = removeEmailQuotes(emailData.text);
+                                }
+                            } else {
+                                inboxReplyText = removeEmailQuotes(emailData.text);
+                            }
+
                             // The sent item is the Anfrage, inbox email becomes a reply
                             var inboxAsReply = {
                                 datum: emailData.datum,
                                 an: '',  // Incoming email
-                                text: removeEmailQuotes(emailData.text),
+                                text: inboxReplyText,
+                                fullText: emailData.text,  // Keep original for reference
                                 replyId: emailData.emailId,
+                                internetMessageId: emailData.internetMessageId || '',
+                                inReplyTo: emailData.inReplyTo || '',
                                 isNew: true,
-                                isIncoming: true
+                                isIncoming: true,
+                                threadDepth: 1,
+                                threadPosition: 0
                             };
 
                             // Build replies: all sent items except the oldest (which is Anfrage)
@@ -1236,8 +1291,17 @@
                             emailData.betreff = stripSubjectPrefixes(emailData.betreff);
                         }
 
-                        // Clean email text before export
-                        emailData.text = removeEmailQuotes(emailData.text);
+                        // PHASE 3: Clean email text before export - use HTML extraction if possible
+                        if (emailData.htmlBody) {
+                            var emailContentResult = extractNewContentFromHtml(emailData.htmlBody);
+                            if (emailContentResult.newContent) {
+                                emailData.text = emailContentResult.newContent;
+                            } else {
+                                emailData.text = removeEmailQuotes(emailData.text);
+                            }
+                        } else {
+                            emailData.text = removeEmailQuotes(emailData.text);
+                        }
                         exportState.emails.push(emailData);
                     }
                 } catch (e) {}
@@ -1422,11 +1486,22 @@
                 var group = threadGroups[threadId];
 
                 if (group.length === 1) {
-                    // Single email - just clean it and add
+                    // Single email - extract new content only
                     var singleEmail = group[0];
-                    singleEmail.text = removeEmailQuotes(singleEmail.text);
 
-                    // PHASE 2: Add thread metadata
+                    // PHASE 3: Extract only new content from HTML
+                    if (singleEmail.htmlBody) {
+                        var singleContentResult = extractNewContentFromHtml(singleEmail.htmlBody);
+                        if (singleContentResult.newContent) {
+                            singleEmail.text = singleContentResult.newContent;
+                        } else {
+                            singleEmail.text = removeEmailQuotes(singleEmail.text);
+                        }
+                    } else {
+                        singleEmail.text = removeEmailQuotes(singleEmail.text);
+                    }
+
+                    // PHASE 3: Add thread metadata
                     singleEmail.threadPosition = 1;
                     singleEmail.threadDepth = 0;
                     singleEmail.isThreadRoot = true;
@@ -1434,61 +1509,181 @@
                     // Also add sent replies using multi-layer matching
                     var sentReplies = findRepliesMultiLayer(singleEmail);
                     if (sentReplies.length > 0) {
+                        // PHASE 3: Process sent replies with date extraction and content extraction
+                        for (var si = 0; si < sentReplies.length; si++) {
+                            var sentReply = sentReplies[si];
+                            sentReply.threadPosition = si + 2;
+
+                            // Calculate depth for sent replies
+                            if (sentReply.inReplyTo === singleEmail.internetMessageId) {
+                                sentReply.threadDepth = 1;
+                                sentReply.isDirectReplyToRoot = true;
+                            } else {
+                                sentReply.threadDepth = 1;  // Default for single email threads
+                                sentReply.isDirectReplyToRoot = true;
+                            }
+                            sentReply.parentMessageId = sentReply.inReplyTo || singleEmail.internetMessageId;
+                        }
                         singleEmail.antworten = (singleEmail.antworten || []).concat(sentReplies);
                     }
                     result.push(singleEmail);
                 } else {
-                    // Multiple emails - sort by date, oldest = Anfrage
-                    group.sort(function(a, b) {
-                        return new Date(a.datum) - new Date(b.datum);
-                    });
+                    // ============================================================
+                    // PHASE 3: Improved Thread Root Identification & Processing
+                    // ============================================================
 
-                    var anfrage = group[0];  // Oldest email
-                    anfrage.text = removeEmailQuotes(anfrage.text);
+                    // Step 1: Find the TRUE thread root
+                    // Root = email WITHOUT inReplyTo OR whose inReplyTo points outside the thread
+                    var threadMessageIds = {};
+                    for (var ti = 0; ti < group.length; ti++) {
+                        if (group[ti].internetMessageId) {
+                            threadMessageIds[group[ti].internetMessageId] = group[ti];
+                        }
+                    }
 
-                    // PHASE 2: Add thread metadata to root
+                    var anfrage = null;
+                    var rootCandidates = [];
+
+                    // Find emails without inReplyTo or with inReplyTo pointing outside thread
+                    for (var ri = 0; ri < group.length; ri++) {
+                        var email = group[ri];
+                        if (!email.inReplyTo || !threadMessageIds[email.inReplyTo]) {
+                            rootCandidates.push(email);
+                        }
+                    }
+
+                    if (rootCandidates.length === 1) {
+                        // Perfect - exactly one root found
+                        anfrage = rootCandidates[0];
+                    } else if (rootCandidates.length > 1) {
+                        // Multiple candidates - pick the oldest one
+                        rootCandidates.sort(function(a, b) {
+                            return new Date(a.datum) - new Date(b.datum);
+                        });
+                        anfrage = rootCandidates[0];
+                    } else {
+                        // No root found (all have inReplyTo in thread) - use oldest
+                        group.sort(function(a, b) {
+                            return new Date(a.datum) - new Date(b.datum);
+                        });
+                        anfrage = group[0];
+                    }
+
+                    // Extract only new content from root
+                    if (anfrage.htmlBody) {
+                        var rootContent = extractNewContentFromHtml(anfrage.htmlBody);
+                        if (rootContent.newContent) {
+                            anfrage.text = rootContent.newContent;
+                        } else {
+                            anfrage.text = removeEmailQuotes(anfrage.text);
+                        }
+                    } else {
+                        anfrage.text = removeEmailQuotes(anfrage.text);
+                    }
+
+                    // PHASE 3: Add thread metadata to root
                     anfrage.threadPosition = 1;
                     anfrage.threadDepth = 0;
                     anfrage.isThreadRoot = true;
 
-                    // All other emails become replies
+                    // Step 2: Process all other emails as replies
                     var antworten = [];
-                    for (var j = 1; j < group.length; j++) {
+                    for (var j = 0; j < group.length; j++) {
                         var replyEmail = group[j];
+
+                        // Skip the root email
+                        if (replyEmail === anfrage) continue;
+
+                        // PHASE 3: Extract actual date from HTML headers if available
+                        var actualDate = replyEmail.datum;
+                        var dateExtracted = false;
+                        if (replyEmail.htmlBody) {
+                            var dateResult = extractDateFromHtmlHeader(replyEmail.htmlBody);
+                            if (dateResult.success) {
+                                actualDate = formatDate(dateResult.date);
+                                dateExtracted = true;
+                            }
+                        }
+
+                        // PHASE 3: Extract only new content from reply
+                        var replyText = '';
+                        if (replyEmail.htmlBody) {
+                            var contentResult = extractNewContentFromHtml(replyEmail.htmlBody);
+                            if (contentResult.newContent) {
+                                replyText = contentResult.newContent;
+                            } else {
+                                replyText = removeEmailQuotes(replyEmail.text);
+                            }
+                        } else {
+                            replyText = removeEmailQuotes(replyEmail.text);
+                        }
 
                         // Determine thread depth based on In-Reply-To chain
                         var depth = calculateThreadDepth(replyEmail, anfrage, emailsByMsgId);
 
+                        // Determine if this is a direct reply to root
+                        var isDirectReplyToRoot = (replyEmail.inReplyTo === anfrage.internetMessageId);
+
                         antworten.push({
-                            datum: replyEmail.datum,
+                            datum: actualDate,
+                            datumExtracted: dateExtracted,
                             von: replyEmail.von_name,
                             vonEmail: replyEmail.von_email,
-                            text: removeEmailQuotes(replyEmail.text),
+                            text: replyText,
+                            fullText: replyEmail.text,  // Keep original for reference
                             htmlBody: replyEmail.htmlBody || '',
                             replyId: replyEmail.emailId,
                             internetMessageId: replyEmail.internetMessageId,
                             inReplyTo: replyEmail.inReplyTo,
                             isNew: true,
                             isIncoming: true,
-                            // PHASE 2: Thread metadata
-                            threadPosition: j + 1,
+                            // PHASE 3: Enhanced thread metadata
+                            threadPosition: 0,  // Will be set after sorting
                             threadDepth: depth,
-                            parentMessageId: replyEmail.inReplyTo || anfrage.internetMessageId
+                            parentMessageId: replyEmail.inReplyTo || anfrage.internetMessageId,
+                            isDirectReplyToRoot: isDirectReplyToRoot
                         });
                     }
 
                     // Add sent replies using multi-layer matching
                     var sentReplies = findRepliesMultiLayer(anfrage);
                     for (var k = 0; k < sentReplies.length; k++) {
-                        antworten.push(sentReplies[k]);
+                        var sentReply = sentReplies[k];
+
+                        // PHASE 3: Extract date from HTML header for sent replies too
+                        if (sentReply.htmlBody) {
+                            var sentDateResult = extractDateFromHtmlHeader(sentReply.htmlBody);
+                            if (sentDateResult.success) {
+                                sentReply.datum = formatDate(sentDateResult.date);
+                                sentReply.datumExtracted = true;
+                            }
+
+                            // Extract only new content
+                            var sentContentResult = extractNewContentFromHtml(sentReply.htmlBody);
+                            if (sentContentResult.newContent) {
+                                sentReply.text = sentContentResult.newContent;
+                            }
+                        }
+
+                        // Calculate depth for sent replies
+                        if (sentReply.inReplyTo) {
+                            sentReply.threadDepth = calculateThreadDepthFromMsgId(sentReply.inReplyTo, anfrage, emailsByMsgId, threadMessageIds);
+                            sentReply.isDirectReplyToRoot = (sentReply.inReplyTo === anfrage.internetMessageId);
+                        } else {
+                            sentReply.threadDepth = 1;
+                            sentReply.isDirectReplyToRoot = true;
+                        }
+                        sentReply.parentMessageId = sentReply.inReplyTo || anfrage.internetMessageId;
+
+                        antworten.push(sentReply);
                     }
 
-                    // Sort all replies by date
+                    // Step 3: Sort all replies chronologically by actual date
                     antworten.sort(function(a, b) {
                         return new Date(a.datum) - new Date(b.datum);
                     });
 
-                    // Update thread positions after sorting
+                    // Step 4: Update thread positions after sorting (chronological order)
                     for (var m = 0; m < antworten.length; m++) {
                         antworten[m].threadPosition = m + 2; // +2 because root is position 1
                     }
@@ -1514,6 +1709,31 @@
                 }
 
                 var parentEmail = emailsByMsgId[currentMsgId];
+                if (parentEmail) {
+                    depth++;
+                    currentMsgId = parentEmail.inReplyTo;
+                } else {
+                    break; // Parent not found
+                }
+            }
+
+            return depth;
+        }
+
+        // PHASE 3: Calculate thread depth from a message ID (for sent items)
+        // Combines emailsByMsgId (inbox) with threadMessageIds (current thread) for lookup
+        function calculateThreadDepthFromMsgId(inReplyToMsgId, rootEmail, emailsByMsgId, threadMessageIds) {
+            var depth = 1; // Default depth for direct reply
+            var maxDepth = 10; // Prevent infinite loops
+
+            var currentMsgId = inReplyToMsgId;
+            while (currentMsgId && depth < maxDepth) {
+                if (currentMsgId === rootEmail.internetMessageId) {
+                    break; // Reached root
+                }
+
+                // Look up in both maps
+                var parentEmail = emailsByMsgId[currentMsgId] || threadMessageIds[currentMsgId];
                 if (parentEmail) {
                     depth++;
                     currentMsgId = parentEmail.inReplyTo;
@@ -1583,17 +1803,42 @@
         }
 
         // Helper to create a reply object from cached sent item
+        // PHASE 3: Enhanced with date extraction and content extraction
         function createReplyObject(cached) {
+            var replyDatum = formatDate(cached.sentDate);
+            var datumExtracted = false;
+            var replyText = cached.body ? cached.body.trim() : '';
+            var fullText = replyText;
+
+            // PHASE 3: Try to extract actual date from HTML headers
+            if (cached.htmlBody) {
+                var dateResult = extractDateFromHtmlHeader(cached.htmlBody);
+                if (dateResult.success) {
+                    replyDatum = formatDate(dateResult.date);
+                    datumExtracted = true;
+                }
+
+                // PHASE 3: Extract only new content from HTML
+                var contentResult = extractNewContentFromHtml(cached.htmlBody);
+                if (contentResult.newContent) {
+                    replyText = contentResult.newContent;
+                }
+            }
+
             return {
-                datum: formatDate(cached.sentDate),
+                datum: replyDatum,
+                datumExtracted: datumExtracted,
                 an: cached.to || '',
-                text: cached.body.trim(),
+                text: replyText,
+                fullText: fullText,  // Keep original for reference
                 htmlBody: cached.htmlBody || '',
                 replyId: cached.entryId || '',
                 internetMessageId: cached.internetMessageId || '',
                 inReplyTo: cached.inReplyTo || '',
                 isIncoming: false,  // Sent items are outgoing
-                threadDepth: 1      // Default depth
+                threadDepth: 1,     // Default depth (will be recalculated in groupEmailsByConversation)
+                threadPosition: 0,  // Will be set after sorting
+                parentMessageId: cached.inReplyTo || ''  // Will be refined in groupEmailsByConversation
             };
         }
 
@@ -2114,6 +2359,263 @@
             text = text.trim();
             if (text.length > 10000) text = text.substring(0, 10000) + '...';
             return text;
+        }
+
+        // ============================================================
+        // PHASE 3: Extract Date from HTML Email Headers
+        // ============================================================
+        // Extracts the actual date from embedded email headers in HTML body
+        // Returns: { date: Date object, success: boolean }
+        function extractDateFromHtmlHeader(htmlBody) {
+            if (!htmlBody) return { date: null, success: false };
+
+            var result = { date: null, success: false };
+
+            // German months mapping
+            var germanMonths = {
+                'januar': 0, 'februar': 1, 'märz': 2, 'maerz': 2, 'april': 3,
+                'mai': 4, 'juni': 5, 'juli': 6, 'august': 7, 'september': 8,
+                'oktober': 9, 'november': 10, 'dezember': 11
+            };
+
+            // English months mapping
+            var englishMonths = {
+                'january': 0, 'february': 1, 'march': 2, 'april': 3,
+                'may': 4, 'june': 5, 'july': 6, 'august': 7, 'september': 8,
+                'october': 9, 'november': 10, 'december': 11
+            };
+
+            // Pattern 1: German HTML format - "Gesendet:</b> Dienstag, 9. Dezember 2025 16:05"
+            var germanHtmlPattern = /Gesendet:<\/b>\s*\w+,\s*(\d{1,2})\.\s*(\w+)\s+(\d{4})\s+(\d{1,2}):(\d{2})/i;
+            var match = germanHtmlPattern.exec(htmlBody);
+            if (match) {
+                var day = parseInt(match[1], 10);
+                var monthName = match[2].toLowerCase();
+                var year = parseInt(match[3], 10);
+                var hour = parseInt(match[4], 10);
+                var minute = parseInt(match[5], 10);
+                var month = germanMonths[monthName];
+
+                if (month !== undefined) {
+                    var date = new Date(year, month, day, hour, minute, 0);
+                    if (!isNaN(date.getTime())) {
+                        result.date = date;
+                        result.success = true;
+                        return result;
+                    }
+                }
+            }
+
+            // Pattern 2: English HTML format - "Sent:</b> Tuesday, December 9, 2025 3:28 PM"
+            var englishHtmlPattern = /Sent:<\/b>\s*\w+,\s*(\w+)\s+(\d{1,2}),\s*(\d{4})\s+(\d{1,2}):(\d{2})(?:\s*(AM|PM))?/i;
+            match = englishHtmlPattern.exec(htmlBody);
+            if (match) {
+                var monthName = match[1].toLowerCase();
+                var day = parseInt(match[2], 10);
+                var year = parseInt(match[3], 10);
+                var hour = parseInt(match[4], 10);
+                var minute = parseInt(match[5], 10);
+                var ampm = match[6] ? match[6].toUpperCase() : '';
+                var month = englishMonths[monthName];
+
+                if (month !== undefined) {
+                    // Handle AM/PM
+                    if (ampm === 'PM' && hour < 12) hour += 12;
+                    if (ampm === 'AM' && hour === 12) hour = 0;
+
+                    var date = new Date(year, month, day, hour, minute, 0);
+                    if (!isNaN(date.getTime())) {
+                        result.date = date;
+                        result.success = true;
+                        return result;
+                    }
+                }
+            }
+
+            // Pattern 3: German HTML format without bold - "Gesendet: Dienstag, 9. Dezember 2025 16:05"
+            var germanPlainPattern = /Gesendet:\s*\w+,\s*(\d{1,2})\.\s*(\w+)\s+(\d{4})\s+(\d{1,2}):(\d{2})/i;
+            match = germanPlainPattern.exec(htmlBody);
+            if (match) {
+                var day = parseInt(match[1], 10);
+                var monthName = match[2].toLowerCase();
+                var year = parseInt(match[3], 10);
+                var hour = parseInt(match[4], 10);
+                var minute = parseInt(match[5], 10);
+                var month = germanMonths[monthName];
+
+                if (month !== undefined) {
+                    var date = new Date(year, month, day, hour, minute, 0);
+                    if (!isNaN(date.getTime())) {
+                        result.date = date;
+                        result.success = true;
+                        return result;
+                    }
+                }
+            }
+
+            // Pattern 4: English HTML format without bold
+            var englishPlainPattern = /Sent:\s*\w+,\s*(\w+)\s+(\d{1,2}),\s*(\d{4})\s+(\d{1,2}):(\d{2})(?:\s*(AM|PM))?/i;
+            match = englishPlainPattern.exec(htmlBody);
+            if (match) {
+                var monthName = match[1].toLowerCase();
+                var day = parseInt(match[2], 10);
+                var year = parseInt(match[3], 10);
+                var hour = parseInt(match[4], 10);
+                var minute = parseInt(match[5], 10);
+                var ampm = match[6] ? match[6].toUpperCase() : '';
+                var month = englishMonths[monthName];
+
+                if (month !== undefined) {
+                    if (ampm === 'PM' && hour < 12) hour += 12;
+                    if (ampm === 'AM' && hour === 12) hour = 0;
+
+                    var date = new Date(year, month, day, hour, minute, 0);
+                    if (!isNaN(date.getTime())) {
+                        result.date = date;
+                        result.success = true;
+                        return result;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // ============================================================
+        // PHASE 3: Extract Only New Content from HTML (Remove Quoted Text)
+        // ============================================================
+        // Extracts only the new content BEFORE the first quote separator
+        // Returns: { newContent: string, hasQuotes: boolean }
+        function extractNewContentFromHtml(htmlBody) {
+            if (!htmlBody) return { newContent: '', hasQuotes: false };
+
+            var result = { newContent: '', hasQuotes: false };
+
+            // Find the position of quote separators in HTML
+            var quotePatterns = [
+                // Outlook-style border separator (most common)
+                /<div[^>]*style\s*=\s*["'][^"']*border-top\s*:\s*solid\s*#E1E1E1[^"']*["'][^>]*>/i,
+                /<div[^>]*style\s*=\s*["'][^"']*border-top\s*:\s*solid\s+#[A-Fa-f0-9]{6}[^"']*["'][^>]*>/i,
+                // Header block start
+                /<p[^>]*><b>Von:<\/b>/i,
+                /<p[^>]*><b>From:<\/b>/i,
+                /<b>Von:<\/b>/i,
+                /<b>From:<\/b>/i,
+                // Separator lines
+                /-----\s*Urspr/i,
+                /-----\s*Original/i,
+                /-----\s*Weitergeleit/i,
+                /_{5,}\s*Von:/i,
+                /_{5,}\s*From:/i
+            ];
+
+            var earliestPos = htmlBody.length;
+            for (var i = 0; i < quotePatterns.length; i++) {
+                var match = quotePatterns[i].exec(htmlBody);
+                if (match && match.index < earliestPos) {
+                    earliestPos = match.index;
+                    result.hasQuotes = true;
+                }
+            }
+
+            if (result.hasQuotes) {
+                // Extract content before the quote
+                var contentBefore = htmlBody.substring(0, earliestPos);
+
+                // Convert HTML to plain text
+                result.newContent = htmlToPlainText(contentBefore);
+            } else {
+                // No quotes found - return full content as plain text
+                result.newContent = htmlToPlainText(htmlBody);
+            }
+
+            // Clean up the result
+            result.newContent = result.newContent.trim();
+
+            // Remove signature if present
+            result.newContent = removeSignature(result.newContent);
+
+            return result;
+        }
+
+        // Convert HTML to plain text
+        function htmlToPlainText(html) {
+            if (!html) return '';
+
+            var text = html;
+
+            // Remove style and script tags with content
+            text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+            text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+            // Replace <br>, <p>, <div> with newlines
+            text = text.replace(/<br\s*\/?>/gi, '\n');
+            text = text.replace(/<\/p>/gi, '\n');
+            text = text.replace(/<\/div>/gi, '\n');
+            text = text.replace(/<p[^>]*>/gi, '');
+            text = text.replace(/<div[^>]*>/gi, '');
+
+            // Replace &nbsp; with space
+            text = text.replace(/&nbsp;/gi, ' ');
+
+            // Decode common HTML entities
+            text = text.replace(/&amp;/gi, '&');
+            text = text.replace(/&lt;/gi, '<');
+            text = text.replace(/&gt;/gi, '>');
+            text = text.replace(/&quot;/gi, '"');
+            text = text.replace(/&#39;/gi, "'");
+
+            // Remove all remaining HTML tags
+            text = text.replace(/<[^>]+>/g, '');
+
+            // Clean up whitespace
+            text = text.replace(/\r\n/g, '\n');
+            text = text.replace(/\r/g, '\n');
+            text = text.replace(/\n{3,}/g, '\n\n');
+            text = text.replace(/[ \t]+/g, ' ');
+
+            return text.trim();
+        }
+
+        // Remove email signature from text
+        function removeSignature(text) {
+            if (!text) return '';
+
+            var lines = text.split('\n');
+            var cutLineIdx = -1;
+
+            // Common signature markers
+            var signaturePatterns = [
+                /^--\s*$/,                    // Standard signature delimiter
+                /^Mit freundlichen Gr/i,     // German formal
+                /^Viele Gr[üu]ße/i,          // German informal
+                /^Freundliche Gr[üu]ße/i,    // German formal
+                /^Best regards/i,             // English
+                /^Kind regards/i,             // English
+                /^Regards,/i,                 // English
+                /^Cheers,/i,                  // English informal
+                /^Thanks,/i,                  // English
+                /^Thank you,/i                // English
+            ];
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                for (var j = 0; j < signaturePatterns.length; j++) {
+                    if (signaturePatterns[j].test(line)) {
+                        cutLineIdx = i;
+                        break;
+                    }
+                }
+                if (cutLineIdx >= 0) break;
+            }
+
+            if (cutLineIdx > 0) {
+                // Keep content before signature but include the greeting line
+                var contentLines = lines.slice(0, cutLineIdx + 1);
+                text = contentLines.join('\n');
+            }
+
+            return text.trim();
         }
 
         // ============================================================
