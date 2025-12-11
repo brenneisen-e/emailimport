@@ -208,6 +208,19 @@ function advanceConvExportPhase() {
  */
 function saveConversationExport() {
     try {
+        // Check if there are any new emails
+        if (convExportState.allEmails.length === 0) {
+            var skippedCount = convExportState.skippedCount || 0;
+            var noNewMsg = 'Keine neuen Emails gefunden.';
+            if (skippedCount > 0) {
+                noNewMsg += '<br><strong>' + skippedCount + '</strong> Emails bereits in Excel vorhanden.';
+            }
+            showExportSuccess(noNewMsg);
+            document.getElementById('exportProgressFill').style.width = '100%';
+            document.getElementById('exportProgressText').innerText = 'Keine neuen Emails';
+            return;
+        }
+
         var exportData = createExportStructure(
             convExportState.conversations,
             convExportState.mailboxName

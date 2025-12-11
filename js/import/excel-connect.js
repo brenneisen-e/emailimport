@@ -118,6 +118,16 @@ function detectExcelForExport() {
             if (emailId) {
                 existingEmailIds[emailId] = true;
             }
+            // Track all replyIds individually for duplicate detection
+            if (replyIds) {
+                var replyIdList = replyIds.split(',');
+                for (var ri = 0; ri < replyIdList.length; ri++) {
+                    var rid = replyIdList[ri].trim();
+                    if (rid) {
+                        existingEmailIds[rid] = true;
+                    }
+                }
+            }
             if (conversationId || datum || betreff) count++;
         }
 
