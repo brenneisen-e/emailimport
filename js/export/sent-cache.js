@@ -20,12 +20,39 @@ function cacheSentItems(days) {
     sentItemsByReference = {};
     sentItemsByNormSubject = {};
     sentCacheState.days = days;
-    sentCacheState.cutoffDate = exportState.cutoffDate;
+    // Search sent items further back than inbox (replies might be older)
+    sentCacheState.cutoffDate = new Date();
+    sentCacheState.cutoffDate.setDate(sentCacheState.cutoffDate.getDate() - (days + 30));
     sentCacheState.folders = [];
     sentCacheState.folderIdx = 0;
 
-    // Only search sent folder of selected mailbox
+    // Collect ALL sent folders (like the working old version)
+    // 1. Selected store's sent folder
     try { sentCacheState.folders.push(selectedStore.GetDefaultFolder(5)); } catch (e) {}
+
+    // 2. Default namespace sent folder
+    try {
+        var defaultSent = outlookNS.GetDefaultFolder(5);
+        var isDup = false;
+        for (var f = 0; f < sentCacheState.folders.length; f++) {
+            try { if (sentCacheState.folders[f].EntryID === defaultSent.EntryID) isDup = true; } catch (e) {}
+        }
+        if (!isDup) sentCacheState.folders.push(defaultSent);
+    } catch (e) {}
+
+    // 3. All other stores' sent folders
+    try {
+        for (var s = 1; s <= outlookNS.Stores.Count; s++) {
+            try {
+                var storeSent = outlookNS.Stores.Item(s).GetDefaultFolder(5);
+                var isDup2 = false;
+                for (var f2 = 0; f2 < sentCacheState.folders.length; f2++) {
+                    try { if (sentCacheState.folders[f2].EntryID === storeSent.EntryID) isDup2 = true; } catch (e) {}
+                }
+                if (!isDup2) sentCacheState.folders.push(storeSent);
+            } catch (e) {}
+        }
+    } catch (e) {}
 
     // Start first folder
     startNextSentFolder();
