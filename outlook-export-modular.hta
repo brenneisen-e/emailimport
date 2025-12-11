@@ -215,12 +215,27 @@
             // Method 1: Try document.location.href (most reliable for HTA)
             try {
                 var href = document.location.href;
-                // Convert file:///C:/path to C:\path
-                if (href.indexOf('file:///') === 0) {
-                    path = href.substring(8);  // Remove "file:///"
-                } else if (href.indexOf('file://') === 0) {
-                    path = href.substring(7);  // Remove "file://"
+
+                // UNC paths: file://///server/share or file:////server/share
+                if (href.indexOf('file://///') === 0) {
+                    path = '\\\\' + href.substring(10);  // file:///// -> \\
+                } else if (href.indexOf('file:////') === 0) {
+                    path = '\\\\' + href.substring(9);   // file://// -> \\
                 }
+                // Local paths: file:///C:/path
+                else if (href.indexOf('file:///') === 0) {
+                    var afterPrefix = href.substring(8);
+                    // Check if it's a UNC path without proper prefix (e.g., file:///cifs/...)
+                    if (afterPrefix.charAt(1) !== ':') {
+                        // Likely a UNC path - add \\
+                        path = '\\\\' + afterPrefix;
+                    } else {
+                        path = afterPrefix;
+                    }
+                } else if (href.indexOf('file://') === 0) {
+                    path = href.substring(7);
+                }
+
                 // URL decode (spaces become %20, etc.)
                 path = unescape(path);
                 // Replace forward slashes with backslashes
@@ -231,8 +246,17 @@
             if (!path || path.length < 3) {
                 try {
                     path = location.pathname;
+                    // Local path: /C:/path
                     if (path.charAt(0) === '/' && path.charAt(2) === ':') {
                         path = path.substring(1);
+                    }
+                    // UNC path: //server/share or /server/share
+                    else if (path.charAt(0) === '/' && path.charAt(1) === '/') {
+                        path = '\\' + path;  // Will become \\ after replace
+                    }
+                    else if (path.charAt(0) === '/' && path.indexOf(':') === -1) {
+                        // Might be UNC without leading //
+                        path = '\\\\' + path.substring(1);
                     }
                     path = unescape(path);
                     path = path.replace(/\//g, '\\');
