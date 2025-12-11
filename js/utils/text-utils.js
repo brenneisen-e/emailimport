@@ -103,12 +103,32 @@ function sanitizeForExcel(text) {
     // Remove control characters except newlines and tabs
     var result = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 
+    // Remove emojis and other 4-byte UTF-8 characters (surrogate pairs)
+    // This prevents issues in HTA/JScript and Excel
+    result = result.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
+
+    // Remove other problematic Unicode symbols
+    result = result.replace(/[\u2600-\u26FF]/g, '');   // Misc symbols (sun, stars, etc.)
+    result = result.replace(/[\u2700-\u27BF]/g, '');   // Dingbats
+    result = result.replace(/[\u2300-\u23FF]/g, '');   // Misc technical symbols
+    result = result.replace(/[\u2B50-\u2B55]/g, '');   // Stars, circles
+    result = result.replace(/[\u203C\u2049]/g, '');    // Exclamation marks
+    result = result.replace(/[\u00AE\u00A9\u2122]/g, ''); // ®, ©, ™
+
     // Replace common problematic characters
     result = result.replace(/\u2018|\u2019/g, "'");  // Smart quotes
     result = result.replace(/\u201C|\u201D/g, '"');  // Smart double quotes
     result = result.replace(/\u2013/g, '-');         // En dash
     result = result.replace(/\u2014/g, '--');        // Em dash
     result = result.replace(/\u2026/g, '...');       // Ellipsis
+    result = result.replace(/\u00B7/g, '-');         // Middle dot
+    result = result.replace(/\u2022/g, '-');         // Bullet point
+    result = result.replace(/\u25CF/g, '-');         // Black circle
+    result = result.replace(/\u25CB/g, 'o');         // White circle
+    result = result.replace(/\u2713|\u2714/g, '[x]'); // Checkmarks
+    result = result.replace(/\u2717|\u2718/g, '[ ]'); // X marks
+    result = result.replace(/\u00AB/g, '<<');        // «
+    result = result.replace(/\u00BB/g, '>>');        // »
 
     return result;
 }
