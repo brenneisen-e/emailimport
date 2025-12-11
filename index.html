@@ -3086,9 +3086,12 @@
                 const selectedClass = email.id === selectedEmailId ? ' selected' : '';
                 const isChecked = selectedForExport.has(email.id) ? 'checked' : '';
 
-                // Count replies
-                const replyCount = (email.antworten?.length || 0) + (email.alleAntworten?.length || 0);
-                const uniqueReplyCount = email.alleAntworten?.length || email.antworten?.length || 0;
+                // Count replies - alleAntworten includes root, so subtract 1
+                const alleCount = email.alleAntworten?.length || 0;
+                const antwortenCount = email.antworten?.length || 0;
+                // If alleAntworten is used, it includes the root message, so real reply count = length - 1
+                // If only antworten is used, it already excludes root
+                const uniqueReplyCount = alleCount > 0 ? Math.max(0, alleCount - 1) : antwortenCount;
 
                 let badges = '';
                 // Show read/unread badge
@@ -3273,7 +3276,7 @@
             const detailTextEl = document.getElementById('detailText');
 
             // Use originalMessage from antworten array (oldest message = original request)
-            if (originalMessage && originalMessage.htmlBody) {
+            if (originalMessage && originalMessage.htmlBody && originalMessage.htmlBody.length > 50) {
                 // Display the original (oldest) email from thread as HTML with quotes removed
                 const iframe = document.createElement('iframe');
                 iframe.className = 'html-email-frame';
@@ -3292,6 +3295,10 @@
 
                 iframe.srcdoc = wrappedHtml;
                 detailTextEl.appendChild(iframe);
+            } else if (originalMessage && originalMessage.text) {
+                // Display original message as plain text (conversation format without HTML)
+                const displayText = removeEmailQuotes(originalMessage.text || '');
+                detailTextEl.innerHTML = highlightKeywords(displayText);
             } else if (email.htmlBody && (
                 email.htmlBody.toLowerCase().includes('<table') ||
                 email.htmlBody.toLowerCase().includes('<div')
@@ -3355,13 +3362,22 @@
                 const seenTexts = new Set();
 
                 for (const reply of replyMessages) {
-                    // Extract cleaned HTML content (removes quoted text)
-                    const cleanedHtml = reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : '';
+                    // Extract cleaned content - prefer htmlBody, fall back to text
+                    let cleanedHtml = '';
+                    let cleanedText = '';
 
-                    // Convert cleaned HTML to text for display
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = cleanedHtml;
-                    const cleanedText = (tempDiv.textContent || tempDiv.innerText || '').trim();
+                    if (reply.htmlBody && reply.htmlBody.length > 50) {
+                        // Has HTML content - clean it and extract text
+                        cleanedHtml = removeEmailQuotesHtml(reply.htmlBody);
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = cleanedHtml;
+                        cleanedText = (tempDiv.textContent || tempDiv.innerText || '').trim();
+                    } else if (reply.text) {
+                        // No HTML - use plain text directly (conversation format)
+                        cleanedText = removeEmailQuotes(reply.text || '');
+                        cleanedHtml = ''; // No HTML to display
+                    }
+
                     const compareText = cleanedText.toLowerCase().substring(0, 150);
 
                     // Skip empty or duplicate content
