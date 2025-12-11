@@ -2148,10 +2148,29 @@
             document.getElementById('detailEmpty').style.display = 'none';
             document.getElementById('emailDetail').classList.add('active');
 
-            // Use cached parsed thread (from processEmails) or parse now
+            // Build list of ALL messages from antworten array to find the oldest (original request)
+            const allMessages = [...(email.alleAntworten || email.antworten || [])].map(reply => ({
+                von: reply.von || reply.vonEmail || 'Unbekannt',
+                datum: reply.datum ? new Date(reply.datum) : null,
+                htmlBody: reply.htmlBody,
+                text: reply.text,
+                isFromAntworten: true
+            }));
+
+            // Sort by date (oldest first) - messages without dates go to the end
+            allMessages.sort((a, b) => {
+                if (!a.datum && !b.datum) return 0;
+                if (!a.datum) return 1;
+                if (!b.datum) return -1;
+                return a.datum.getTime() - b.datum.getTime();
+            });
+
+            // The oldest message is the original request (Anfrage)
+            const originalMessage = allMessages.length > 0 ? allMessages[0] : null;
+
+            // Keep parsedThread for backwards compatibility with other parts of the code
             const parsedThread = email._parsedThread || (email.htmlBody ? parseEmailThreadHtml(email.htmlBody) : []);
             if (!email._parsedThread) email._parsedThread = parsedThread;
-            const originalMessage = parsedThread.find(m => m.isOriginal);
 
             // Fill header - use original sender from parsed thread if available
             document.getElementById('detailSubject').textContent = email.betreff;
@@ -2216,13 +2235,14 @@
             // Email text with keyword highlighting
             const detailTextEl = document.getElementById('detailText');
 
-            // Use originalMessage from parsed thread (defined earlier)
-            if (originalMessage && originalMessage.html) {
-                // Display the original (oldest) email from thread as HTML
+            // Use originalMessage from antworten array (oldest message = original request)
+            if (originalMessage && originalMessage.htmlBody) {
+                // Display the original (oldest) email from thread as HTML with quotes removed
                 const iframe = document.createElement('iframe');
                 iframe.className = 'html-email-frame';
                 detailTextEl.innerHTML = '';
 
+                const cleanedOriginalHtml = removeEmailQuotesHtml(originalMessage.htmlBody);
                 const wrappedHtml = `<!DOCTYPE html>
                     <html><head><meta charset="UTF-8">
                     <style>
@@ -2231,7 +2251,7 @@
                         td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
                         th { background-color: #f5f5f5; }
                         tr:nth-child(even) { background-color: #fafafa; }
-                    </style></head><body>${originalMessage.html}</body></html>`;
+                    </style></head><body>${cleanedOriginalHtml}</body></html>`;
 
                 iframe.srcdoc = wrappedHtml;
                 detailTextEl.appendChild(iframe);
@@ -2287,81 +2307,49 @@
             const replyCountBadge = document.getElementById('replyCount');
             const tabAntworten = document.getElementById('tabAntworten');
 
-            // Build display replies from multiple sources
+            // Use allMessages (already sorted oldest first) - skip the first one (Anfrage)
+            // All remaining messages are replies (Antworten)
             let displayReplies = [];
-            const rawReplies = email.alleAntworten && email.alleAntworten.length > 0
-                ? [...email.alleAntworten]
-                : [...(email.antworten || [])];
+            const rawReplies = email.alleAntworten || email.antworten || [];
 
-            // Get parsed thread (non-original messages are replies)
-            const htmlReplies = (email._parsedThread || []).filter(m => !m.isOriginal);
-
-            // Get the original message text for comparison (originalMessage already defined above)
-            const originalTextLower = originalMessage
-                ? null  // Will use HTML comparison
-                : removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 150);
-
-            // Strategy: Use rawReplies (antworten from JSON) when available
-            // They have correct sender names and we can extract content from their htmlBody
-            // Only use HTML-parsed replies if rawReplies is empty
-            if (rawReplies.length === 0 && htmlReplies.length > 0) {
-                // Use HTML-parsed replies - they have individual email content
-                const seenHtml = new Set();
-                for (const htmlReply of htmlReplies) {
-                    // Deduplicate by HTML content
-                    const htmlLower = (htmlReply.html || '').toLowerCase().substring(0, 200);
-                    if (seenHtml.has(htmlLower)) continue;
-                    seenHtml.add(htmlLower);
-
-                    // Convert HTML to text for preview
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = htmlReply.html || '';
-                    const plainText = tempDiv.textContent || tempDiv.innerText || '';
-
-                    displayReplies.push({
-                        von: htmlReply.von || 'Unbekannt',
-                        datum: htmlReply.datum,
-                        cleanedText: plainText.trim(),
-                        cleanedHtml: htmlReply.html,
-                        isNew: false
-                    });
-                }
-            } else {
-                // Use antworten from JSON - extract individual content from htmlBody
+            if (allMessages.length > 1) {
+                // Skip the first (oldest = Anfrage), show the rest as replies
+                const replyMessages = allMessages.slice(1);
                 const seenTexts = new Set();
-                for (const reply of rawReplies) {
+
+                for (const reply of replyMessages) {
                     // Extract cleaned HTML content (removes quoted text)
                     const cleanedHtml = reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : '';
 
-                    // Convert cleaned HTML to text for comparison
+                    // Convert cleaned HTML to text for display
                     const tempDiv = document.createElement('div');
                     tempDiv.innerHTML = cleanedHtml;
-                    const htmlDerivedText = (tempDiv.textContent || tempDiv.innerText || '').trim();
-
-                    // Use HTML-derived text, fallback to reply.text only if no htmlBody
-                    const cleanedText = htmlDerivedText || removeEmailQuotes(reply.text || reply.body || '').trim();
+                    const cleanedText = (tempDiv.textContent || tempDiv.innerText || '').trim();
                     const compareText = cleanedText.toLowerCase().substring(0, 150);
 
-                    // Skip empty, duplicates, or same as original request
+                    // Skip empty or duplicate content
                     if (!cleanedText || cleanedText.length < 20) continue;
                     if (seenTexts.has(compareText)) continue;
-                    if (originalTextLower && compareText === originalTextLower) continue;
 
                     seenTexts.add(compareText);
+
+                    // Find the original reply object to get isNew status
+                    const originalReply = rawReplies.find(r =>
+                        r.datum === (reply.datum ? reply.datum.toISOString().replace('.000Z', '') : null) ||
+                        (r.datum && reply.datum && new Date(r.datum).getTime() === reply.datum.getTime())
+                    );
+
                     displayReplies.push({
-                        ...reply,
+                        von: reply.von,
+                        datum: reply.datum,
                         cleanedText: cleanedText,
-                        cleanedHtml: cleanedHtml && cleanedHtml.length > 50 ? cleanedHtml : null
+                        cleanedHtml: cleanedHtml && cleanedHtml.length > 50 ? cleanedHtml : null,
+                        isNew: originalReply?.isNew || false
                     });
                 }
             }
 
-            // Sort by date (oldest first)
-            displayReplies.sort((a, b) => {
-                const dateA = a.datum ? new Date(a.datum) : new Date(0);
-                const dateB = b.datum ? new Date(b.datum) : new Date(0);
-                return dateA - dateB;
-            });
+            // displayReplies is already sorted by date (oldest first) from allMessages
 
             const newRepliesCount = (email.antworten || []).filter(r => r.isNew).length;
 
