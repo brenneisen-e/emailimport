@@ -1816,22 +1816,8 @@
 
                 // Determine the display sender: prefer original sender from parsed thread
                 let displaySender = fromName || fromEmail;
-                let isSentEmail = false;
                 if (originalMessage && originalMessage.von) {
                     displaySender = originalMessage.von;
-                    // Check if this is a sent email by comparing names
-                    // Extract first name from original sender and from field
-                    const originalFirstName = originalMessage.von.split(' ')[0].toLowerCase();
-                    const fromFieldFirstName = (fromName || '').split(/[\s,]/)[0].toLowerCase();
-                    const fromEmailUser = (fromEmail || '').split('@')[0].toLowerCase().replace(/[._-]/g, '');
-
-                    // It's a sent email if the original sender's name doesn't match
-                    // the from field (name or email user part)
-                    if (originalFirstName && fromFieldFirstName &&
-                        originalFirstName !== fromFieldFirstName &&
-                        !fromEmailUser.startsWith(originalFirstName)) {
-                        isSentEmail = true;
-                    }
                 }
 
                 // Auto-categorize
@@ -1880,7 +1866,6 @@
 
                     // Display sender info (from HTML parsing)
                     displaySender: displaySender,
-                    isSentEmail: isSentEmail,
                     _parsedThread: parsedThread  // Cache parsed thread for later use
                 };
             });
@@ -2091,9 +2076,8 @@
                     badges += '<span class="badge badge-cluster">' + c + '</span>';
                 });
 
-                // Use displaySender (from HTML parsing) with (Ausgang) marker for sent emails
+                // Use displaySender (from HTML parsing)
                 const senderDisplay = email.displaySender || email.von_name || email.von_email;
-                const sentMarker = email.isSentEmail ? ' (Ausgang)' : '';
 
                 html += `
                     <div class="email-item${selectedClass}">
@@ -2101,7 +2085,7 @@
                                onclick="event.stopPropagation(); toggleEmailSelection(${email.id})">
                         <div class="email-item-content" onclick="selectEmail(${email.id})">
                             <div class="email-item-header">
-                                <span class="email-sender">${escapeHtml(senderDisplay)}${sentMarker}</span>
+                                <span class="email-sender">${escapeHtml(senderDisplay)}</span>
                                 <span class="email-date">${dateStr}</span>
                             </div>
                             <div class="email-subject">${escapeHtml(email.betreff)}</div>
