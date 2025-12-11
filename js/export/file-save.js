@@ -10,8 +10,9 @@
  * @param {number} duplicatesSkipped - Count of duplicates skipped
  * @param {number} duplicatesWithReplies - Count of duplicates with new replies
  * @param {number} batchDuplicates - Count of duplicates within batch
+ * @param {Object} debugInfo - Optional debug information
  */
-function saveExportFile(emails, repliesFound, duplicatesSkipped, duplicatesWithReplies, batchDuplicates) {
+function saveExportFile(emails, repliesFound, duplicatesSkipped, duplicatesWithReplies, batchDuplicates, debugInfo) {
     try {
         var fso = new ActiveXObject("Scripting.FileSystemObject");
         var shell = new ActiveXObject("WScript.Shell");
@@ -33,7 +34,7 @@ function saveExportFile(emails, repliesFound, duplicatesSkipped, duplicatesWithR
         var filename = downloads + "\\hypercare_emails_" + dateStr + ".json";
 
         // Build JSON string with proper formatting
-        var jsonContent = buildJsonString(emails);
+        var jsonContent = buildJsonString(emails, debugInfo);
 
         // Write using FileSystemObject (works with network paths)
         // CreateTextFile(path, overwrite, unicode)
@@ -45,7 +46,7 @@ function saveExportFile(emails, repliesFound, duplicatesSkipped, duplicatesWithR
         // Store for direct import
         lastExportedEmails = emails;
 
-        // Show success
+        // Build success message with reply statistics
         var newCount = emails.length - duplicatesWithReplies;
         var successMsg = '<strong>' + newCount + '</strong> neue Emails';
         if (duplicatesWithReplies > 0) {
@@ -57,6 +58,16 @@ function saveExportFile(emails, repliesFound, duplicatesSkipped, duplicatesWithR
         if (batchDuplicates > 0) {
             successMsg += ', <strong>' + batchDuplicates + '</strong> Duplikate';
         }
+
+        // Add reply match statistics
+        if (debugInfo) {
+            successMsg += '<br><strong>Antworten:</strong> ' + debugInfo.emailsWithReplies + '/' + debugInfo.totalEmails + ' Emails (' + debugInfo.replyRate + ')';
+            if (debugInfo.matchingStats) {
+                var ms = debugInfo.matchingStats;
+                successMsg += '<br><small>Matches: ConvId=' + ms.byConversationId + ', InReplyTo=' + ms.byInternetMessageId + ', Subject=' + ms.bySubject + '</small>';
+            }
+        }
+
         successMsg += '<br>Gespeichert: ' + filename;
 
         showExportSuccess(successMsg);
@@ -72,9 +83,10 @@ function saveExportFile(emails, repliesFound, duplicatesSkipped, duplicatesWithR
 /**
  * Build JSON string from email array
  * @param {Array} emails - Array of email objects
+ * @param {Object} debugInfo - Optional debug information
  * @returns {string} JSON string
  */
-function buildJsonString(emails) {
+function buildJsonString(emails, debugInfo) {
     // Sanitize all text fields before JSON encoding
     for (var i = 0; i < emails.length; i++) {
         var email = emails[i];
@@ -90,6 +102,15 @@ function buildJsonString(emails) {
                 reply.an = sanitizeText(reply.an || '');
             }
         }
+    }
+
+    // Create export object with optional debug info
+    if (debugInfo) {
+        var exportObj = {
+            _exportInfo: debugInfo,
+            emails: emails
+        };
+        return JSON.stringify(exportObj, null, 2);
     }
 
     return JSON.stringify(emails, null, 2);
