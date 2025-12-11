@@ -54,15 +54,17 @@ function writeEmailRow(worksheet, row, email) {
     _writeRowCurrentField = 'Agentur erstellen';
     var agentur = fixEncoding(email.agentur || '');
 
-    // Anfrage
+    // Anfrage (mit Quote-Entfernung fuer Memory-Schutz)
     _writeRowCurrentField = 'Anfrage erstellen';
     var anfrage = '';
     if (email.anfrage && email.anfrage.trim()) {
-        anfrage = fixEncoding(email.anfrage);
+        anfrage = removeQuotedContent(email.anfrage);
+        anfrage = fixEncoding(anfrage);
     } else if (pd.nachricht) {
         anfrage = fixEncoding(pd.nachricht);
     } else {
-        anfrage = fixEncoding(email.text || '');
+        anfrage = removeQuotedContent(email.text || '');
+        anfrage = fixEncoding(anfrage);
     }
 
     // BD-Nummer
@@ -243,11 +245,14 @@ function formatReplies(antworten) {
                 try {
                     if (reply.text !== undefined && reply.text !== null) {
                         replyText = '' + reply.text;
+                        // WICHTIG: Zuerst zitierte Inhalte entfernen (sonst Memory-Probleme)
+                        replyText = removeQuotedContent(replyText);
                         replyText = fixEncoding(replyText);
                         replyText = sanitizeForExcel(replyText);
                     }
                 } catch (e) { replyText = '[Fehler]'; }
 
+                // Kuerzen auf max 2000 Zeichen pro Antwort
                 if (replyText.length > 2000) {
                     replyText = replyText.substring(0, 2000) + '...';
                 }

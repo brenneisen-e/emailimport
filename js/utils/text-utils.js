@@ -118,6 +118,46 @@ function stripSubjectPrefixes(subject) {
 }
 
 /**
+ * Remove quoted content aggressively (for HTA Excel import)
+ * Cuts off everything after common quote markers to prevent memory issues
+ */
+function removeQuotedContent(text) {
+    if (!text) return '';
+
+    // Limit input to prevent memory issues with huge strings
+    var safeText = text.length > 50000 ? text.substring(0, 50000) : text;
+
+    // Find the earliest quote marker and cut there
+    var cutPatterns = [
+        /_{5,}\s*\r?\n\s*Von:/i,                    // _____ Von:
+        /_{5,}\s*\r?\n\s*From:/i,                   // _____ From:
+        /-{5,}\s*Urspr[uü]ngliche\s+Nachricht/i,    // ----- Urspruengliche Nachricht
+        /-{5,}\s*Original\s*Message/i,              // ----- Original Message
+        /-{5,}\s*Weitergeleitete\s+Nachricht/i,     // ----- Weitergeleitete Nachricht
+        /\r?\n\s*Von:\s+[^\r\n]+\r?\n\s*Gesendet:/i,  // Von: ... Gesendet:
+        /\r?\n\s*From:\s+[^\r\n]+\r?\n\s*Sent:/i,     // From: ... Sent:
+        /\r?\n\s*Am\s+\d[^\r\n]+schrieb[^\r\n]*:/i,   // Am ... schrieb ...:
+        /\r?\n\s*On\s+[^\r\n]+wrote:/i                // On ... wrote:
+    ];
+
+    var result = safeText;
+    var earliestCut = result.length;
+
+    for (var i = 0; i < cutPatterns.length; i++) {
+        var match = result.search(cutPatterns[i]);
+        if (match > 0 && match < earliestCut) {
+            earliestCut = match;
+        }
+    }
+
+    if (earliestCut < result.length) {
+        result = result.substring(0, earliestCut);
+    }
+
+    return result.trim();
+}
+
+/**
  * Remove email signature from text
  */
 function removeSignature(text) {
