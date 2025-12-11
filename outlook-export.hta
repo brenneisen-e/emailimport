@@ -1339,10 +1339,166 @@
                 return;
             }
 
-            // Group emails by ConversationID and merge: oldest = Anfrage, rest = Antworten
-            var groupedEmails = groupEmailsByConversation(exportState.emails);
+            // PHASE 4: Use unified conversation processing
+            // Merge inbox emails with sent items and process using the unified approach
+            var groupedEmails = groupEmailsByConversationUnifiedMode(exportState.emails);
 
             saveExportFile(groupedEmails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates);
+        }
+
+        // ============================================================
+        // PHASE 4: Unified Conversation Grouping (New Approach)
+        // ============================================================
+        // Merges inbox emails with sent items and processes using unified logic
+        function groupEmailsByConversationUnifiedMode(inboxEmails) {
+            var result = [];
+
+            // Step 1: Convert inbox emails to unified format
+            var allEmails = [];
+            for (var i = 0; i < inboxEmails.length; i++) {
+                var inboxEmail = inboxEmails[i];
+                var unifiedEmail = convertToUnifiedFormat(inboxEmail, 'inbox');
+                allEmails.push(unifiedEmail);
+            }
+
+            // Step 2: Add sent items from cache
+            // Group sent items by ConversationID for efficient lookup
+            var sentByConvId = {};
+            for (var j = 0; j < sentItemsCache.length; j++) {
+                var sentItem = sentItemsCache[j];
+                var convId = sentItem.conversationId || '';
+                if (convId) {
+                    if (!sentByConvId[convId]) {
+                        sentByConvId[convId] = [];
+                    }
+                    sentByConvId[convId].push(sentItem);
+                }
+            }
+
+            // For each inbox email, add matching sent items to the email list
+            var addedSentIds = {};  // Track which sent items have been added
+            for (var k = 0; k < inboxEmails.length; k++) {
+                var email = inboxEmails[k];
+                var convId = email.conversationId || '';
+                if (convId && sentByConvId[convId]) {
+                    var matchingSent = sentByConvId[convId];
+                    for (var m = 0; m < matchingSent.length; m++) {
+                        var sent = matchingSent[m];
+                        if (addedSentIds[sent.entryId]) continue;
+                        addedSentIds[sent.entryId] = true;
+
+                        var unifiedSent = convertSentItemToUnifiedFormat(sent);
+                        allEmails.push(unifiedSent);
+                    }
+                }
+            }
+
+            // Step 3: Group by ConversationID
+            var conversations = groupByConversation(allEmails);
+
+            // Step 4: Process each conversation using unified logic
+            for (var convId in conversations) {
+                var conversationEmails = conversations[convId];
+
+                if (conversationEmails.length === 0) continue;
+
+                // Use unified processing
+                var conversationJson = processConversationUnified(conversationEmails);
+
+                // Add metadata for backward compatibility
+                if (!conversationJson.normalizedSubject) {
+                    conversationJson.normalizedSubject = normalizeSubject(conversationJson.betreff || '');
+                }
+
+                result.push(conversationJson);
+            }
+
+            // Sort by last activity date (newest first)
+            result.sort(function(a, b) {
+                var dateA = new Date(a.lastActivityDate || a.datum);
+                var dateB = new Date(b.lastActivityDate || b.datum);
+                return dateB - dateA;
+            });
+
+            return result;
+        }
+
+        // Convert inbox email (old format) to unified format
+        function convertToUnifiedFormat(email, folderType) {
+            return {
+                entryId: email.emailId || '',
+                conversationId: email.conversationId || '',
+                internetMessageId: email.internetMessageId || '',
+                inReplyTo: email.inReplyTo || '',
+                references: email.references || [],
+
+                receivedTime: email.datum ? new Date(email.datum) : new Date(),
+                sentOn: email.datum ? new Date(email.datum) : new Date(),
+                timestamp: email.datum ? new Date(email.datum) : new Date(),
+
+                von_email: email.von_email || '',
+                von_name: email.von_name || '',
+                recipients: [],
+
+                betreff: email.betreff || '',
+                text: email.text || '',
+                htmlBody: email.htmlBody || '',
+
+                anhaenge: email.anhaenge || [],
+                outlookKategorie: email.outlookKategorie || '',
+
+                folderType: folderType,
+                folderName: '',
+
+                isIncoming: true,
+
+                threadPosition: 0,
+                threadDepth: 0,
+                parentMessageId: null,
+                parentFoundInThread: false,
+                isThreadRoot: false,
+                newContent: '',
+                normalizedSubject: email.normalizedSubject || normalizeSubject(email.betreff || '')
+            };
+        }
+
+        // Convert sent item (cache format) to unified format
+        function convertSentItemToUnifiedFormat(sent) {
+            return {
+                entryId: sent.entryId || '',
+                conversationId: sent.conversationId || '',
+                internetMessageId: sent.internetMessageId || '',
+                inReplyTo: sent.inReplyTo || '',
+                references: sent.references || [],
+
+                receivedTime: sent.sentDate || new Date(),
+                sentOn: sent.sentDate || new Date(),
+                timestamp: sent.sentDate || new Date(),
+
+                von_email: '',  // Sent items don't have sender (it's "me")
+                von_name: 'Ich',
+                recipients: sent.to ? [{ name: sent.to, email: '', type: 1 }] : [],
+
+                betreff: sent.subject || '',
+                text: sent.body || '',
+                htmlBody: sent.htmlBody || '',
+
+                anhaenge: [],
+                outlookKategorie: '',
+
+                folderType: 'sent',
+                folderName: 'Sent',
+
+                isIncoming: false,
+
+                threadPosition: 0,
+                threadDepth: 0,
+                parentMessageId: null,
+                parentFoundInThread: false,
+                isThreadRoot: false,
+                newContent: '',
+                normalizedSubject: sent.normalizedSubject || normalizeSubject(sent.subject || '')
+            };
         }
 
         // Group emails by ConversationID: oldest email = Anfrage, all others = Antworten
@@ -2492,21 +2648,49 @@
             var result = { newContent: '', hasQuotes: false };
 
             // Find the position of quote separators in HTML
+            // Comprehensive patterns for all major email clients
             var quotePatterns = [
-                // Outlook-style border separator (most common)
+                // === OUTLOOK-STYLE PATTERNS ===
+                // Border-top separator (most common Outlook pattern)
                 /<div[^>]*style\s*=\s*["'][^"']*border-top\s*:\s*solid\s*#E1E1E1[^"']*["'][^>]*>/i,
                 /<div[^>]*style\s*=\s*["'][^"']*border-top\s*:\s*solid\s+#[A-Fa-f0-9]{6}[^"']*["'][^>]*>/i,
-                // Header block start
+                /<div[^>]*style\s*=\s*["'][^"']*border:\s*none\s*;\s*border-top:\s*solid[^"']*["'][^>]*>/i,
+
+                // Outlook header block with span
+                /<p[^>]*class\s*=\s*["']?MsoNormal["']?[^>]*>\s*<b[^>]*>\s*<span[^>]*>\s*(Von|From)\s*:\s*<\/span>\s*<\/b>/i,
+
+                // Simple header block start
                 /<p[^>]*><b>Von:<\/b>/i,
                 /<p[^>]*><b>From:<\/b>/i,
                 /<b>Von:<\/b>/i,
                 /<b>From:<\/b>/i,
-                // Separator lines
-                /-----\s*Urspr/i,
-                /-----\s*Original/i,
-                /-----\s*Weitergeleit/i,
+
+                // === GMAIL-STYLE PATTERNS ===
+                /<blockquote[^>]*class\s*=\s*["'][^"']*gmail_quote[^"']*["'][^>]*>/i,
+                /<div[^>]*class\s*=\s*["'][^"']*gmail_quote[^"']*["'][^>]*>/i,
+
+                // === APPLE MAIL PATTERNS ===
+                /<blockquote[^>]*type\s*=\s*["']cite["'][^>]*>/i,
+
+                // === THUNDERBIRD PATTERNS ===
+                /<blockquote[^>]*cite[^>]*>/i,
+
+                // === TEXT-BASED SEPARATORS ===
+                /-----\s*Urspr[üu]ngliche\s*Nachricht/i,
+                /-----\s*Original\s*Message/i,
+                /-----\s*Weitergeleitete\s*Nachricht/i,
+                /-----\s*Forwarded\s*message/i,
                 /_{5,}\s*Von:/i,
-                /_{5,}\s*From:/i
+                /_{5,}\s*From:/i,
+
+                // === INLINE HEADER PATTERNS ===
+                // "Von: Name <email@domain>"
+                />\s*Von:\s*[^<]+<[^@>]+@[^>]+>/i,
+                />\s*From:\s*[^<]+<[^@>]+@[^>]+>/i,
+
+                // "Am ... schrieb" / "On ... wrote"
+                /Am\s+\d{1,2}\.\s*\w+\s+\d{4}[^<]*schrieb[^:]*:/i,
+                /On\s+\w+\s+\d{1,2},?\s+\d{4}[^<]*wrote:/i
             ];
 
             var earliestPos = htmlBody.length;
@@ -2616,6 +2800,577 @@
             }
 
             return text.trim();
+        }
+
+        // ============================================================
+        // PHASE 4: UNIFIED BATCH EMAIL PROCESSING
+        // ============================================================
+        // Implements the complete email collection and processing logic
+        // as specified in the Master-Ablauf specification
+
+        // Configuration for unified processing
+        var unifiedConfig = {
+            meineEmail: '',           // Will be set from selected mailbox
+            startDatum: null,
+            endDatum: null
+        };
+
+        // State for unified processing
+        var unifiedState = {
+            allEmails: [],           // All emails from both Inbox and Sent
+            conversations: {},        // Grouped by ConversationID
+            messageIdMap: {},         // internetMessageId -> email
+            isProcessing: false
+        };
+
+        // Calculate if email is incoming based on folder type and sender
+        function calculateIsIncoming(email, folderType, meineEmail) {
+            // Rule 1: Sent folder = always outgoing
+            if (folderType === 'sent') {
+                return false;
+            }
+
+            // Rule 2: Inbox = always incoming
+            if (folderType === 'inbox') {
+                return true;
+            }
+
+            // Rule 3: Other folders = based on sender
+            if (!meineEmail || !email.von_email) return true;
+
+            var senderLower = (email.von_email || '').toLowerCase();
+            var meineLower = meineEmail.toLowerCase();
+
+            // Check if sender = me (also consider aliases)
+            if (senderLower === meineLower) {
+                return false;
+            }
+
+            // Check for same domain different format
+            if (senderLower.indexOf('@') > 0 && meineLower.indexOf('@') > 0) {
+                var senderDomain = senderLower.split('@')[1];
+                var meineDomain = meineLower.split('@')[1];
+                if (senderDomain === meineDomain) {
+                    var senderUser = senderLower.split('@')[0];
+                    var meineUser = meineLower.split('@')[0];
+                    if (senderUser === meineUser) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        // Extract email data from Outlook MailItem (unified version)
+        function extractEmailUnified(mailItem, folderType) {
+            var email = {
+                // Identification
+                entryId: '',
+                conversationId: '',
+                internetMessageId: '',
+                inReplyTo: '',
+                references: [],
+
+                // Timestamps
+                receivedTime: null,
+                sentOn: null,
+                timestamp: null,
+
+                // People
+                von_email: '',
+                von_name: '',
+                recipients: [],
+
+                // Content
+                betreff: '',
+                text: '',
+                htmlBody: '',
+
+                // Attachments
+                anhaenge: [],
+
+                // Outlook categories
+                outlookKategorie: '',
+
+                // Folder info
+                folderType: folderType,
+                folderName: '',
+
+                // Direction
+                isIncoming: true,
+
+                // Thread metadata (to be calculated later)
+                threadPosition: 0,
+                threadDepth: 0,
+                parentMessageId: null,
+                parentFoundInThread: false,
+                isThreadRoot: false,
+                newContent: ''
+            };
+
+            try {
+                // Entry ID
+                try { email.entryId = mailItem.EntryID || ''; } catch (e) {}
+
+                // Conversation ID
+                try { email.conversationId = mailItem.ConversationID || ''; } catch (e) {}
+
+                // Timestamps
+                try { email.receivedTime = new Date(mailItem.ReceivedTime); } catch (e) {}
+                try { email.sentOn = new Date(mailItem.SentOn); } catch (e) {}
+
+                // Sender email (resolve Exchange addresses)
+                try {
+                    email.von_email = mailItem.SenderEmailAddress || '';
+                    if ((!email.von_email || email.von_email.indexOf('@') === -1) && mailItem.SenderEmailType === 'EX') {
+                        try {
+                            var exUser = mailItem.Sender.GetExchangeUser();
+                            if (exUser) email.von_email = exUser.PrimarySmtpAddress || email.von_email;
+                        } catch (e) {}
+                    }
+                } catch (e) {}
+
+                // Sender name
+                try { email.von_name = mailItem.SenderName || 'Unbekannt'; } catch (e) {}
+
+                // Recipients
+                try {
+                    var recips = mailItem.Recipients;
+                    for (var r = 1; r <= recips.Count; r++) {
+                        try {
+                            var recip = recips.Item(r);
+                            email.recipients.push({
+                                name: recip.Name || '',
+                                email: recip.Address || '',
+                                type: recip.Type // 1=To, 2=CC, 3=BCC
+                            });
+                        } catch (e) {}
+                    }
+                } catch (e) {}
+
+                // Subject
+                try { email.betreff = mailItem.Subject || '(Kein Betreff)'; } catch (e) {}
+
+                // Body
+                try {
+                    email.text = mailItem.Body || '';
+                    if (email.text.length > 50000) email.text = email.text.substring(0, 50000) + '...';
+                } catch (e) {}
+
+                // HTML Body
+                try {
+                    email.htmlBody = mailItem.HTMLBody || '';
+                    if (email.htmlBody.length > 500000) email.htmlBody = '';
+                } catch (e) {}
+
+                // Attachments
+                try {
+                    for (var a = 1; a <= mailItem.Attachments.Count; a++) {
+                        email.anhaenge.push(mailItem.Attachments.Item(a).FileName);
+                    }
+                } catch (e) {}
+
+                // Categories
+                try {
+                    var cats = mailItem.Categories || '';
+                    if (cats) {
+                        email.outlookKategorie = cats.split(',')[0].trim();
+                    }
+                } catch (e) {}
+
+                // Folder name
+                try { email.folderName = mailItem.Parent.Name || ''; } catch (e) {}
+
+                // MAPI headers for thread linking
+                var headers = getEmailHeaders(mailItem);
+                email.internetMessageId = headers.internetMessageId;
+                email.inReplyTo = headers.inReplyTo;
+                email.references = headers.references;
+
+                // Calculate timestamp (use sentOn for sent items, receivedTime for inbox)
+                if (folderType === 'sent' && email.sentOn && !isNaN(email.sentOn.getTime())) {
+                    email.timestamp = email.sentOn;
+                } else if (email.receivedTime && !isNaN(email.receivedTime.getTime())) {
+                    email.timestamp = email.receivedTime;
+                } else {
+                    email.timestamp = new Date();
+                }
+
+                // Calculate direction
+                email.isIncoming = calculateIsIncoming(email, folderType, unifiedConfig.meineEmail);
+
+                // Normalized subject for matching
+                email.normalizedSubject = normalizeSubject(email.betreff);
+
+            } catch (e) {}
+
+            return email;
+        }
+
+        // Remove duplicates from email list using InternetMessageId
+        function removeDuplicateEmails(emails) {
+            var seen = {};
+            var unique = [];
+
+            for (var i = 0; i < emails.length; i++) {
+                var email = emails[i];
+                var msgId = email.internetMessageId;
+
+                // Without Message-ID: use hash fallback
+                if (!msgId || msgId === '') {
+                    msgId = 'hash:' + (email.timestamp ? email.timestamp.getTime() : 0) + '|' +
+                            email.von_email + '|' + email.betreff;
+                }
+
+                if (!seen[msgId]) {
+                    seen[msgId] = email;
+                    unique.push(email);
+                } else {
+                    // Duplicate found - keep the one with more info
+                    var existing = seen[msgId];
+                    if (email.htmlBody && email.htmlBody.length > (existing.htmlBody || '').length) {
+                        // Replace with more complete version
+                        var index = unique.indexOf(existing);
+                        if (index >= 0) {
+                            unique[index] = email;
+                            seen[msgId] = email;
+                        }
+                    }
+                }
+            }
+
+            return unique;
+        }
+
+        // Group emails by ConversationID
+        function groupByConversation(emails) {
+            var conversations = {};
+
+            for (var i = 0; i < emails.length; i++) {
+                var email = emails[i];
+                var convId = email.conversationId || 'orphan:' + email.internetMessageId;
+
+                if (!conversations[convId]) {
+                    conversations[convId] = [];
+                }
+                conversations[convId].push(email);
+            }
+
+            return conversations;
+        }
+
+        // Assign parent relationships using InReplyTo and References
+        function assignParentRelationships(emails, messageIdMap) {
+            for (var i = 0; i < emails.length; i++) {
+                var email = emails[i];
+                email.parentMessageId = null;
+                email.parentFoundInThread = false;
+
+                // Method 1: In-Reply-To header (PRIMARY - highest priority)
+                if (email.inReplyTo && email.inReplyTo !== '') {
+                    if (messageIdMap[email.inReplyTo]) {
+                        email.parentMessageId = email.inReplyTo;
+                        email.parentFoundInThread = true;
+                        continue;
+                    }
+                }
+
+                // Method 2: References header (last entry that's in the thread)
+                if (email.references && email.references.length > 0) {
+                    // Go from end to start
+                    for (var j = email.references.length - 1; j >= 0; j--) {
+                        var refId = email.references[j];
+                        if (messageIdMap[refId]) {
+                            email.parentMessageId = refId;
+                            email.parentFoundInThread = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return emails;
+        }
+
+        // Identify the true thread root
+        function identifyThreadRoot(emails) {
+            // Candidates: All emails without found parent in thread
+            var rootCandidates = [];
+            for (var i = 0; i < emails.length; i++) {
+                if (!emails[i].parentFoundInThread) {
+                    rootCandidates.push(emails[i]);
+                }
+            }
+
+            var root = null;
+
+            // Case 1: Exactly one candidate
+            if (rootCandidates.length === 1) {
+                root = rootCandidates[0];
+                root.isThreadRoot = true;
+                return root;
+            }
+
+            // Case 2: Multiple candidates (e.g., incomplete conversation)
+            if (rootCandidates.length > 1) {
+                // Choose the oldest email
+                rootCandidates.sort(function(a, b) {
+                    return a.timestamp - b.timestamp;
+                });
+                root = rootCandidates[0];
+                root.isThreadRoot = true;
+
+                // The other candidates: set parent to root if they come after
+                for (var j = 1; j < rootCandidates.length; j++) {
+                    var orphan = rootCandidates[j];
+                    if (orphan.timestamp > root.timestamp) {
+                        orphan.parentMessageId = root.internetMessageId;
+                        orphan.parentFoundInThread = true;
+                        orphan.parentAssignedByFallback = true;
+                    }
+                }
+
+                return root;
+            }
+
+            // Case 3: No candidate (all have parent, but parent missing)
+            // Choose oldest email as "virtual" root
+            if (rootCandidates.length === 0) {
+                emails.sort(function(a, b) {
+                    return a.timestamp - b.timestamp;
+                });
+                root = emails[0];
+                root.isThreadRoot = true;
+                root.isVirtualRoot = true;
+                root.parentMessageId = null;
+                root.parentFoundInThread = false;
+                return root;
+            }
+
+            return null;
+        }
+
+        // Calculate thread depth for all emails
+        function calculateThreadDepthsUnified(emails, messageIdMap) {
+            var depthCache = {};
+
+            function getDepth(email) {
+                // Cache hit
+                if (depthCache[email.internetMessageId] !== undefined) {
+                    return depthCache[email.internetMessageId];
+                }
+
+                // Base: Root has depth 0
+                if (email.isThreadRoot || !email.parentMessageId) {
+                    depthCache[email.internetMessageId] = 0;
+                    return 0;
+                }
+
+                // Find parent
+                var parent = messageIdMap[email.parentMessageId];
+
+                // Parent not in thread (orphan)
+                if (!parent) {
+                    depthCache[email.internetMessageId] = 0;
+                    return 0;
+                }
+
+                // Recursion: depth = parent depth + 1
+                var depth = getDepth(parent) + 1;
+                depthCache[email.internetMessageId] = depth;
+                return depth;
+            }
+
+            // Calculate for all emails
+            for (var i = 0; i < emails.length; i++) {
+                emails[i].threadDepth = getDepth(emails[i]);
+            }
+
+            return emails;
+        }
+
+        // Assign thread positions (chronological order)
+        function assignThreadPositionsUnified(emails) {
+            // Sort chronologically (oldest first)
+            emails.sort(function(a, b) {
+                return a.timestamp - b.timestamp;
+            });
+
+            // Assign positions
+            for (var i = 0; i < emails.length; i++) {
+                emails[i].threadPosition = i + 1;
+            }
+
+            return emails;
+        }
+
+        // Process a single conversation
+        function processConversationUnified(emailsInConversation) {
+            // Step 1: Remove duplicates
+            var emails = removeDuplicateEmails(emailsInConversation);
+
+            // Step 2: Create message ID index
+            var messageIdMap = {};
+            for (var i = 0; i < emails.length; i++) {
+                if (emails[i].internetMessageId) {
+                    messageIdMap[emails[i].internetMessageId] = emails[i];
+                }
+            }
+
+            // Step 3: Assign parent relationships
+            emails = assignParentRelationships(emails, messageIdMap);
+
+            // Step 4: Identify thread root
+            var threadRoot = identifyThreadRoot(emails);
+
+            // Step 5: Calculate thread depths
+            emails = calculateThreadDepthsUnified(emails, messageIdMap);
+
+            // Step 6: Assign thread positions (chronological)
+            emails = assignThreadPositionsUnified(emails);
+
+            // Step 7: Extract new content for all emails
+            for (var j = 0; j < emails.length; j++) {
+                var email = emails[j];
+                if (email.htmlBody) {
+                    var contentResult = extractNewContentFromHtml(email.htmlBody);
+                    if (contentResult.newContent) {
+                        email.newContent = contentResult.newContent;
+                    } else {
+                        email.newContent = removeEmailQuotes(email.text);
+                    }
+                } else {
+                    email.newContent = removeEmailQuotes(email.text);
+                }
+            }
+
+            // Step 8: Build conversation JSON
+            return buildConversationJsonUnified(threadRoot, emails);
+        }
+
+        // Build conversation JSON
+        function buildConversationJsonUnified(threadRoot, allEmails) {
+            // Sort by threadPosition
+            allEmails.sort(function(a, b) {
+                return a.threadPosition - b.threadPosition;
+            });
+
+            // Replies = all except root
+            var replies = [];
+            for (var i = 0; i < allEmails.length; i++) {
+                if (!allEmails[i].isThreadRoot) {
+                    replies.push(allEmails[i]);
+                }
+            }
+
+            // Conversation start date = root timestamp
+            var conversationStartDate = threadRoot.timestamp;
+
+            // Last activity date
+            var lastActivityDate = threadRoot.timestamp;
+            for (var j = 0; j < allEmails.length; j++) {
+                if (allEmails[j].timestamp > lastActivityDate) {
+                    lastActivityDate = allEmails[j].timestamp;
+                }
+            }
+
+            var json = {
+                // === IDENTIFICATION ===
+                emailId: threadRoot.entryId,
+                conversationId: threadRoot.conversationId,
+                internetMessageId: threadRoot.internetMessageId,
+                threadId: 'conv:' + threadRoot.conversationId,
+
+                // === TIMESTAMPS ===
+                datum: formatDate(threadRoot.timestamp),
+                conversationStartDate: formatDate(conversationStartDate),
+                lastActivityDate: formatDate(lastActivityDate),
+
+                // === SENDER (Root) ===
+                von_email: threadRoot.von_email,
+                von_name: threadRoot.von_name,
+
+                // === SUBJECT ===
+                betreff: threadRoot.betreff,
+                originalSubject: threadRoot.betreff,
+                normalizedSubject: threadRoot.normalizedSubject,
+
+                // === CONTENT (only new content!) ===
+                text: threadRoot.newContent || threadRoot.text,
+                htmlBody: threadRoot.htmlBody,
+
+                // === THREAD METADATA ===
+                threadPosition: threadRoot.threadPosition,
+                threadDepth: 0,
+                isThreadRoot: true,
+                messageCount: allEmails.length,
+
+                // === HEADER REFERENCES ===
+                inReplyTo: threadRoot.inReplyTo || '',
+                references: threadRoot.references || [],
+
+                // === ATTACHMENTS ===
+                anhaenge: threadRoot.anhaenge,
+
+                // === OUTLOOK CATEGORIES ===
+                outlookKategorie: threadRoot.outlookKategorie,
+
+                // === REPLIES ===
+                antworten: []
+            };
+
+            // Build reply objects
+            for (var k = 0; k < replies.length; k++) {
+                var email = replies[k];
+
+                var reply = {
+                    // Timestamp
+                    datum: formatDate(email.timestamp),
+
+                    // People
+                    von: email.von_name,
+                    vonEmail: email.von_email,
+
+                    // For outgoing: recipients
+                    an: email.isIncoming ? '' : formatRecipientsUnified(email.recipients),
+
+                    // Content (only new content!)
+                    text: email.newContent || email.text,
+                    htmlBody: email.htmlBody,
+
+                    // Thread structure
+                    threadPosition: email.threadPosition,
+                    threadDepth: email.threadDepth,
+                    parentMessageId: email.parentMessageId || '',
+
+                    // Identification
+                    replyId: email.entryId,
+                    internetMessageId: email.internetMessageId,
+                    inReplyTo: email.inReplyTo || '',
+
+                    // Direction
+                    isIncoming: email.isIncoming,
+                    isNew: true,
+
+                    // Additional flags
+                    isDirectReplyToRoot: email.parentMessageId === threadRoot.internetMessageId
+                };
+
+                json.antworten.push(reply);
+            }
+
+            return json;
+        }
+
+        // Format recipients for JSON
+        function formatRecipientsUnified(recipients) {
+            if (!recipients || recipients.length === 0) return '';
+            var names = [];
+            for (var i = 0; i < recipients.length; i++) {
+                names.push(recipients[i].name || recipients[i].email || '');
+            }
+            return names.join('; ');
         }
 
         // ============================================================
