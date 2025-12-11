@@ -2301,9 +2301,10 @@
                 ? null  // Will use HTML comparison
                 : removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 150);
 
-            // Strategy: Use HTML-parsed replies if available (they have actual individual content)
-            // Otherwise fall back to antworten from JSON
-            if (htmlReplies.length > 0) {
+            // Strategy: Use rawReplies (antworten from JSON) when available
+            // They have correct sender names and we can extract content from their htmlBody
+            // Only use HTML-parsed replies if rawReplies is empty
+            if (rawReplies.length === 0 && htmlReplies.length > 0) {
                 // Use HTML-parsed replies - they have individual email content
                 const seenHtml = new Set();
                 for (const htmlReply of htmlReplies) {
@@ -2326,11 +2327,19 @@
                     });
                 }
             } else {
-                // No HTML parsing - use antworten from JSON
-                // Deduplicate by cleaned text
+                // Use antworten from JSON - extract individual content from htmlBody
                 const seenTexts = new Set();
                 for (const reply of rawReplies) {
-                    const cleanedText = removeEmailQuotes(reply.text || reply.body || '').trim();
+                    // Extract cleaned HTML content (removes quoted text)
+                    const cleanedHtml = reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : '';
+
+                    // Convert cleaned HTML to text for comparison
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = cleanedHtml;
+                    const htmlDerivedText = (tempDiv.textContent || tempDiv.innerText || '').trim();
+
+                    // Use HTML-derived text, fallback to reply.text only if no htmlBody
+                    const cleanedText = htmlDerivedText || removeEmailQuotes(reply.text || reply.body || '').trim();
                     const compareText = cleanedText.toLowerCase().substring(0, 150);
 
                     // Skip empty, duplicates, or same as original request
@@ -2342,7 +2351,7 @@
                     displayReplies.push({
                         ...reply,
                         cleanedText: cleanedText,
-                        cleanedHtml: reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : null
+                        cleanedHtml: cleanedHtml && cleanedHtml.length > 50 ? cleanedHtml : null
                     });
                 }
             }
