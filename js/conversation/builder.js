@@ -3,6 +3,28 @@
  * Collects emails from Inbox + Sent, deduplicates, and builds conversation trees
  */
 
+/**
+ * Clean X500 Exchange address to readable name
+ * @param {string} addr - Email address or X500 path
+ * @returns {string} Clean email or name
+ */
+function cleanX500Address(addr) {
+    if (!addr) return '';
+    // If already clean email, return as-is
+    if (addr.indexOf('@') > -1 && addr.indexOf('/cn=') === -1) {
+        return addr;
+    }
+    // Extract name from X500 format: /o=.../cn=hash-Name
+    if (addr.indexOf('/cn=') > -1) {
+        var match = addr.match(/cn=([^\/,]+)$/i);
+        if (match) {
+            // Remove leading GUID (like "f4fadad6c63f4b8e93e39ddb6abbf8d7-")
+            return match[1].replace(/^[a-f0-9]{32}-/i, '');
+        }
+    }
+    return addr;
+}
+
 // State for async conversation extraction
 var convExportState = {
     phase: 0, // 0=init, 1=inbox, 2=sent, 3=building, 4=done
@@ -355,7 +377,7 @@ function convertToLegacyFormat(conversations) {
 
             legacyEmail.antworten.push({
                 datum: replyTime,
-                an: isSent ? (reply.recipients[0] ? reply.recipients[0].email : '') : '',
+                an: isSent ? cleanX500Address(reply.recipients[0] ? reply.recipients[0].email : '') : '',
                 von: isSent ? '' : reply.senderName,
                 text: removeEmailQuotes(reply.body || reply.bodyPreview || ''),
                 replyId: reply.entryID,
