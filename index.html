@@ -2016,22 +2016,17 @@
                     return timeA < timeB ? -1 : (timeA > timeB ? 1 : 0);
                 });
 
-                // Find root message: earliest INBOX message, or just earliest message
+                // Find root message for main email fields: earliest INBOX message, or just earliest
                 let rootMsg = null;
-
-                // First: try to find earliest inbox message
                 for (const msg of sortedMessages) {
                     if (msg.folder === 'inbox') {
                         rootMsg = msg;
                         break;
                     }
                 }
-
-                // Fallback: use earliest message overall
                 if (!rootMsg && sortedMessages.length > 0) {
                     rootMsg = sortedMessages[0];
                 }
-
                 if (!rootMsg) continue;
 
                 // Build legacy email object
@@ -2043,9 +2038,13 @@
                     von_name: rootMsg.senderName,
                     betreff: rootMsg.subject || conv.subject || '',
                     text: rootMsg.body || rootMsg.bodyPreview || '',
+                    htmlBody: rootMsg.htmlBody || '',
                     anhaenge: rootMsg.anhaenge || [],
                     kategorie: rootMsg.kategorie || '',
                     hasAttachments: rootMsg.hasAttachments,
+                    // WICHTIG: alleAntworten enthält ALLE messages (inkl. Root)
+                    // Die Anzeige-Logik nimmt die älteste als "Anfrage" und Rest als "Antworten"
+                    alleAntworten: [],
                     antworten: [],
                     // Metadata from conversation
                     participantCount: conv.participantCount,
@@ -2054,10 +2053,9 @@
                     lastMessageDate: conv.lastMessageDate
                 };
 
-                // Add ALL other messages as antworten
+                // Add ALL messages to alleAntworten (including root!)
+                // The display logic will sort and use oldest as Anfrage
                 for (const msg of sortedMessages) {
-                    if (msg.entryID === rootMsg.entryID) continue;
-
                     const msgTime = msg.sentOn || msg.receivedTime || '';
                     const isSent = msg.folder === 'sent';
 
@@ -2067,20 +2065,28 @@
                         recipientInfo = msg.recipients[0].email || msg.recipients[0].name || '';
                     }
 
-                    legacyEmail.antworten.push({
+                    const msgObj = {
                         datum: msgTime,
                         an: isSent ? recipientInfo : '',
-                        von: !isSent ? msg.senderName : '',
+                        von: !isSent ? msg.senderName : (msg.senderName || 'Ich'),
                         vonEmail: msg.senderEmail,
                         text: msg.body || msg.bodyPreview || '',
+                        htmlBody: msg.htmlBody || '',
                         replyId: msg.entryID,
                         isIncoming: !isSent,
                         folder: msg.folder,
                         subject: msg.subject,
                         hasAttachments: msg.hasAttachments,
                         anhaenge: msg.anhaenge || []
-                    });
-                    totalAntworten++;
+                    };
+
+                    legacyEmail.alleAntworten.push(msgObj);
+
+                    // Also add to antworten if not the root message
+                    if (msg.entryID !== rootMsg.entryID) {
+                        legacyEmail.antworten.push(msgObj);
+                        totalAntworten++;
+                    }
                 }
 
                 result.push(legacyEmail);
