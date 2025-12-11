@@ -3,21 +3,7 @@
  * Main export logic and batch processing
  */
 
-// Export state object
-var exportState = {
-    folder: null,
-    items: null,
-    emails: [],
-    total: 0,
-    current: 1,
-    oldCount: 0,
-    cutoffDate: null,
-    repliesFound: 0,
-    duplicatesSkipped: 0,
-    batchDuplicates: 0,
-    duplicatesWithReplies: 0,
-    processedConvIds: {}
-};
+// Note: exportState is declared in config.js
 
 // Last exported emails for direct import
 var lastExportedEmails = null;

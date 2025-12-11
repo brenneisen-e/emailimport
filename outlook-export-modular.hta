@@ -304,7 +304,7 @@
         var detectedBaseDir = '';
 
         // Load a JavaScript file and execute it
-        // Uses FileSystemObject instead of ADODB.Stream for network path compatibility
+        // Try ADODB.Stream for UTF-8 support, fall back to FSO for network paths
         function loadModule(relativePath) {
             try {
                 var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -317,12 +317,23 @@
                     return false;
                 }
 
-                // Read file using FileSystemObject (works with network paths)
-                // OpenTextFile(path, iomode, create, format)
-                // iomode: 1=ForReading, format: -2=TristateUseDefault
-                var file = fso.OpenTextFile(fullPath, 1, false, -2);
-                var content = file.ReadAll();
-                file.Close();
+                var content = '';
+
+                // Try ADODB.Stream first (better UTF-8 support)
+                try {
+                    var stream = new ActiveXObject("ADODB.Stream");
+                    stream.Type = 2; // adTypeText
+                    stream.Charset = "UTF-8";
+                    stream.Open();
+                    stream.LoadFromFile(fullPath);
+                    content = stream.ReadText();
+                    stream.Close();
+                } catch (adoErr) {
+                    // Fallback to FSO for network paths (security restrictions)
+                    var file = fso.OpenTextFile(fullPath, 1, false, -2);
+                    content = file.ReadAll();
+                    file.Close();
+                }
 
                 // Execute the code in global scope
                 // execScript() runs in global scope (unlike eval which runs in local scope)
@@ -340,7 +351,7 @@
         }
 
         // Load CSS file
-        // Uses FileSystemObject instead of ADODB.Stream for network path compatibility
+        // Try ADODB.Stream for UTF-8 support, fall back to FSO for network paths
         function loadCSS(relativePath) {
             try {
                 var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -351,10 +362,23 @@
                     return false;
                 }
 
-                // Read file using FileSystemObject (works with network paths)
-                var file = fso.OpenTextFile(fullPath, 1, false, -2);
-                var content = file.ReadAll();
-                file.Close();
+                var content = '';
+
+                // Try ADODB.Stream first (better UTF-8 support)
+                try {
+                    var stream = new ActiveXObject("ADODB.Stream");
+                    stream.Type = 2;
+                    stream.Charset = "UTF-8";
+                    stream.Open();
+                    stream.LoadFromFile(fullPath);
+                    content = stream.ReadText();
+                    stream.Close();
+                } catch (adoErr) {
+                    // Fallback to FSO for network paths
+                    var file = fso.OpenTextFile(fullPath, 1, false, -2);
+                    content = file.ReadAll();
+                    file.Close();
+                }
 
                 var style = document.createElement('style');
                 style.type = 'text/css';
