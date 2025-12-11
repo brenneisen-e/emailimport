@@ -145,6 +145,15 @@ function buildConversationJsonUnified(threadRoot, allEmails) {
         }
     }
 
+    // For outgoing emails (sent items as root), show recipient instead of sender
+    var rootVonName = threadRoot.von_name;
+    var rootVonEmail = threadRoot.von_email;
+    if (!threadRoot.isIncoming && threadRoot.recipients && threadRoot.recipients.length > 0) {
+        // This is an outgoing email - show "An: [recipient]"
+        rootVonName = 'An: ' + (threadRoot.recipients[0].name || threadRoot.recipients[0].email || '');
+        rootVonEmail = threadRoot.recipients[0].email || '';
+    }
+
     var json = {
         // === IDENTIFICATION ===
         emailId: threadRoot.entryId,
@@ -158,8 +167,8 @@ function buildConversationJsonUnified(threadRoot, allEmails) {
         lastActivityDate: formatDate(lastActivityDate),
 
         // === SENDER (Root) ===
-        von_email: threadRoot.von_email,
-        von_name: threadRoot.von_name,
+        von_email: rootVonEmail,
+        von_name: rootVonName,
 
         // === SUBJECT ===
         betreff: threadRoot.betreff,

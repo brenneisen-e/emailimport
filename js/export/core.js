@@ -450,42 +450,43 @@ function groupEmailsByConversationUnifiedMode(inboxEmails) {
         var unifiedEmail = convertToUnifiedFormat(inboxEmail, 'inbox');
         allEmails.push(unifiedEmail);
 
-        // Add pre-existing incoming replies
+        // Add ALL pre-existing replies (both incoming AND outgoing/sent)
         if (inboxEmail.antworten && inboxEmail.antworten.length > 0) {
             for (var ai = 0; ai < inboxEmail.antworten.length; ai++) {
                 var reply = inboxEmail.antworten[ai];
-                if (reply.isIncoming && reply.replyId && !addedReplyIds[reply.replyId]) {
-                    addedReplyIds[reply.replyId] = true;
-                    var unifiedReply = {
-                        entryId: reply.replyId || '',
-                        conversationId: inboxEmail.conversationId || '',
-                        internetMessageId: reply.internetMessageId || '',
-                        inReplyTo: reply.inReplyTo || '',
-                        references: [],
-                        receivedTime: reply.datum ? new Date(reply.datum) : new Date(),
-                        sentOn: reply.datum ? new Date(reply.datum) : new Date(),
-                        timestamp: reply.datum ? new Date(reply.datum) : new Date(),
-                        von_email: reply.vonEmail || '',
-                        von_name: reply.von || '',
-                        recipients: [],
-                        betreff: inboxEmail.betreff || '',
-                        text: reply.text || '',
-                        htmlBody: reply.htmlBody || '',
-                        anhaenge: [],
-                        outlookKategorie: '',
-                        folderType: 'inbox',
-                        folderName: '',
-                        isIncoming: true,
-                        threadPosition: 0,
-                        threadDepth: reply.threadDepth || 1,
-                        parentMessageId: reply.parentMessageId || reply.inReplyTo || null,
-                        parentFoundInThread: false,
-                        isThreadRoot: false,
-                        newContent: reply.text || '',
-                        normalizedSubject: inboxEmail.normalizedSubject || ''
-                    };
-                    allEmails.push(unifiedReply);
-                }
+                var replyId = reply.replyId || reply.internetMessageId || ('reply_' + ai);
+                if (addedReplyIds[replyId]) continue;
+                addedReplyIds[replyId] = true;
+
+                var unifiedReply = {
+                    entryId: reply.replyId || '',
+                    conversationId: inboxEmail.conversationId || '',
+                    internetMessageId: reply.internetMessageId || '',
+                    inReplyTo: reply.inReplyTo || '',
+                    references: [],
+                    receivedTime: reply.datum ? new Date(reply.datum) : new Date(),
+                    sentOn: reply.datum ? new Date(reply.datum) : new Date(),
+                    timestamp: reply.datum ? new Date(reply.datum) : new Date(),
+                    von_email: reply.vonEmail || '',
+                    von_name: reply.von || reply.an || '',  // Use 'an' for outgoing
+                    recipients: reply.an ? [{name: reply.an, email: '', type: 1}] : [],
+                    betreff: inboxEmail.betreff || '',
+                    text: reply.text || '',
+                    htmlBody: reply.htmlBody || '',
+                    anhaenge: [],
+                    outlookKategorie: '',
+                    folderType: reply.isIncoming ? 'inbox' : 'sent',
+                    folderName: '',
+                    isIncoming: reply.isIncoming !== false,  // Default to true if not specified
+                    threadPosition: 0,
+                    threadDepth: reply.threadDepth || 1,
+                    parentMessageId: reply.parentMessageId || reply.inReplyTo || null,
+                    parentFoundInThread: false,
+                    isThreadRoot: false,
+                    newContent: reply.text || '',
+                    normalizedSubject: inboxEmail.normalizedSubject || ''
+                };
+                allEmails.push(unifiedReply);
             }
         }
     }
