@@ -30,7 +30,6 @@ function startConversationExport(folderId, days) {
     convExportState.allEmails = [];
     convExportState.seenEntryIds = {};
     convExportState.conversations = null;
-    convExportState.skippedCount = 0;
 
     // Calculate cutoff date
     convExportState.cutoffDate = new Date();
@@ -130,14 +129,12 @@ function processConvExportBatch(folderType) {
             var entryId = item.EntryID || '';
             if (convExportState.seenEntryIds[entryId]) continue;
 
-            // Check if already in Excel (skip if exists)
-            if (typeof existingEmailIds !== 'undefined' && existingEmailIds[entryId]) {
-                convExportState.skippedCount = (convExportState.skippedCount || 0) + 1;
-                continue;
-            }
-
-            // Extract email
+            // Extract email (we'll filter at conversation level later)
             var email = extractEmailForConversation(item, folderType);
+
+            // Mark if this email is already in Excel
+            email.alreadyInExcel = (typeof existingEmailIds !== 'undefined' && existingEmailIds[entryId]) ? true : false;
+
             convExportState.allEmails.push(email);
             convExportState.seenEntryIds[entryId] = true;
 
@@ -151,14 +148,9 @@ function processConvExportBatch(folderType) {
     document.getElementById('exportProgressFill').style.width = (phasePct + folderPct) + '%';
 
     var phaseText = convExportState.phase === 1 ? 'Phase 1/4: Inbox' : 'Phase 2/4: Sent';
-    var skipped = convExportState.skippedCount || 0;
-    var progressText = phaseText + ' - ' + convExportState.currentIdx + '/' + convExportState.maxItems +
-        ' (' + convExportState.allEmails.length + ' neu';
-    if (skipped > 0) {
-        progressText += ', ' + skipped + ' uebersprungen';
-    }
-    progressText += ')';
-    document.getElementById('exportProgressText').innerText = progressText;
+    document.getElementById('exportProgressText').innerText =
+        phaseText + ' - ' + convExportState.currentIdx + '/' + convExportState.maxItems +
+        ' (' + convExportState.allEmails.length + ' Emails)';
 
     // Continue or next phase
     if (convExportState.currentIdx <= convExportState.maxItems) {
@@ -208,12 +200,39 @@ function advanceConvExportPhase() {
  */
 function saveConversationExport() {
     try {
-        // Check if there are any new emails
-        if (convExportState.allEmails.length === 0) {
-            var skippedCount = convExportState.skippedCount || 0;
+        // Filter conversations: keep only those with at least one NEW email
+        var filteredConversations = {};
+        var skippedConvCount = 0;
+        var newEmailCount = 0;
+        var totalEmailCount = 0;
+
+        for (var convId in convExportState.conversations) {
+            var conv = convExportState.conversations[convId];
+            var hasNewEmail = false;
+            var newInConv = 0;
+
+            for (var mi = 0; mi < conv.messages.length; mi++) {
+                totalEmailCount++;
+                if (!conv.messages[mi].alreadyInExcel) {
+                    hasNewEmail = true;
+                    newInConv++;
+                }
+            }
+
+            if (hasNewEmail) {
+                filteredConversations[convId] = conv;
+                newEmailCount += newInConv;
+            } else {
+                skippedConvCount++;
+            }
+        }
+
+        // Check if there are any new conversations
+        var filteredCount = Object.keys(filteredConversations).length;
+        if (filteredCount === 0) {
             var noNewMsg = 'Keine neuen Emails gefunden.';
-            if (skippedCount > 0) {
-                noNewMsg += '<br><strong>' + skippedCount + '</strong> Emails bereits in Excel vorhanden.';
+            if (skippedConvCount > 0) {
+                noNewMsg += '<br><strong>' + totalEmailCount + '</strong> Emails in <strong>' + skippedConvCount + '</strong> Konversationen bereits in Excel.';
             }
             showExportSuccess(noNewMsg);
             document.getElementById('exportProgressFill').style.width = '100%';
@@ -222,7 +241,7 @@ function saveConversationExport() {
         }
 
         var exportData = createExportStructure(
-            convExportState.conversations,
+            filteredConversations,
             convExportState.mailboxName
         );
 
@@ -249,11 +268,9 @@ function saveConversationExport() {
         file.Close();
 
         // Show success
-        var convCount = Object.keys(convExportState.conversations).length;
-        var skippedCount = convExportState.skippedCount || 0;
-        var successMsg = '<strong>' + convExportState.allEmails.length + '</strong> neue Emails in <strong>' + convCount + '</strong> Konversationen';
-        if (skippedCount > 0) {
-            successMsg += '<br><strong>' + skippedCount + '</strong> bereits in Excel vorhanden (uebersprungen)';
+        var successMsg = '<strong>' + newEmailCount + '</strong> neue Emails in <strong>' + filteredCount + '</strong> Konversationen';
+        if (skippedConvCount > 0) {
+            successMsg += '<br><strong>' + skippedConvCount + '</strong> Konversationen bereits vollstaendig in Excel';
         }
         successMsg += '<br>Gespeichert: ' + filename;
 
