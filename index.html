@@ -1686,15 +1686,32 @@
             const messages = parts.map((part, idx) => {
                 const partHtml = part.html;
 
-                // Extract sender
-                const vonMatch = partHtml.match(/<b>\s*Von:\s*<\/b>\s*<\/span>([^<]+)/i) ||
-                                 partHtml.match(/Von:\s*<\/span>\s*([^<]+)/i) ||
-                                 partHtml.match(/<b>Von:<\/b>([^<]+)/i);
+                // Extract sender - multiple patterns for different Outlook HTML formats
+                let vonMatch = partHtml.match(/<b>\s*Von:\s*<\/b>\s*<\/span>([^<]+)/i) ||
+                               partHtml.match(/Von:\s*<\/span>\s*([^<]+)/i) ||
+                               partHtml.match(/<b>Von:<\/b>([^<]+)/i);
 
-                // Extract date
+                // Try table-based format: Von:</...></tr><tr><td>NAME</td>
+                if (!vonMatch) {
+                    const tableMatch = partHtml.match(/Von:[\s\S]*?<\/tr>[\s\S]*?<tr[^>]*>[\s\S]*?<td[^>]*>([^<]+)/i);
+                    if (tableMatch) {
+                        vonMatch = tableMatch;
+                    }
+                }
+
+                // Try span-based format: Von:</span></b>...</p>...<span>NAME
+                if (!vonMatch) {
+                    const spanMatch = partHtml.match(/Von:[\s\S]*?<\/span><\/b>[\s\S]*?<span[^>]*>([^<&]+)/i);
+                    if (spanMatch) {
+                        vonMatch = spanMatch;
+                    }
+                }
+
+                // Extract date - multiple patterns
                 const datumMatch = partHtml.match(/<b>\s*Gesendet:\s*<\/b>\s*([^<]+)/i) ||
                                    partHtml.match(/Gesendet:\s*<\/b>\s*([^<]+)/i) ||
-                                   partHtml.match(/<b>Gesendet:<\/b>([^<]+)/i);
+                                   partHtml.match(/<b>Gesendet:<\/b>([^<]+)/i) ||
+                                   partHtml.match(/Gesendet:[\s\S]*?<\/span>[\s\S]*?<span[^>]*>([^<]+)/i);
 
                 let parsedDate = null;
                 if (datumMatch) {
@@ -2252,38 +2269,73 @@
             const replyCountBadge = document.getElementById('replyCount');
             const tabAntworten = document.getElementById('tabAntworten');
 
-            // Use antworten from JSON - they have correct sender names
-            // Apply removeEmailQuotes to get individual reply text
+            // Build display replies from multiple sources
             let displayReplies = [];
             const rawReplies = email.alleAntworten && email.alleAntworten.length > 0
                 ? [...email.alleAntworten]
                 : [...(email.antworten || [])];
 
-            // Process and deduplicate replies
-            const seenTexts = new Set();
-            const originalText = (email._parsedThread && email._parsedThread.find(m => m.isOriginal))
-                ? null  // Will compare HTML
+            // Get parsed thread (non-original messages are replies)
+            const htmlReplies = (email._parsedThread || []).filter(m => !m.isOriginal);
+
+            // Get the original message text for comparison
+            const originalMessage = (email._parsedThread || []).find(m => m.isOriginal);
+            const originalTextLower = originalMessage
+                ? null  // Will use HTML comparison
                 : removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 150);
 
-            for (const reply of rawReplies) {
-                const cleanedText = removeEmailQuotes(reply.text || reply.body || '').trim();
-                const compareText = cleanedText.toLowerCase().substring(0, 150);
+            // Strategy: Use HTML-parsed replies if available (they have actual individual content)
+            // Otherwise fall back to antworten from JSON
+            if (htmlReplies.length > 0) {
+                // Use HTML-parsed replies - they have individual email content
+                const seenHtml = new Set();
+                for (const htmlReply of htmlReplies) {
+                    // Deduplicate by HTML content
+                    const htmlLower = (htmlReply.html || '').toLowerCase().substring(0, 200);
+                    if (seenHtml.has(htmlLower)) continue;
+                    seenHtml.add(htmlLower);
 
-                // Skip empty, duplicates, or same as original request
-                if (!cleanedText || cleanedText.length < 20) continue;
-                if (seenTexts.has(compareText)) continue;
-                if (originalText && compareText === originalText) continue;
+                    // Convert HTML to text for preview
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = htmlReply.html || '';
+                    const plainText = tempDiv.textContent || tempDiv.innerText || '';
 
-                seenTexts.add(compareText);
-                displayReplies.push({
-                    ...reply,
-                    cleanedText: cleanedText,
-                    cleanedHtml: reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : null
-                });
+                    displayReplies.push({
+                        von: htmlReply.von || 'Unbekannt',
+                        datum: htmlReply.datum,
+                        cleanedText: plainText.trim(),
+                        cleanedHtml: htmlReply.html,
+                        isNew: false
+                    });
+                }
+            } else {
+                // No HTML parsing - use antworten from JSON
+                // Deduplicate by cleaned text
+                const seenTexts = new Set();
+                for (const reply of rawReplies) {
+                    const cleanedText = removeEmailQuotes(reply.text || reply.body || '').trim();
+                    const compareText = cleanedText.toLowerCase().substring(0, 150);
+
+                    // Skip empty, duplicates, or same as original request
+                    if (!cleanedText || cleanedText.length < 20) continue;
+                    if (seenTexts.has(compareText)) continue;
+                    if (originalTextLower && compareText === originalTextLower) continue;
+
+                    seenTexts.add(compareText);
+                    displayReplies.push({
+                        ...reply,
+                        cleanedText: cleanedText,
+                        cleanedHtml: reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : null
+                    });
+                }
             }
 
             // Sort by date (oldest first)
-            displayReplies.sort((a, b) => new Date(a.datum || a.date || 0) - new Date(b.datum || b.date || 0));
+            displayReplies.sort((a, b) => {
+                const dateA = a.datum ? new Date(a.datum) : new Date(0);
+                const dateB = b.datum ? new Date(b.datum) : new Date(0);
+                return dateA - dateB;
+            });
 
             const newRepliesCount = (email.antworten || []).filter(r => r.isNew).length;
 
