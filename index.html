@@ -1140,6 +1140,201 @@
 
         .icon-lg { width: 1.5em; height: 1.5em; }
         .icon-xl { width: 2em; height: 2em; }
+
+        /* AI Assistant Styles */
+        .ai-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        .ai-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 30px rgba(139, 92, 246, 0.6);
+        }
+        .ai-panel {
+            position: fixed;
+            bottom: 100px;
+            right: 24px;
+            width: 450px;
+            max-height: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: none;
+            flex-direction: column;
+            z-index: 1001;
+            overflow: hidden;
+        }
+        .ai-panel.open { display: flex; }
+        .ai-header {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            color: white;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ai-header h3 { margin: 0; font-size: 16px; }
+        .ai-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .ai-close:hover { opacity: 1; }
+        .ai-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            max-height: 350px;
+        }
+        .ai-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .ai-message {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .ai-message.user {
+            background: var(--primary-light);
+            align-self: flex-end;
+            max-width: 85%;
+        }
+        .ai-message.assistant {
+            background: #f3f4f6;
+            align-self: flex-start;
+            max-width: 95%;
+        }
+        .ai-message pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin: 8px 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .ai-message code {
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .ai-footer {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .ai-input-row {
+            display: flex;
+            gap: 8px;
+        }
+        .ai-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            resize: none;
+        }
+        .ai-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .ai-send {
+            padding: 10px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .ai-send:hover { background: var(--primary-dark); }
+        .ai-send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ai-quick-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .ai-quick-btn {
+            padding: 6px 10px;
+            background: #f3f4f6;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .ai-quick-btn:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+        .ai-api-setup {
+            padding: 16px;
+            text-align: center;
+        }
+        .ai-api-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .copy-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .copy-btn:hover { background: #0b5a0b; }
+        .ai-loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            padding: 12px;
+        }
+        .ai-loading::before {
+            content: '';
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1577,6 +1772,41 @@
                         <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">tarifwechsel</span>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Debug Assistant -->
+    <button class="ai-fab" onclick="toggleAiPanel()" title="KI Debug-Assistent">
+        🤖
+    </button>
+
+    <div class="ai-panel" id="aiPanel">
+        <div class="ai-header">
+            <h3>🤖 Debug-Assistent (Claude)</h3>
+            <button class="ai-close" onclick="toggleAiPanel()">&times;</button>
+        </div>
+        <div class="ai-body" id="aiBody">
+            <div class="ai-api-setup" id="aiSetup">
+                <p><strong>API Key eingeben</strong></p>
+                <p style="font-size: 12px; color: var(--text-secondary);">
+                    Dein Anthropic API Key wird lokal gespeichert und nur für direkte API-Calls verwendet.
+                </p>
+                <input type="password" class="ai-api-input" id="apiKeyInput" placeholder="sk-ant-api03-...">
+                <button class="btn btn-primary" onclick="saveApiKey()">Speichern</button>
+            </div>
+            <div class="ai-messages" id="aiMessages" style="display: none;">
+            </div>
+        </div>
+        <div class="ai-footer" id="aiFooter" style="display: none;">
+            <div class="ai-quick-actions">
+                <button class="ai-quick-btn" onclick="aiAnalyzeJson()">📊 JSON analysieren</button>
+                <button class="ai-quick-btn" onclick="aiCheckThreads()">🧵 Threads prüfen</button>
+                <button class="ai-quick-btn" onclick="aiGenerateFix()">🔧 Fix generieren</button>
+            </div>
+            <div class="ai-input-row">
+                <textarea class="ai-input" id="aiInput" placeholder="Was ist das Problem?" rows="2"></textarea>
+                <button class="ai-send" id="aiSendBtn" onclick="sendAiMessage()">Senden</button>
             </div>
         </div>
     </div>
@@ -3330,6 +3560,263 @@
             div.textContent = text || '';
             return div.innerHTML;
         }
+
+        // ============================================================================
+        // AI DEBUG ASSISTANT
+        // ============================================================================
+        let aiApiKey = localStorage.getItem('ai_api_key') || '';
+        let aiMessages = [];
+
+        function toggleAiPanel() {
+            const panel = document.getElementById('aiPanel');
+            panel.classList.toggle('open');
+            if (panel.classList.contains('open')) {
+                checkAiSetup();
+            }
+        }
+
+        function checkAiSetup() {
+            const setup = document.getElementById('aiSetup');
+            const messages = document.getElementById('aiMessages');
+            const footer = document.getElementById('aiFooter');
+
+            if (aiApiKey) {
+                setup.style.display = 'none';
+                messages.style.display = 'flex';
+                footer.style.display = 'flex';
+                if (aiMessages.length === 0) {
+                    addAiMessage('assistant', 'Hallo! Ich bin dein Debug-Assistent. Ich kann:\n\n• Die hochgeladene JSON analysieren\n• Thread-Zuordnungen prüfen\n• Fix-Anweisungen für Claude Code generieren\n\nWas möchtest du tun?');
+                }
+            } else {
+                setup.style.display = 'block';
+                messages.style.display = 'none';
+                footer.style.display = 'none';
+            }
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            if (key && key.startsWith('sk-')) {
+                aiApiKey = key;
+                localStorage.setItem('ai_api_key', key);
+                checkAiSetup();
+                showNotification('API Key gespeichert!', 'success');
+            } else {
+                showNotification('Ungültiger API Key', 'error');
+            }
+        }
+
+        function addAiMessage(role, content) {
+            aiMessages.push({ role, content });
+            renderAiMessages();
+        }
+
+        function renderAiMessages() {
+            const container = document.getElementById('aiMessages');
+            container.innerHTML = aiMessages.map(msg => {
+                const formattedContent = formatAiMessage(msg.content);
+                return `<div class="ai-message ${msg.role}">${formattedContent}</div>`;
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function formatAiMessage(content) {
+            // Convert markdown code blocks
+            let formatted = content.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+                const copyBtn = `<button class="copy-btn" onclick="copyToClipboard(this)">📋 Kopieren</button>`;
+                return `<pre>${escapeHtml(code.trim())}</pre>${copyBtn}`;
+            });
+            // Convert inline code
+            formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Convert newlines to breaks
+            formatted = formatted.replace(/\n/g, '<br>');
+            return formatted;
+        }
+
+        function copyToClipboard(btn) {
+            const pre = btn.previousElementSibling;
+            const text = pre.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = '✓ Kopiert!';
+                setTimeout(() => btn.textContent = '📋 Kopieren', 2000);
+            });
+        }
+
+        async function sendAiMessage() {
+            const input = document.getElementById('aiInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addAiMessage('user', message);
+            input.value = '';
+
+            await callClaudeApi(message);
+        }
+
+        async function aiAnalyzeJson() {
+            if (emails.length === 0) {
+                addAiMessage('assistant', '⚠️ Bitte lade zuerst eine JSON-Datei hoch.');
+                return;
+            }
+
+            addAiMessage('user', '📊 Analysiere die JSON-Struktur');
+
+            const sample = emails.slice(0, 3).map(e => ({
+                datum: e.datum,
+                betreff: e.betreff,
+                von_name: e.von_name,
+                conversationId: e.conversationId,
+                antworten_count: e.antworten?.length || 0,
+                antworten: e.antworten?.slice(0, 2).map(a => ({
+                    datum: a.datum,
+                    an: a.an,
+                    text: a.text?.substring(0, 100) + '...',
+                    replyId: a.replyId
+                }))
+            }));
+
+            const prompt = `Analysiere diese Email-JSON-Struktur aus dem Hypercare Email Export Tool:
+
+${JSON.stringify(sample, null, 2)}
+
+Prüfe:
+1. Sind die datum-Felder korrekt formatiert (YYYY-MM-DDTHH:MM:SS)?
+2. Haben die Emails antworten (replies)?
+3. Sind die antworten-Objekte vollständig (datum, an, text, replyId)?
+4. Gibt es offensichtliche Probleme?
+
+Gib eine kurze Analyse und wenn es Probleme gibt, generiere eine Anweisung für Claude Code um das Problem zu beheben.`;
+
+            await callClaudeApi(prompt);
+        }
+
+        async function aiCheckThreads() {
+            if (emails.length === 0) {
+                addAiMessage('assistant', '⚠️ Bitte lade zuerst eine JSON-Datei hoch.');
+                return;
+            }
+
+            addAiMessage('user', '🧵 Prüfe Thread-Zuordnung');
+
+            const threadStats = {
+                total: emails.length,
+                withReplies: emails.filter(e => e.antworten?.length > 0).length,
+                emptyReplies: emails.filter(e => !e.antworten || e.antworten.length === 0).length,
+                sampleWithReplies: emails.find(e => e.antworten?.length > 0),
+                sampleWithoutReplies: emails.find(e => !e.antworten || e.antworten.length === 0)
+            };
+
+            const prompt = `Analysiere diese Thread-Statistiken aus dem Email Export:
+
+Gesamt: ${threadStats.total} Emails
+Mit Antworten: ${threadStats.withReplies}
+Ohne Antworten: ${threadStats.emptyReplies}
+
+Beispiel MIT Antworten:
+${threadStats.sampleWithReplies ? JSON.stringify({
+    betreff: threadStats.sampleWithReplies.betreff,
+    conversationId: threadStats.sampleWithReplies.conversationId,
+    antworten: threadStats.sampleWithReplies.antworten?.slice(0, 2)
+}, null, 2) : 'Keine gefunden'}
+
+Beispiel OHNE Antworten:
+${threadStats.sampleWithoutReplies ? JSON.stringify({
+    betreff: threadStats.sampleWithoutReplies.betreff,
+    conversationId: threadStats.sampleWithoutReplies.conversationId,
+    antworten: threadStats.sampleWithoutReplies.antworten
+}, null, 2) : 'Keine gefunden'}
+
+Ist das Verhältnis normal? Wenn viele Emails keine Antworten haben, generiere eine Debugging-Anweisung für Claude Code.`;
+
+            await callClaudeApi(prompt);
+        }
+
+        async function aiGenerateFix() {
+            addAiMessage('user', '🔧 Generiere Fix-Anweisung');
+
+            const context = {
+                emailCount: emails.length,
+                withReplies: emails.filter(e => e.antworten?.length > 0).length,
+                sampleFields: emails[0] ? Object.keys(emails[0]) : [],
+                sampleReplyFields: emails[0]?.antworten?.[0] ? Object.keys(emails[0].antworten[0]) : []
+            };
+
+            const prompt = `Basierend auf der aktuellen JSON-Struktur:
+
+Emails: ${context.emailCount}
+Mit Antworten: ${context.withReplies}
+Email-Felder: ${context.sampleFields.join(', ')}
+Antwort-Felder: ${context.sampleReplyFields.join(', ')}
+
+Generiere eine detaillierte Anweisung, die der Benutzer kopieren und in Claude Code einfügen kann, um das Export-Problem zu debuggen. Die Anweisung sollte:
+
+1. Die relevanten Dateien im /home/user/emailimport/js/ Verzeichnis analysieren
+2. Die findReplies und createReplyObject Funktionen prüfen
+3. Den sent-cache Aufbau verifizieren
+4. Eine konkrete Lösung vorschlagen
+
+Formatiere die Anweisung so, dass sie direkt kopiert werden kann.`;
+
+            await callClaudeApi(prompt);
+        }
+
+        async function callClaudeApi(userMessage) {
+            const sendBtn = document.getElementById('aiSendBtn');
+            sendBtn.disabled = true;
+
+            // Show loading
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'ai-loading';
+            loadingDiv.id = 'aiLoading';
+            loadingDiv.textContent = 'Claude denkt nach...';
+            document.getElementById('aiMessages').appendChild(loadingDiv);
+
+            try {
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': aiApiKey,
+                        'anthropic-version': '2023-06-01',
+                        'anthropic-dangerous-direct-browser-access': 'true'
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 2000,
+                        system: `Du bist ein Debug-Assistent für das BGAV Hypercare Email Export Tool.
+Das Tool exportiert Emails aus Outlook in JSON und zeigt sie in einer Web-App an.
+Das Hauptproblem: Die "antworten" (replies) Arrays sind oft leer oder die Timestamps stimmen nicht.
+
+Die relevanten Dateien sind:
+- /home/user/emailimport/js/export/core.js - Export-Logik
+- /home/user/emailimport/js/export/sent-cache.js - Cache für gesendete Emails
+- /home/user/emailimport/js/threads/matching.js - findReplies Funktion
+- /home/user/emailimport/js/outlook/extract.js - Email-Extraktion
+
+Wenn du Fixes vorschlägst, generiere eine klar formatierte Anweisung die der Benutzer kopieren und in Claude Code einfügen kann.`,
+                        messages: [{ role: 'user', content: userMessage }]
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+
+                const assistantMessage = data.content[0].text;
+                addAiMessage('assistant', assistantMessage);
+
+            } catch (error) {
+                addAiMessage('assistant', `❌ Fehler: ${error.message}\n\nBitte prüfe deinen API Key.`);
+            } finally {
+                document.getElementById('aiLoading')?.remove();
+                sendBtn.disabled = false;
+            }
+        }
+
+        // Initialize AI panel state on load
+        document.addEventListener('DOMContentLoaded', checkAiSetup);
     </script>
 </body>
 </html>
