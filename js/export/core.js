@@ -315,104 +315,30 @@ function handleConversationContinuation(emailData, allReplies, existingReplyText
 
 /**
  * Handle completely new email
+ * SIMPLIFIED to match old working version
  */
 function handleNewEmail(emailData, allReplies) {
-    var inboxDate = new Date(emailData.datum);
-    var oldestSentItem = null;
-    var oldestSentDate = null;
-
-    // Find oldest sent item
-    for (var si = 0; si < allReplies.length; si++) {
-        var replyDate = new Date(allReplies[si].datum);
-        if (!oldestSentDate || replyDate < oldestSentDate) {
-            oldestSentDate = replyDate;
-            oldestSentItem = allReplies[si];
-        }
+    // Completely new email - include all replies (like old working version)
+    emailData.antworten = allReplies;
+    for (var r = 0; r < allReplies.length; r++) {
+        allReplies[r].isNew = true;
     }
 
-    // Check if sent item started the conversation
-    if (oldestSentItem && oldestSentDate < inboxDate) {
-        // Extract content from inbox email
-        var inboxReplyText = '';
-        if (emailData.htmlBody) {
-            var contentResult = extractNewContentFromHtml(emailData.htmlBody);
-            inboxReplyText = contentResult.newContent || removeEmailQuotes(emailData.text);
-        } else {
-            inboxReplyText = removeEmailQuotes(emailData.text);
-        }
-
-        // Inbox email becomes a reply
-        var inboxAsReply = {
-            datum: emailData.datum,
-            an: '',
-            text: inboxReplyText,
-            fullText: emailData.text,
-            replyId: emailData.emailId,
-            internetMessageId: emailData.internetMessageId || '',
-            inReplyTo: emailData.inReplyTo || '',
-            isNew: true,
-            isIncoming: true,
-            threadDepth: 1,
-            threadPosition: 0
-        };
-
-        // Build replies without oldest sent item
-        var repliesWithoutOldest = [];
-        for (var ri = 0; ri < allReplies.length; ri++) {
-            if (allReplies[ri] !== oldestSentItem) {
-                allReplies[ri].isNew = true;
-                repliesWithoutOldest.push(allReplies[ri]);
-            }
-        }
-        repliesWithoutOldest.push(inboxAsReply);
-
-        // Use sent item as Anfrage
-        emailData.text = oldestSentItem.text;
-        emailData.datum = oldestSentItem.datum;
-        emailData.antworten = repliesWithoutOldest;
-
-        if (oldestSentItem.to) {
-            emailData.von_name = 'An: ' + oldestSentItem.to;
-            emailData.von_email = '';
-        }
+    // Use conversation start date if available, otherwise try quoted headers
+    if (emailData.conversationStartDate) {
+        emailData.datum = emailData.conversationStartDate;
     } else {
-        // Inbox email is the oldest - normal case
-        emailData.antworten = allReplies;
-        for (var r = 0; r < allReplies.length; r++) {
-            allReplies[r].isNew = true;
+        var quotedDate = extractOldestDateFromQuotes(emailData.text);
+        if (quotedDate) {
+            emailData.datum = formatDate(quotedDate);
         }
     }
 
-    // Only override datum for root emails
-    var isLikelyRoot = !emailData.inReplyTo;
-    if (isLikelyRoot) {
-        if (emailData.conversationStartDate) {
-            var convStartDate = new Date(emailData.conversationStartDate);
-            var currentDate = new Date(emailData.datum);
-            if (convStartDate < currentDate) {
-                emailData.datum = emailData.conversationStartDate;
-            }
-        } else if (!oldestSentItem || oldestSentDate >= inboxDate) {
-            var quotedDate = extractOldestDateFromQuotes(emailData.text);
-            if (quotedDate) {
-                emailData.datum = formatDate(quotedDate);
-            }
-        }
-    }
-
-    // Use original subject
+    // Use original subject if available, otherwise strip prefixes
     if (emailData.originalSubject) {
         emailData.betreff = emailData.originalSubject;
     } else {
         emailData.betreff = stripSubjectPrefixes(emailData.betreff);
-    }
-
-    // Clean email text
-    if (emailData.htmlBody) {
-        var textResult = extractNewContentFromHtml(emailData.htmlBody);
-        emailData.text = textResult.newContent || removeEmailQuotes(emailData.text);
-    } else {
-        emailData.text = removeEmailQuotes(emailData.text);
     }
 
     exportState.emails.push(emailData);

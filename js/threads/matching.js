@@ -4,61 +4,30 @@
  */
 
 /**
- * Find replies for an email using multi-layer matching
+ * Find replies for an email - SIMPLIFIED to match old working version
+ * Uses only ConversationID matching (like the old version that worked)
  * @param {Object} originalEmail - The original email to find replies for
  * @returns {Array} Array of reply objects
  */
 function findRepliesMultiLayer(originalEmail) {
     var replies = [];
-    var seenIds = {};  // Prevent duplicates
 
     try {
         var originalConvId = originalEmail.conversationId || '';
-        var originalMsgId = originalEmail.internetMessageId || '';
-        var originalNormSubject = normalizeSubject(originalEmail.betreff || '');
 
-        // Layer 1: ConversationID (Primary - Outlook native)
-        if (originalConvId && sentItemsByConvId[originalConvId]) {
-            var convMatches = sentItemsByConvId[originalConvId];
-            for (var i = 0; i < convMatches.length; i++) {
-                var cached = convMatches[i];
-                if (seenIds[cached.entryId]) continue;
-                seenIds[cached.entryId] = true;
+        // No ConversationID = can't match reliably (same as old version)
+        if (!originalConvId) return replies;
 
-                if (cached.body && cached.body.trim() !== '') {
-                    replies.push(createReplyObject(cached));
-                }
+        // Use lookup map for O(1) access (same as old version)
+        var matchingItems = sentItemsByConvId[originalConvId];
+        if (!matchingItems || matchingItems.length === 0) return replies;
+
+        for (var i = 0; i < matchingItems.length; i++) {
+            var cached = matchingItems[i];
+            if (cached.body && cached.body.trim() !== '') {
+                replies.push(createReplyObject(cached));
             }
         }
-
-        // Layer 2: In-Reply-To header (direct parent-child relationship)
-        if (originalMsgId && sentItemsByInReplyTo[originalMsgId]) {
-            var replyToMatches = sentItemsByInReplyTo[originalMsgId];
-            for (var j = 0; j < replyToMatches.length; j++) {
-                var cached = replyToMatches[j];
-                if (seenIds[cached.entryId]) continue;
-                seenIds[cached.entryId] = true;
-
-                if (cached.body && cached.body.trim() !== '') {
-                    replies.push(createReplyObject(cached));
-                }
-            }
-        }
-
-        // Layer 3: References header (thread chain membership)
-        if (originalMsgId && sentItemsByReference[originalMsgId]) {
-            var refMatches = sentItemsByReference[originalMsgId];
-            for (var k = 0; k < refMatches.length; k++) {
-                var cached = refMatches[k];
-                if (seenIds[cached.entryId]) continue;
-                seenIds[cached.entryId] = true;
-
-                if (cached.body && cached.body.trim() !== '') {
-                    replies.push(createReplyObject(cached));
-                }
-            }
-        }
-
     } catch (e) {}
 
     return replies;
@@ -66,45 +35,18 @@ function findRepliesMultiLayer(originalEmail) {
 
 /**
  * Create a reply object from cached sent item
- * Enhanced with date extraction and content extraction
+ * SIMPLIFIED to match old working version exactly
  * @param {Object} cached - Cached sent item
  * @returns {Object} Reply object
  */
 function createReplyObject(cached) {
-    var replyDatum = formatDate(cached.sentDate);
-    var datumExtracted = false;
-    var replyText = cached.body ? cached.body.trim() : '';
-    var fullText = replyText;
-
-    // Try to extract actual date from HTML headers
-    if (cached.htmlBody) {
-        var dateResult = extractDateFromHtmlHeader(cached.htmlBody);
-        if (dateResult.success) {
-            replyDatum = formatDate(dateResult.date);
-            datumExtracted = true;
-        }
-
-        // Extract only new content from HTML
-        var contentResult = extractNewContentFromHtml(cached.htmlBody);
-        if (contentResult.newContent) {
-            replyText = contentResult.newContent;
-        }
-    }
-
+    // Use simple structure like old working version
+    // Old version: { datum, an, text, replyId }
     return {
-        datum: replyDatum,
-        datumExtracted: datumExtracted,
+        datum: formatDate(cached.sentDate),
         an: cached.to || '',
-        text: replyText,
-        fullText: fullText,
-        htmlBody: cached.htmlBody || '',
-        replyId: cached.entryId || '',
-        internetMessageId: cached.internetMessageId || '',
-        inReplyTo: cached.inReplyTo || '',
-        isIncoming: false,  // Sent items are outgoing
-        threadDepth: 1,     // Default depth
-        threadPosition: 0,  // Will be set after sorting
-        parentMessageId: cached.inReplyTo || ''
+        text: cached.body ? cached.body.trim() : '',
+        replyId: cached.entryId || ''
     };
 }
 

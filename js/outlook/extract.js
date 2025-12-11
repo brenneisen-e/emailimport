@@ -19,6 +19,8 @@ function extractEmail(mailItem) {
         text: '',
         htmlBody: '',
         anhaenge: [],
+        antworten: [],  // Initialize replies array (old version had this)
+        kategorie: '',  // Outlook category (old field name for web app)
         outlookKategorie: '',
         folderName: '',
         conversationStartDate: '',
@@ -73,7 +75,9 @@ function extractEmail(mailItem) {
         try {
             var cats = mailItem.Categories || '';
             if (cats) {
-                email.outlookKategorie = cats.split(',')[0].trim();
+                var firstCat = cats.split(',')[0].trim();
+                email.outlookKategorie = firstCat;
+                email.kategorie = firstCat;  // Old field name for web app compatibility
             }
         } catch (e) {}
 

@@ -14,11 +14,9 @@
  * @param {number} days - Number of days to look back
  */
 function cacheSentItems(days) {
+    // SIMPLIFIED to match old working version
     sentItemsCache = [];
-    sentItemsByConvId = {};
-    sentItemsByInReplyTo = {};
-    sentItemsByReference = {};
-    sentItemsByNormSubject = {};
+    sentItemsByConvId = {};  // Only index we need
     sentCacheState.days = days;
     // Search sent items further back than inbox (replies might be older)
     sentCacheState.cutoffDate = new Date();
@@ -113,11 +111,9 @@ function processSentBatch() {
                 break;
             }
 
+            // SIMPLIFIED to match old working version
             var body = '';
             try { body = item.Body || ''; } catch (e) {}
-
-            var htmlBody = '';
-            try { htmlBody = item.HTMLBody || ''; if (htmlBody.length > 500000) htmlBody = ''; } catch (e) {}
 
             var toRecipient = '';
             try { toRecipient = item.To || ''; } catch (e) {}
@@ -128,52 +124,22 @@ function processSentBatch() {
             var entryId = '';
             try { entryId = item.EntryID || ''; } catch (e) {}
 
-            // Extract extended headers
-            var headers = getEmailHeaders(item);
-
-            var subject = '';
-            try { subject = item.Subject || ''; } catch (e) {}
-
+            // Match old working version's sent item structure
             var sentItem = {
                 sentDate: sentDate,
                 conversationId: convId,
                 entryId: entryId,
                 body: removeEmailQuotes(body),
-                htmlBody: htmlBody,
-                to: toRecipient,
-                subject: subject,
-                internetMessageId: headers.internetMessageId,
-                inReplyTo: headers.inReplyTo,
-                references: headers.references,
-                normalizedSubject: normalizeSubject(subject)
+                to: toRecipient
             };
             sentItemsCache.push(sentItem);
 
-            // Index by ConversationID
+            // Index by ConversationID (only - like old version)
             if (convId) {
                 if (!sentItemsByConvId[convId]) {
                     sentItemsByConvId[convId] = [];
                 }
                 sentItemsByConvId[convId].push(sentItem);
-            }
-
-            // Index by In-Reply-To
-            if (headers.inReplyTo) {
-                if (!sentItemsByInReplyTo[headers.inReplyTo]) {
-                    sentItemsByInReplyTo[headers.inReplyTo] = [];
-                }
-                sentItemsByInReplyTo[headers.inReplyTo].push(sentItem);
-            }
-
-            // Index by References
-            if (headers.references && headers.references.length > 0) {
-                for (var ri = 0; ri < headers.references.length; ri++) {
-                    var refId = headers.references[ri];
-                    if (!sentItemsByReference[refId]) {
-                        sentItemsByReference[refId] = [];
-                    }
-                    sentItemsByReference[refId].push(sentItem);
-                }
             }
         } catch (e) {}
     }
