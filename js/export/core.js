@@ -448,6 +448,11 @@ function groupEmailsByConversationUnifiedMode(inboxEmails) {
     for (var i = 0; i < inboxEmails.length; i++) {
         var inboxEmail = inboxEmails[i];
         var unifiedEmail = convertToUnifiedFormat(inboxEmail, 'inbox');
+
+        // IMPORTANT: Preserve original antworten for fallback
+        unifiedEmail.originalAntworten = inboxEmail.antworten || [];
+        unifiedEmail.originalVonName = inboxEmail.von_name || '';
+
         allEmails.push(unifiedEmail);
 
         // Add ALL pre-existing replies (both incoming AND outgoing/sent)
