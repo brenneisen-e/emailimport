@@ -19,8 +19,8 @@ function writeEmailRow(worksheet, row, email) {
     if (row > 2) {
         try {
             _writeRowCurrentField = 'Format kopieren';
-            var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 24));
-            var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 24));
+            var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 25));
+            var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 25));
             sourceRange.Copy();
             targetRange.PasteSpecial(-4122); // xlPasteFormats
             try { worksheet.Application.CutCopyMode = false; } catch(e) {}
@@ -119,11 +119,37 @@ function writeEmailRow(worksheet, row, email) {
         antwortText = userAntwort || repliesText || '';
     }
 
+    // Calculate "Datum neuste Antwort" (latest reply date)
+    _writeRowCurrentField = 'Neuste Antwort berechnen';
+    var neusteDatum = '';
+    try {
+        if (email.antworten && email.antworten.length > 0) {
+            var latestDate = null;
+            for (var ai = 0; ai < email.antworten.length; ai++) {
+                var replyDate = email.antworten[ai].datum;
+                if (replyDate) {
+                    var rd = new Date(replyDate);
+                    if (!isNaN(rd.getTime()) && (!latestDate || rd > latestDate)) {
+                        latestDate = rd;
+                    }
+                }
+            }
+            if (latestDate) {
+                neusteDatum = latestDate.getFullYear() + '-' +
+                    pad(latestDate.getMonth() + 1) + '-' +
+                    pad(latestDate.getDate()) + ' ' +
+                    pad(latestDate.getHours()) + ':' +
+                    pad(latestDate.getMinutes()) + ':' +
+                    pad(latestDate.getSeconds());
+            }
+        }
+    } catch (e) {}
+
     // Write cells
     _writeRowCurrentField = 'Spalte 1 (ID)';
     worksheet.Cells(row, 1).Value = 'HC-' + (row - 1);
 
-    _writeRowCurrentField = 'Spalte 2 (Datum)';
+    _writeRowCurrentField = 'Spalte 2 (Datum Anfrage)';
     try {
         var datumValue = email.datum || '';
         if (datumValue) {
@@ -145,63 +171,69 @@ function writeEmailRow(worksheet, row, email) {
         worksheet.Cells(row, 2).Value = email.datum || '';
     }
 
-    _writeRowCurrentField = 'Spalte 3 (Kanal)';
-    worksheet.Cells(row, 3).Value = 'E-Mail';
+    _writeRowCurrentField = 'Spalte 3 (Datum neuste Antwort)';
+    if (neusteDatum) {
+        worksheet.Cells(row, 3).Value = neusteDatum;
+        worksheet.Cells(row, 3).NumberFormat = 'DD.MM.YYYY HH:MM';
+    }
 
-    _writeRowCurrentField = 'Spalte 4 (BD-Nummer)';
-    worksheet.Cells(row, 4).Value = bdNummer;
+    _writeRowCurrentField = 'Spalte 4 (Kanal)';
+    worksheet.Cells(row, 4).Value = 'E-Mail';
 
-    _writeRowCurrentField = 'Spalte 5 (Agentur)';
-    worksheet.Cells(row, 5).Value = agentur;
+    _writeRowCurrentField = 'Spalte 5 (BD-Nummer)';
+    worksheet.Cells(row, 5).Value = bdNummer;
 
-    _writeRowCurrentField = 'Spalte 6 (Absender)';
-    worksheet.Cells(row, 6).Value = absender;
+    _writeRowCurrentField = 'Spalte 6 (Agentur)';
+    worksheet.Cells(row, 6).Value = agentur;
 
-    _writeRowCurrentField = 'Spalte 7 (Kategorie)';
-    worksheet.Cells(row, 7).Value = kategorie;
+    _writeRowCurrentField = 'Spalte 7 (Absender)';
+    worksheet.Cells(row, 7).Value = absender;
 
-    _writeRowCurrentField = 'Spalte 8 (Status)';
-    worksheet.Cells(row, 8).Value = status;
+    _writeRowCurrentField = 'Spalte 8 (Kategorie)';
+    worksheet.Cells(row, 8).Value = kategorie;
 
-    _writeRowCurrentField = 'Spalte 9 (In Bearbeitung von)';
-    worksheet.Cells(row, 9).Value = bearbeiter;
+    _writeRowCurrentField = 'Spalte 9 (Status)';
+    worksheet.Cells(row, 9).Value = status;
 
-    _writeRowCurrentField = 'Spalte 10 (Cluster)';
-    worksheet.Cells(row, 10).Value = clusters;
+    _writeRowCurrentField = 'Spalte 10 (In Bearbeitung von)';
+    worksheet.Cells(row, 10).Value = bearbeiter;
 
-    _writeRowCurrentField = 'Spalte 11 (leer)';
-    // Column 11 reserved
+    _writeRowCurrentField = 'Spalte 11 (Cluster)';
+    worksheet.Cells(row, 11).Value = clusters;
 
-    _writeRowCurrentField = 'Spalte 12 (Betreff)';
-    worksheet.Cells(row, 12).Value = betreff;
+    _writeRowCurrentField = 'Spalte 12 (leer)';
+    // Column 12 reserved
 
-    _writeRowCurrentField = 'Spalte 13 (Anfrage)';
+    _writeRowCurrentField = 'Spalte 13 (Betreff)';
+    worksheet.Cells(row, 13).Value = betreff;
+
+    _writeRowCurrentField = 'Spalte 14 (Anfrage)';
     // Truncate and sanitize for Excel (max 30000 chars for safety)
     var safeAnfrage = truncateForExcel(sanitizeForExcel(fixEncoding(anfrage)), 30000);
-    worksheet.Cells(row, 13).Value = safeAnfrage;
+    worksheet.Cells(row, 14).Value = safeAnfrage;
 
-    _writeRowCurrentField = 'Spalte 14 (Antwort)';
+    _writeRowCurrentField = 'Spalte 15 (Antwort)';
     // Truncate and sanitize for Excel (max 30000 chars for safety)
     var safeAntwort = truncateForExcel(sanitizeForExcel(fixEncoding(antwortText)), 30000);
-    worksheet.Cells(row, 14).Value = safeAntwort;
+    worksheet.Cells(row, 15).Value = safeAntwort;
 
     // Bold timestamps in reply cell
     _writeRowCurrentField = 'Timestamps fetten';
-    boldTimestamps(worksheet.Cells(row, 14));
+    boldTimestamps(worksheet.Cells(row, 15));
 
-    _writeRowCurrentField = 'Spalte 15-20 (leer)';
-    // Columns 15-20 reserved
+    _writeRowCurrentField = 'Spalte 16-21 (leer)';
+    // Columns 16-21 reserved
 
-    _writeRowCurrentField = 'Spalte 21 (Kommentar)';
-    worksheet.Cells(row, 21).Value = kommentar;
+    _writeRowCurrentField = 'Spalte 22 (Kommentar)';
+    worksheet.Cells(row, 22).Value = kommentar;
 
-    _writeRowCurrentField = 'Spalte 22 (ConversationID)';
-    worksheet.Cells(row, 22).Value = email.conversationId || '';
+    _writeRowCurrentField = 'Spalte 23 (ConversationID)';
+    worksheet.Cells(row, 23).Value = email.conversationId || '';
 
-    _writeRowCurrentField = 'Spalte 23 (EmailID)';
-    worksheet.Cells(row, 23).Value = email.emailId || '';
+    _writeRowCurrentField = 'Spalte 24 (EmailID)';
+    worksheet.Cells(row, 24).Value = email.emailId || '';
 
-    _writeRowCurrentField = 'Spalte 24 (ReplyIDs)';
+    _writeRowCurrentField = 'Spalte 25 (ReplyIDs)';
     var replyIdList = [];
     if (email.antworten) {
         for (var ri = 0; ri < email.antworten.length; ri++) {
@@ -210,7 +242,7 @@ function writeEmailRow(worksheet, row, email) {
             }
         }
     }
-    worksheet.Cells(row, 24).Value = replyIdList.join(',');
+    worksheet.Cells(row, 25).Value = replyIdList.join(',');
 
     _writeRowCurrentField = 'Fertig';
 }
@@ -284,13 +316,17 @@ function boldTimestamps(cell) {
         var text = cell.Value || '';
         if (!text || typeof text !== 'string') return;
 
-        var pattern = /===[^=]+===/g;
-        var match;
-        var regex = new RegExp('===[^=]+===', 'g');
+        // First, ensure entire cell is NOT bold (reset from format copy)
+        try {
+            cell.Font.Bold = false;
+        } catch (e) {}
 
-        var lastIndex = 0;
+        // Now apply bold only to timestamp patterns
+        var regex = new RegExp('===[^=]+===', 'g');
+        var match;
+
         while ((match = regex.exec(text)) !== null) {
-            var start = match.index + 1;
+            var start = match.index + 1; // Excel Characters is 1-indexed
             var length = match[0].length;
             try {
                 cell.Characters(start, length).Font.Bold = true;
@@ -312,7 +348,7 @@ function readExistingData(worksheet) {
 
         for (var row = 2; row <= lastRow; row++) {
             var datum = worksheet.Cells(row, 2).Value || '';
-            var betreff = worksheet.Cells(row, 12).Value || '';
+            var betreff = worksheet.Cells(row, 13).Value || '';  // Column 13 = Betreff
 
             if (datum || betreff) {
                 var key = createEmailKey(datum, betreff);
