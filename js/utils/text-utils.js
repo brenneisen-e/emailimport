@@ -17,49 +17,64 @@ function sanitizeText(text) {
 
 /**
  * Fix encoding issues (common in German emails)
- * Handles UTF-8 double-encoding and other common encoding problems
+ * Handles UTF-8 double-encoding using Unicode escapes for HTA compatibility
  */
 function fixEncoding(text) {
     if (!text) return '';
-    return text
-        // UTF-8 double-encoded German umlauts
-        .replace(/Ã¤/g, 'ä')
-        .replace(/Ã¶/g, 'ö')
-        .replace(/Ã¼/g, 'ü')
-        .replace(/Ã„/g, 'Ä')
-        .replace(/Ã–/g, 'Ö')
-        .replace(/Ãœ/g, 'Ü')
-        .replace(/ÃŸ/g, 'ß')
-        // Additional common double-encoding patterns
-        .replace(/Ã¼/g, 'ü')
-        .replace(/Ã¶/g, 'ö')
-        .replace(/Ã¤/g, 'ä')
-        .replace(/Ã©/g, 'é')
-        .replace(/Ã¨/g, 'è')
-        .replace(/Ã /g, 'à')
-        .replace(/Ã¢/g, 'â')
-        .replace(/Ã®/g, 'î')
-        .replace(/Ã´/g, 'ô')
-        .replace(/Ã»/g, 'û')
-        .replace(/Ã§/g, 'ç')
-        // Special characters
-        .replace(/â‚¬/g, '€')
-        .replace(/â€"/g, '–')
-        .replace(/â€"/g, '—')
-        .replace(/â€˜/g, "'")
-        .replace(/â€™/g, "'")
-        .replace(/â€œ/g, '"')
-        .replace(/â€/g, '"')
-        .replace(/â€¦/g, '...')
-        .replace(/Â /g, ' ')
-        .replace(/Â´/g, "'")
-        .replace(/Â°/g, '°')
-        .replace(/Â§/g, '§')
-        .replace(/Â©/g, '©')
-        .replace(/Â®/g, '®')
-        // Remove invisible/problematic Unicode characters
-        .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width chars
-        .replace(/\u00A0/g, ' ');  // Non-breaking space to regular space
+
+    var result = text;
+
+    // UTF-8 double-encoded German umlauts (using Unicode escapes for HTA)
+    // Pattern: UTF-8 bytes interpreted as Latin-1, then re-encoded
+    result = result.replace(/\u00C3\u00A4/g, '\u00E4');  // Ã¤ -> ä
+    result = result.replace(/\u00C3\u00B6/g, '\u00F6');  // Ã¶ -> ö
+    result = result.replace(/\u00C3\u00BC/g, '\u00FC');  // Ã¼ -> ü
+    result = result.replace(/\u00C3\u0084/g, '\u00C4');  // Ã„ -> Ä
+    result = result.replace(/\u00C3\u0096/g, '\u00D6');  // Ã– -> Ö
+    result = result.replace(/\u00C3\u009C/g, '\u00DC');  // Ãœ -> Ü
+    result = result.replace(/\u00C3\u009F/g, '\u00DF');  // ÃŸ -> ß
+
+    // Double-encoded special characters
+    result = result.replace(/\u00C3\u00A9/g, '\u00E9');  // Ã© -> é
+    result = result.replace(/\u00C3\u00A8/g, '\u00E8');  // Ã¨ -> è
+    result = result.replace(/\u00C3\u00A0/g, '\u00E0');  // Ã  -> à
+    result = result.replace(/\u00C3\u00A2/g, '\u00E2');  // Ã¢ -> â
+    result = result.replace(/\u00C3\u00AE/g, '\u00EE');  // Ã® -> î
+    result = result.replace(/\u00C3\u00B4/g, '\u00F4');  // Ã´ -> ô
+    result = result.replace(/\u00C3\u00BB/g, '\u00FB');  // Ã» -> û
+    result = result.replace(/\u00C3\u00A7/g, '\u00E7');  // Ã§ -> ç
+
+    // Triple-byte UTF-8 sequences double-encoded (arrows, quotes, etc.)
+    // → (U+2192) = E2 86 92 in UTF-8 -> â†' when double-encoded
+    result = result.replace(/\u00E2\u0086\u0092/g, '\u2192');  // â†' -> →
+    result = result.replace(/\u00E2\u0086\u0090/g, '\u2190');  // â†? -> ←
+
+    // German quotes double-encoded
+    result = result.replace(/\u00E2\u0080\u009E/g, '\u201E');  // â€ž -> „
+    result = result.replace(/\u00E2\u0080\u009C/g, '\u201C');  // â€œ -> "
+    result = result.replace(/\u00E2\u0080\u009D/g, '\u201D');  // â€? -> "
+    result = result.replace(/\u00E2\u0080\u0098/g, '\u2018');  // â€˜ -> '
+    result = result.replace(/\u00E2\u0080\u0099/g, '\u2019');  // â€™ -> '
+
+    // Euro and other symbols
+    result = result.replace(/\u00E2\u0082\u00AC/g, '\u20AC');  // â‚¬ -> €
+    result = result.replace(/\u00E2\u0080\u0093/g, '\u2013');  // â€" -> –
+    result = result.replace(/\u00E2\u0080\u0094/g, '\u2014');  // â€" -> —
+    result = result.replace(/\u00E2\u0080\u00A6/g, '\u2026');  // â€¦ -> …
+
+    // Stray  characters from double-encoding
+    result = result.replace(/\u00C2\u00A0/g, ' ');  // Â  -> space (NBSP)
+    result = result.replace(/\u00C2\u00B4/g, "'");  // Â´ -> '
+    result = result.replace(/\u00C2\u00B0/g, '\u00B0');  // Â° -> °
+    result = result.replace(/\u00C2\u00A7/g, '\u00A7');  // Â§ -> §
+    result = result.replace(/\u00C2\u00A9/g, '\u00A9');  // Â© -> ©
+    result = result.replace(/\u00C2\u00AE/g, '\u00AE');  // Â® -> ®
+
+    // Remove invisible/problematic Unicode characters
+    result = result.replace(/[\u200B-\u200D\uFEFF]/g, '');  // Zero-width chars
+    result = result.replace(/\u00A0/g, ' ');  // Non-breaking space to regular space
+
+    return result;
 }
 
 /**
