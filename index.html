@@ -637,6 +637,125 @@
             overflow-y: auto;
         }
 
+        /* PHASE 5: Thread Visualization Styles */
+        .thread-visualization {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .thread-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        .thread-connector {
+            width: 20px;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .thread-connector .connector-line {
+            position: absolute;
+            left: 8px;
+            top: -10px;
+            width: 2px;
+            height: 20px;
+            background: var(--border-color);
+        }
+
+        .thread-connector .connector-line::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 10px;
+            height: 2px;
+            background: var(--border-color);
+        }
+
+        .thread-content {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: white;
+        }
+
+        .thread-content.incoming {
+            background: #f0f7ff;
+            border-color: #bdd8f5;
+        }
+
+        .thread-content.outgoing {
+            background: #f0fff4;
+            border-color: #b8e6c4;
+        }
+
+        .thread-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .thread-sender {
+            font-weight: 600;
+            font-size: 0.8125rem;
+            color: var(--text-primary);
+        }
+
+        .thread-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .thread-badge {
+            font-size: 0.625rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .thread-badge.original {
+            background: var(--primary);
+            color: white;
+        }
+
+        .thread-badge.new {
+            background: var(--warning);
+            color: white;
+        }
+
+        .thread-root .thread-content {
+            border-width: 2px;
+        }
+
+        /* Thread Summary in Email List */
+        .thread-summary {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .thread-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .thread-summary-item svg {
+            width: 12px;
+            height: 12px;
+        }
+
         /* Content Tabs */
         .content-tabs {
             display: flex;
@@ -1606,6 +1725,299 @@
         // EMAIL PROCESSING
         // ============================================================================
 
+        // ============================================================================
+        // PHASE 1: Subject Normalization for Thread-Matching
+        // ============================================================================
+
+        // Normalize subject by removing Re:/AW:/Fwd:/WG: prefixes (JavaScript version)
+        // Returns lowercase normalized subject for comparison
+        function normalizeSubjectJS(subject) {
+            if (!subject) return '';
+
+            let normalized = subject;
+
+            // Remove common reply/forward prefixes (case-insensitive, can repeat)
+            // German: AW: (Antwort), WG: (Weitergeleitet)
+            // English: Re:, Fwd:, Fw:
+            // French: Rép:, Tr:
+            // Spanish: Re:, RV:
+            const prefixPattern = /^[\s]*(RE|AW|FWD|FW|WG|Antwort|Weitergeleitet|Rép|Tr|RV)[\s]*:[\s]*/i;
+
+            // Keep removing prefixes until none left
+            let prevLength;
+            do {
+                prevLength = normalized.length;
+                normalized = normalized.replace(prefixPattern, '');
+            } while (normalized.length < prevLength);
+
+            // Also remove [EXT], [EXTERNAL], etc. tags
+            normalized = normalized.replace(/^\s*\[[^\]]{1,20}\]\s*/gi, '');
+
+            // Trim and lowercase for comparison
+            return normalized.trim().toLowerCase();
+        }
+
+        // Compute thread ID using multi-layer fallback (JavaScript version)
+        // Mirrors the HTA computeThreadId() function
+        function computeThreadIdJS(email) {
+            // Primary: Outlook ConversationID (most reliable when available)
+            if (email.conversationId) {
+                return 'conv:' + email.conversationId;
+            }
+
+            // Secondary: First message in References chain (the thread root)
+            if (email.references && email.references.length > 0) {
+                return 'ref:' + email.references[0];
+            }
+
+            // Tertiary: In-Reply-To (parent message)
+            if (email.inReplyTo) {
+                return 'reply:' + email.inReplyTo;
+            }
+
+            // Quaternary: Normalized subject (fallback)
+            if (email.normalizedSubject) {
+                return 'subj:' + email.normalizedSubject;
+            }
+
+            // Last resort: unique ID for orphan emails
+            return 'orphan:' + (email.emailId || email.internetMessageId || Math.random().toString(36));
+        }
+
+        // ============================================================================
+        // PHASE 5: Thread Tree Building & Visualization
+        // ============================================================================
+
+        // Build a tree structure from flat email list with replies
+        // Returns: { root: email, children: [{node, children}...] }
+        function buildThreadTree(email) {
+            const root = {
+                email: email,
+                children: [],
+                depth: 0,
+                position: 1
+            };
+
+            // Get replies from email
+            const replies = email.antworten || email.alleAntworten || [];
+            if (replies.length === 0) {
+                return root;
+            }
+
+            // Build lookup by message ID for parent finding
+            const nodesByMsgId = {};
+            if (email.internetMessageId) {
+                nodesByMsgId[email.internetMessageId] = root;
+            }
+
+            // Create nodes for all replies
+            const replyNodes = replies.map((reply, idx) => ({
+                reply: reply,
+                children: [],
+                depth: reply.threadDepth || 1,
+                position: idx + 2,
+                parentMessageId: reply.parentMessageId || reply.inReplyTo || email.internetMessageId
+            }));
+
+            // Index reply nodes by their message ID
+            replyNodes.forEach(node => {
+                if (node.reply.internetMessageId) {
+                    nodesByMsgId[node.reply.internetMessageId] = node;
+                }
+            });
+
+            // Assign children to parents
+            replyNodes.forEach(node => {
+                const parentId = node.parentMessageId;
+                const parentNode = nodesByMsgId[parentId];
+
+                if (parentNode && parentNode !== node) {
+                    parentNode.children.push(node);
+                    node.depth = parentNode.depth + 1;
+                } else {
+                    // No parent found - attach to root
+                    root.children.push(node);
+                }
+            });
+
+            // Recursive function to sort children by date
+            function sortChildren(node) {
+                if (node.children.length > 0) {
+                    node.children.sort((a, b) => {
+                        const dateA = new Date(a.reply?.datum || a.email?.datum);
+                        const dateB = new Date(b.reply?.datum || b.email?.datum);
+                        return dateA - dateB;
+                    });
+                    node.children.forEach(sortChildren);
+                }
+            }
+            sortChildren(root);
+
+            return root;
+        }
+
+        // Flatten thread tree to array with depth info (depth-first traversal)
+        // sortOrder: 'chronological' | 'threaded' | 'reverse'
+        function flattenThreadTree(tree, sortOrder = 'threaded') {
+            const result = [];
+            let position = 1;
+
+            function traverse(node, depth) {
+                if (node.email) {
+                    result.push({
+                        type: 'root',
+                        email: node.email,
+                        depth: depth,
+                        position: position++,
+                        isRoot: true
+                    });
+                } else if (node.reply) {
+                    result.push({
+                        type: 'reply',
+                        reply: node.reply,
+                        depth: depth,
+                        position: position++,
+                        isRoot: false
+                    });
+                }
+
+                // Process children
+                node.children.forEach(child => traverse(child, depth + 1));
+            }
+
+            traverse(tree, 0);
+
+            // Re-sort if needed
+            if (sortOrder === 'chronological') {
+                result.sort((a, b) => {
+                    const dateA = new Date(a.email?.datum || a.reply?.datum);
+                    const dateB = new Date(b.email?.datum || b.reply?.datum);
+                    return dateA - dateB;
+                });
+            } else if (sortOrder === 'reverse') {
+                result.sort((a, b) => {
+                    const dateA = new Date(a.email?.datum || a.reply?.datum);
+                    const dateB = new Date(b.email?.datum || b.reply?.datum);
+                    return dateB - dateA;
+                });
+            }
+
+            // Update positions after sorting
+            result.forEach((item, idx) => item.position = idx + 1);
+
+            return result;
+        }
+
+        // Generate HTML for thread visualization with indentation
+        function renderThreadVisualization(email) {
+            const tree = buildThreadTree(email);
+            const flatList = flattenThreadTree(tree, 'threaded');
+
+            let html = '<div class="thread-visualization">';
+
+            flatList.forEach(item => {
+                const indent = item.depth * 20; // 20px per level
+                const isIncoming = item.reply?.isIncoming !== false;
+                const direction = isIncoming ? 'incoming' : 'outgoing';
+
+                if (item.isRoot) {
+                    html += `
+                        <div class="thread-item thread-root" style="margin-left: ${indent}px;">
+                            <div class="thread-connector"></div>
+                            <div class="thread-content ${direction}">
+                                <div class="thread-header">
+                                    <span class="thread-sender">${escapeHtml(item.email.von_name || item.email.displaySender || 'Unbekannt')}</span>
+                                    <span class="thread-date">${formatDateDisplay(item.email.datum)}</span>
+                                    <span class="thread-badge original">Original</span>
+                                </div>
+                            </div>
+                        </div>`;
+                } else {
+                    const sender = item.reply.von || item.reply.vonEmail || item.reply.an || 'Unbekannt';
+                    html += `
+                        <div class="thread-item thread-reply" style="margin-left: ${indent}px;">
+                            <div class="thread-connector">
+                                <span class="connector-line"></span>
+                            </div>
+                            <div class="thread-content ${direction}">
+                                <div class="thread-header">
+                                    <span class="thread-sender">${escapeHtml(sender)}</span>
+                                    <span class="thread-date">${formatDateDisplay(item.reply.datum)}</span>
+                                    ${item.reply.isNew ? '<span class="thread-badge new">Neu</span>' : ''}
+                                </div>
+                            </div>
+                        </div>`;
+                }
+            });
+
+            html += '</div>';
+            return html;
+        }
+
+        // Helper: Format date for display
+        function formatDateDisplay(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr;
+
+            const now = new Date();
+            const diffMs = now - date;
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            // Relative time for recent dates
+            if (diffHours < 1) return 'vor wenigen Minuten';
+            if (diffHours < 24) return `vor ${diffHours} Stunde${diffHours > 1 ? 'n' : ''}`;
+            if (diffDays < 7) return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
+
+            // Absolute date for older dates
+            return date.toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Helper: Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Get thread summary for email list display
+        function getThreadSummary(email) {
+            const replies = email.antworten || [];
+            const allReplies = email.alleAntworten || replies;
+
+            const participants = new Set();
+            participants.add(email.von_email || email.von_name);
+
+            replies.forEach(r => {
+                if (r.von) participants.add(r.von);
+                if (r.vonEmail) participants.add(r.vonEmail);
+                if (r.an) participants.add(r.an);
+            });
+
+            const lastReply = replies.length > 0 ? replies[replies.length - 1] : null;
+            const newReplies = replies.filter(r => r.isNew).length;
+
+            return {
+                messageCount: 1 + allReplies.length,
+                participantCount: participants.size,
+                participants: Array.from(participants).slice(0, 3),
+                lastActivityDate: lastReply ? lastReply.datum : email.datum,
+                newRepliesCount: newReplies,
+                hasNewReplies: newReplies > 0
+            };
+        }
+
         // Remove email quotes and signatures from text
         function removeEmailQuotes(text) {
             if (!text) return '';
@@ -1638,12 +2050,199 @@
             return result.trim();
         }
 
-        // Parse HTML email thread into individual messages
-        // Splits at Outlook quote separators and extracts each email with metadata
-        function parseEmailThreadHtml(html) {
-            if (!html) return [];
+        // ============================================================================
+        // PHASE 4: Multi-Client HTML Thread Parsing
+        // ============================================================================
 
-            // Find all separator positions: <div style="border:none;border-top:solid #E1E1E1...">
+        // Month mappings for date parsing
+        const MONTH_MAPS = {
+            // German
+            'januar': 0, 'februar': 1, 'märz': 2, 'april': 3, 'mai': 4, 'juni': 5,
+            'juli': 6, 'august': 7, 'september': 8, 'oktober': 9, 'november': 10, 'dezember': 11,
+            // English
+            'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
+            'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11,
+            // English short
+            'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'jun': 5,
+            'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+        };
+
+        // Detect email client from HTML structure
+        function detectEmailClient(html) {
+            if (!html) return 'unknown';
+
+            // Outlook: border-top solid separators
+            if (/<div[^>]*style=['"][^'"]*border(?:-top)?:\s*solid/i.test(html)) {
+                return 'outlook';
+            }
+
+            // Gmail: gmail_quote class
+            if (/<div[^>]*class=['"][^'"]*gmail_quote/i.test(html)) {
+                return 'gmail';
+            }
+
+            // Apple Mail / Thunderbird: blockquote with type="cite"
+            if (/<blockquote[^>]*type=['"]cite['"]/i.test(html)) {
+                return 'apple-thunderbird';
+            }
+
+            // Generic blockquote
+            if (/<blockquote/i.test(html)) {
+                return 'generic-blockquote';
+            }
+
+            // Plain text quote markers in HTML
+            if (/&gt;\s*&gt;|>\s*>/i.test(html)) {
+                return 'plaintext-quote';
+            }
+
+            return 'unknown';
+        }
+
+        // Parse date string from various formats
+        function parseDateMultiFormat(dateStr) {
+            if (!dateStr) return null;
+
+            const cleaned = dateStr.trim();
+
+            // German format: "14. November 2025 10:30" or "14.11.2025 10:30"
+            let match = cleaned.match(/(\d{1,2})\.?\s*(\w+|\d{1,2})\.?\s*(\d{4})\s+(?:um\s+)?(\d{1,2}):(\d{2})/i);
+            if (match) {
+                let month;
+                if (/^\d+$/.test(match[2])) {
+                    month = parseInt(match[2]) - 1;
+                } else {
+                    month = MONTH_MAPS[match[2].toLowerCase()];
+                }
+                if (month !== undefined) {
+                    return new Date(parseInt(match[3]), month, parseInt(match[1]), parseInt(match[4]), parseInt(match[5]));
+                }
+            }
+
+            // English format: "November 14, 2025 at 10:30 AM" or "Nov 14, 2025 10:30"
+            match = cleaned.match(/(\w+)\s+(\d{1,2}),?\s*(\d{4})\s+(?:at\s+)?(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+            if (match) {
+                const month = MONTH_MAPS[match[1].toLowerCase()];
+                if (month !== undefined) {
+                    let hours = parseInt(match[4]);
+                    if (match[6]) {
+                        if (match[6].toUpperCase() === 'PM' && hours < 12) hours += 12;
+                        if (match[6].toUpperCase() === 'AM' && hours === 12) hours = 0;
+                    }
+                    return new Date(parseInt(match[3]), month, parseInt(match[2]), hours, parseInt(match[5]));
+                }
+            }
+
+            // ISO format: "2025-11-14T10:30:00"
+            match = cleaned.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), parseInt(match[4]), parseInt(match[5]));
+            }
+
+            // US format: "11/14/2025 10:30"
+            match = cleaned.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+            if (match) {
+                return new Date(parseInt(match[3]), parseInt(match[1]) - 1, parseInt(match[2]), parseInt(match[4]), parseInt(match[5]));
+            }
+
+            // Try native Date parsing as fallback
+            const fallback = new Date(cleaned);
+            return isNaN(fallback.getTime()) ? null : fallback;
+        }
+
+        // Extract sender from various formats
+        function extractSenderFromHtml(html, client) {
+            let match;
+
+            // Outlook patterns
+            if (client === 'outlook') {
+                match = html.match(/<b>\s*Von:\s*<\/b>\s*<\/span>([^<]+)/i) ||
+                        html.match(/Von:\s*<\/span>\s*([^<]+)/i) ||
+                        html.match(/<b>Von:<\/b>([^<]+)/i) ||
+                        html.match(/Von:[\s\S]*?<\/tr>[\s\S]*?<tr[^>]*>[\s\S]*?<td[^>]*>([^<]+)/i) ||
+                        html.match(/Von:[\s\S]*?<\/span><\/b>[\s\S]*?<span[^>]*>([^<&]+)/i) ||
+                        html.match(/<b>\s*From:\s*<\/b>\s*<\/span>([^<]+)/i) ||
+                        html.match(/From:\s*<\/b>\s*([^<]+)/i);
+            }
+
+            // Gmail patterns
+            if (client === 'gmail') {
+                // "On Nov 14, 2025, Name <email> wrote:"
+                match = html.match(/On\s+[\w\s,]+,\s+([^<]+)<[^>]+>\s+wrote:/i) ||
+                        html.match(/Am\s+[\d\.\s]+(?:um\s+[\d:]+)?\s+schrieb\s+([^<:]+)/i);
+            }
+
+            // Apple Mail / Thunderbird patterns
+            if (client === 'apple-thunderbird') {
+                match = html.match(/On\s+[\w\s,]+,?\s+at\s+[\d:]+\s*(?:AM|PM)?,\s+([^<]+)<[^>]+>\s+wrote:/i) ||
+                        html.match(/Am\s+[\d\.\s]+(?:um\s+[\d:]+)?\s+schrieb\s+([^<:]+)/i) ||
+                        html.match(/Von:\s*([^<\n]+)/i) ||
+                        html.match(/From:\s*([^<\n]+)/i);
+            }
+
+            // Generic fallback patterns
+            if (!match) {
+                match = html.match(/Von:\s*([^<\n]+)/i) ||
+                        html.match(/From:\s*([^<\n]+)/i) ||
+                        html.match(/wrote:/i) && html.match(/([^<,]+)<[^>]+>\s+wrote:/i) ||
+                        html.match(/schrieb\s+([^<:]+)/i);
+            }
+
+            if (match && match[1]) {
+                // Clean up the sender name
+                return match[1]
+                    .replace(/&lt;.*$/, '')
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/&[a-z]+;/gi, ' ')
+                    .trim();
+            }
+
+            return null;
+        }
+
+        // Extract date from various HTML formats
+        function extractDateFromHtml(html, client) {
+            let match;
+
+            // Outlook patterns
+            if (client === 'outlook') {
+                match = html.match(/<b>\s*Gesendet:\s*<\/b>\s*([^<]+)/i) ||
+                        html.match(/Gesendet:\s*<\/b>\s*([^<]+)/i) ||
+                        html.match(/<b>Gesendet:<\/b>([^<]+)/i) ||
+                        html.match(/Gesendet:[\s\S]*?<\/span>[\s\S]*?<span[^>]*>([^<]+)/i) ||
+                        html.match(/<b>\s*Sent:\s*<\/b>\s*([^<]+)/i) ||
+                        html.match(/Sent:\s*<\/b>\s*([^<]+)/i);
+            }
+
+            // Gmail patterns: "On Nov 14, 2025, at 10:30 AM"
+            if (client === 'gmail') {
+                match = html.match(/On\s+([\w\s,]+\d{4}[^,]*),/i) ||
+                        html.match(/Am\s+([\d\.\s]+(?:um\s+[\d:]+)?)/i);
+            }
+
+            // Apple Mail / Thunderbird
+            if (client === 'apple-thunderbird') {
+                match = html.match(/On\s+([\w\s,]+at\s+[\d:]+\s*(?:AM|PM)?)/i) ||
+                        html.match(/Am\s+([\d\.\s]+(?:um\s+[\d:]+)?)/i);
+            }
+
+            // Generic fallback
+            if (!match) {
+                match = html.match(/Gesendet:\s*([^<\n]+)/i) ||
+                        html.match(/Sent:\s*([^<\n]+)/i) ||
+                        html.match(/Date:\s*([^<\n]+)/i) ||
+                        html.match(/Datum:\s*([^<\n]+)/i);
+            }
+
+            if (match && match[1]) {
+                return parseDateMultiFormat(match[1]);
+            }
+
+            return null;
+        }
+
+        // Parse Outlook-style threads
+        function parseOutlookThread(html) {
             const separatorRegex = /<div[^>]*style=['"][^'"]*border(?:-top)?:\s*(?:none;border-top:)?solid[^'"]*['"][^>]*>/gi;
             const separatorPositions = [];
             let match;
@@ -1651,97 +2250,140 @@
                 separatorPositions.push(match.index);
             }
 
-            if (separatorPositions.length === 0) {
-                // No thread structure found - single email
-                return [];
-            }
+            if (separatorPositions.length === 0) return [];
 
-            // Split HTML into parts
             const parts = [];
 
-            // First part: from start to first separator (newest email - no header)
+            // First part: from start to first separator
             if (separatorPositions[0] > 100) {
-                parts.push({
-                    html: html.substring(0, separatorPositions[0]),
-                    hasHeader: false
-                });
+                parts.push({ html: html.substring(0, separatorPositions[0]), hasHeader: false });
             }
 
-            // Remaining parts: from each separator to the next
+            // Remaining parts
             for (let i = 0; i < separatorPositions.length; i++) {
                 const start = separatorPositions[i];
                 const end = i < separatorPositions.length - 1 ? separatorPositions[i + 1] : html.length;
-                parts.push({
-                    html: html.substring(start, end),
-                    hasHeader: true
-                });
+                parts.push({ html: html.substring(start, end), hasHeader: true });
             }
 
-            // Parse each part
-            const germanMonths = {
-                'januar': 0, 'februar': 1, 'märz': 2, 'april': 3, 'mai': 4, 'juni': 5,
-                'juli': 6, 'august': 7, 'september': 8, 'oktober': 9, 'november': 10, 'dezember': 11
-            };
+            return parts.map(part => ({
+                html: part.html,
+                von: extractSenderFromHtml(part.html, 'outlook'),
+                datum: extractDateFromHtml(part.html, 'outlook'),
+                client: 'outlook',
+                confidence: 0.9
+            })).filter(m => m.html && m.html.length > 50);
+        }
 
-            const messages = parts.map((part, idx) => {
-                const partHtml = part.html;
+        // Parse Gmail-style threads
+        function parseGmailThread(html) {
+            const parts = [];
+            const gmailQuoteRegex = /<div[^>]*class=['"][^'"]*gmail_quote[^'"]*['"][^>]*>/gi;
+            const positions = [];
+            let match;
+            while ((match = gmailQuoteRegex.exec(html)) !== null) {
+                positions.push(match.index);
+            }
 
-                // Extract sender - multiple patterns for different Outlook HTML formats
-                let vonMatch = partHtml.match(/<b>\s*Von:\s*<\/b>\s*<\/span>([^<]+)/i) ||
-                               partHtml.match(/Von:\s*<\/span>\s*([^<]+)/i) ||
-                               partHtml.match(/<b>Von:<\/b>([^<]+)/i);
+            if (positions.length === 0) return [];
 
-                // Try table-based format: Von:</...></tr><tr><td>NAME</td>
-                if (!vonMatch) {
-                    const tableMatch = partHtml.match(/Von:[\s\S]*?<\/tr>[\s\S]*?<tr[^>]*>[\s\S]*?<td[^>]*>([^<]+)/i);
-                    if (tableMatch) {
-                        vonMatch = tableMatch;
+            // First part before any quote
+            if (positions[0] > 100) {
+                parts.push({ html: html.substring(0, positions[0]), hasHeader: false });
+            }
+
+            // Each quoted section
+            for (let i = 0; i < positions.length; i++) {
+                const start = positions[i];
+                const end = i < positions.length - 1 ? positions[i + 1] : html.length;
+                parts.push({ html: html.substring(start, end), hasHeader: true });
+            }
+
+            return parts.map(part => ({
+                html: part.html,
+                von: extractSenderFromHtml(part.html, 'gmail'),
+                datum: extractDateFromHtml(part.html, 'gmail'),
+                client: 'gmail',
+                confidence: 0.85
+            })).filter(m => m.html && m.html.length > 50);
+        }
+
+        // Parse blockquote-style threads (Apple Mail, Thunderbird)
+        function parseBlockquoteThread(html) {
+            const parts = [];
+            const blockquoteRegex = /<blockquote[^>]*(?:type=['"]cite['"])?[^>]*>/gi;
+            const positions = [];
+            let match;
+            while ((match = blockquoteRegex.exec(html)) !== null) {
+                positions.push(match.index);
+            }
+
+            if (positions.length === 0) return [];
+
+            // First part before any blockquote
+            if (positions[0] > 100) {
+                parts.push({ html: html.substring(0, positions[0]), hasHeader: false });
+            }
+
+            // Each blockquote section
+            for (let i = 0; i < positions.length; i++) {
+                const start = positions[i];
+                // Find matching closing tag (simplified - may need improvement for nested)
+                const closeMatch = html.substring(start).match(/<\/blockquote>/i);
+                const end = closeMatch ? start + closeMatch.index + closeMatch[0].length : html.length;
+                parts.push({ html: html.substring(start, end), hasHeader: true });
+            }
+
+            return parts.map(part => ({
+                html: part.html,
+                von: extractSenderFromHtml(part.html, 'apple-thunderbird'),
+                datum: extractDateFromHtml(part.html, 'apple-thunderbird'),
+                client: 'apple-thunderbird',
+                confidence: 0.8
+            })).filter(m => m.html && m.html.length > 50);
+        }
+
+        // Main function: Parse HTML email thread into individual messages
+        // Supports multiple email clients: Outlook, Gmail, Apple Mail, Thunderbird
+        function parseEmailThreadHtml(html) {
+            if (!html) return [];
+
+            // Detect email client
+            const client = detectEmailClient(html);
+            let messages = [];
+
+            // Parse based on detected client
+            switch (client) {
+                case 'outlook':
+                    messages = parseOutlookThread(html);
+                    break;
+                case 'gmail':
+                    messages = parseGmailThread(html);
+                    break;
+                case 'apple-thunderbird':
+                case 'generic-blockquote':
+                    messages = parseBlockquoteThread(html);
+                    break;
+                default:
+                    // Try all parsers and use the one with best results
+                    const outlookResult = parseOutlookThread(html);
+                    const gmailResult = parseGmailThread(html);
+                    const blockquoteResult = parseBlockquoteThread(html);
+
+                    // Use the result with most messages found
+                    if (outlookResult.length >= gmailResult.length && outlookResult.length >= blockquoteResult.length) {
+                        messages = outlookResult;
+                    } else if (gmailResult.length >= blockquoteResult.length) {
+                        messages = gmailResult;
+                    } else {
+                        messages = blockquoteResult;
                     }
-                }
+            }
 
-                // Try span-based format: Von:</span></b>...</p>...<span>NAME
-                if (!vonMatch) {
-                    const spanMatch = partHtml.match(/Von:[\s\S]*?<\/span><\/b>[\s\S]*?<span[^>]*>([^<&]+)/i);
-                    if (spanMatch) {
-                        vonMatch = spanMatch;
-                    }
-                }
-
-                // Extract date - multiple patterns
-                const datumMatch = partHtml.match(/<b>\s*Gesendet:\s*<\/b>\s*([^<]+)/i) ||
-                                   partHtml.match(/Gesendet:\s*<\/b>\s*([^<]+)/i) ||
-                                   partHtml.match(/<b>Gesendet:<\/b>([^<]+)/i) ||
-                                   partHtml.match(/Gesendet:[\s\S]*?<\/span>[\s\S]*?<span[^>]*>([^<]+)/i);
-
-                let parsedDate = null;
-                if (datumMatch) {
-                    const dateStr = datumMatch[1].trim();
-                    const dateMatch2 = dateStr.match(/(\d{1,2})\.\s*(\w+)\s*(\d{4})\s*(\d{1,2}):(\d{2})/i);
-                    if (dateMatch2) {
-                        const month = germanMonths[dateMatch2[2].toLowerCase()];
-                        if (month !== undefined) {
-                            parsedDate = new Date(parseInt(dateMatch2[3]), month, parseInt(dateMatch2[1]), parseInt(dateMatch2[4]), parseInt(dateMatch2[5]));
-                        }
-                    }
-                }
-
-                // Clean the HTML: remove the header block for display
-                let cleanHtml = partHtml;
-                if (part.hasHeader) {
-                    // Find end of header (after Betreff line)
-                    const betreffEnd = cleanHtml.search(/<\/p>\s*<\/div>\s*<\/div>\s*<p/i);
-                    if (betreffEnd > 0) {
-                        cleanHtml = cleanHtml.substring(betreffEnd);
-                    }
-                }
-
-                return {
-                    html: cleanHtml,
-                    von: vonMatch ? vonMatch[1].replace(/&lt;.*$/, '').replace(/<[^>]+>/g, '').trim() : null,
-                    datum: parsedDate,
-                    isOriginal: false
-                };
-            }).filter(m => m.html && m.html.length > 100);
+            if (messages.length === 0) {
+                // No thread structure found - single email
+                return [];
+            }
 
             // Sort by date (oldest first)
             messages.sort((a, b) => {
@@ -1751,10 +2393,12 @@
                 return a.datum.getTime() - b.datum.getTime();
             });
 
-            // Mark oldest as original
-            if (messages.length > 0) {
-                messages[0].isOriginal = true;
-            }
+            // Mark oldest as original and add metadata
+            messages.forEach((msg, idx) => {
+                msg.isOriginal = (idx === 0);
+                msg.threadPosition = idx + 1;
+                msg.threadDepth = idx; // Simple linear depth
+            });
 
             return messages;
         }
@@ -1846,6 +2490,15 @@
                     existingReplies: email.existingReplies || '',  // Bereits in Excel vorhandene Antworten
                     isDuplicateWithNewReplies: email.isDuplicateWithNewReplies || false,
                     conversationId: email.conversationId || '',  // Outlook ConversationID für Duplikatsprüfung
+
+                    // PHASE 1: Extended thread-mapping fields
+                    emailId: email.emailId || '',                    // Outlook EntryID
+                    internetMessageId: email.internetMessageId || '', // RFC 2822 Message-ID
+                    inReplyTo: email.inReplyTo || '',                // Parent message ID
+                    references: email.references || [],              // Full thread chain
+                    conversationIndex: email.conversationIndex || '', // Outlook internal index
+                    normalizedSubject: email.normalizedSubject || normalizeSubjectJS(subject), // Normalized for matching
+                    threadId: email.threadId || '',                  // Computed thread ID from HTA
 
                     // Pre-filled fields
                     kategorie: kategorie,
