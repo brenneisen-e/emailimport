@@ -201,9 +201,6 @@ function saveConversationExport() {
             convExportState.mailboxName
         );
 
-        // Also create legacy format for web app compatibility
-        var legacyEmails = convertToLegacyFormat(convExportState.conversations);
-
         var fso = new ActiveXObject("Scripting.FileSystemObject");
         var shell = new ActiveXObject("WScript.Shell");
         var shellApp = new ActiveXObject("Shell.Application");
@@ -220,23 +217,16 @@ function saveConversationExport() {
             (today.getMonth() + 1 < 10 ? '0' : '') + (today.getMonth() + 1) + '-' +
             (today.getDate() < 10 ? '0' : '') + today.getDate();
 
-        // Save full conversation format
+        // Save conversation format
         var filename = downloads + "\\hypercare_conversations_" + dateStr + ".json";
         var file = fso.CreateTextFile(filename, true, true);
         file.Write(JSON.stringify(exportData, null, 2));
         file.Close();
 
-        // Also save legacy format for web app
-        var legacyFilename = downloads + "\\hypercare_emails_" + dateStr + ".json";
-        var legacyFile = fso.CreateTextFile(legacyFilename, true, true);
-        legacyFile.Write(JSON.stringify(legacyEmails, null, 2));
-        legacyFile.Close();
-
         // Show success
         var convCount = Object.keys(convExportState.conversations).length;
         var successMsg = '<strong>' + convExportState.allEmails.length + '</strong> Emails in <strong>' + convCount + '</strong> Konversationen';
         successMsg += '<br>Gespeichert: ' + filename;
-        successMsg += '<br>Legacy-Format: ' + legacyFilename;
 
         showExportSuccess(successMsg);
         completeStep(3);

@@ -3099,13 +3099,15 @@
                 // If only antworten is used, it already excludes root
                 const uniqueReplyCount = alleCount > 0 ? Math.max(0, alleCount - 1) : antwortenCount;
 
-                let badges = '';
-                // Show read/unread badge
+                // Read/Unread badge (separate - goes next to name)
+                let readBadge = '';
                 if (readEmails.has(email.id)) {
-                    badges += '<span class="badge badge-read">Gelesen</span>';
+                    readBadge = '<span class="badge badge-read">Gelesen</span>';
                 } else {
-                    badges += '<span class="badge badge-unread">Ungelesen</span>';
+                    readBadge = '<span class="badge badge-unread">Ungelesen</span>';
                 }
+
+                let badges = '';
                 // Show reply count badge
                 if (uniqueReplyCount > 0) {
                     badges += '<span class="badge badge-reply">' + uniqueReplyCount + ' Antw.</span>';
@@ -3132,6 +3134,7 @@
                         <div class="email-item-content" onclick="selectEmail(${email.id})">
                             <div class="email-item-header">
                                 <span class="email-sender">${escapeHtml(senderDisplay)}</span>
+                                ${readBadge}
                                 <span class="email-date">${dateStr}</span>
                             </div>
                             <div class="email-subject">${escapeHtml(email.betreff)}</div>
