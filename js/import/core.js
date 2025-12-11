@@ -179,7 +179,7 @@ function convertConversationsToEmailArray(conversations) {
  */
 function startImport() {
     if (!targetWorkbook || !jsonData) {
-        alert('Excel und JSON müssen verbunden sein!');
+        alert('Excel und JSON muessen verbunden sein!');
         return;
     }
 
@@ -200,8 +200,8 @@ function doImport() {
     var currentEmailBetreff = '';
 
     try {
-        currentStep = 'Worksheet öffnen';
-        var sheetName = document.getElementById('sheetName').value || 'Übersicht';
+        currentStep = 'Worksheet oeffnen';
+        var sheetName = document.getElementById('sheetName').value || 'Uebersicht';
         var worksheet;
         try {
             worksheet = targetWorkbook.Worksheets(sheetName);

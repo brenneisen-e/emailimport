@@ -72,7 +72,7 @@ function detectExcelForExport() {
         document.getElementById('exportExcelStatus').value = "Lese bestehende Eintraege...";
         var worksheet;
         try {
-            worksheet = exportWorkbook.Worksheets("Übersicht");
+            worksheet = exportWorkbook.Worksheets("Uebersicht");
         } catch (e) {
             worksheet = exportWorkbook.Worksheets(1);
         }
