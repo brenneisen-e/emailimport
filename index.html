@@ -1944,26 +1944,40 @@
                 try {
                     const data = JSON.parse(e.target.result);
 
-                    // Handle new format with _exportInfo wrapper
                     let emails;
                     let exportInfo = null;
 
-                    if (data && data._exportInfo && data.emails) {
-                        // New format: { _exportInfo: {...}, emails: [...] }
+                    // Format 1: New conversation-based export { conversations: {...}, ... }
+                    if (data && data.conversations && typeof data.conversations === 'object') {
+                        console.log('Detected: Conversation format');
+                        emails = convertConversationsToLegacy(data.conversations);
+                        exportInfo = {
+                            exportDate: data.exportDate,
+                            totalEmails: data.totalEmails,
+                            conversationCount: data.conversationCount,
+                            mailboxName: data.mailboxName
+                        };
+                        showNotification('Konversations-Export geladen: ' + data.totalEmails + ' Emails in ' +
+                            data.conversationCount + ' Konversationen', 'success');
+                    }
+                    // Format 2: Debug info wrapper { _exportInfo: {...}, emails: [...] }
+                    else if (data && data._exportInfo && data.emails) {
+                        console.log('Detected: Debug info format');
                         exportInfo = data._exportInfo;
                         emails = data.emails;
-                        console.log('Export Info:', exportInfo);
-
-                        // Show export statistics if available
                         if (exportInfo.replyRate) {
                             showNotification('Export geladen: ' + exportInfo.totalEmails + ' Emails, ' +
                                 exportInfo.replyRate + ' mit Antworten', 'success');
                         }
-                    } else if (Array.isArray(data)) {
-                        // Old format: direct array of emails
+                    }
+                    // Format 3: Direct array of emails
+                    else if (Array.isArray(data)) {
+                        console.log('Detected: Direct array format');
                         emails = data;
-                    } else {
-                        // Single email object
+                    }
+                    // Format 4: Single email object
+                    else {
+                        console.log('Detected: Single email');
                         emails = [data];
                     }
 
@@ -1976,6 +1990,102 @@
                 }
             };
             reader.readAsText(file);
+        }
+
+        /**
+         * Convert new conversation format to legacy email format
+         * @param {Object} conversations - Conversations object from new export
+         * @returns {Array} Legacy email array
+         */
+        function convertConversationsToLegacy(conversations) {
+            const result = [];
+
+            for (const convId in conversations) {
+                const conv = conversations[convId];
+                const messages = conv.messages || [];
+
+                if (messages.length === 0) continue;
+
+                // Find root message (lowest depth, or earliest if same depth)
+                let rootMsg = null;
+                let rootTime = null;
+
+                // First pass: find inbox root with depth 0
+                for (const msg of messages) {
+                    const isInbox = msg.folder === 'inbox';
+                    const msgTime = msg.receivedTime || msg.sentOn;
+
+                    if (isInbox && msg.depth === 0) {
+                        if (!rootMsg || (msgTime && (!rootTime || msgTime < rootTime))) {
+                            rootMsg = msg;
+                            rootTime = msgTime;
+                        }
+                    }
+                }
+
+                // Second pass: if no inbox root, use earliest message
+                if (!rootMsg) {
+                    for (const msg of messages) {
+                        const msgTime = msg.receivedTime || msg.sentOn;
+                        if (!rootMsg || (msgTime && (!rootTime || msgTime < rootTime))) {
+                            rootMsg = msg;
+                            rootTime = msgTime;
+                        }
+                    }
+                }
+
+                if (!rootMsg) continue;
+
+                // Build legacy email object
+                const legacyEmail = {
+                    emailId: rootMsg.entryID,
+                    conversationId: convId,
+                    datum: rootMsg.receivedTime || rootMsg.sentOn || '',
+                    von_email: rootMsg.senderEmail,
+                    von_name: rootMsg.senderName,
+                    betreff: rootMsg.subject,
+                    text: rootMsg.body || rootMsg.bodyPreview || '',
+                    anhaenge: rootMsg.anhaenge || [],
+                    kategorie: rootMsg.kategorie || '',
+                    antworten: [],
+                    // New fields from conversation format
+                    conversationIndexHex: rootMsg.conversationIndexHex,
+                    depth: rootMsg.depth
+                };
+
+                // Add other messages as antworten
+                for (const reply of messages) {
+                    if (reply.entryID === rootMsg.entryID) continue;
+
+                    const replyTime = reply.sentOn || reply.receivedTime || '';
+                    const isSent = reply.folder === 'sent';
+
+                    legacyEmail.antworten.push({
+                        datum: replyTime,
+                        an: isSent ? (reply.recipients?.[0]?.email || '') : '',
+                        von: isSent ? '' : reply.senderName,
+                        text: reply.body || reply.bodyPreview || '',
+                        replyId: reply.entryID,
+                        isIncoming: !isSent,
+                        depth: reply.depth,
+                        parentEntryID: reply.parentEntryID
+                    });
+                }
+
+                // Sort antworten by date
+                legacyEmail.antworten.sort((a, b) => (a.datum || '') < (b.datum || '') ? -1 : 1);
+
+                result.push(legacyEmail);
+            }
+
+            // Sort by most recent activity
+            result.sort((a, b) => {
+                const dateA = a.antworten.length > 0 ? a.antworten[a.antworten.length - 1].datum : a.datum;
+                const dateB = b.antworten.length > 0 ? b.antworten[b.antworten.length - 1].datum : b.datum;
+                return (dateB || '') > (dateA || '') ? 1 : -1;
+            });
+
+            return result;
         }
 
         // ============================================================================
