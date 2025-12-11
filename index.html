@@ -2278,8 +2278,7 @@
             // Get parsed thread (non-original messages are replies)
             const htmlReplies = (email._parsedThread || []).filter(m => !m.isOriginal);
 
-            // Get the original message text for comparison
-            const originalMessage = (email._parsedThread || []).find(m => m.isOriginal);
+            // Get the original message text for comparison (originalMessage already defined above)
             const originalTextLower = originalMessage
                 ? null  // Will use HTML comparison
                 : removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 150);
