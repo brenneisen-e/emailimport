@@ -375,6 +375,12 @@ function finishExport() {
             console.log('Matches by Subject: ' + matchStats.bySubject);
             console.log('Emails with no replies: ' + matchStats.noMatch);
             console.log('Match rate: ' + matchStats.matchRate + '%');
+            console.log('--- Skip reasons ---');
+            console.log('Skipped (empty body): ' + (matchStats.skippedEmptyBody || 0));
+            console.log('Skipped (before date): ' + (matchStats.skippedBeforeDate || 0));
+            console.log('Skipped (duplicate): ' + (matchStats.skippedDuplicate || 0));
+            console.log('No ConvId in email: ' + (matchStats.noConvIdInEmail || 0));
+            console.log('ConvId not in cache: ' + (matchStats.noConvIdInCache || 0));
         } catch (e) {}
     }
 

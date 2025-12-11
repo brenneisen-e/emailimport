@@ -9,8 +9,17 @@ var matchingStats = {
     byInternetMessageId: 0,
     bySubject: 0,
     noMatch: 0,
-    totalProcessed: 0
+    totalProcessed: 0,
+    // Detailed debug info
+    skippedEmptyBody: 0,
+    skippedBeforeDate: 0,
+    skippedDuplicate: 0,
+    noConvIdInEmail: 0,
+    noConvIdInCache: 0
 };
+
+// Enable verbose logging for debugging
+var VERBOSE_MATCHING = true;
 
 /**
  * Normalize subject for matching
@@ -67,30 +76,70 @@ function findRepliesMultiLayer(originalEmail) {
         var originalSubject = normalizeSubjectForMatching(originalEmail.betreff);
         var originalDate = originalEmail.datum ? new Date(originalEmail.datum) : null;
 
+        // Debug: Log email being processed
+        if (VERBOSE_MATCHING && matchingStats.totalProcessed <= 5) {
+            try {
+                console.log('=== MATCHING Email #' + matchingStats.totalProcessed + ' ===');
+                console.log('Betreff: ' + (originalEmail.betreff || '').substring(0, 50));
+                console.log('ConvId: ' + (originalConvId ? originalConvId.slice(-12) : 'NONE'));
+                console.log('Datum: ' + originalEmail.datum + ' -> parsed: ' + (originalDate ? originalDate.toISOString() : 'INVALID'));
+                console.log('Sent cache size: ' + sentItemsCache.length);
+                console.log('ConvId index keys: ' + Object.keys(sentItemsByConvId).length);
+            } catch(e) {}
+        }
+
+        // Track no convId cases
+        if (!originalConvId) {
+            matchingStats.noConvIdInEmail++;
+        }
+
         // Strategy 1: ConversationID matching (primary - most reliable for Outlook)
         if (originalConvId && sentItemsByConvId[originalConvId]) {
             var convMatches = sentItemsByConvId[originalConvId];
+
+            if (VERBOSE_MATCHING && matchingStats.totalProcessed <= 5) {
+                try { console.log('ConvId matches found: ' + convMatches.length); } catch(e) {}
+            }
+
             for (var i = 0; i < convMatches.length; i++) {
                 var cached = convMatches[i];
                 // Skip empty body or already added
                 if (!cached.body || cached.body.trim() === '' || addedEntryIds[cached.entryId]) {
+                    matchingStats.skippedEmptyBody++;
                     continue;
                 }
                 // IMPORTANT: Reply must be AFTER original email (fix for timestamp problem)
                 if (originalDate && cached.sentDate) {
                     if (cached.sentDate < originalDate) {
+                        matchingStats.skippedBeforeDate++;
+                        if (VERBOSE_MATCHING && matchingStats.totalProcessed <= 5) {
+                            try {
+                                console.log('SKIPPED (before date): sent=' + cached.sentDate.toISOString() + ' < email=' + originalDate.toISOString());
+                            } catch(e) {}
+                        }
                         continue; // Skip - sent before original email received
                     }
                 }
                 // Check for content duplicates (same date + text start)
                 var textHash = formatDate(cached.sentDate) + '_' + (cached.body || '').substring(0, 50).trim();
                 if (addedTextHashes[textHash]) {
+                    matchingStats.skippedDuplicate++;
                     continue; // Skip - duplicate content
                 }
                 replies.push(createReplyObject(cached, 'conversationId'));
                 addedEntryIds[cached.entryId] = true;
                 addedTextHashes[textHash] = true;
                 matchingStats.byConversationId++;
+
+                if (VERBOSE_MATCHING && matchingStats.totalProcessed <= 5) {
+                    try { console.log('MATCHED: ' + cached.to + ' at ' + formatDate(cached.sentDate)); } catch(e) {}
+                }
+            }
+        } else if (originalConvId) {
+            // Has convId but no matches in cache
+            matchingStats.noConvIdInCache++;
+            if (VERBOSE_MATCHING && matchingStats.totalProcessed <= 5) {
+                try { console.log('No sent items with this ConvId in cache'); } catch(e) {}
             }
         }
 
@@ -213,7 +262,13 @@ function getMatchingStats() {
         totalProcessed: matchingStats.totalProcessed,
         totalMatches: total,
         matchRate: matchingStats.totalProcessed > 0 ?
-            Math.round((matchingStats.totalProcessed - matchingStats.noMatch) / matchingStats.totalProcessed * 100) : 0
+            Math.round((matchingStats.totalProcessed - matchingStats.noMatch) / matchingStats.totalProcessed * 100) : 0,
+        // Detailed skip reasons
+        skippedEmptyBody: matchingStats.skippedEmptyBody,
+        skippedBeforeDate: matchingStats.skippedBeforeDate,
+        skippedDuplicate: matchingStats.skippedDuplicate,
+        noConvIdInEmail: matchingStats.noConvIdInEmail,
+        noConvIdInCache: matchingStats.noConvIdInCache
     };
 }
 
@@ -226,6 +281,11 @@ function resetMatchingStats() {
     matchingStats.bySubject = 0;
     matchingStats.noMatch = 0;
     matchingStats.totalProcessed = 0;
+    matchingStats.skippedEmptyBody = 0;
+    matchingStats.skippedBeforeDate = 0;
+    matchingStats.skippedDuplicate = 0;
+    matchingStats.noConvIdInEmail = 0;
+    matchingStats.noConvIdInCache = 0;
 }
 
 /**
