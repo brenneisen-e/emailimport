@@ -324,8 +324,14 @@
                 var content = file.ReadAll();
                 file.Close();
 
-                // Execute the code
-                eval(content);
+                // Execute the code in global scope
+                // execScript() runs in global scope (unlike eval which runs in local scope)
+                if (typeof execScript !== 'undefined') {
+                    execScript(content, 'JavaScript');
+                } else {
+                    // Fallback: use indirect eval for global scope
+                    (1, eval)(content);
+                }
                 return true;
             } catch (e) {
                 loadErrors.push(relativePath + ': ' + e.message);
