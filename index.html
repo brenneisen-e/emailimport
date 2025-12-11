@@ -2029,6 +2029,19 @@
                 }
                 if (!rootMsg) continue;
 
+                // Determine display sender based on folder type
+                const isRootSent = rootMsg.folder === 'sent';
+                let displaySender = rootMsg.senderName || rootMsg.senderEmail || 'Unbekannt';
+
+                if (isRootSent) {
+                    // For sent messages, show the recipient with "(Ausgehend)" suffix
+                    let recipientName = '';
+                    if (rootMsg.recipients && rootMsg.recipients.length > 0) {
+                        recipientName = rootMsg.recipients[0].name || rootMsg.recipients[0].email || '';
+                    }
+                    displaySender = (recipientName || 'Unbekannt') + ' (Ausgehend)';
+                }
+
                 // Build legacy email object
                 const legacyEmail = {
                     emailId: rootMsg.entryID,
@@ -2036,6 +2049,8 @@
                     datum: rootMsg.receivedTime || rootMsg.sentOn || '',
                     von_email: rootMsg.senderEmail,
                     von_name: rootMsg.senderName,
+                    displaySender: displaySender,
+                    isOutgoing: isRootSent,
                     betreff: rootMsg.subject || conv.subject || '',
                     text: rootMsg.body || rootMsg.bodyPreview || '',
                     htmlBody: rootMsg.htmlBody || '',
