@@ -2034,12 +2034,8 @@
                 let displaySender = rootMsg.senderName || rootMsg.senderEmail || 'Unbekannt';
 
                 if (isRootSent) {
-                    // For sent messages, show the recipient with "(Ausgehend)" suffix
-                    let recipientName = '';
-                    if (rootMsg.recipients && rootMsg.recipients.length > 0) {
-                        recipientName = rootMsg.recipients[0].name || rootMsg.recipients[0].email || '';
-                    }
-                    displaySender = (recipientName || 'Unbekannt') + ' (Ausgehend)';
+                    // For sent messages (I am the sender), show "Ich"
+                    displaySender = 'Ich';
                 }
 
                 // Build legacy email object
@@ -2857,9 +2853,12 @@
                 const parsedThread = parseEmailThreadHtml(htmlBody);
                 const originalMessage = parsedThread.find(m => m.isOriginal);
 
-                // Determine the display sender: prefer original sender from parsed thread
-                let displaySender = fromName || fromEmail;
-                if (originalMessage && originalMessage.von) {
+                // Determine the display sender:
+                // 1. Keep existing displaySender if set (from conversation conversion)
+                // 2. Otherwise use original sender from parsed HTML thread
+                // 3. Fallback to fromName/fromEmail
+                let displaySender = email.displaySender || fromName || fromEmail;
+                if (!email.displaySender && originalMessage && originalMessage.von) {
                     displaySender = originalMessage.von;
                 }
 
