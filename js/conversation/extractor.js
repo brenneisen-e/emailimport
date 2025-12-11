@@ -244,6 +244,12 @@ function extractEmailForConversation(mailItem, folder) {
             email.conversationIndex = mailItem.ConversationIndex || '';
             email.conversationIndexHex = getConversationIndexHex(mailItem);
 
+            // Fallback: if conversationIndexHex is empty, use conversationIndex directly
+            // (Outlook sometimes returns index in usable format already)
+            if (!email.conversationIndexHex && email.conversationIndex) {
+                email.conversationIndexHex = email.conversationIndex;
+            }
+
             // Calculate depth and parent from index
             if (email.conversationIndexHex) {
                 email.depth = calculateDepthFromIndex(email.conversationIndexHex);
