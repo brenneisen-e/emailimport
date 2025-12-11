@@ -335,10 +335,13 @@ function boldTimestamps(cell) {
 /**
  * Read existing data from Excel for duplicate checking
  * @param {Object} worksheet - Excel worksheet
- * @returns {Object} Map of key -> row number
+ * @returns {Object} Object with byKey and byConvId maps
  */
 function readExistingData(worksheet) {
-    var data = {};
+    var data = {
+        byKey: {},      // date+subject -> row
+        byConvId: {}    // conversationId -> row
+    };
     try {
         var lastRow = worksheet.Cells(worksheet.Rows.Count, 1).End(-4162).Row;
         if (lastRow <= 1) return data;
@@ -346,10 +349,17 @@ function readExistingData(worksheet) {
         for (var row = 2; row <= lastRow; row++) {
             var datum = worksheet.Cells(row, 2).Value || '';
             var betreff = worksheet.Cells(row, 12).Value || '';  // Column 12 = Betreff
+            var conversationId = worksheet.Cells(row, 22).Value || '';  // Column 22 = ConversationID
 
+            // Track by date+subject
             if (datum || betreff) {
                 var key = createEmailKey(datum, betreff);
-                data[key] = row;
+                data.byKey[key] = row;
+            }
+
+            // Track by ConversationID
+            if (conversationId) {
+                data.byConvId[conversationId] = row;
             }
         }
     } catch (e) {}
