@@ -1999,39 +1999,37 @@
          */
         function convertConversationsToLegacy(conversations) {
             const result = [];
+            let totalMessages = 0;
+            let totalAntworten = 0;
 
             for (const convId in conversations) {
                 const conv = conversations[convId];
                 const messages = conv.messages || [];
 
                 if (messages.length === 0) continue;
+                totalMessages += messages.length;
 
-                // Find root message (lowest depth, or earliest if same depth)
+                // Sort messages by timestamp (earliest first)
+                const sortedMessages = [...messages].sort((a, b) => {
+                    const timeA = a.receivedTime || a.sentOn || '';
+                    const timeB = b.receivedTime || b.sentOn || '';
+                    return timeA < timeB ? -1 : (timeA > timeB ? 1 : 0);
+                });
+
+                // Find root message: earliest INBOX message, or just earliest message
                 let rootMsg = null;
-                let rootTime = null;
 
-                // First pass: find inbox root with depth 0
-                for (const msg of messages) {
-                    const isInbox = msg.folder === 'inbox';
-                    const msgTime = msg.receivedTime || msg.sentOn;
-
-                    if (isInbox && msg.depth === 0) {
-                        if (!rootMsg || (msgTime && (!rootTime || msgTime < rootTime))) {
-                            rootMsg = msg;
-                            rootTime = msgTime;
-                        }
+                // First: try to find earliest inbox message
+                for (const msg of sortedMessages) {
+                    if (msg.folder === 'inbox') {
+                        rootMsg = msg;
+                        break;
                     }
                 }
 
-                // Second pass: if no inbox root, use earliest message
-                if (!rootMsg) {
-                    for (const msg of messages) {
-                        const msgTime = msg.receivedTime || msg.sentOn;
-                        if (!rootMsg || (msgTime && (!rootTime || msgTime < rootTime))) {
-                            rootMsg = msg;
-                            rootTime = msgTime;
-                        }
-                    }
+                // Fallback: use earliest message overall
+                if (!rootMsg && sortedMessages.length > 0) {
+                    rootMsg = sortedMessages[0];
                 }
 
                 if (!rootMsg) continue;
@@ -2043,47 +2041,60 @@
                     datum: rootMsg.receivedTime || rootMsg.sentOn || '',
                     von_email: rootMsg.senderEmail,
                     von_name: rootMsg.senderName,
-                    betreff: rootMsg.subject,
+                    betreff: rootMsg.subject || conv.subject || '',
                     text: rootMsg.body || rootMsg.bodyPreview || '',
                     anhaenge: rootMsg.anhaenge || [],
                     kategorie: rootMsg.kategorie || '',
+                    hasAttachments: rootMsg.hasAttachments,
                     antworten: [],
-                    // New fields from conversation format
-                    conversationIndexHex: rootMsg.conversationIndexHex,
-                    depth: rootMsg.depth
+                    // Metadata from conversation
+                    participantCount: conv.participantCount,
+                    messageCount: conv.messageCount,
+                    firstMessageDate: conv.firstMessageDate,
+                    lastMessageDate: conv.lastMessageDate
                 };
 
-                // Add other messages as antworten
-                for (const reply of messages) {
-                    if (reply.entryID === rootMsg.entryID) continue;
+                // Add ALL other messages as antworten
+                for (const msg of sortedMessages) {
+                    if (msg.entryID === rootMsg.entryID) continue;
 
-                    const replyTime = reply.sentOn || reply.receivedTime || '';
-                    const isSent = reply.folder === 'sent';
+                    const msgTime = msg.sentOn || msg.receivedTime || '';
+                    const isSent = msg.folder === 'sent';
+
+                    // Get recipient info safely
+                    let recipientInfo = '';
+                    if (msg.recipients && msg.recipients.length > 0) {
+                        recipientInfo = msg.recipients[0].email || msg.recipients[0].name || '';
+                    }
 
                     legacyEmail.antworten.push({
-                        datum: replyTime,
-                        an: isSent ? (reply.recipients?.[0]?.email || '') : '',
-                        von: isSent ? '' : reply.senderName,
-                        text: reply.body || reply.bodyPreview || '',
-                        replyId: reply.entryID,
+                        datum: msgTime,
+                        an: isSent ? recipientInfo : '',
+                        von: !isSent ? msg.senderName : '',
+                        vonEmail: msg.senderEmail,
+                        text: msg.body || msg.bodyPreview || '',
+                        replyId: msg.entryID,
                         isIncoming: !isSent,
-                        depth: reply.depth,
-                        parentEntryID: reply.parentEntryID
+                        folder: msg.folder,
+                        subject: msg.subject,
+                        hasAttachments: msg.hasAttachments,
+                        anhaenge: msg.anhaenge || []
                     });
+                    totalAntworten++;
                 }
-
-                // Sort antworten by date
-                legacyEmail.antworten.sort((a, b) => (a.datum || '') < (b.datum || '') ? -1 : 1);
 
                 result.push(legacyEmail);
             }
 
-            // Sort by most recent activity
+            // Sort conversations by most recent activity
             result.sort((a, b) => {
-                const dateA = a.antworten.length > 0 ? a.antworten[a.antworten.length - 1].datum : a.datum;
-                const dateB = b.antworten.length > 0 ? b.antworten[b.antworten.length - 1].datum : b.datum;
-                return (dateB || '') > (dateA || '') ? 1 : -1;
+                const dateA = a.lastMessageDate || a.datum || '';
+                const dateB = b.lastMessageDate || b.datum || '';
+                return dateB > dateA ? 1 : -1;
             });
+
+            console.log('Konvertierung: ' + result.length + ' Konversationen, ' +
+                        totalMessages + ' Messages total, ' + totalAntworten + ' als Antworten');
 
             return result;
         }
