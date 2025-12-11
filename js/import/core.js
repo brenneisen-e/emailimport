@@ -42,24 +42,57 @@ function loadJsonFile(path) {
             return;
         }
 
-        // Read file using FileSystemObject (works with network paths)
-        // OpenTextFile(path, iomode, create, format)
-        // iomode: 1=ForReading, format: -1=TristateTrue (Unicode/UTF-16LE)
-        var file = fso.OpenTextFile(path, 1, false, -1);
-        var content = file.ReadAll();
-        file.Close();
+        // Read file using ADODB.Stream for proper UTF-8 support
+        var content = '';
+        try {
+            var stream = new ActiveXObject("ADODB.Stream");
+            stream.Type = 2; // adTypeText
+            stream.Charset = "UTF-8";
+            stream.Open();
+            stream.LoadFromFile(path);
+            content = stream.ReadText(-1); // -1 = adReadAll
+            stream.Close();
+        } catch (streamErr) {
+            // Fallback to FSO if ADODB fails
+            var file = fso.OpenTextFile(path, 1, false, 0); // 0 = ASCII/Default
+            content = file.ReadAll();
+            file.Close();
+        }
 
-        // Remove BOM if present (FSO may include it)
-        if (content.charCodeAt(0) === 0xFEFF) {
+        // Remove BOM if present
+        if (content.charCodeAt(0) === 0xFEFF || content.charCodeAt(0) === 0xEF) {
             content = content.substring(1);
+        }
+        // Also check for UTF-8 BOM sequence that might appear as characters
+        if (content.substring(0, 3) === '\xEF\xBB\xBF') {
+            content = content.substring(3);
         }
 
         // Parse JSON
-        jsonData = JSON.parse(content);
+        var parsed = JSON.parse(content);
+
+        // Handle different JSON formats
+        if (parsed && parsed.conversations) {
+            // New conversation format - convert to array
+            jsonData = convertConversationsToEmailArray(parsed.conversations);
+            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Vorgänge aus Konversations-Export geladen';
+        } else if (parsed && parsed._exportInfo && parsed.emails) {
+            // Debug format with export info
+            jsonData = parsed.emails;
+            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
+        } else if (Array.isArray(parsed)) {
+            // Direct array
+            jsonData = parsed;
+            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
+        } else {
+            // Single email
+            jsonData = [parsed];
+            document.getElementById('jsonStatus').innerHTML = '1 Email geladen';
+        }
+
         document.getElementById('jsonPath').value = path;
         document.getElementById('jsonStatus').style.display = 'block';
         document.getElementById('jsonStatus').className = 'status success';
-        document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
 
         checkImportReady();
 
@@ -70,6 +103,75 @@ function loadJsonFile(path) {
         jsonData = null;
         checkImportReady();
     }
+}
+
+/**
+ * Convert conversation format to flat email array for Excel import
+ * @param {Object} conversations - Conversations object
+ * @returns {Array} Array of emails with antworten
+ */
+function convertConversationsToEmailArray(conversations) {
+    var result = [];
+
+    for (var convId in conversations) {
+        if (!conversations.hasOwnProperty(convId)) continue;
+
+        var conv = conversations[convId];
+        var messages = conv.messages || [];
+        if (messages.length === 0) continue;
+
+        // Sort by timestamp
+        messages.sort(function(a, b) {
+            var timeA = a.receivedTime || a.sentOn || '';
+            var timeB = b.receivedTime || b.sentOn || '';
+            return timeA < timeB ? -1 : (timeA > timeB ? 1 : 0);
+        });
+
+        // Find root (first inbox message, or first message)
+        var rootMsg = null;
+        for (var i = 0; i < messages.length; i++) {
+            if (messages[i].folder === 'inbox') {
+                rootMsg = messages[i];
+                break;
+            }
+        }
+        if (!rootMsg) rootMsg = messages[0];
+
+        // Build email object
+        var email = {
+            emailId: rootMsg.entryID || '',
+            conversationId: convId,
+            datum: rootMsg.receivedTime || rootMsg.sentOn || '',
+            von_email: rootMsg.senderEmail || '',
+            von_name: rootMsg.senderName || '',
+            betreff: rootMsg.subject || conv.subject || '',
+            text: rootMsg.body || rootMsg.bodyPreview || '',
+            htmlBody: rootMsg.htmlBody || '',
+            kategorie: '',
+            status: '',
+            antwort: '',
+            kommentar: '',
+            antworten: []
+        };
+
+        // Add non-root messages as antworten
+        for (var j = 0; j < messages.length; j++) {
+            var msg = messages[j];
+            if (msg.entryID === rootMsg.entryID) continue;
+
+            var isSent = msg.folder === 'sent';
+            email.antworten.push({
+                datum: msg.sentOn || msg.receivedTime || '',
+                von: isSent ? 'Ich' : (msg.senderName || msg.senderEmail || ''),
+                text: msg.body || msg.bodyPreview || '',
+                isIncoming: !isSent
+            });
+        }
+
+        result.push(email);
+    }
+
+    return result;
 }
 
 /**
