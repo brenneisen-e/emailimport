@@ -210,26 +210,63 @@
 
         // Get the directory where this HTA file is located
         function getScriptDir() {
-            var path = location.pathname;
-            // Remove leading slash on Windows paths like /C:/path
-            if (path.charAt(0) === '/' && path.charAt(2) === ':') {
-                path = path.substring(1);
+            var path = '';
+
+            // Method 1: Try document.location.href (most reliable for HTA)
+            try {
+                var href = document.location.href;
+                // Convert file:///C:/path to C:\path
+                if (href.indexOf('file:///') === 0) {
+                    path = href.substring(8);  // Remove "file:///"
+                } else if (href.indexOf('file://') === 0) {
+                    path = href.substring(7);  // Remove "file://"
+                }
+                // URL decode (spaces become %20, etc.)
+                path = unescape(path);
+                // Replace forward slashes with backslashes
+                path = path.replace(/\//g, '\\');
+            } catch (e) {}
+
+            // Method 2: Fallback using location.pathname
+            if (!path || path.length < 3) {
+                try {
+                    path = location.pathname;
+                    if (path.charAt(0) === '/' && path.charAt(2) === ':') {
+                        path = path.substring(1);
+                    }
+                    path = unescape(path);
+                    path = path.replace(/\//g, '\\');
+                } catch (e) {}
             }
-            // URL decode
-            path = unescape(path);
-            // Get directory
-            return path.substring(0, path.lastIndexOf('\\') + 1) || path.substring(0, path.lastIndexOf('/') + 1);
+
+            // Get directory (remove filename)
+            var lastSlash = path.lastIndexOf('\\');
+            if (lastSlash > 0) {
+                return path.substring(0, lastSlash + 1);
+            }
+
+            // Method 3: Use WScript.Shell as last resort
+            try {
+                var shell = new ActiveXObject("WScript.Shell");
+                return shell.CurrentDirectory + '\\';
+            } catch (e) {}
+
+            return '';
         }
+
+        // Store detected base directory for debugging
+        var detectedBaseDir = '';
 
         // Load a JavaScript file and execute it
         function loadModule(relativePath) {
             try {
                 var fso = new ActiveXObject("Scripting.FileSystemObject");
                 var baseDir = getScriptDir();
+                detectedBaseDir = baseDir;  // Store for debugging
                 var fullPath = baseDir + relativePath.replace(/\//g, '\\');
 
                 if (!fso.FileExists(fullPath)) {
-                    loadErrors.push('Datei nicht gefunden: ' + relativePath);
+                    loadErrors.push('Datei nicht gefunden: ' + relativePath + ' (Pfad: ' + fullPath + ')');
                     return false;
                 }
 
@@ -343,8 +380,9 @@
                 document.getElementById('loadError').style.display = 'block';
                 document.getElementById('loadError').innerHTML =
                     '<strong>Fehler beim Laden:</strong><br>' +
+                    '<small>Basis-Pfad: ' + detectedBaseDir + '</small><br><br>' +
                     loadErrors.join('<br>') +
-                    '<br><br>Stellen Sie sicher, dass alle Dateien vorhanden sind.';
+                    '<br><br>Stellen Sie sicher, dass alle Dateien im richtigen Verzeichnis sind.';
                 return;
             }
 
