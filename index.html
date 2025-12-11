@@ -3389,8 +3389,8 @@
 
                     const compareText = cleanedText.toLowerCase().substring(0, 150);
 
-                    // Skip empty or duplicate content
-                    if (!cleanedText || cleanedText.length < 20) continue;
+                    // Skip empty content (but allow short replies)
+                    if (!cleanedText || cleanedText.length < 5) continue;
                     if (seenTexts.has(compareText)) continue;
 
                     seenTexts.add(compareText);
