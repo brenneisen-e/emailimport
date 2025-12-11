@@ -358,7 +358,7 @@ function readExistingData(worksheet) {
 
 /**
  * Create unique key from date and subject
- * @param {*} datum - Date value
+ * @param {*} datum - Date value (can be Excel serial number, Date object, or string)
  * @param {string} betreff - Subject
  * @returns {string} Key string
  */
@@ -366,13 +366,28 @@ function createEmailKey(datum, betreff) {
     var dateStr = '';
     if (datum) {
         try {
-            var d = new Date(datum);
-            dateStr = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+            var d;
+            // Handle Excel serial numbers (e.g., 45678.5)
+            if (typeof datum === 'number') {
+                // Excel serial: days since 1900-01-01 (with Excel bug for 1900)
+                d = new Date((datum - 25569) * 86400 * 1000);
+            } else {
+                d = new Date(datum);
+            }
+            if (!isNaN(d.getTime())) {
+                dateStr = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+            } else {
+                dateStr = String(datum).substring(0, 10);
+            }
         } catch (e) {
             dateStr = String(datum).substring(0, 10);
         }
     }
-    var subjectStr = String(betreff || '').toLowerCase().trim().substring(0, 100);
+    // Normalize subject: lowercase, remove RE/AW prefixes
+    var subjectStr = String(betreff || '').toLowerCase().trim();
+    subjectStr = subjectStr.replace(/^(re|aw|fw|wg|fwd|antwort|antw):\s*/gi, '');
+    subjectStr = subjectStr.replace(/^(re|aw|fw|wg|fwd|antwort|antw):\s*/gi, '');
+    subjectStr = subjectStr.substring(0, 100);
     return dateStr + '|' + subjectStr;
 }
 
