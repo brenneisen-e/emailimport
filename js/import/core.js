@@ -164,7 +164,8 @@ function convertConversationsToEmailArray(conversations) {
                 datum: msg.sentOn || msg.receivedTime || '',
                 von: isSent ? 'Ich' : (msg.senderName || msg.senderEmail || ''),
                 text: msg.body || msg.bodyPreview || '',
-                isIncoming: !isSent
+                isIncoming: !isSent,
+                replyId: msg.entryID || ''
             });
         }
 
@@ -271,19 +272,53 @@ function doImport() {
             }
 
             if (existingRow) {
-                // Email exists - check for new replies
+                // Email exists - check for new replies using ReplyIDs
                 currentStep = 'Email ' + (i+1) + ' Antworten prüfen';
                 if (email.antworten && email.antworten.length > 0) {
-                    var currentReplies = worksheet.Cells(existingRow, 14).Value || '';
+                    // Get existing ReplyIDs from Excel
+                    var currentReplyIdsStr = '';
+                    try {
+                        currentReplyIdsStr = worksheet.Cells(existingRow, 24).Value || '';
+                    } catch (e) {}
 
-                    currentStep = 'Email ' + (i+1) + ' Antworten formatieren';
-                    var newRepliesText = formatReplies(email.antworten);
+                    // Build set of existing IDs for fast lookup
+                    var existingIds = {};
+                    if (currentReplyIdsStr) {
+                        var idList = currentReplyIdsStr.split(',');
+                        for (var ei = 0; ei < idList.length; ei++) {
+                            var trimmedId = idList[ei].trim();
+                            if (trimmedId) existingIds[trimmedId] = true;
+                        }
+                    }
 
-                    var normalizedCurrent = fixEncoding(currentReplies).toLowerCase();
-                    var normalizedNew = fixEncoding(newRepliesText).toLowerCase();
+                    // Filter to only truly new replies
+                    var newReplies = [];
+                    for (var nr = 0; nr < email.antworten.length; nr++) {
+                        var reply = email.antworten[nr];
+                        if (reply.replyId && !existingIds[reply.replyId]) {
+                            newReplies.push(reply);
+                        } else if (!reply.replyId) {
+                            // No replyId - check by timestamp
+                            var replyTimestamp = reply.datum || '';
+                            var currentRepliesText = '';
+                            try {
+                                currentRepliesText = worksheet.Cells(existingRow, 14).Value || '';
+                            } catch (e) {}
+                            if (replyTimestamp && currentRepliesText.indexOf(replyTimestamp) === -1) {
+                                newReplies.push(reply);
+                            }
+                        }
+                    }
 
-                    if (newRepliesText && normalizedCurrent.indexOf(normalizedNew.substring(0, 50)) === -1) {
+                    if (newReplies.length > 0) {
+                        currentStep = 'Email ' + (i+1) + ' ' + newReplies.length + ' neue Antworten formatieren';
+                        var newRepliesText = formatReplies(newReplies);
+
                         currentStep = 'Email ' + (i+1) + ' Antworten schreiben';
+                        var currentReplies = '';
+                        try {
+                            currentReplies = worksheet.Cells(existingRow, 14).Value || '';
+                        } catch (e) {}
                         var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
                         combinedReplies = sanitizeText(combinedReplies);
                         worksheet.Cells(existingRow, 14).Value = combinedReplies;
@@ -294,15 +329,14 @@ function doImport() {
                         // Update ReplyIDs
                         currentStep = 'Email ' + (i+1) + ' ReplyIDs aktualisieren';
                         try {
-                            var currentReplyIds = worksheet.Cells(existingRow, 24).Value || '';
                             var newReplyIds = [];
-                            for (var nr = 0; nr < email.antworten.length; nr++) {
-                                if (email.antworten[nr].replyId) {
-                                    newReplyIds.push(email.antworten[nr].replyId);
+                            for (var nri = 0; nri < newReplies.length; nri++) {
+                                if (newReplies[nri].replyId) {
+                                    newReplyIds.push(newReplies[nri].replyId);
                                 }
                             }
                             if (newReplyIds.length > 0) {
-                                var combinedIds = currentReplyIds ? currentReplyIds + ',' + newReplyIds.join(',') : newReplyIds.join(',');
+                                var combinedIds = currentReplyIdsStr ? currentReplyIdsStr + ',' + newReplyIds.join(',') : newReplyIds.join(',');
                                 worksheet.Cells(existingRow, 24).Value = combinedIds;
                             }
                         } catch (replyIdErr) {}
