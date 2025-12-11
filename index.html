@@ -1943,7 +1943,34 @@
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    processEmails(Array.isArray(data) ? data : [data]);
+
+                    // Handle new format with _exportInfo wrapper
+                    let emails;
+                    let exportInfo = null;
+
+                    if (data && data._exportInfo && data.emails) {
+                        // New format: { _exportInfo: {...}, emails: [...] }
+                        exportInfo = data._exportInfo;
+                        emails = data.emails;
+                        console.log('Export Info:', exportInfo);
+
+                        // Show export statistics if available
+                        if (exportInfo.replyRate) {
+                            showNotification('Export geladen: ' + exportInfo.totalEmails + ' Emails, ' +
+                                exportInfo.replyRate + ' mit Antworten', 'success');
+                        }
+                    } else if (Array.isArray(data)) {
+                        // Old format: direct array of emails
+                        emails = data;
+                    } else {
+                        // Single email object
+                        emails = [data];
+                    }
+
+                    // Store export info for AI assistant
+                    window.lastExportInfo = exportInfo;
+
+                    processEmails(emails);
                 } catch (err) {
                     showNotification('Fehler beim Laden: ' + err.message, 'error');
                 }

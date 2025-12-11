@@ -353,9 +353,58 @@ function finishExport() {
         return;
     }
 
-    // SIMPLIFIED: Just save the emails directly (like the old working version)
-    // The emails already have antworten set correctly from processExportEmail
-    saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates);
+    // Get matching statistics for debug output
+    var matchStats = null;
+    var cacheStats = null;
+    try {
+        if (typeof getMatchingStats === 'function') {
+            matchStats = getMatchingStats();
+        }
+        if (typeof getSentCacheStats === 'function') {
+            cacheStats = getSentCacheStats();
+        }
+    } catch (e) {}
+
+    // Log statistics to console for debugging
+    if (matchStats) {
+        try {
+            console.log('=== REPLY MATCHING STATISTICS ===');
+            console.log('Total emails processed: ' + matchStats.totalProcessed);
+            console.log('Matches by ConversationID: ' + matchStats.byConversationId);
+            console.log('Matches by InReplyTo: ' + matchStats.byInternetMessageId);
+            console.log('Matches by Subject: ' + matchStats.bySubject);
+            console.log('Emails with no replies: ' + matchStats.noMatch);
+            console.log('Match rate: ' + matchStats.matchRate + '%');
+        } catch (e) {}
+    }
+
+    // Count emails with replies for validation
+    var emailsWithReplies = 0;
+    var totalReplies = 0;
+    for (var i = 0; i < exportState.emails.length; i++) {
+        var email = exportState.emails[i];
+        if (email.antworten && email.antworten.length > 0) {
+            emailsWithReplies++;
+            totalReplies += email.antworten.length;
+        }
+    }
+
+    // Add debug info to export
+    var debugInfo = {
+        exportDate: new Date().toISOString(),
+        totalEmails: exportState.emails.length,
+        emailsWithReplies: emailsWithReplies,
+        replyRate: Math.round(emailsWithReplies / exportState.emails.length * 100) + '%',
+        totalReplies: totalReplies,
+        matchingStats: matchStats,
+        cacheStats: cacheStats
+    };
+
+    // Store debug info for potential retrieval
+    exportState.debugInfo = debugInfo;
+
+    // Save the export with statistics
+    saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates, debugInfo);
 }
 
 /**

@@ -9,14 +9,48 @@
 // Sent cache state for async processing
 // Note: sentCacheState is declared in config.js
 
+// Sent cache statistics
+var sentCacheStats = {
+    totalCached: 0,
+    withConvId: 0,
+    withInReplyTo: 0,
+    withSubject: 0,
+    withoutAnyIndex: 0
+};
+
 /**
- * Start caching sent items
+ * Normalize subject for indexing (same logic as matching.js)
+ * @param {string} subject - Original subject
+ * @returns {string} Normalized subject
+ */
+function normalizeSubjectForIndex(subject) {
+    if (!subject) return '';
+    var normalized = subject.replace(/^(re:|aw:|fwd:|wg:|fw:)\s*/gi, '');
+    while (/^(re:|aw:|fwd:|wg:|fw:)\s*/i.test(normalized)) {
+        normalized = normalized.replace(/^(re:|aw:|fwd:|wg:|fw:)\s*/gi, '');
+    }
+    normalized = normalized.replace(/\s+/g, ' ').trim().toLowerCase();
+    return normalized;
+}
+
+/**
+ * Start caching sent items with multiple indexes
  * @param {number} days - Number of days to look back
  */
 function cacheSentItems(days) {
-    // SIMPLIFIED to match old working version
+    // Initialize all indexes
     sentItemsCache = [];
-    sentItemsByConvId = {};  // Only index we need
+    sentItemsByConvId = {};
+    sentItemsByInReplyTo = {};
+    sentItemsByNormSubject = {};
+
+    // Reset stats
+    sentCacheStats.totalCached = 0;
+    sentCacheStats.withConvId = 0;
+    sentCacheStats.withInReplyTo = 0;
+    sentCacheStats.withSubject = 0;
+    sentCacheStats.withoutAnyIndex = 0;
+
     sentCacheState.days = days;
     // Search sent items further back than inbox (replies might be older)
     sentCacheState.cutoffDate = new Date();
@@ -61,10 +95,19 @@ function cacheSentItems(days) {
  */
 function startNextSentFolder() {
     if (sentCacheState.folderIdx >= sentCacheState.folders.length) {
-        // All folders done - start Phase 3
-        document.getElementById('exportProgressText').innerText =
-            'Phase 2/3 fertig: ' + sentItemsCache.length + ' gesendete Emails aus ' + sentCacheState.folders.length + ' Ordnern geladen';
+        // All folders done - show stats and start Phase 3
+        var statsMsg = 'Phase 2/3 fertig: ' + sentItemsCache.length + ' gesendete Emails geladen';
+        statsMsg += ' (ConvId: ' + sentCacheStats.withConvId;
+        statsMsg += ', InReplyTo: ' + sentCacheStats.withInReplyTo;
+        statsMsg += ', Subject: ' + sentCacheStats.withSubject + ')';
+        document.getElementById('exportProgressText').innerText = statsMsg;
         document.getElementById('exportProgressFill').style.width = '30%';
+
+        // Reset matching stats before Phase 3
+        if (typeof resetMatchingStats === 'function') {
+            resetMatchingStats();
+        }
+
         setTimeout(processEmailBatch, 10);
         return;
     }
@@ -111,7 +154,7 @@ function processSentBatch() {
                 break;
             }
 
-            // SIMPLIFIED to match old working version
+            // Extract all relevant fields
             var body = '';
             try { body = item.Body || ''; } catch (e) {}
 
@@ -124,22 +167,68 @@ function processSentBatch() {
             var entryId = '';
             try { entryId = item.EntryID || ''; } catch (e) {}
 
-            // Match old working version's sent item structure
+            var subject = '';
+            try { subject = item.Subject || ''; } catch (e) {}
+
+            // Get MAPI headers for InReplyTo matching
+            var inReplyTo = '';
+            var internetMsgId = '';
+            try {
+                var headers = getEmailHeaders(item);
+                inReplyTo = headers.inReplyTo || '';
+                internetMsgId = headers.internetMessageId || '';
+            } catch (e) {}
+
+            // Create sent item with all matching fields
             var sentItem = {
                 sentDate: sentDate,
                 conversationId: convId,
                 entryId: entryId,
                 body: removeEmailQuotes(body),
-                to: toRecipient
+                to: toRecipient,
+                subject: subject,
+                normalizedSubject: normalizeSubjectForIndex(subject),
+                inReplyTo: inReplyTo,
+                internetMessageId: internetMsgId
             };
             sentItemsCache.push(sentItem);
+            sentCacheStats.totalCached++;
 
-            // Index by ConversationID (only - like old version)
+            // Track indexing for stats
+            var hasAnyIndex = false;
+
+            // Index by ConversationID (primary)
             if (convId) {
                 if (!sentItemsByConvId[convId]) {
                     sentItemsByConvId[convId] = [];
                 }
                 sentItemsByConvId[convId].push(sentItem);
+                sentCacheStats.withConvId++;
+                hasAnyIndex = true;
+            }
+
+            // Index by InReplyTo (secondary - for cross-client threads)
+            if (inReplyTo) {
+                if (!sentItemsByInReplyTo[inReplyTo]) {
+                    sentItemsByInReplyTo[inReplyTo] = [];
+                }
+                sentItemsByInReplyTo[inReplyTo].push(sentItem);
+                sentCacheStats.withInReplyTo++;
+                hasAnyIndex = true;
+            }
+
+            // Index by normalized subject (fallback)
+            if (sentItem.normalizedSubject && sentItem.normalizedSubject.length > 5) {
+                if (!sentItemsByNormSubject[sentItem.normalizedSubject]) {
+                    sentItemsByNormSubject[sentItem.normalizedSubject] = [];
+                }
+                sentItemsByNormSubject[sentItem.normalizedSubject].push(sentItem);
+                sentCacheStats.withSubject++;
+                hasAnyIndex = true;
+            }
+
+            if (!hasAnyIndex) {
+                sentCacheStats.withoutAnyIndex++;
             }
         } catch (e) {}
     }
@@ -162,5 +251,22 @@ function processSentBatch() {
         sentCacheState.folderIdx++;
         setTimeout(startNextSentFolder, 10);
     }
+}
+
+/**
+ * Get sent cache statistics for debugging
+ * @returns {Object} Statistics object
+ */
+function getSentCacheStats() {
+    return {
+        totalCached: sentCacheStats.totalCached,
+        withConvId: sentCacheStats.withConvId,
+        withInReplyTo: sentCacheStats.withInReplyTo,
+        withSubject: sentCacheStats.withSubject,
+        withoutAnyIndex: sentCacheStats.withoutAnyIndex,
+        uniqueConvIds: Object.keys(sentItemsByConvId).length,
+        uniqueInReplyTo: Object.keys(sentItemsByInReplyTo).length,
+        uniqueSubjects: Object.keys(sentItemsByNormSubject).length
+    };
 }
 
