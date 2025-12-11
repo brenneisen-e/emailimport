@@ -101,7 +101,7 @@ function buildJsonString(emails) {
 function openWebApp() {
     try {
         var shell = new ActiveXObject("WScript.Shell");
-        shell.Run("https://brenneisen-e.github.io/emailimport/");
+        shell.Run("https://emailimport.pages.dev/");
 
         // Step 4 completed - Web-App opened
         completeStep(4);

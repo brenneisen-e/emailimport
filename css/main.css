@@ -87,21 +87,10 @@ select:focus, input:focus { outline: none; border-color: #6366f1; }
 .btn-active-step {
     animation: btnPulse 2s ease-in-out infinite;
     box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
-    position: relative;
-}
-.btn-active-step::before {
-    content: '►';
-    position: absolute;
-    left: 0.75rem;
-    animation: arrowBounce 1s ease-in-out infinite;
 }
 @keyframes btnPulse {
     0%, 100% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
     50% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.7); }
-}
-@keyframes arrowBounce {
-    0%, 100% { transform: translateX(0); }
-    50% { transform: translateX(5px); }
 }
 
 /* Inactive step button - grayed out */
