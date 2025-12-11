@@ -24,15 +24,22 @@ function fixEncoding(text) {
 
     var result = text;
 
-    // UTF-8 double-encoded German umlauts (using Unicode escapes for HTA)
+    // UTF-8 double-encoded German umlauts (Latin-1 interpretation)
     // Pattern: UTF-8 bytes interpreted as Latin-1, then re-encoded
     result = result.replace(/\u00C3\u00A4/g, '\u00E4');  // Ã¤ -> ä
     result = result.replace(/\u00C3\u00B6/g, '\u00F6');  // Ã¶ -> ö
     result = result.replace(/\u00C3\u00BC/g, '\u00FC');  // Ã¼ -> ü
     result = result.replace(/\u00C3\u0084/g, '\u00C4');  // Ã„ -> Ä
     result = result.replace(/\u00C3\u0096/g, '\u00D6');  // Ã– -> Ö
-    result = result.replace(/\u00C3\u009C/g, '\u00DC');  // Ãœ -> Ü
-    result = result.replace(/\u00C3\u009F/g, '\u00DF');  // ÃŸ -> ß
+    result = result.replace(/\u00C3\u009C/g, '\u00DC');  // Ãœ -> Ü (Latin-1)
+    result = result.replace(/\u00C3\u009F/g, '\u00DF');  // ÃŸ -> ß (Latin-1)
+
+    // UTF-8 double-encoded German umlauts (Windows-1252 interpretation)
+    // When bytes 0x80-0x9F are read as Windows-1252 instead of Latin-1
+    result = result.replace(/\u00C3\u201E/g, '\u00C4');  // Ã„ -> Ä (Win-1252: 84 = „)
+    result = result.replace(/\u00C3\u2013/g, '\u00D6');  // Ã– -> Ö (Win-1252: 96 = –)
+    result = result.replace(/\u00C3\u0153/g, '\u00DC');  // Ãœ -> Ü (Win-1252: 9C = œ)
+    result = result.replace(/\u00C3\u0178/g, '\u00DF');  // ÃŸ -> ß (Win-1252: 9F = Ÿ)
 
     // Double-encoded special characters
     result = result.replace(/\u00C3\u00A9/g, '\u00E9');  // Ã© -> é
