@@ -7,18 +7,12 @@
 var exportExcelApp = null;
 var exportWorkbook = null;
 
-// Excel data caches for export duplicate detection
-var existingEmailKeys = {};
-var existingEmailIds = {};
-var existingReplies = {};
-var existingReplyIds = {};
-var existingAnfragen = {};
-var existingDates = {};
-var existingSubjects = {};
-var existingExcelRows = {};
+// Note: existingEmailKeys, existingEmailIds, existingReplies, existingReplyIds,
+// existingAnfragen, existingDates, existingSubjects, foundInInbox
+// are declared in config.js
 
-// Track conversations found in inbox (for auto-erledigt feature)
-var foundInInbox = {};
+// Excel rows lookup for auto-erledigt feature
+var existingExcelRows = {};
 
 // Import state
 var excelApp = null;
@@ -75,7 +69,7 @@ function detectExcelForExport() {
         }
 
         // Read existing data from Excel
-        document.getElementById('exportExcelStatus').value = "Lese bestehende Einträge...";
+        document.getElementById('exportExcelStatus').value = "Lese bestehende Eintraege...";
         var worksheet;
         try {
             worksheet = exportWorkbook.Worksheets("Übersicht");
@@ -127,7 +121,7 @@ function detectExcelForExport() {
             if (conversationId || datum || betreff) count++;
         }
 
-        document.getElementById('exportExcelStatus').value = "OK: " + exportWorkbook.Name + " (" + count + " Einträge)";
+        document.getElementById('exportExcelStatus').value = "OK: " + exportWorkbook.Name + " (" + count + " Eintraege)";
         checkExportReady();
 
         // Step 1 completed

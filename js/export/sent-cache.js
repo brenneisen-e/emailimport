@@ -3,23 +3,11 @@
  * Cache and index sent items for efficient reply matching
  */
 
-// Sent items cache and lookup maps
-var sentItemsCache = [];
-var sentItemsByConvId = {};
-var sentItemsByInReplyTo = {};
-var sentItemsByReference = {};
-var sentItemsByNormSubject = {};
+// Note: sentItemsCache, sentItemsByConvId, sentItemsByInReplyTo,
+// sentItemsByReference, sentItemsByNormSubject are declared in config.js
 
 // Sent cache state for async processing
-var sentCacheState = {
-    folders: [],
-    folderIdx: 0,
-    itemIdx: 1,
-    maxItems: 0,
-    items: null,
-    cutoffDate: null,
-    days: 7
-};
+// Note: sentCacheState is declared in config.js
 
 /**
  * Start caching sent items
