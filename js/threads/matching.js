@@ -57,7 +57,8 @@ function isWithinTimeWindow(date1, date2, maxDays) {
  */
 function findRepliesMultiLayer(originalEmail) {
     var replies = [];
-    var addedEntryIds = {};  // Prevent duplicates
+    var addedEntryIds = {};  // Prevent duplicates by EntryID
+    var addedTextHashes = {}; // Prevent duplicates by content (date+text hash)
     matchingStats.totalProcessed++;
 
     try {
@@ -71,11 +72,25 @@ function findRepliesMultiLayer(originalEmail) {
             var convMatches = sentItemsByConvId[originalConvId];
             for (var i = 0; i < convMatches.length; i++) {
                 var cached = convMatches[i];
-                if (cached.body && cached.body.trim() !== '' && !addedEntryIds[cached.entryId]) {
-                    replies.push(createReplyObject(cached, 'conversationId'));
-                    addedEntryIds[cached.entryId] = true;
-                    matchingStats.byConversationId++;
+                // Skip empty body or already added
+                if (!cached.body || cached.body.trim() === '' || addedEntryIds[cached.entryId]) {
+                    continue;
                 }
+                // IMPORTANT: Reply must be AFTER original email (fix for timestamp problem)
+                if (originalDate && cached.sentDate) {
+                    if (cached.sentDate < originalDate) {
+                        continue; // Skip - sent before original email received
+                    }
+                }
+                // Check for content duplicates (same date + text start)
+                var textHash = formatDate(cached.sentDate) + '_' + (cached.body || '').substring(0, 50).trim();
+                if (addedTextHashes[textHash]) {
+                    continue; // Skip - duplicate content
+                }
+                replies.push(createReplyObject(cached, 'conversationId'));
+                addedEntryIds[cached.entryId] = true;
+                addedTextHashes[textHash] = true;
+                matchingStats.byConversationId++;
             }
         }
 
@@ -84,11 +99,25 @@ function findRepliesMultiLayer(originalEmail) {
             var replyToMatches = sentItemsByInReplyTo[originalMsgId];
             for (var j = 0; j < replyToMatches.length; j++) {
                 var cached2 = replyToMatches[j];
-                if (cached2.body && cached2.body.trim() !== '' && !addedEntryIds[cached2.entryId]) {
-                    replies.push(createReplyObject(cached2, 'inReplyTo'));
-                    addedEntryIds[cached2.entryId] = true;
-                    matchingStats.byInternetMessageId++;
+                // Skip empty body or already added
+                if (!cached2.body || cached2.body.trim() === '' || addedEntryIds[cached2.entryId]) {
+                    continue;
                 }
+                // Reply must be AFTER original email
+                if (originalDate && cached2.sentDate) {
+                    if (cached2.sentDate < originalDate) {
+                        continue;
+                    }
+                }
+                // Check for content duplicates
+                var textHash2 = formatDate(cached2.sentDate) + '_' + (cached2.body || '').substring(0, 50).trim();
+                if (addedTextHashes[textHash2]) {
+                    continue;
+                }
+                replies.push(createReplyObject(cached2, 'inReplyTo'));
+                addedEntryIds[cached2.entryId] = true;
+                addedTextHashes[textHash2] = true;
+                matchingStats.byInternetMessageId++;
             }
         }
 
@@ -108,8 +137,14 @@ function findRepliesMultiLayer(originalEmail) {
                         var isAfterOriginal = sentDate >= originalDate;
                         var withinWindow = isWithinTimeWindow(originalDate, sentDate, 30);
                         if (isAfterOriginal && withinWindow) {
+                            // Check for content duplicates
+                            var textHash3 = formatDate(cached3.sentDate) + '_' + (cached3.body || '').substring(0, 50).trim();
+                            if (addedTextHashes[textHash3]) {
+                                continue;
+                            }
                             replies.push(createReplyObject(cached3, 'subject'));
                             addedEntryIds[cached3.entryId] = true;
+                            addedTextHashes[textHash3] = true;
                             matchingStats.bySubject++;
                         }
                     }
