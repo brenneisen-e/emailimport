@@ -427,10 +427,9 @@ function finishExport() {
         return;
     }
 
-    // Use unified conversation processing
-    var groupedEmails = groupEmailsByConversationUnifiedMode(exportState.emails);
-
-    saveExportFile(groupedEmails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates);
+    // SIMPLIFIED: Just save the emails directly (like the old working version)
+    // The emails already have antworten set correctly from processExportEmail
+    saveExportFile(exportState.emails, exportState.repliesFound, exportState.duplicatesSkipped, exportState.duplicatesWithReplies, exportState.batchDuplicates);
 }
 
 /**
