@@ -2016,17 +2016,9 @@
                     return timeA < timeB ? -1 : (timeA > timeB ? 1 : 0);
                 });
 
-                // Find root message for main email fields: earliest INBOX message, or just earliest
-                let rootMsg = null;
-                for (const msg of sortedMessages) {
-                    if (msg.folder === 'inbox') {
-                        rootMsg = msg;
-                        break;
-                    }
-                }
-                if (!rootMsg && sortedMessages.length > 0) {
-                    rootMsg = sortedMessages[0];
-                }
+                // Root message is always the FIRST (oldest) message - this is who started the conversation
+                // Whether it's from inbox (someone wrote to me) or sent (I started it)
+                const rootMsg = sortedMessages.length > 0 ? sortedMessages[0] : null;
                 if (!rootMsg) continue;
 
                 // Determine display sender based on folder type
@@ -2034,8 +2026,8 @@
                 let displaySender = rootMsg.senderName || rootMsg.senderEmail || 'Unbekannt';
 
                 if (isRootSent) {
-                    // For sent messages (I am the sender), show "Ich"
-                    displaySender = 'Ich';
+                    // For sent messages (I started the conversation), show my name + "(Ausgehend)"
+                    displaySender = (rootMsg.senderName || 'Ich') + ' (Ausgehend)';
                 }
 
                 // Build legacy email object
