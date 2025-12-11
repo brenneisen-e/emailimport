@@ -16,7 +16,9 @@ function cleanX500Address(addr) {
     }
     // Extract name from X500 format: /o=.../cn=hash-Name
     if (addr.indexOf('/cn=') > -1) {
-        var match = addr.match(/cn=([^\/,]+)$/i);
+        // Remove trailing comma/whitespace first
+        var cleaned = addr.replace(/[,\s]+$/, '');
+        var match = cleaned.match(/cn=([^\/]+)$/i);
         if (match) {
             // Remove leading GUID (like "f4fadad6c63f4b8e93e39ddb6abbf8d7-")
             return match[1].replace(/^[a-f0-9]{32}-/i, '');
