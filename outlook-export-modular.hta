@@ -124,8 +124,14 @@
                         &#128269; Excel verbinden
                     </button>
 
+                    <label>Export-Modus</label>
+                    <div style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="useConversationMode" checked style="width: auto; margin: 0;">
+                        <span style="font-size: 0.85rem;">Konversations-Modus (empfohlen) - Hierarchie via ConversationIndex</span>
+                    </div>
+
                     <label>Emails exportieren</label>
-                    <button class="btn btn-success" id="exportBtn" onclick="startExport()" disabled>
+                    <button class="btn btn-success" id="exportBtn" onclick="doSmartExport()" disabled>
                         &#128229; Emails exportieren
                     </button>
 
@@ -427,6 +433,10 @@
                 'js/threads/grouping.js',
                 'js/threads/depth.js',
                 'js/threads/matching.js',
+
+                // Conversation modules (new ConversationIndex-based approach)
+                'js/conversation/extractor.js',
+                'js/conversation/builder.js',
 
                 // Export modules
                 'js/export/sent-cache.js',
