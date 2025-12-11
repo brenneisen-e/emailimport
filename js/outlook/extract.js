@@ -3,6 +3,50 @@
  * Extract email data from Outlook mail items
  */
 
+// MAPI Property for SMTP Address (resolves Exchange X500 to SMTP)
+var PR_SMTP_ADDRESS_EXTRACT = "http://schemas.microsoft.com/mapi/proptag/0x39FE001F";
+
+/**
+ * Get SMTP email address from sender (resolves Exchange X500 addresses)
+ * @param {Object} mailItem - Outlook mail item
+ * @returns {string} SMTP email address
+ */
+function getSenderSMTPAddressLegacy(mailItem) {
+    try {
+        var emailType = mailItem.SenderEmailType;
+
+        if (emailType === 'EX') {
+            try {
+                var sender = mailItem.Sender;
+                if (sender) {
+                    try {
+                        var exchUser = sender.GetExchangeUser();
+                        if (exchUser && exchUser.PrimarySmtpAddress) {
+                            return exchUser.PrimarySmtpAddress;
+                        }
+                    } catch (e1) {}
+
+                    try {
+                        var propAccessor = sender.PropertyAccessor;
+                        var smtpAddr = propAccessor.GetProperty(PR_SMTP_ADDRESS_EXTRACT);
+                        if (smtpAddr) return smtpAddr;
+                    } catch (e2) {}
+                }
+            } catch (e3) {}
+
+            try {
+                var mailProp = mailItem.PropertyAccessor;
+                var senderSmtp = mailProp.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x5D01001F");
+                if (senderSmtp) return senderSmtp;
+            } catch (e4) {}
+        }
+
+        return mailItem.SenderEmailAddress || '';
+    } catch (e) {
+        return mailItem.SenderEmailAddress || '';
+    }
+}
+
 /**
  * Extract all data from an Outlook mail item
  * @param {Object} mailItem - Outlook mail item
@@ -43,9 +87,9 @@ function extractEmail(mailItem) {
             }
         } catch (e) {}
 
-        // Sender
+        // Sender (resolve Exchange X500 to SMTP)
         try {
-            email.von_email = mailItem.SenderEmailAddress || '';
+            email.von_email = getSenderSMTPAddressLegacy(mailItem);
             email.von_name = mailItem.SenderName || '';
         } catch (e) {}
 
@@ -163,9 +207,9 @@ function extractEmailUnified(mailItem, folderType) {
             if (isNaN(email.sentOn.getTime())) email.sentOn = null;
         } catch (e) {}
 
-        // Sender
+        // Sender (resolve Exchange X500 to SMTP)
         try {
-            email.von_email = mailItem.SenderEmailAddress || '';
+            email.von_email = getSenderSMTPAddressLegacy(mailItem);
             email.von_name = mailItem.SenderName || '';
         } catch (e) {}
 

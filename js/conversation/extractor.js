@@ -6,6 +6,87 @@
 // MAPI Property for ConversationIndex (binary)
 var PR_CONVERSATION_INDEX_BIN = "http://schemas.microsoft.com/mapi/proptag/0x00710102";
 
+// MAPI Property for SMTP Address (resolves Exchange X500 to SMTP)
+var PR_SMTP_ADDRESS = "http://schemas.microsoft.com/mapi/proptag/0x39FE001F";
+
+/**
+ * Get SMTP email address from sender (resolves Exchange X500 addresses)
+ * @param {Object} mailItem - Outlook mail item
+ * @returns {string} SMTP email address
+ */
+function getSenderSMTPAddress(mailItem) {
+    try {
+        // Check if sender is Exchange type
+        var emailType = mailItem.SenderEmailType;
+
+        if (emailType === 'EX') {
+            // Try to get SMTP address via Sender object
+            try {
+                var sender = mailItem.Sender;
+                if (sender) {
+                    // Try GetExchangeUser first
+                    try {
+                        var exchUser = sender.GetExchangeUser();
+                        if (exchUser && exchUser.PrimarySmtpAddress) {
+                            return exchUser.PrimarySmtpAddress;
+                        }
+                    } catch (e1) {}
+
+                    // Try PropertyAccessor
+                    try {
+                        var propAccessor = sender.PropertyAccessor;
+                        var smtpAddr = propAccessor.GetProperty(PR_SMTP_ADDRESS);
+                        if (smtpAddr) return smtpAddr;
+                    } catch (e2) {}
+                }
+            } catch (e3) {}
+
+            // Fallback: Try PropertyAccessor on mail item itself
+            try {
+                var mailProp = mailItem.PropertyAccessor;
+                // PR_SENDER_SMTP_ADDRESS
+                var senderSmtp = mailProp.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x5D01001F");
+                if (senderSmtp) return senderSmtp;
+            } catch (e4) {}
+        }
+
+        // Not Exchange or couldn't resolve - return original
+        return mailItem.SenderEmailAddress || '';
+    } catch (e) {
+        return mailItem.SenderEmailAddress || '';
+    }
+}
+
+/**
+ * Get SMTP email address from recipient (resolves Exchange X500 addresses)
+ * @param {Object} recipient - Outlook recipient object
+ * @returns {string} SMTP email address
+ */
+function getRecipientSMTPAddress(recipient) {
+    try {
+        var addrType = recipient.AddressEntry ? recipient.AddressEntry.Type : '';
+
+        if (addrType === 'EX') {
+            try {
+                var exchUser = recipient.AddressEntry.GetExchangeUser();
+                if (exchUser && exchUser.PrimarySmtpAddress) {
+                    return exchUser.PrimarySmtpAddress;
+                }
+            } catch (e1) {}
+
+            try {
+                var propAccessor = recipient.AddressEntry.PropertyAccessor;
+                var smtpAddr = propAccessor.GetProperty(PR_SMTP_ADDRESS);
+                if (smtpAddr) return smtpAddr;
+            } catch (e2) {}
+        }
+
+        return recipient.Address || '';
+    } catch (e) {
+        return recipient.Address || '';
+    }
+}
+
 /**
  * Extract ConversationIndex as Hex string from mail item
  * @param {Object} mailItem - Outlook mail item
@@ -173,27 +254,28 @@ function extractEmailForConversation(mailItem, folder) {
         // Subject
         try { email.subject = mailItem.Subject || ''; } catch (e) {}
 
-        // Sender
+        // Sender (resolve Exchange X500 to SMTP)
         try {
-            email.senderEmail = mailItem.SenderEmailAddress || '';
+            email.senderEmail = getSenderSMTPAddress(mailItem);
             email.senderName = mailItem.SenderName || '';
         } catch (e) {}
 
-        // Recipients (To)
+        // Recipients (To) - resolve Exchange X500 to SMTP
         try {
             var recipients = mailItem.Recipients;
             for (var r = 1; r <= recipients.Count; r++) {
                 try {
                     var recip = recipients.Item(r);
+                    var recipEmail = getRecipientSMTPAddress(recip);
                     if (recip.Type === 1) { // To
                         email.recipients.push({
                             name: recip.Name || '',
-                            email: recip.Address || ''
+                            email: recipEmail
                         });
                     } else if (recip.Type === 2) { // CC
                         email.ccRecipients.push({
                             name: recip.Name || '',
-                            email: recip.Address || ''
+                            email: recipEmail
                         });
                     }
                 } catch (e) {}
