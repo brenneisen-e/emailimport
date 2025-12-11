@@ -1263,25 +1263,31 @@
                             }
                         }
 
-                        // Use conversation start date if available, otherwise try quoted headers
-                        if (emailData.conversationStartDate) {
-                            // Only override if we haven't already set it from sent item
-                            var convStartDate = new Date(emailData.conversationStartDate);
-                            var currentDate = new Date(emailData.datum);
-                            if (convStartDate < currentDate) {
-                                emailData.datum = emailData.conversationStartDate;
-                            }
-                        } else if (!oldestSentItem || oldestSentDate >= inboxDate) {
-                            var quotedDate = extractOldestDateFromQuotes(emailData.text);
-                            if (quotedDate) {
-                                emailData.datum = quotedDate.getFullYear() + '-' +
-                                    pad(quotedDate.getMonth() + 1) + '-' +
-                                    pad(quotedDate.getDate()) + 'T' +
-                                    pad(quotedDate.getHours()) + ':' +
-                                    pad(quotedDate.getMinutes()) + ':' +
-                                    pad(quotedDate.getSeconds());
+                        // Use conversation start date ONLY for root emails (those without inReplyTo)
+                        // Replies should keep their own ReceivedTime for correct chronological ordering
+                        var isLikelyRoot = !emailData.inReplyTo;
+
+                        if (isLikelyRoot) {
+                            if (emailData.conversationStartDate) {
+                                // Only override if we haven't already set it from sent item
+                                var convStartDate = new Date(emailData.conversationStartDate);
+                                var currentDate = new Date(emailData.datum);
+                                if (convStartDate < currentDate) {
+                                    emailData.datum = emailData.conversationStartDate;
+                                }
+                            } else if (!oldestSentItem || oldestSentDate >= inboxDate) {
+                                var quotedDate = extractOldestDateFromQuotes(emailData.text);
+                                if (quotedDate) {
+                                    emailData.datum = quotedDate.getFullYear() + '-' +
+                                        pad(quotedDate.getMonth() + 1) + '-' +
+                                        pad(quotedDate.getDate()) + 'T' +
+                                        pad(quotedDate.getHours()) + ':' +
+                                        pad(quotedDate.getMinutes()) + ':' +
+                                        pad(quotedDate.getSeconds());
+                                }
                             }
                         }
+                        // Replies keep their original datum (ReceivedTime) for correct thread ordering
 
                         // Use original subject if available, otherwise strip prefixes
                         if (emailData.originalSubject) {
@@ -1355,10 +1361,54 @@
 
             // Step 1: Convert inbox emails to unified format
             var allEmails = [];
+            var addedReplyIds = {};  // Track which replies have been added (prevent duplicates)
+
             for (var i = 0; i < inboxEmails.length; i++) {
                 var inboxEmail = inboxEmails[i];
                 var unifiedEmail = convertToUnifiedFormat(inboxEmail, 'inbox');
                 allEmails.push(unifiedEmail);
+
+                // Step 1b: Also add any pre-existing antworten (from Conversation Continuations)
+                // These are incoming replies that were already identified during batch processing
+                if (inboxEmail.antworten && inboxEmail.antworten.length > 0) {
+                    for (var ai = 0; ai < inboxEmail.antworten.length; ai++) {
+                        var reply = inboxEmail.antworten[ai];
+                        // Only add incoming replies (not sent items, they're added in Step 2)
+                        if (reply.isIncoming && reply.replyId && !addedReplyIds[reply.replyId]) {
+                            addedReplyIds[reply.replyId] = true;
+                            // Convert reply to unified format
+                            var unifiedReply = {
+                                entryId: reply.replyId || '',
+                                conversationId: inboxEmail.conversationId || '',
+                                internetMessageId: reply.internetMessageId || '',
+                                inReplyTo: reply.inReplyTo || '',
+                                references: [],
+                                receivedTime: reply.datum ? new Date(reply.datum) : new Date(),
+                                sentOn: reply.datum ? new Date(reply.datum) : new Date(),
+                                timestamp: reply.datum ? new Date(reply.datum) : new Date(),
+                                von_email: reply.vonEmail || '',
+                                von_name: reply.von || '',
+                                recipients: [],
+                                betreff: inboxEmail.betreff || '',
+                                text: reply.text || '',
+                                htmlBody: reply.htmlBody || '',
+                                anhaenge: [],
+                                outlookKategorie: '',
+                                folderType: 'inbox',
+                                folderName: '',
+                                isIncoming: true,
+                                threadPosition: 0,
+                                threadDepth: reply.threadDepth || 1,
+                                parentMessageId: reply.parentMessageId || reply.inReplyTo || null,
+                                parentFoundInThread: false,
+                                isThreadRoot: false,
+                                newContent: reply.text || '',
+                                normalizedSubject: inboxEmail.normalizedSubject || ''
+                            };
+                            allEmails.push(unifiedReply);
+                        }
+                    }
+                }
             }
 
             // Step 2: Add sent items from cache
