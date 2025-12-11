@@ -84,7 +84,7 @@
                         <span class="step-arrow">&#10140;</span>
                         <div class="step-wrapper">
                             <div class="step-circle step-2" id="step2">2</div>
-                            <div class="step-label">Postfach auswählen</div>
+                            <div class="step-label">Postfach auswaehlen</div>
                         </div>
                         <span class="step-arrow">&#10140;</span>
                         <div class="step-wrapper">
@@ -118,17 +118,11 @@
 
                     <label>Excel verbinden (Pflicht)</label>
                     <div class="row">
-                        <input type="text" id="exportExcelStatus" readonly placeholder="Tracking_Hypercare.xlsm öffnen, dann verbinden" style="flex:1">
+                        <input type="text" id="exportExcelStatus" readonly placeholder="Tracking_Hypercare.xlsm oeffnen, dann verbinden" style="flex:1">
                     </div>
                     <button class="btn btn-primary" id="btnExcelConnect" onclick="detectExcelForExport()" style="margin-bottom:0.75rem;">
                         &#128269; Excel verbinden
                     </button>
-
-                    <label>Export-Modus</label>
-                    <div style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <input type="checkbox" id="useConversationMode" checked style="width: auto; margin: 0;">
-                        <span style="font-size: 0.85rem;">Konversations-Modus (empfohlen) - Hierarchie via ConversationIndex</span>
-                    </div>
 
                     <label>Emails exportieren</label>
                     <button class="btn btn-success" id="exportBtn" onclick="doSmartExport()" disabled>
@@ -147,8 +141,8 @@
                     <div class="status error" id="exportError"><span id="exportErrorMsg"></span></div>
 
                     <div class="action-buttons" id="exportActions">
-                        <button class="btn btn-success" id="btnWebApp" onclick="openWebApp()">&#127760; Web-App öffnen (bearbeiten)</button>
-                        <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads öffnen</button>
+                        <button class="btn btn-success" id="btnWebApp" onclick="openWebApp()">&#127760; Web-App oeffnen (bearbeiten)</button>
+                        <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads oeffnen</button>
                     </div>
 
                     <div class="info-box">
@@ -172,16 +166,16 @@
 
                     <div class="status" id="jsonStatus" style="display:none; margin-bottom:0.75rem;"></div>
 
-                    <label>Excel-Ziel (vom Export übernommen)</label>
+                    <label>Excel-Ziel (vom Export &uuml;bernommen)</label>
                     <div class="row">
-                        <input type="text" id="excelStatus" readonly placeholder="Wird vom Export übernommen..." style="flex:1">
+                        <input type="text" id="excelStatus" readonly placeholder="Wird vom Export uebernommen..." style="flex:1">
                     </div>
                     <button class="btn btn-secondary" onclick="detectExcel()" style="margin-bottom:0.75rem;">
                         &#128269; Andere Excel
                     </button>
 
                     <label>Tabellenblatt</label>
-                    <input type="text" id="sheetName" value="Übersicht">
+                    <input type="text" id="sheetName" value="Uebersicht">
 
                     <button class="btn btn-success" id="btnImport" onclick="startImport()" disabled>
                         &#128200; In Excel importieren

@@ -28,7 +28,7 @@ function switchTab(tab) {
             var testName = exportWorkbook.Name;
             excelApp = exportExcelApp;
             targetWorkbook = exportWorkbook;
-            document.getElementById('excelStatus').value = "OK: " + testName + " (vom Export übernommen)";
+            document.getElementById('excelStatus').value = "OK: " + testName + " (vom Export uebernommen)";
             checkImportReady();
         } catch (e) {
             // Excel connection lost - reset
