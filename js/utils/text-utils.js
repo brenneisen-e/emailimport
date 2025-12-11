@@ -17,10 +17,12 @@ function sanitizeText(text) {
 
 /**
  * Fix encoding issues (common in German emails)
+ * Handles UTF-8 double-encoding and other common encoding problems
  */
 function fixEncoding(text) {
     if (!text) return '';
     return text
+        // UTF-8 double-encoded German umlauts
         .replace(/Ã¤/g, 'ä')
         .replace(/Ã¶/g, 'ö')
         .replace(/Ã¼/g, 'ü')
@@ -28,12 +30,46 @@ function fixEncoding(text) {
         .replace(/Ã–/g, 'Ö')
         .replace(/Ãœ/g, 'Ü')
         .replace(/ÃŸ/g, 'ß')
+        // Additional common double-encoding patterns
+        .replace(/Ã¼/g, 'ü')
+        .replace(/Ã¶/g, 'ö')
+        .replace(/Ã¤/g, 'ä')
+        .replace(/Ã©/g, 'é')
+        .replace(/Ã¨/g, 'è')
+        .replace(/Ã /g, 'à')
+        .replace(/Ã¢/g, 'â')
+        .replace(/Ã®/g, 'î')
+        .replace(/Ã´/g, 'ô')
+        .replace(/Ã»/g, 'û')
+        .replace(/Ã§/g, 'ç')
+        // Special characters
         .replace(/â‚¬/g, '€')
         .replace(/â€"/g, '–')
+        .replace(/â€"/g, '—')
         .replace(/â€˜/g, "'")
         .replace(/â€™/g, "'")
         .replace(/â€œ/g, '"')
-        .replace(/â€/g, '"');
+        .replace(/â€/g, '"')
+        .replace(/â€¦/g, '...')
+        .replace(/Â /g, ' ')
+        .replace(/Â´/g, "'")
+        .replace(/Â°/g, '°')
+        .replace(/Â§/g, '§')
+        .replace(/Â©/g, '©')
+        .replace(/Â®/g, '®')
+        // Remove invisible/problematic Unicode characters
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width chars
+        .replace(/\u00A0/g, ' ');  // Non-breaking space to regular space
+}
+
+/**
+ * Truncate text for Excel cell (max 32767 chars, we use 30000 for safety)
+ */
+function truncateForExcel(text, maxLength) {
+    if (!text) return '';
+    maxLength = maxLength || 30000;
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '\n[... Text gekürzt ...]';
 }
 
 /**

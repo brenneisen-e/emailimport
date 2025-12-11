@@ -31,8 +31,9 @@ function writeEmailRow(worksheet, row, email) {
     var repliesText = '';
     try {
         repliesText = formatReplies(email.antworten);
-        if (repliesText.length > 15000) {
-            repliesText = repliesText.substring(0, 15000) + '\n\n[... weitere Antworten gekürzt ...]';
+        // Excel cell limit is 32767 chars, keep it safe at 30000
+        if (repliesText.length > 30000) {
+            repliesText = repliesText.substring(0, 30000) + '\n\n[... weitere Antworten gekürzt ...]';
         }
     } catch (repliesErr) {
         repliesText = '[Fehler: ' + repliesErr.message + ']';
@@ -173,10 +174,14 @@ function writeEmailRow(worksheet, row, email) {
     worksheet.Cells(row, 12).Value = betreff;
 
     _writeRowCurrentField = 'Spalte 13 (Anfrage)';
-    worksheet.Cells(row, 13).Value = sanitizeText(anfrage);
+    // Truncate and sanitize for Excel (max 30000 chars for safety)
+    var safeAnfrage = truncateForExcel(sanitizeForExcel(fixEncoding(anfrage)), 30000);
+    worksheet.Cells(row, 13).Value = safeAnfrage;
 
     _writeRowCurrentField = 'Spalte 14 (Antwort)';
-    worksheet.Cells(row, 14).Value = sanitizeText(antwortText);
+    // Truncate and sanitize for Excel (max 30000 chars for safety)
+    var safeAntwort = truncateForExcel(sanitizeForExcel(fixEncoding(antwortText)), 30000);
+    worksheet.Cells(row, 14).Value = safeAntwort;
 
     // Bold timestamps in reply cell
     _writeRowCurrentField = 'Timestamps fetten';
@@ -230,7 +235,7 @@ function formatReplies(antworten) {
                 var replyDatum = '';
                 try {
                     if (reply.datum !== undefined && reply.datum !== null) {
-                        replyDatum = sanitizeText('' + reply.datum);
+                        replyDatum = sanitizeForExcel('' + reply.datum);
                     }
                 } catch (e) { replyDatum = ''; }
 
@@ -239,7 +244,7 @@ function formatReplies(antworten) {
                     if (reply.text !== undefined && reply.text !== null) {
                         replyText = '' + reply.text;
                         replyText = fixEncoding(replyText);
-                        replyText = sanitizeText(replyText);
+                        replyText = sanitizeForExcel(replyText);
                     }
                 } catch (e) { replyText = '[Fehler]'; }
 
@@ -259,7 +264,7 @@ function formatReplies(antworten) {
                 text += '=== [Fehler beim Lesen dieser Antwort] ===\n\n';
             }
         }
-        return sanitizeText(text.trim());
+        return sanitizeForExcel(text.trim());
     } catch (e) {
         return '[Fehler: ' + (e.message || e) + ']';
     }
