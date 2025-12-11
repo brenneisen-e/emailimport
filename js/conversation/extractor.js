@@ -64,6 +64,13 @@ function getSenderSMTPAddress(mailItem) {
  */
 function getRecipientSMTPAddress(recipient) {
     try {
+        var addr = recipient.Address || '';
+
+        // If already SMTP format, return as-is
+        if (addr.indexOf('@') > -1) {
+            return addr;
+        }
+
         var addrType = recipient.AddressEntry ? recipient.AddressEntry.Type : '';
 
         if (addrType === 'EX') {
@@ -81,9 +88,19 @@ function getRecipientSMTPAddress(recipient) {
             } catch (e2) {}
         }
 
-        return recipient.Address || '';
+        // Fallback: extract name from X500 format
+        if (addr.indexOf('/cn=') > -1) {
+            var cleaned = addr.replace(/[,\s]+$/, '');
+            var match = cleaned.match(/cn=([^\/]+)$/i);
+            if (match) {
+                // Remove leading GUID (like "f4fadad6c63f4b8e93e39ddb6abbf8d7-")
+                return match[1].replace(/^[a-f0-9]{32}-/i, '') || recipient.Name || addr;
+            }
+        }
+
+        return recipient.Name || addr;
     } catch (e) {
-        return recipient.Address || '';
+        return recipient.Address || recipient.Name || '';
     }
 }
 
