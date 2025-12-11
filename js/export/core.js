@@ -29,7 +29,32 @@ function checkExportReady() {
 }
 
 /**
- * Start the export process
+ * Smart export - chooses between old and new export method
+ */
+function doSmartExport() {
+    var useConvMode = document.getElementById('useConversationMode');
+    var folderId = document.getElementById('folderSelect').value;
+    var days = parseInt(document.getElementById('daysInput').value) || 7;
+
+    if (!folderId) { alert('Bitte Ordner auswählen!'); return; }
+
+    document.getElementById('exportProgress').style.display = 'block';
+    document.getElementById('exportBtn').disabled = true;
+    document.getElementById('exportSuccess').style.display = 'none';
+    document.getElementById('exportError').style.display = 'none';
+    document.getElementById('exportActions').style.display = 'none';
+
+    if (useConvMode && useConvMode.checked && typeof startConversationExport === 'function') {
+        // New conversation-based export
+        setTimeout(function() { startConversationExport(folderId, days); }, 100);
+    } else {
+        // Legacy export
+        setTimeout(function() { doExport(folderId, days); }, 100);
+    }
+}
+
+/**
+ * Start the export process (legacy method)
  */
 function startExport() {
     var folderId = document.getElementById('folderSelect').value;
