@@ -915,6 +915,10 @@
 
         var sentItemsCache = [];
         var sentItemsByConvId = {};  // Lookup map for O(1) access by ConversationID
+        // PHASE 1: Additional lookup maps for multi-layer thread matching
+        var sentItemsByInReplyTo = {};   // Lookup by In-Reply-To header (parent message ID)
+        var sentItemsByReference = {};   // Lookup by References header (any message in thread chain)
+        var sentItemsByNormSubject = {}; // Lookup by normalized subject (fallback)
 
         // Export state for async processing
         var exportState = {
@@ -1278,35 +1282,157 @@
         }
 
         // Group emails by ConversationID: oldest email = Anfrage, all others = Antworten
-        function groupEmailsByConversation(emails) {
-            var convGroups = {};  // ConversationID -> array of emails
-            var noConvEmails = []; // Emails without ConversationID
+        // ============================================================
+        // PHASE 2: Multi-Layer Conversation Grouping
+        // ============================================================
 
-            // Group by ConversationID
+        // Find the thread ID for an email using multi-layer matching
+        // Returns the thread ID that should be used for grouping
+        function findThreadGroup(email, threadGroups, emailsByMsgId, emailsByNormSubject) {
+            // Layer 1: ConversationID (most reliable when present)
+            if (email.conversationId) {
+                var convKey = 'conv:' + email.conversationId;
+                if (threadGroups[convKey]) {
+                    return convKey;
+                }
+            }
+
+            // Layer 2: In-Reply-To header (direct parent reference)
+            if (email.inReplyTo && emailsByMsgId[email.inReplyTo]) {
+                var parentEmail = emailsByMsgId[email.inReplyTo];
+                if (parentEmail.threadId) {
+                    return parentEmail.threadId;
+                }
+            }
+
+            // Layer 3: References header (any message in the chain)
+            if (email.references && email.references.length > 0) {
+                for (var i = 0; i < email.references.length; i++) {
+                    var refId = email.references[i];
+                    if (emailsByMsgId[refId]) {
+                        var refEmail = emailsByMsgId[refId];
+                        if (refEmail.threadId) {
+                            return refEmail.threadId;
+                        }
+                    }
+                }
+            }
+
+            // Layer 4: Normalized subject + time window (fallback)
+            if (email.normalizedSubject) {
+                var candidates = emailsByNormSubject[email.normalizedSubject];
+                if (candidates && candidates.length > 0) {
+                    var emailDate = new Date(email.datum);
+                    var windowMs = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+                    for (var j = 0; j < candidates.length; j++) {
+                        var candidate = candidates[j];
+                        if (candidate.emailId === email.emailId) continue; // Skip self
+
+                        var candidateDate = new Date(candidate.datum);
+                        var timeDiff = Math.abs(emailDate - candidateDate);
+
+                        if (timeDiff <= windowMs && candidate.threadId) {
+                            return candidate.threadId;
+                        }
+                    }
+                }
+            }
+
+            // No match found - use email's own threadId (will create new group)
+            return email.threadId || computeThreadId(email);
+        }
+
+        function groupEmailsByConversation(emails) {
+            // Build lookup indexes for multi-layer matching
+            var emailsByMsgId = {};      // internetMessageId -> email
+            var emailsByNormSubject = {}; // normalizedSubject -> [emails]
+
+            for (var i = 0; i < emails.length; i++) {
+                var email = emails[i];
+
+                // Index by Internet Message-ID
+                if (email.internetMessageId) {
+                    emailsByMsgId[email.internetMessageId] = email;
+                }
+
+                // Index by normalized subject
+                if (email.normalizedSubject) {
+                    if (!emailsByNormSubject[email.normalizedSubject]) {
+                        emailsByNormSubject[email.normalizedSubject] = [];
+                    }
+                    emailsByNormSubject[email.normalizedSubject].push(email);
+                }
+            }
+
+            // Group emails using multi-layer matching
+            var threadGroups = {};  // threadId -> array of emails
+            var emailToThread = {}; // emailId -> threadId (for tracking)
+
+            // First pass: Assign initial thread IDs based on ConversationID
             for (var i = 0; i < emails.length; i++) {
                 var email = emails[i];
                 if (email.conversationId) {
-                    if (!convGroups[email.conversationId]) {
-                        convGroups[email.conversationId] = [];
+                    var convKey = 'conv:' + email.conversationId;
+                    if (!threadGroups[convKey]) {
+                        threadGroups[convKey] = [];
                     }
-                    convGroups[email.conversationId].push(email);
-                } else {
-                    noConvEmails.push(email);
+                    threadGroups[convKey].push(email);
+                    emailToThread[email.emailId] = convKey;
+                    email.threadId = convKey;
                 }
+            }
+
+            // Second pass: Try to match remaining emails using other layers
+            var unassigned = [];
+            for (var i = 0; i < emails.length; i++) {
+                var email = emails[i];
+                if (emailToThread[email.emailId]) continue; // Already assigned
+
+                var threadId = findThreadGroup(email, threadGroups, emailsByMsgId, emailsByNormSubject);
+
+                if (threadGroups[threadId]) {
+                    // Add to existing group
+                    threadGroups[threadId].push(email);
+                    emailToThread[email.emailId] = threadId;
+                    email.threadId = threadId;
+                } else {
+                    // Will create new group later
+                    unassigned.push(email);
+                }
+            }
+
+            // Third pass: Create groups for unassigned emails
+            for (var i = 0; i < unassigned.length; i++) {
+                var email = unassigned[i];
+                var threadId = email.threadId || computeThreadId(email);
+
+                if (!threadGroups[threadId]) {
+                    threadGroups[threadId] = [];
+                }
+                threadGroups[threadId].push(email);
+                emailToThread[email.emailId] = threadId;
+                email.threadId = threadId;
             }
 
             var result = [];
 
-            // Process each conversation group
-            for (var convId in convGroups) {
-                var group = convGroups[convId];
+            // Process each thread group
+            for (var threadId in threadGroups) {
+                var group = threadGroups[threadId];
 
                 if (group.length === 1) {
                     // Single email - just clean it and add
                     var singleEmail = group[0];
                     singleEmail.text = removeEmailQuotes(singleEmail.text);
-                    // Also add sent replies
-                    var sentReplies = findReplies(singleEmail);
+
+                    // PHASE 2: Add thread metadata
+                    singleEmail.threadPosition = 1;
+                    singleEmail.threadDepth = 0;
+                    singleEmail.isThreadRoot = true;
+
+                    // Also add sent replies using multi-layer matching
+                    var sentReplies = findRepliesMultiLayer(singleEmail);
                     if (sentReplies.length > 0) {
                         singleEmail.antworten = (singleEmail.antworten || []).concat(sentReplies);
                     }
@@ -1320,10 +1446,19 @@
                     var anfrage = group[0];  // Oldest email
                     anfrage.text = removeEmailQuotes(anfrage.text);
 
+                    // PHASE 2: Add thread metadata to root
+                    anfrage.threadPosition = 1;
+                    anfrage.threadDepth = 0;
+                    anfrage.isThreadRoot = true;
+
                     // All other emails become replies
                     var antworten = [];
                     for (var j = 1; j < group.length; j++) {
                         var replyEmail = group[j];
+
+                        // Determine thread depth based on In-Reply-To chain
+                        var depth = calculateThreadDepth(replyEmail, anfrage, emailsByMsgId);
+
                         antworten.push({
                             datum: replyEmail.datum,
                             von: replyEmail.von_name,
@@ -1331,13 +1466,19 @@
                             text: removeEmailQuotes(replyEmail.text),
                             htmlBody: replyEmail.htmlBody || '',
                             replyId: replyEmail.emailId,
+                            internetMessageId: replyEmail.internetMessageId,
+                            inReplyTo: replyEmail.inReplyTo,
                             isNew: true,
-                            isIncoming: true
+                            isIncoming: true,
+                            // PHASE 2: Thread metadata
+                            threadPosition: j + 1,
+                            threadDepth: depth,
+                            parentMessageId: replyEmail.inReplyTo || anfrage.internetMessageId
                         });
                     }
 
-                    // Add sent replies too
-                    var sentReplies = findReplies(anfrage);
+                    // Add sent replies using multi-layer matching
+                    var sentReplies = findRepliesMultiLayer(anfrage);
                     for (var k = 0; k < sentReplies.length; k++) {
                         antworten.push(sentReplies[k]);
                     }
@@ -1347,20 +1488,118 @@
                         return new Date(a.datum) - new Date(b.datum);
                     });
 
+                    // Update thread positions after sorting
+                    for (var m = 0; m < antworten.length; m++) {
+                        antworten[m].threadPosition = m + 2; // +2 because root is position 1
+                    }
+
                     anfrage.antworten = antworten;
                     exportState.repliesFound += antworten.length;
                     result.push(anfrage);
                 }
             }
 
-            // Add emails without ConversationID
-            for (var m = 0; m < noConvEmails.length; m++) {
-                var email = noConvEmails[m];
-                email.text = removeEmailQuotes(email.text);
-                result.push(email);
+            return result;
+        }
+
+        // Calculate thread depth based on In-Reply-To chain
+        function calculateThreadDepth(email, rootEmail, emailsByMsgId) {
+            var depth = 1; // Default depth for direct reply
+            var maxDepth = 10; // Prevent infinite loops
+
+            var currentMsgId = email.inReplyTo;
+            while (currentMsgId && depth < maxDepth) {
+                if (currentMsgId === rootEmail.internetMessageId) {
+                    break; // Reached root
+                }
+
+                var parentEmail = emailsByMsgId[currentMsgId];
+                if (parentEmail) {
+                    depth++;
+                    currentMsgId = parentEmail.inReplyTo;
+                } else {
+                    break; // Parent not found
+                }
             }
 
-            return result;
+            return depth;
+        }
+
+        // Find replies using multi-layer matching (extends original findReplies)
+        function findRepliesMultiLayer(originalEmail) {
+            var replies = [];
+            var seenIds = {}; // Prevent duplicates
+
+            try {
+                // Layer 1: ConversationID matching (original method)
+                var originalConvId = originalEmail.conversationId || '';
+                if (originalConvId) {
+                    var matchingItems = sentItemsByConvId[originalConvId];
+                    if (matchingItems) {
+                        for (var i = 0; i < matchingItems.length; i++) {
+                            var cached = matchingItems[i];
+                            if (seenIds[cached.entryId]) continue;
+                            seenIds[cached.entryId] = true;
+
+                            if (cached.body && cached.body.trim() !== '') {
+                                replies.push(createReplyObject(cached));
+                            }
+                        }
+                    }
+                }
+
+                // Layer 2: In-Reply-To matching (sent items that reply to this email)
+                var msgId = originalEmail.internetMessageId;
+                if (msgId && sentItemsByInReplyTo[msgId]) {
+                    var replyToMatches = sentItemsByInReplyTo[msgId];
+                    for (var j = 0; j < replyToMatches.length; j++) {
+                        var cached = replyToMatches[j];
+                        if (seenIds[cached.entryId]) continue;
+                        seenIds[cached.entryId] = true;
+
+                        if (cached.body && cached.body.trim() !== '') {
+                            replies.push(createReplyObject(cached));
+                        }
+                    }
+                }
+
+                // Layer 3: References matching (sent items that reference this email)
+                if (msgId && sentItemsByReference[msgId]) {
+                    var refMatches = sentItemsByReference[msgId];
+                    for (var k = 0; k < refMatches.length; k++) {
+                        var cached = refMatches[k];
+                        if (seenIds[cached.entryId]) continue;
+                        seenIds[cached.entryId] = true;
+
+                        if (cached.body && cached.body.trim() !== '') {
+                            replies.push(createReplyObject(cached));
+                        }
+                    }
+                }
+
+            } catch (e) {}
+
+            return replies;
+        }
+
+        // Helper to create a reply object from cached sent item
+        function createReplyObject(cached) {
+            return {
+                datum: formatDate(cached.sentDate),
+                an: cached.to || '',
+                text: cached.body.trim(),
+                htmlBody: cached.htmlBody || '',
+                replyId: cached.entryId || '',
+                internetMessageId: cached.internetMessageId || '',
+                inReplyTo: cached.inReplyTo || '',
+                isIncoming: false,  // Sent items are outgoing
+                threadDepth: 1      // Default depth
+            };
+        }
+
+        // Keep original findReplies for backward compatibility
+        function findReplies(originalEmail) {
+            return findRepliesMultiLayer(originalEmail);
         }
 
         // State for async sent items caching
@@ -1377,6 +1616,10 @@
         function cacheSentItems(days) {
             sentItemsCache = [];
             sentItemsByConvId = {};  // Clear lookup map
+            // PHASE 1: Clear all lookup maps
+            sentItemsByInReplyTo = {};
+            sentItemsByReference = {};
+            sentItemsByNormSubject = {};
             sentCacheState.days = days;
             // Use same cutoff date as inbox - replies can't exist before the emails
             sentCacheState.cutoffDate = exportState.cutoffDate;
@@ -1456,22 +1699,53 @@
                     var entryId = '';
                     try { entryId = item.EntryID || ''; } catch (e) {}
 
+                    // PHASE 1: Extract extended headers for thread-mapping
+                    var headers = getEmailHeaders(item);
+
+                    var subject = '';
+                    try { subject = item.Subject || ''; } catch (e) {}
+
                     var sentItem = {
                         sentDate: sentDate,
                         conversationId: convId,
                         entryId: entryId,  // Unique ID for reply duplicate detection
                         body: removeEmailQuotes(body),
                         htmlBody: htmlBody,
-                        to: toRecipient
+                        to: toRecipient,
+                        subject: subject,
+                        // PHASE 1: New header fields
+                        internetMessageId: headers.internetMessageId,
+                        inReplyTo: headers.inReplyTo,
+                        references: headers.references,
+                        normalizedSubject: normalizeSubject(subject)
                     };
                     sentItemsCache.push(sentItem);
 
-                    // Add to lookup map for fast access
+                    // Add to lookup map for fast access by ConversationID
                     if (convId) {
                         if (!sentItemsByConvId[convId]) {
                             sentItemsByConvId[convId] = [];
                         }
                         sentItemsByConvId[convId].push(sentItem);
+                    }
+
+                    // PHASE 1: Also index by In-Reply-To for multi-layer matching
+                    if (headers.inReplyTo) {
+                        if (!sentItemsByInReplyTo[headers.inReplyTo]) {
+                            sentItemsByInReplyTo[headers.inReplyTo] = [];
+                        }
+                        sentItemsByInReplyTo[headers.inReplyTo].push(sentItem);
+                    }
+
+                    // PHASE 1: Also index by References for chain matching
+                    if (headers.references && headers.references.length > 0) {
+                        for (var ri = 0; ri < headers.references.length; ri++) {
+                            var refId = headers.references[ri];
+                            if (!sentItemsByReference[refId]) {
+                                sentItemsByReference[refId] = [];
+                            }
+                            sentItemsByReference[refId].push(sentItem);
+                        }
                     }
                 } catch (e) {}
             }
@@ -1842,6 +2116,122 @@
             return text;
         }
 
+        // ============================================================
+        // PHASE 1: Extended Header Extraction for Thread-Mapping
+        // ============================================================
+
+        // MAPI Property Tags for email headers
+        var PR_INTERNET_MESSAGE_ID = "http://schemas.microsoft.com/mapi/proptag/0x1035001F";
+        var PR_IN_REPLY_TO_ID = "http://schemas.microsoft.com/mapi/proptag/0x1042001F";
+        var PR_INTERNET_REFERENCES = "http://schemas.microsoft.com/mapi/proptag/0x1039001F";
+        var PR_CONVERSATION_INDEX = "http://schemas.microsoft.com/mapi/proptag/0x00710102";
+
+        // Extract email headers using PropertyAccessor
+        // Returns: { internetMessageId, inReplyTo, references, conversationIndex }
+        function getEmailHeaders(item) {
+            var headers = {
+                internetMessageId: '',
+                inReplyTo: '',
+                references: [],
+                conversationIndex: ''
+            };
+
+            try {
+                var pa = item.PropertyAccessor;
+                if (!pa) return headers;
+
+                // Internet Message-ID (unique identifier across email systems)
+                try {
+                    headers.internetMessageId = pa.GetProperty(PR_INTERNET_MESSAGE_ID) || '';
+                } catch (e) {}
+
+                // In-Reply-To header (Message-ID of the parent email)
+                try {
+                    headers.inReplyTo = pa.GetProperty(PR_IN_REPLY_TO_ID) || '';
+                } catch (e) {}
+
+                // References header (chain of Message-IDs in thread)
+                try {
+                    var refs = pa.GetProperty(PR_INTERNET_REFERENCES) || '';
+                    if (refs) {
+                        // References is a space or newline separated list of Message-IDs
+                        headers.references = refs.split(/[\s\r\n]+/).filter(function(r) {
+                            return r && r.indexOf('@') > -1;
+                        });
+                    }
+                } catch (e) {}
+
+                // Conversation Index (Outlook's internal thread tracking)
+                try {
+                    var convIdx = pa.GetProperty(PR_CONVERSATION_INDEX);
+                    if (convIdx) {
+                        // Convert binary to base64 string
+                        headers.conversationIndex = convIdx;
+                    }
+                } catch (e) {}
+
+            } catch (e) {
+                // PropertyAccessor not available or failed
+            }
+
+            return headers;
+        }
+
+        // Normalize subject by removing Re:/AW:/Fwd:/WG: prefixes
+        // Returns lowercase normalized subject for comparison
+        function normalizeSubject(subject) {
+            if (!subject) return '';
+
+            var normalized = subject;
+
+            // Remove common reply/forward prefixes (case-insensitive, can repeat)
+            // German: AW: (Antwort), WG: (Weitergeleitet)
+            // English: Re:, Fwd:, Fw:
+            // French: Rép:, Tr:
+            // Spanish: Re:, RV:
+            var prefixPattern = /^[\s]*(RE|AW|FWD|FW|WG|Antwort|Weitergeleitet|Rép|Tr|RV)[\s]*:[\s]*/i;
+
+            // Keep removing prefixes until none left
+            var prevLength;
+            do {
+                prevLength = normalized.length;
+                normalized = normalized.replace(prefixPattern, '');
+            } while (normalized.length < prevLength);
+
+            // Also remove [EXT], [EXTERNAL], etc. tags
+            normalized = normalized.replace(/^\s*\[[^\]]{1,20}\]\s*/gi, '');
+
+            // Trim and lowercase for comparison
+            return normalized.trim().toLowerCase();
+        }
+
+        // Compute a thread ID using multi-layer fallback strategy
+        // Priority: 1. ConversationID, 2. First Reference, 3. InReplyTo root, 4. Normalized subject
+        function computeThreadId(email) {
+            // Primary: Outlook ConversationID (most reliable when available)
+            if (email.conversationId) {
+                return 'conv:' + email.conversationId;
+            }
+
+            // Secondary: First message in References chain (the thread root)
+            if (email.references && email.references.length > 0) {
+                return 'ref:' + email.references[0];
+            }
+
+            // Tertiary: In-Reply-To (parent message)
+            if (email.inReplyTo) {
+                return 'reply:' + email.inReplyTo;
+            }
+
+            // Quaternary: Normalized subject (fallback)
+            if (email.normalizedSubject) {
+                return 'subj:' + email.normalizedSubject;
+            }
+
+            // Last resort: unique ID for orphan emails
+            return 'orphan:' + (email.emailId || email.internetMessageId || Math.random().toString(36));
+        }
+
         function extractEmail(item) {
             var senderEmail = '';
             try {
@@ -1871,6 +2261,13 @@
             var entryId = '';
             try { entryId = item.EntryID || ''; } catch (e) {}
 
+            // PHASE 1: Extract extended headers for thread-mapping
+            var headers = getEmailHeaders(item);
+
+            // Calculate normalized subject for thread matching
+            var subject = item.Subject || '(Kein Betreff)';
+            var normSubject = normalizeSubject(subject);
+
             // Try to get the conversation start date (when the first email was sent/received)
             var convStartDate = null;
             try {
@@ -1893,21 +2290,34 @@
                 }
             } catch (e) {}
 
-            return {
+            // Build email object with extended header fields
+            var emailObj = {
                 datum: formatDate(item.ReceivedTime),
                 conversationStartDate: convStartDate ? formatDate(convStartDate) : null,
                 originalSubject: convOriginalSubject,
                 von_email: senderEmail,
                 von_name: item.SenderName || 'Unbekannt',
-                betreff: item.Subject || '(Kein Betreff)',
+                betreff: subject,
                 text: body,
                 htmlBody: htmlBody,  // HTML version for tables/formatting
                 anhaenge: attachments,
                 conversationId: convId,
                 emailId: entryId,  // Unique ID for duplicate detection
                 outlookKategorie: category,  // Outlook category → Bearbeiter
-                antworten: []
+                antworten: [],
+
+                // PHASE 1: New fields for robust thread-mapping
+                internetMessageId: headers.internetMessageId,  // Unique ID across email systems
+                inReplyTo: headers.inReplyTo,                  // Parent message ID
+                references: headers.references,                 // Full thread chain
+                conversationIndex: headers.conversationIndex,   // Outlook internal index
+                normalizedSubject: normSubject                  // For subject-based matching
             };
+
+            // Compute thread ID using multi-layer fallback
+            emailObj.threadId = computeThreadId(emailObj);
+
+            return emailObj;
         }
 
         function formatDate(date) {
