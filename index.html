@@ -1807,7 +1807,32 @@
                 const text = email.text || email.body || '';
                 const subject = email.betreff || email.subject || '';
                 const fromEmail = email.von_email || email.from_email || '';
-                const fromName = email.von_name || email.from_name || '';
+                const fromName = email.von_name || email.from_name || email.von || '';
+
+                // Pre-parse HTML thread to find original sender
+                const htmlBody = email.htmlBody || '';
+                const parsedThread = parseEmailThreadHtml(htmlBody);
+                const originalMessage = parsedThread.find(m => m.isOriginal);
+
+                // Determine the display sender: prefer original sender from parsed thread
+                let displaySender = fromName || fromEmail;
+                let isSentEmail = false;
+                if (originalMessage && originalMessage.von) {
+                    displaySender = originalMessage.von;
+                    // Check if this is a sent email by comparing names
+                    // Extract first name from original sender and from field
+                    const originalFirstName = originalMessage.von.split(' ')[0].toLowerCase();
+                    const fromFieldFirstName = (fromName || '').split(/[\s,]/)[0].toLowerCase();
+                    const fromEmailUser = (fromEmail || '').split('@')[0].toLowerCase().replace(/[._-]/g, '');
+
+                    // It's a sent email if the original sender's name doesn't match
+                    // the from field (name or email user part)
+                    if (originalFirstName && fromFieldFirstName &&
+                        originalFirstName !== fromFieldFirstName &&
+                        !fromEmailUser.startsWith(originalFirstName)) {
+                        isSentEmail = true;
+                    }
+                }
 
                 // Auto-categorize
                 const kategorie = categorizeEmail(subject, text, fromEmail);
@@ -1851,7 +1876,12 @@
 
                     isProvision: isProvision,
                     provisionData: provisionData,
-                    outlookKategorie: email.outlookKategorie || ''  // Outlook category for Bearbeiter
+                    outlookKategorie: email.outlookKategorie || '',  // Outlook category for Bearbeiter
+
+                    // Display sender info (from HTML parsing)
+                    displaySender: displaySender,
+                    isSentEmail: isSentEmail,
+                    _parsedThread: parsedThread  // Cache parsed thread for later use
                 };
             });
 
@@ -2061,13 +2091,17 @@
                     badges += '<span class="badge badge-cluster">' + c + '</span>';
                 });
 
+                // Use displaySender (from HTML parsing) with (Ausgang) marker for sent emails
+                const senderDisplay = email.displaySender || email.von_name || email.von_email;
+                const sentMarker = email.isSentEmail ? ' (Ausgang)' : '';
+
                 html += `
                     <div class="email-item${selectedClass}">
                         <input type="checkbox" class="email-checkbox" ${isChecked}
                                onclick="event.stopPropagation(); toggleEmailSelection(${email.id})">
                         <div class="email-item-content" onclick="selectEmail(${email.id})">
                             <div class="email-item-header">
-                                <span class="email-sender">${escapeHtml(email.von_name || email.von_email)}</span>
+                                <span class="email-sender">${escapeHtml(senderDisplay)}${sentMarker}</span>
                                 <span class="email-date">${dateStr}</span>
                             </div>
                             <div class="email-subject">${escapeHtml(email.betreff)}</div>
@@ -2130,9 +2164,9 @@
             document.getElementById('detailEmpty').style.display = 'none';
             document.getElementById('emailDetail').classList.add('active');
 
-            // Parse HTML thread early to get original sender info
-            const parsedThread = email.htmlBody ? parseEmailThreadHtml(email.htmlBody) : [];
-            email._parsedThread = parsedThread;
+            // Use cached parsed thread (from processEmails) or parse now
+            const parsedThread = email._parsedThread || (email.htmlBody ? parseEmailThreadHtml(email.htmlBody) : []);
+            if (!email._parsedThread) email._parsedThread = parsedThread;
             const originalMessage = parsedThread.find(m => m.isOriginal);
 
             // Fill header - use original sender from parsed thread if available
