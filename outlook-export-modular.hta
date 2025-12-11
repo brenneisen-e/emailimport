@@ -208,74 +208,96 @@
         var totalModules = 0;
         var loadErrors = [];
 
+        // Debug info storage
+        var debugInfo = {
+            href: '',
+            pathname: '',
+            rawPath: '',
+            finalPath: ''
+        };
+
         // Get the directory where this HTA file is located
         function getScriptDir() {
             var path = '';
 
-            // Method 1: Try document.location.href (most reliable for HTA)
+            // Method 1: Try document.location.href
             try {
                 var href = document.location.href;
+                debugInfo.href = href;
 
-                // UNC paths: file://///server/share or file:////server/share
-                if (href.indexOf('file://///') === 0) {
-                    path = '\\\\' + href.substring(10);  // file:///// -> \\
-                } else if (href.indexOf('file:////') === 0) {
-                    path = '\\\\' + href.substring(9);   // file://// -> \\
-                }
-                // Local paths: file:///C:/path
-                else if (href.indexOf('file:///') === 0) {
-                    var afterPrefix = href.substring(8);
-                    // Check if it's a UNC path without proper prefix (e.g., file:///cifs/...)
-                    if (afterPrefix.charAt(1) !== ':') {
-                        // Likely a UNC path - add \\
-                        path = '\\\\' + afterPrefix;
-                    } else {
-                        path = afterPrefix;
+                // Remove file:// prefix (handle various formats)
+                if (href.indexOf('file:') === 0) {
+                    // Count slashes after "file:"
+                    var afterFile = href.substring(5);
+                    var slashCount = 0;
+                    while (afterFile.charAt(slashCount) === '/') {
+                        slashCount++;
                     }
-                } else if (href.indexOf('file://') === 0) {
-                    path = href.substring(7);
+
+                    // Get path after the slashes
+                    var pathPart = afterFile.substring(slashCount);
+                    debugInfo.rawPath = pathPart;
+
+                    // Check if it's a local drive (second char is :) or UNC path
+                    if (pathPart.length > 1 && pathPart.charAt(1) === ':') {
+                        // Local path like C:/Users/...
+                        path = pathPart;
+                    } else {
+                        // UNC path - needs \\ prefix
+                        path = '\\\\' + pathPart;
+                    }
                 }
 
-                // URL decode (spaces become %20, etc.)
+                // URL decode and convert slashes
                 path = unescape(path);
-                // Replace forward slashes with backslashes
                 path = path.replace(/\//g, '\\');
-            } catch (e) {}
+            } catch (e) {
+                debugInfo.href = 'Error: ' + e.message;
+            }
 
             // Method 2: Fallback using location.pathname
             if (!path || path.length < 3) {
                 try {
-                    path = location.pathname;
-                    // Local path: /C:/path
-                    if (path.charAt(0) === '/' && path.charAt(2) === ':') {
-                        path = path.substring(1);
+                    var pathname = location.pathname;
+                    debugInfo.pathname = pathname;
+
+                    // Remove leading slash if present
+                    if (pathname.charAt(0) === '/') {
+                        pathname = pathname.substring(1);
                     }
-                    // UNC path: //server/share or /server/share
-                    else if (path.charAt(0) === '/' && path.charAt(1) === '/') {
-                        path = '\\' + path;  // Will become \\ after replace
+
+                    // Check if local or UNC
+                    if (pathname.length > 1 && pathname.charAt(1) === ':') {
+                        path = pathname;
+                    } else {
+                        path = '\\\\' + pathname;
                     }
-                    else if (path.charAt(0) === '/' && path.indexOf(':') === -1) {
-                        // Might be UNC without leading //
-                        path = '\\\\' + path.substring(1);
-                    }
+
                     path = unescape(path);
                     path = path.replace(/\//g, '\\');
-                } catch (e) {}
+                } catch (e) {
+                    debugInfo.pathname = 'Error: ' + e.message;
+                }
             }
 
             // Get directory (remove filename)
             var lastSlash = path.lastIndexOf('\\');
             if (lastSlash > 0) {
-                return path.substring(0, lastSlash + 1);
+                path = path.substring(0, lastSlash + 1);
             }
 
-            // Method 3: Use WScript.Shell as last resort
-            try {
-                var shell = new ActiveXObject("WScript.Shell");
-                return shell.CurrentDirectory + '\\';
-            } catch (e) {}
+            debugInfo.finalPath = path;
 
-            return '';
+            // Method 3: Use WScript.Shell as last resort
+            if (!path || path.length < 5) {
+                try {
+                    var shell = new ActiveXObject("WScript.Shell");
+                    path = shell.CurrentDirectory + '\\';
+                    debugInfo.finalPath = path + ' (from Shell)';
+                } catch (e) {}
+            }
+
+            return path;
         }
 
         // Store detected base directory for debugging
