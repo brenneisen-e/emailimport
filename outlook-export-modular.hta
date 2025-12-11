@@ -358,8 +358,13 @@
 
                 var style = document.createElement('style');
                 style.type = 'text/css';
-                style.styleSheet.cssText = content;
+                // In IE/HTA: must append to DOM first, then access styleSheet
                 document.getElementsByTagName('head')[0].appendChild(style);
+                if (style.styleSheet) {
+                    style.styleSheet.cssText = content;
+                } else {
+                    style.appendChild(document.createTextNode(content));
+                }
                 return true;
             } catch (e) {
                 return false;
