@@ -1133,27 +1133,32 @@
                             emailData.text = removeEmailQuotes(originalRawText);
                         }
 
-                        // IMPORTANT: Use original request DATE - priority:
-                        // 1. From Excel (if already saved)
-                        // 2. From Outlook Conversation API (conversationStartDate)
-                        // 3. From quoted email headers (fallback)
-                        var originalDate = existingDates[convKey] || existingDates[emailKey] || '';
-                        if (originalDate) {
-                            emailData.datum = originalDate;  // Keep the original date from Excel
-                        } else if (emailData.conversationStartDate) {
-                            emailData.datum = emailData.conversationStartDate;  // Use Outlook's conversation start date
-                        } else {
-                            // Fallback: try to extract from quoted email headers (use ORIGINAL raw text!)
-                            var quotedDate = extractOldestDateFromQuotes(originalRawText);
-                            if (quotedDate) {
-                                emailData.datum = quotedDate.getFullYear() + '-' +
-                                    pad(quotedDate.getMonth() + 1) + '-' +
-                                    pad(quotedDate.getDate()) + 'T' +
-                                    pad(quotedDate.getHours()) + ':' +
-                                    pad(quotedDate.getMinutes()) + ':' +
-                                    pad(quotedDate.getSeconds());
+                        // IMPORTANT: Use original request DATE - but ONLY for root emails!
+                        // Replies should keep their own ReceivedTime for correct chronological ordering
+                        // Root = email without inReplyTo header
+                        var isLikelyRootCC = !emailData.inReplyTo;
+
+                        if (isLikelyRootCC) {
+                            // Only override datum for root emails
+                            var originalDate = existingDates[convKey] || existingDates[emailKey] || '';
+                            if (originalDate) {
+                                emailData.datum = originalDate;  // Keep the original date from Excel
+                            } else if (emailData.conversationStartDate) {
+                                emailData.datum = emailData.conversationStartDate;  // Use Outlook's conversation start date
+                            } else {
+                                // Fallback: try to extract from quoted email headers (use ORIGINAL raw text!)
+                                var quotedDate = extractOldestDateFromQuotes(originalRawText);
+                                if (quotedDate) {
+                                    emailData.datum = quotedDate.getFullYear() + '-' +
+                                        pad(quotedDate.getMonth() + 1) + '-' +
+                                        pad(quotedDate.getDate()) + 'T' +
+                                        pad(quotedDate.getHours()) + ':' +
+                                        pad(quotedDate.getMinutes()) + ':' +
+                                        pad(quotedDate.getSeconds());
+                                }
                             }
                         }
+                        // Replies keep their original datum (ReceivedTime) for correct thread ordering
 
                         // IMPORTANT: Use original SUBJECT - priority:
                         // 1. From Excel (if already saved)
