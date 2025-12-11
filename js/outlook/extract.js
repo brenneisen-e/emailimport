@@ -48,6 +48,57 @@ function getSenderSMTPAddressLegacy(mailItem) {
 }
 
 /**
+ * Get SMTP email address from recipient (resolves Exchange X500 addresses)
+ * @param {Object} recipient - Outlook recipient object
+ * @returns {string} SMTP email address or fallback
+ */
+function getRecipientSMTPAddress(recipient) {
+    try {
+        var addr = recipient.Address || '';
+
+        // If it's already SMTP format, return it
+        if (addr.indexOf('@') > -1) {
+            return addr;
+        }
+
+        // Try to resolve Exchange address to SMTP
+        try {
+            var addrEntry = recipient.AddressEntry;
+            if (addrEntry) {
+                // Try GetExchangeUser first
+                try {
+                    var exchUser = addrEntry.GetExchangeUser();
+                    if (exchUser && exchUser.PrimarySmtpAddress) {
+                        return exchUser.PrimarySmtpAddress;
+                    }
+                } catch (e1) {}
+
+                // Try PropertyAccessor
+                try {
+                    var propAccessor = addrEntry.PropertyAccessor;
+                    var smtpAddr = propAccessor.GetProperty(PR_SMTP_ADDRESS_EXTRACT);
+                    if (smtpAddr) return smtpAddr;
+                } catch (e2) {}
+            }
+        } catch (e3) {}
+
+        // If X500 format, extract name from it as fallback
+        if (addr.indexOf('/cn=') > -1) {
+            var match = addr.match(/cn=([^\/,]+)$/i);
+            if (match) {
+                // Clean up the name (remove leading numbers/hyphens like "f4fadad6c63f4b8e93e39ddb6abbf8d7-")
+                var name = match[1].replace(/^[a-f0-9]{32}-/i, '');
+                return name || recipient.Name || addr;
+            }
+        }
+
+        return recipient.Name || addr;
+    } catch (e) {
+        return recipient.Address || recipient.Name || '';
+    }
+}
+
+/**
  * Extract all data from an Outlook mail item
  * @param {Object} mailItem - Outlook mail item
  * @returns {Object} Extracted email data
@@ -221,7 +272,7 @@ function extractEmailUnified(mailItem, folderType) {
                     var recip = recipients.Item(r);
                     email.recipients.push({
                         name: recip.Name || '',
-                        email: recip.Address || '',
+                        email: getRecipientSMTPAddress(recip),
                         type: recip.Type // 1=To, 2=CC, 3=BCC
                     });
                 } catch (e) {}
