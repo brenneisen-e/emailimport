@@ -239,6 +239,37 @@ function buildConversationJsonUnified(threadRoot, allEmails) {
         json.antworten.push(reply);
     }
 
+    // FALLBACK: If no replies found through unified processing, use original antworten
+    if (json.antworten.length === 0 && threadRoot.originalAntworten && threadRoot.originalAntworten.length > 0) {
+        for (var f = 0; f < threadRoot.originalAntworten.length; f++) {
+            var origReply = threadRoot.originalAntworten[f];
+            json.antworten.push({
+                datum: origReply.datum || '',
+                von: origReply.von || '',
+                vonEmail: origReply.vonEmail || '',
+                an: origReply.an || '',
+                text: origReply.text || '',
+                htmlBody: origReply.htmlBody || '',
+                threadPosition: origReply.threadPosition || (f + 2),
+                threadDepth: origReply.threadDepth || 1,
+                parentMessageId: origReply.parentMessageId || origReply.inReplyTo || '',
+                replyId: origReply.replyId || '',
+                internetMessageId: origReply.internetMessageId || '',
+                inReplyTo: origReply.inReplyTo || '',
+                isIncoming: origReply.isIncoming !== false,
+                isNew: true,
+                isDirectReplyToRoot: true
+            });
+        }
+        // Update message count
+        json.messageCount = 1 + json.antworten.length;
+    }
+
+    // Use original von_name if available (preserves "An: ..." from handleNewEmail)
+    if (threadRoot.originalVonName && threadRoot.originalVonName !== '') {
+        json.von_name = threadRoot.originalVonName;
+    }
+
     return json;
 }
 
