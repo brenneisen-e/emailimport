@@ -261,7 +261,14 @@ function doImport() {
 
             currentStep = 'Email ' + (i+1) + ' Key erstellen';
             var emailKey = createEmailKey(email.datum, email.betreff);
-            var existingRow = existingData[emailKey];
+
+            // Find existing row: first by ConversationID, then by date+subject
+            var existingRow = null;
+            if (email.conversationId && existingData.byConvId[email.conversationId]) {
+                existingRow = existingData.byConvId[email.conversationId];
+            } else if (existingData.byKey[emailKey]) {
+                existingRow = existingData.byKey[emailKey];
+            }
 
             if (existingRow) {
                 // Email exists - check for new replies
@@ -319,7 +326,10 @@ function doImport() {
                         } catch (addErr) {}
                     }
                     writeEmailRow(worksheet, actualRow, email);
-                    existingData[emailKey] = actualRow;
+                    existingData.byKey[emailKey] = actualRow;
+                    if (email.conversationId) {
+                        existingData.byConvId[email.conversationId] = actualRow;
+                    }
                     nextRow = actualRow + 1;
                     newCount++;
                 } catch (writeErr) {
@@ -336,7 +346,7 @@ function doImport() {
                         worksheet.Cells(errorRow, 2).Value = email.datum || '';
                         worksheet.Cells(errorRow, 12).Value = email.betreff || '';
                         worksheet.Cells(errorRow, 13).Value = '[FEHLER beim Import: ' + writeErr.message + ']';
-                        existingData[emailKey] = errorRow;
+                        existingData.byKey[emailKey] = errorRow;
                         nextRow = errorRow + 1;
                         skipCount++;
                     } catch (e2) {

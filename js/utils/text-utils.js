@@ -56,12 +56,19 @@ function fixEncoding(text) {
     result = result.replace(/\u00E2\u0086\u0092/g, '\u2192');  // â†' -> →
     result = result.replace(/\u00E2\u0086\u0090/g, '\u2190');  // â†? -> ←
 
-    // German quotes double-encoded
+    // German quotes double-encoded (Latin-1 interpretation)
     result = result.replace(/\u00E2\u0080\u009E/g, '\u201E');  // â€ž -> „
     result = result.replace(/\u00E2\u0080\u009C/g, '\u201C');  // â€œ -> "
     result = result.replace(/\u00E2\u0080\u009D/g, '\u201D');  // â€? -> "
     result = result.replace(/\u00E2\u0080\u0098/g, '\u2018');  // â€˜ -> '
     result = result.replace(/\u00E2\u0080\u0099/g, '\u2019');  // â€™ -> '
+
+    // German quotes double-encoded (Windows-1252 interpretation)
+    // In Win-1252: 0x80=€, 0x98=˜, 0x99=™, 0x9C=œ, 0x9E=ž
+    result = result.replace(/\u00E2\u20AC\u02DC/g, '\u2018');  // â€˜ -> ' (Win-1252)
+    result = result.replace(/\u00E2\u20AC\u2122/g, '\u2019');  // â€™ -> ' (Win-1252)
+    result = result.replace(/\u00E2\u20AC\u0153/g, '\u201C');  // â€œ -> " (Win-1252)
+    result = result.replace(/\u00E2\u20AC\u017E/g, '\u201E');  // â€ž -> „ (Win-1252)
 
     // Euro and other symbols
     result = result.replace(/\u00E2\u0082\u00AC/g, '\u20AC');  // â‚¬ -> €
