@@ -84,7 +84,9 @@ function getRecipientSMTPAddress(recipient) {
 
         // If X500 format, extract name from it as fallback
         if (addr.indexOf('/cn=') > -1) {
-            var match = addr.match(/cn=([^\/,]+)$/i);
+            // Remove trailing comma/whitespace first
+            var cleaned = addr.replace(/[,\s]+$/, '');
+            var match = cleaned.match(/cn=([^\/]+)$/i);
             if (match) {
                 // Clean up the name (remove leading numbers/hyphens like "f4fadad6c63f4b8e93e39ddb6abbf8d7-")
                 var name = match[1].replace(/^[a-f0-9]{32}-/i, '');
