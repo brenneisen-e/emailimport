@@ -1807,7 +1807,18 @@
                 const text = email.text || email.body || '';
                 const subject = email.betreff || email.subject || '';
                 const fromEmail = email.von_email || email.from_email || '';
-                const fromName = email.von_name || email.from_name || '';
+                const fromName = email.von_name || email.from_name || email.von || '';
+
+                // Pre-parse HTML thread to find original sender
+                const htmlBody = email.htmlBody || '';
+                const parsedThread = parseEmailThreadHtml(htmlBody);
+                const originalMessage = parsedThread.find(m => m.isOriginal);
+
+                // Determine the display sender: prefer original sender from parsed thread
+                let displaySender = fromName || fromEmail;
+                if (originalMessage && originalMessage.von) {
+                    displaySender = originalMessage.von;
+                }
 
                 // Auto-categorize
                 const kategorie = categorizeEmail(subject, text, fromEmail);
@@ -1851,7 +1862,11 @@
 
                     isProvision: isProvision,
                     provisionData: provisionData,
-                    outlookKategorie: email.outlookKategorie || ''  // Outlook category for Bearbeiter
+                    outlookKategorie: email.outlookKategorie || '',  // Outlook category for Bearbeiter
+
+                    // Display sender info (from HTML parsing)
+                    displaySender: displaySender,
+                    _parsedThread: parsedThread  // Cache parsed thread for later use
                 };
             });
 
@@ -2061,13 +2076,16 @@
                     badges += '<span class="badge badge-cluster">' + c + '</span>';
                 });
 
+                // Use displaySender (from HTML parsing)
+                const senderDisplay = email.displaySender || email.von_name || email.von_email;
+
                 html += `
                     <div class="email-item${selectedClass}">
                         <input type="checkbox" class="email-checkbox" ${isChecked}
                                onclick="event.stopPropagation(); toggleEmailSelection(${email.id})">
                         <div class="email-item-content" onclick="selectEmail(${email.id})">
                             <div class="email-item-header">
-                                <span class="email-sender">${escapeHtml(email.von_name || email.von_email)}</span>
+                                <span class="email-sender">${escapeHtml(senderDisplay)}</span>
                                 <span class="email-date">${dateStr}</span>
                             </div>
                             <div class="email-subject">${escapeHtml(email.betreff)}</div>
@@ -2130,9 +2148,9 @@
             document.getElementById('detailEmpty').style.display = 'none';
             document.getElementById('emailDetail').classList.add('active');
 
-            // Parse HTML thread early to get original sender info
-            const parsedThread = email.htmlBody ? parseEmailThreadHtml(email.htmlBody) : [];
-            email._parsedThread = parsedThread;
+            // Use cached parsed thread (from processEmails) or parse now
+            const parsedThread = email._parsedThread || (email.htmlBody ? parseEmailThreadHtml(email.htmlBody) : []);
+            if (!email._parsedThread) email._parsedThread = parsedThread;
             const originalMessage = parsedThread.find(m => m.isOriginal);
 
             // Fill header - use original sender from parsed thread if available
@@ -2283,9 +2301,10 @@
                 ? null  // Will use HTML comparison
                 : removeEmailQuotes(email.text || '').trim().toLowerCase().substring(0, 150);
 
-            // Strategy: Use HTML-parsed replies if available (they have actual individual content)
-            // Otherwise fall back to antworten from JSON
-            if (htmlReplies.length > 0) {
+            // Strategy: Use rawReplies (antworten from JSON) when available
+            // They have correct sender names and we can extract content from their htmlBody
+            // Only use HTML-parsed replies if rawReplies is empty
+            if (rawReplies.length === 0 && htmlReplies.length > 0) {
                 // Use HTML-parsed replies - they have individual email content
                 const seenHtml = new Set();
                 for (const htmlReply of htmlReplies) {
@@ -2308,11 +2327,19 @@
                     });
                 }
             } else {
-                // No HTML parsing - use antworten from JSON
-                // Deduplicate by cleaned text
+                // Use antworten from JSON - extract individual content from htmlBody
                 const seenTexts = new Set();
                 for (const reply of rawReplies) {
-                    const cleanedText = removeEmailQuotes(reply.text || reply.body || '').trim();
+                    // Extract cleaned HTML content (removes quoted text)
+                    const cleanedHtml = reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : '';
+
+                    // Convert cleaned HTML to text for comparison
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = cleanedHtml;
+                    const htmlDerivedText = (tempDiv.textContent || tempDiv.innerText || '').trim();
+
+                    // Use HTML-derived text, fallback to reply.text only if no htmlBody
+                    const cleanedText = htmlDerivedText || removeEmailQuotes(reply.text || reply.body || '').trim();
                     const compareText = cleanedText.toLowerCase().substring(0, 150);
 
                     // Skip empty, duplicates, or same as original request
@@ -2324,7 +2351,7 @@
                     displayReplies.push({
                         ...reply,
                         cleanedText: cleanedText,
-                        cleanedHtml: reply.htmlBody ? removeEmailQuotesHtml(reply.htmlBody) : null
+                        cleanedHtml: cleanedHtml && cleanedHtml.length > 50 ? cleanedHtml : null
                     });
                 }
             }
