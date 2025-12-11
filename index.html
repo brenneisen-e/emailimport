@@ -3653,39 +3653,97 @@
             await callClaudeApi(message);
         }
 
+        // Helper: Kompakte Email-Zusammenfassung für Chunk-Analyse
+        function summarizeEmail(email, idx) {
+            return {
+                i: idx,
+                datum: email.datum || 'FEHLT',
+                betreff: (email.betreff || '').substring(0, 40),
+                von: (email.von_name || email.von_email || '').substring(0, 30),
+                convId: email.conversationId ? '...' + email.conversationId.slice(-8) : 'FEHLT',
+                replies: email.antworten?.length || 0,
+                kat: email.kategorie || ''
+            };
+        }
+
         async function aiAnalyzeJson() {
             if (emails.length === 0) {
                 addAiMessage('assistant', '⚠️ Bitte lade zuerst eine JSON-Datei hoch.');
                 return;
             }
 
-            addAiMessage('user', '📊 Analysiere die JSON-Struktur');
+            addAiMessage('user', `📊 Analysiere ${emails.length} Emails...`);
 
-            const sample = emails.slice(0, 3).map(e => ({
-                datum: e.datum,
-                betreff: e.betreff,
-                von_name: e.von_name,
-                conversationId: e.conversationId,
-                antworten_count: e.antworten?.length || 0,
-                antworten: e.antworten?.slice(0, 2).map(a => ({
-                    datum: a.datum,
-                    an: a.an,
-                    text: a.text?.substring(0, 100) + '...',
-                    replyId: a.replyId
-                }))
+            // Statistiken über alle Emails sammeln
+            let stats = {
+                total: emails.length,
+                mitAntworten: 0,
+                ohneAntworten: 0,
+                antwortenGesamt: 0,
+                fehlendDatum: 0,
+                fehlendConvId: 0,
+                fehlendKategorie: 0,
+                antwortenOhneDatum: 0,
+                antwortenOhneReplyId: 0
+            };
+
+            emails.forEach(e => {
+                const replies = e.antworten?.length || 0;
+                if (replies > 0) {
+                    stats.mitAntworten++;
+                    stats.antwortenGesamt += replies;
+                    e.antworten.forEach(r => {
+                        if (!r.datum) stats.antwortenOhneDatum++;
+                        if (!r.replyId) stats.antwortenOhneReplyId++;
+                    });
+                } else {
+                    stats.ohneAntworten++;
+                }
+                if (!e.datum) stats.fehlendDatum++;
+                if (!e.conversationId) stats.fehlendConvId++;
+                if (!e.kategorie && !e.outlookKategorie) stats.fehlendKategorie++;
+            });
+
+            // Samples: 2 mit Antworten, 2 ohne
+            const mitAntw = emails.filter(e => e.antworten?.length > 0).slice(0, 2);
+            const ohneAntw = emails.filter(e => !e.antworten?.length).slice(0, 2);
+
+            const samplesMit = mitAntw.map((e, i) => ({
+                ...summarizeEmail(e, i),
+                erstAntwort: e.antworten?.[0] ? {
+                    datum: e.antworten[0].datum || 'FEHLT',
+                    an: (e.antworten[0].an || '').substring(0, 20),
+                    textLen: e.antworten[0].text?.length || 0,
+                    replyId: e.antworten[0].replyId ? 'OK' : 'FEHLT'
+                } : null
             }));
 
-            const prompt = `Analysiere diese Email-JSON-Struktur aus dem Hypercare Email Export Tool:
+            const samplesOhne = ohneAntw.map((e, i) => summarizeEmail(e, i));
 
-${JSON.stringify(sample, null, 2)}
+            // Felder-Liste
+            const emailFelder = emails[0] ? Object.keys(emails[0]).join(', ') : 'keine';
+            const antwFelder = mitAntw[0]?.antworten?.[0] ? Object.keys(mitAntw[0].antworten[0]).join(', ') : 'keine';
 
-Prüfe:
-1. Sind die datum-Felder korrekt formatiert (YYYY-MM-DDTHH:MM:SS)?
-2. Haben die Emails antworten (replies)?
-3. Sind die antworten-Objekte vollständig (datum, an, text, replyId)?
-4. Gibt es offensichtliche Probleme?
+            const prompt = `CHUNK-ANALYSE (${stats.total} Emails):
 
-Gib eine kurze Analyse und wenn es Probleme gibt, generiere eine Anweisung für Claude Code um das Problem zu beheben.`;
+📊 STATISTIKEN:
+- Mit Antworten: ${stats.mitAntworten} (${Math.round(stats.mitAntworten/stats.total*100)}%)
+- Ohne Antworten: ${stats.ohneAntworten}
+- Antworten gesamt: ${stats.antwortenGesamt}
+- Fehlend: datum=${stats.fehlendDatum}, convId=${stats.fehlendConvId}, kategorie=${stats.fehlendKategorie}
+- Antworten-Probleme: ohne datum=${stats.antwortenOhneDatum}, ohne replyId=${stats.antwortenOhneReplyId}
+
+📁 FELDER:
+Email: ${emailFelder}
+Antwort: ${antwFelder}
+
+✅ MIT ANTWORTEN:
+${JSON.stringify(samplesMit, null, 2)}
+
+❌ OHNE ANTWORTEN:
+${JSON.stringify(samplesOhne, null, 2)}
+
+AUFGABE: Analysiere diese Daten. Wenn ${stats.ohneAntworten > stats.mitAntworten ? 'VIELE' : 'wenige'} ohne Antworten sind oder Felder fehlen, generiere eine KOPIERBARE Debugging-Anweisung für Claude Code.`;
 
             await callClaudeApi(prompt);
         }
@@ -3696,66 +3754,75 @@ Gib eine kurze Analyse und wenn es Probleme gibt, generiere eine Anweisung für 
                 return;
             }
 
-            addAiMessage('user', '🧵 Prüfe Thread-Zuordnung');
+            addAiMessage('user', `🧵 Prüfe Thread-Zuordnung (${emails.length} Emails)`);
 
-            const threadStats = {
-                total: emails.length,
-                withReplies: emails.filter(e => e.antworten?.length > 0).length,
-                emptyReplies: emails.filter(e => !e.antworten || e.antworten.length === 0).length,
-                sampleWithReplies: emails.find(e => e.antworten?.length > 0),
-                sampleWithoutReplies: emails.find(e => !e.antworten || e.antworten.length === 0)
-            };
+            // Gruppiere nach ConversationID
+            const convGroups = {};
+            emails.forEach(e => {
+                const cid = e.conversationId || 'keine';
+                if (!convGroups[cid]) convGroups[cid] = [];
+                convGroups[cid].push(e);
+            });
 
-            const prompt = `Analysiere diese Thread-Statistiken aus dem Email Export:
+            const multiEmailConvs = Object.entries(convGroups).filter(([k,v]) => v.length > 1);
+            const withReplies = emails.filter(e => e.antworten?.length > 0).length;
+            const withoutReplies = emails.length - withReplies;
 
-Gesamt: ${threadStats.total} Emails
-Mit Antworten: ${threadStats.withReplies}
-Ohne Antworten: ${threadStats.emptyReplies}
+            // Samples kompakt
+            const sampleMit = emails.find(e => e.antworten?.length > 0);
+            const sampleOhne = emails.find(e => !e.antworten?.length);
 
-Beispiel MIT Antworten:
-${threadStats.sampleWithReplies ? JSON.stringify({
-    betreff: threadStats.sampleWithReplies.betreff,
-    conversationId: threadStats.sampleWithReplies.conversationId,
-    antworten: threadStats.sampleWithReplies.antworten?.slice(0, 2)
-}, null, 2) : 'Keine gefunden'}
+            const prompt = `THREAD-ANALYSE (${emails.length} Emails):
 
-Beispiel OHNE Antworten:
-${threadStats.sampleWithoutReplies ? JSON.stringify({
-    betreff: threadStats.sampleWithoutReplies.betreff,
-    conversationId: threadStats.sampleWithoutReplies.conversationId,
-    antworten: threadStats.sampleWithoutReplies.antworten
-}, null, 2) : 'Keine gefunden'}
+📊 ÜBERSICHT:
+- Mit Antworten: ${withReplies} (${Math.round(withReplies/emails.length*100)}%)
+- Ohne Antworten: ${withoutReplies}
+- Unique ConversationIDs: ${Object.keys(convGroups).length}
+- Conversations mit >1 Email: ${multiEmailConvs.length}
 
-Ist das Verhältnis normal? Wenn viele Emails keine Antworten haben, generiere eine Debugging-Anweisung für Claude Code.`;
+${withoutReplies > withReplies ? '⚠️ PROBLEM: Mehr Emails OHNE Antworten!' : '✅ OK: Meiste haben Antworten'}
+
+SAMPLE MIT ANTWORTEN:
+${sampleMit ? JSON.stringify(summarizeEmail(sampleMit, 0), null, 2) : 'keine'}
+Erste Antwort: ${sampleMit?.antworten?.[0] ? JSON.stringify({datum: sampleMit.antworten[0].datum, an: sampleMit.antworten[0].an?.substring(0,20)}) : 'keine'}
+
+SAMPLE OHNE ANTWORTEN:
+${sampleOhne ? JSON.stringify(summarizeEmail(sampleOhne, 0), null, 2) : 'keine'}
+
+${withoutReplies > withReplies ? 'Generiere eine KOPIERBARE Debugging-Anweisung für Claude Code!' : 'Sieht normal aus. Möchtest du Details zu einem bestimmten Aspekt?'}`;
 
             await callClaudeApi(prompt);
         }
 
         async function aiGenerateFix() {
-            addAiMessage('user', '🔧 Generiere Fix-Anweisung');
+            const withReplies = emails.filter(e => e.antworten?.length > 0).length;
+            const problem = emails.length > 0 && withReplies < emails.length / 2;
 
-            const context = {
-                emailCount: emails.length,
-                withReplies: emails.filter(e => e.antworten?.length > 0).length,
-                sampleFields: emails[0] ? Object.keys(emails[0]) : [],
-                sampleReplyFields: emails[0]?.antworten?.[0] ? Object.keys(emails[0].antworten[0]) : []
-            };
+            addAiMessage('user', '🔧 Generiere Fix-Anweisung' + (problem ? ' (Problem erkannt)' : ''));
 
-            const prompt = `Basierend auf der aktuellen JSON-Struktur:
+            const emailFelder = emails[0] ? Object.keys(emails[0]).join(', ') : 'keine';
+            const antwFelder = emails.find(e => e.antworten?.[0])?.antworten[0] ? Object.keys(emails.find(e => e.antworten?.[0]).antworten[0]).join(', ') : 'keine';
 
-Emails: ${context.emailCount}
-Mit Antworten: ${context.withReplies}
-Email-Felder: ${context.sampleFields.join(', ')}
-Antwort-Felder: ${context.sampleReplyFields.join(', ')}
+            const prompt = `GENERIERE FIX-ANWEISUNG für Email Export Tool:
 
-Generiere eine detaillierte Anweisung, die der Benutzer kopieren und in Claude Code einfügen kann, um das Export-Problem zu debuggen. Die Anweisung sollte:
+STATUS: ${emails.length} Emails, ${withReplies} mit Antworten (${Math.round(withReplies/emails.length*100)}%)
+${problem ? '⚠️ PROBLEM: Zu wenige Emails haben Antworten!' : ''}
 
-1. Die relevanten Dateien im /home/user/emailimport/js/ Verzeichnis analysieren
-2. Die findReplies und createReplyObject Funktionen prüfen
-3. Den sent-cache Aufbau verifizieren
-4. Eine konkrete Lösung vorschlagen
+FELDER:
+- Email: ${emailFelder}
+- Antwort: ${antwFelder}
 
-Formatiere die Anweisung so, dass sie direkt kopiert werden kann.`;
+Generiere eine DETAILLIERTE, KOPIERBARE Anweisung für Claude Code:
+
+\`\`\`
+[HIER ANWEISUNG EINFÜGEN]
+- Pfad: /home/user/emailimport/js/
+- Relevante Dateien: export/core.js, export/sent-cache.js, threads/matching.js
+- Problem: antworten Array ist oft leer
+- Gewünschtes Ergebnis: Alle sent items korrekt den Inbox-Emails zuordnen
+\`\`\`
+
+Die Anweisung soll konkrete Schritte enthalten die Claude Code ausführen kann.`;
 
             await callClaudeApi(prompt);
         }
