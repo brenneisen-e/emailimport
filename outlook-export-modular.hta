@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>BGAV Hypercare Tool (Modular)</title>
+    <HTA:APPLICATION
+        ID="BGAV_Hypercare"
+        APPLICATIONNAME="BGAV Hypercare Tool"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="no"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="2.1"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        /* Inline critical styles for initial load */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 80vh;
+            text-align: center;
+        }
+        .loading h2 { margin-bottom: 1rem; }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .error { color: #ef4444; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div id="loadingScreen" class="loading">
+        <div class="spinner"></div>
+        <h2>BGAV Hypercare Tool wird geladen...</h2>
+        <p id="loadStatus">Module werden initialisiert...</p>
+        <p id="loadError" class="error" style="display:none;"></p>
+    </div>
+
+    <div id="mainApp" style="display:none;">
+        <div class="container">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('export')">&#128229; Outlook Export</div>
+                <div class="tab" onclick="switchTab('import')">&#128200; Excel Import</div>
+            </div>
+
+            <div class="card">
+                <!-- TAB 1: OUTLOOK EXPORT -->
+                <div class="tab-content active" id="tabExport">
+                    <div class="header">
+                        <div class="logo logo-export">&#9993;</div>
+                        <h2>Emails aus Outlook exportieren</h2>
+                        <p class="subtitle">Emails der letzten Tage als JSON speichern</p>
+                    </div>
+
+                    <!-- Step Indicator -->
+                    <div class="step-indicator" id="stepIndicator">
+                        <div class="step-wrapper">
+                            <div class="step-circle step-1 active" id="step1">1</div>
+                            <div class="step-label">Excel verbinden</div>
+                        </div>
+                        <span class="step-arrow">&#10140;</span>
+                        <div class="step-wrapper">
+                            <div class="step-circle step-2" id="step2">2</div>
+                            <div class="step-label">Postfach auswählen</div>
+                        </div>
+                        <span class="step-arrow">&#10140;</span>
+                        <div class="step-wrapper">
+                            <div class="step-circle step-3" id="step3">3</div>
+                            <div class="step-label">Emails exportieren</div>
+                        </div>
+                        <span class="step-arrow">&#10140;</span>
+                        <div class="step-wrapper">
+                            <div class="step-circle step-4" id="step4">4</div>
+                            <div class="step-label">Web-App</div>
+                        </div>
+                        <span class="step-arrow">&#10140;</span>
+                        <div class="step-wrapper">
+                            <div class="step-circle step-5" id="step5">5</div>
+                            <div class="step-label">Excel Import</div>
+                        </div>
+                    </div>
+
+                    <label>Postfach</label>
+                    <select id="mailboxSelect" onchange="loadFolders()">
+                        <option value="">-- Postfach wahlen --</option>
+                    </select>
+
+                    <label>Ordner</label>
+                    <select id="folderSelect" disabled>
+                        <option value="">-- Erst Postfach wahlen --</option>
+                    </select>
+
+                    <label>Zeitraum (Tage)</label>
+                    <input type="number" id="daysInput" value="7" min="1" max="30">
+
+                    <label>Excel verbinden (Pflicht)</label>
+                    <div class="row">
+                        <input type="text" id="exportExcelStatus" readonly placeholder="Tracking_Hypercare.xlsm öffnen, dann verbinden" style="flex:1">
+                    </div>
+                    <button class="btn btn-primary" id="btnExcelConnect" onclick="detectExcelForExport()" style="margin-bottom:0.75rem;">
+                        &#128269; Excel verbinden
+                    </button>
+
+                    <label>Emails exportieren</label>
+                    <button class="btn btn-success" id="exportBtn" onclick="startExport()" disabled>
+                        &#128229; Emails exportieren
+                    </button>
+
+                    <div class="progress-container" id="exportProgress">
+                        <div class="progress-bar"><div class="progress-fill export" id="exportProgressFill"></div></div>
+                        <div class="progress-text" id="exportProgressText">Exportiere...</div>
+                    </div>
+
+                    <div class="status success" id="exportSuccess">
+                        <strong>&#10003; Export erfolgreich!</strong><br>
+                        <span id="exportSuccessMsg"></span>
+                    </div>
+                    <div class="status error" id="exportError"><span id="exportErrorMsg"></span></div>
+
+                    <div class="action-buttons" id="exportActions">
+                        <button class="btn btn-success" id="btnWebApp" onclick="openWebApp()">&#127760; Web-App öffnen (bearbeiten)</button>
+                        <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads öffnen</button>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>Workflow:</strong> Siehe Schritte oben - die Kreise zeigen den aktuellen Schritt
+                    </div>
+                </div>
+
+                <!-- TAB 2: EXCEL IMPORT -->
+                <div class="tab-content" id="tabImport">
+                    <div class="header">
+                        <div class="logo logo-import">&#128200;</div>
+                        <h2>In Excel importieren</h2>
+                        <p class="subtitle">Bearbeitete JSON in Hypercare-Excel schreiben</p>
+                    </div>
+
+                    <label>JSON-Datei (wird automatisch geladen)</label>
+                    <div class="row">
+                        <input type="text" id="jsonPath" readonly placeholder="Lade hypercare_bearbeitet_heute.json..." style="flex:3">
+                        <button class="btn btn-secondary" onclick="selectJsonFile()" style="flex:1; margin-bottom:0.75rem;">Andere...</button>
+                    </div>
+
+                    <div class="status" id="jsonStatus" style="display:none; margin-bottom:0.75rem;"></div>
+
+                    <label>Excel-Ziel (vom Export übernommen)</label>
+                    <div class="row">
+                        <input type="text" id="excelStatus" readonly placeholder="Wird vom Export übernommen..." style="flex:1">
+                    </div>
+                    <button class="btn btn-secondary" onclick="detectExcel()" style="margin-bottom:0.75rem;">
+                        &#128269; Andere Excel
+                    </button>
+
+                    <label>Tabellenblatt</label>
+                    <input type="text" id="sheetName" value="Übersicht">
+
+                    <button class="btn btn-success" id="btnImport" onclick="startImport()" disabled>
+                        &#128200; In Excel importieren
+                    </button>
+
+                    <div class="progress-container" id="importProgress">
+                        <div class="progress-bar"><div class="progress-fill import" id="importProgressFill"></div></div>
+                        <div class="progress-text" id="importProgressText">Importiere...</div>
+                    </div>
+
+                    <div class="status success" id="importSuccess">
+                        <strong>&#10003; Import erfolgreich!</strong><br>
+                        <span id="importSuccessMsg"></span>
+                    </div>
+                    <div class="status error" id="importError"><span id="importErrorMsg"></span></div>
+
+                    <div class="info-box">
+                        <strong>Hinweis:</strong> Offne zuerst die Tracking_Hypercare.xlsm in Excel, dann klicke "Excel erkennen"
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Module loader for HTA
+        // Since HTA can't use <script src="">, we load modules via FileSystemObject
+
+        var modulesLoaded = 0;
+        var totalModules = 0;
+        var loadErrors = [];
+
+        // Get the directory where this HTA file is located
+        function getScriptDir() {
+            var path = location.pathname;
+            // Remove leading slash on Windows paths like /C:/path
+            if (path.charAt(0) === '/' && path.charAt(2) === ':') {
+                path = path.substring(1);
+            }
+            // URL decode
+            path = unescape(path);
+            // Get directory
+            return path.substring(0, path.lastIndexOf('\\') + 1) || path.substring(0, path.lastIndexOf('/') + 1);
+        }
+
+        // Load a JavaScript file and execute it
+        function loadModule(relativePath) {
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var baseDir = getScriptDir();
+                var fullPath = baseDir + relativePath.replace(/\//g, '\\');
+
+                if (!fso.FileExists(fullPath)) {
+                    loadErrors.push('Datei nicht gefunden: ' + relativePath);
+                    return false;
+                }
+
+                // Read file as UTF-8
+                var stream = new ActiveXObject("ADODB.Stream");
+                stream.Type = 2; // adTypeText
+                stream.Charset = "UTF-8";
+                stream.Open();
+                stream.LoadFromFile(fullPath);
+                var content = stream.ReadText();
+                stream.Close();
+
+                // Execute the code
+                eval(content);
+                return true;
+            } catch (e) {
+                loadErrors.push(relativePath + ': ' + e.message);
+                return false;
+            }
+        }
+
+        // Load CSS file
+        function loadCSS(relativePath) {
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var baseDir = getScriptDir();
+                var fullPath = baseDir + relativePath.replace(/\//g, '\\');
+
+                if (!fso.FileExists(fullPath)) {
+                    return false;
+                }
+
+                var stream = new ActiveXObject("ADODB.Stream");
+                stream.Type = 2;
+                stream.Charset = "UTF-8";
+                stream.Open();
+                stream.LoadFromFile(fullPath);
+                var content = stream.ReadText();
+                stream.Close();
+
+                var style = document.createElement('style');
+                style.type = 'text/css';
+                style.styleSheet.cssText = content;
+                document.getElementsByTagName('head')[0].appendChild(style);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Update loading status
+        function updateLoadStatus(message) {
+            document.getElementById('loadStatus').innerText = message;
+        }
+
+        // Initialize the application
+        function initApp() {
+            // Define modules to load in order (dependencies first)
+            var modules = [
+                // Utilities (no dependencies)
+                'js/utils/json-polyfill.js',
+                'js/utils/date-utils.js',
+                'js/utils/text-utils.js',
+                'js/utils/html-parser.js',
+
+                // Config
+                'js/config.js',
+
+                // UI modules
+                'js/ui/step-indicator.js',
+                'js/ui/tabs.js',
+                'js/ui/progress.js',
+
+                // Outlook modules
+                'js/outlook/mapi.js',
+                'js/outlook/extract.js',
+                'js/outlook/init.js',
+
+                // Thread modules
+                'js/threads/grouping.js',
+                'js/threads/depth.js',
+                'js/threads/matching.js',
+
+                // Export modules
+                'js/export/sent-cache.js',
+                'js/export/file-save.js',
+                'js/export/core.js',
+
+                // Import modules
+                'js/import/excel-connect.js',
+                'js/import/excel-write.js',
+                'js/import/core.js'
+            ];
+
+            totalModules = modules.length;
+
+            // Load CSS first
+            updateLoadStatus('Lade Styles...');
+            loadCSS('css/main.css');
+
+            // Load modules sequentially
+            for (var i = 0; i < modules.length; i++) {
+                updateLoadStatus('Lade Modul ' + (i + 1) + '/' + totalModules + ': ' + modules[i]);
+                if (loadModule(modules[i])) {
+                    modulesLoaded++;
+                }
+            }
+
+            // Check for errors
+            if (loadErrors.length > 0) {
+                document.getElementById('loadError').style.display = 'block';
+                document.getElementById('loadError').innerHTML =
+                    '<strong>Fehler beim Laden:</strong><br>' +
+                    loadErrors.join('<br>') +
+                    '<br><br>Stellen Sie sicher, dass alle Dateien vorhanden sind.';
+                return;
+            }
+
+            // Hide loading, show app
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+
+            // Initialize Outlook
+            initOutlook();
+
+            // Initialize button states
+            updateButtonStates();
+        }
+
+        // Start loading when page loads
+        window.onload = function() {
+            setTimeout(initApp, 100);
+        };
+    </script>
+</body>
+</html>

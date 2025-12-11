@@ -1,10 +1,58 @@
 # BGAV Hypercare - Email Review Tool
 
-Tool zur Uberprufung und Kategorisierung von Hypercare-Emails fur das Barmenia/Gothaer-Projekt.
+Tool zur Überprüfung und Kategorisierung von Hypercare-Emails für das Barmenia/Gothaer-Projekt.
 
-## Drei Versionen verfugbar
+## Projektstruktur
 
-### Web-Version (Cloudflare Pages) - NEU!
+```
+emailimport/
+├── index.html                    # Web-App für Cloudflare Pages
+├── outlook-export.hta            # Monolithische HTA (Legacy)
+├── outlook-export-modular.hta    # Modulare HTA (Neu)
+│
+├── css/
+│   └── main.css                  # Haupt-Stylesheet
+│
+├── js/
+│   ├── config.js                 # Globale Konfiguration und State
+│   │
+│   ├── utils/                    # Utility-Funktionen
+│   │   ├── json-polyfill.js      # JSON für IE/HTA
+│   │   ├── date-utils.js         # Datumsformatierung und -parsing
+│   │   ├── text-utils.js         # Text-Bereinigung und Encoding
+│   │   └── html-parser.js        # HTML-Extraktion für Emails
+│   │
+│   ├── ui/                       # UI-Komponenten
+│   │   ├── step-indicator.js     # Workflow-Schrittanzeige
+│   │   ├── tabs.js               # Tab-Wechsel
+│   │   └── progress.js           # Fortschrittsanzeigen
+│   │
+│   ├── outlook/                  # Outlook-Integration
+│   │   ├── init.js               # Outlook-Initialisierung
+│   │   ├── mapi.js               # MAPI-Property-Extraktion
+│   │   └── extract.js            # Email-Daten-Extraktion
+│   │
+│   ├── threads/                  # Thread-Verarbeitung
+│   │   ├── grouping.js           # Konversations-Gruppierung
+│   │   ├── depth.js              # Thread-Tiefenberechnung
+│   │   └── matching.js           # Reply-Matching
+│   │
+│   ├── export/                   # Export-Funktionalität
+│   │   ├── core.js               # Export-Hauptlogik
+│   │   ├── sent-cache.js         # Gesendete-Items-Cache
+│   │   └── file-save.js          # JSON-Speicherung
+│   │
+│   └── import/                   # Import-Funktionalität
+│       ├── core.js               # Import-Hauptlogik
+│       ├── excel-connect.js      # Excel-Verbindung
+│       └── excel-write.js        # Excel-Schreibfunktionen
+│
+└── Export-OutlookEmails.ps1      # PowerShell Export-Script
+```
+
+## Versionen
+
+### Web-Version (Cloudflare Pages)
 
 **`index.html`** - Moderne Web-App mit Dark Mode Design
 
@@ -12,145 +60,144 @@ Tool zur Uberprufung und Kategorisierung von Hypercare-Emails fur das Barmenia/G
 - Funktioniert in jedem Browser
 - Kann auf Cloudflare Pages gehostet werden
 - JSON-Import per Drag & Drop
-- Fortschrittsanzeigen bei allen Operationen
-- CSV-Export
-
-**Deployment auf Cloudflare Pages:**
-1. Repository mit GitHub verbinden
-2. Build command: (leer lassen - statische Site)
-3. Build output directory: `/` oder `.`
-4. Fertig! Die App ist unter deiner Cloudflare-URL erreichbar
-
-**Live Demo:** Lade einfach `index.html` im Browser
-
----
+- CSV-Export für bearbeitete Emails
 
 ### HTA-Version (Windows-Desktop)
 
-**`bgav-hypercare-standalone.hta`** - Fur Windows mit direktem Outlook-Zugriff
+Zwei Varianten verfügbar:
 
-- Direkter Outlook-Zugriff - Keine Scripts, keine Exports
-- Direkter Excel-Export - Offnet sich automatisch in Excel
-- Komplett offline - Keine Internetverbindung notig
+#### 1. Modulare Version (Empfohlen)
+**`outlook-export-modular.hta`** - Neue Version mit modularem Code
 
-**Quick Start:**
-1. Doppelklick auf `bgav-hypercare-standalone.hta`
-2. "Emails laden" klicken
-3. Postfach auswahlen
-4. Review & Kategorisierung
-5. "Excel Export" klicken
+- Lädt JavaScript-Module zur Laufzeit
+- Bessere Wartbarkeit und Übersichtlichkeit
+- Einfacher zu debuggen
+- Benötigt alle Dateien im `js/` Ordner
 
----
+#### 2. Monolithische Version (Legacy)
+**`outlook-export.hta`** - Alles in einer Datei (~4800 Zeilen)
 
-### HTML-Version (Legacy)
+- Einzelne Datei, keine Abhängigkeiten
+- Einfacher zu verteilen
+- Schwerer zu warten
 
-**`bgav-hypercare-email-review.html`** - Altere Version
+### Features beider HTA-Versionen
 
-- Fur Mac, Linux, Windows
-- Benotigt JSON-Export aus Outlook
+- **Direkter Outlook-Zugriff** - Liest Emails direkt aus Outlook
+- **Excel-Duplikaterkennung** - Prüft bestehende Einträge
+- **Thread-Erkennung** - Gruppiert Konversationen automatisch
+- **Antwort-Matching** - Findet zugehörige gesendete Emails
+- **Auto-Erledigt** - Markiert gelöste Vorgänge automatisch
 
----
+## Workflow
 
-## Features v3.0
+1. **Excel verbinden** - Tracking_Hypercare.xlsm öffnen und verbinden
+2. **Postfach auswählen** - Mailbox und Ordner wählen
+3. **Emails exportieren** - JSON-Datei wird erstellt
+4. **Web-App** - Emails kategorisieren und bearbeiten
+5. **Excel Import** - Bearbeitete Daten importieren
 
-### Provisionsreklamation b24 Template
-- **Automatische Erkennung**: Betreff "Provisionsreklamation b24" oder Emails von redaktion@barmenia.de
-- **Parser fur strukturierte Daten**: Extrahiert alle Felder wie:
-  - `vermittlernummer_vermittler`, `vorname_vermittler`, `nachname_vermittler`
-  - `versicherungsnummer_kunde`, `vorname_kunde`, `nachname_kunde`
-  - `reklamation_provision`, `reklamation_absatz`, `datenschutz`, `nachricht`
+## Module-Dokumentation
 
-### Mehrfachkategorisierung
-- Emails konnen **mehrere Cluster** gleichzeitig haben (z.B. KV + KFZ)
-- **Klickbare Tags** zum An-/Abwahlen der Cluster
-- Filter funktioniert mit Mehrfachauswahl
+### js/utils/ - Utilities
 
-### Outlook-ahnliches Design
-- Email-Ansicht wie in Outlook
-- Header mit Von / Datum / Betreff
-- Anhange-Leiste mit Datei-Icons
+| Modul | Funktionen |
+|-------|-----------|
+| `json-polyfill.js` | `JSON.stringify()`, `JSON.parse()` für IE |
+| `date-utils.js` | `formatDate()`, `formatDateKey()`, `extractOldestDateFromQuotes()`, `extractDateFromHtmlHeader()` |
+| `text-utils.js` | `sanitizeText()`, `fixEncoding()`, `normalizeSubject()`, `removeEmailQuotes()`, `htmlToPlainText()` |
+| `html-parser.js` | `extractNewContentFromHtml()` - Entfernt zitierte Texte aus HTML |
 
-### Email-Thread Baumansicht
-- Original-Email oben angezeigt
-- Antworten darunter als eingeruckte Zweige
-- Auf-/Zuklappbar per Klick
+### js/outlook/ - Outlook-Integration
 
-### Moderne UI
-- Dark Mode mit Glow-Effekten
-- Smooth Animationen uberall
-- Fortschrittsanzeigen bei allen Operationen
-- Skeleton Loading States
+| Modul | Funktionen |
+|-------|-----------|
+| `init.js` | `initOutlook()`, `loadMailboxes()`, `loadFolders()` |
+| `mapi.js` | `getEmailHeaders()` - Extrahiert Message-ID, In-Reply-To, References |
+| `extract.js` | `extractEmail()`, `extractEmailUnified()` |
 
----
+### js/threads/ - Thread-Verarbeitung
 
-## Outlook-Integration
+| Modul | Funktionen |
+|-------|-----------|
+| `grouping.js` | `groupByConversation()`, `removeDuplicateEmails()`, `assignParentRelationships()` |
+| `depth.js` | `calculateThreadDepthsUnified()`, `assignThreadPositionsUnified()`, `processConversationUnified()` |
+| `matching.js` | `findRepliesMultiLayer()`, `filterNewReplies()`, `createReplyObject()` |
 
-### PowerShell-Script (empfohlen)
+### js/export/ - Export
 
-```powershell
-# Ausfuhren in PowerShell
-.\Export-OutlookEmails.ps1
-```
+| Modul | Funktionen |
+|-------|-----------|
+| `core.js` | `startExport()`, `doExport()`, `processEmailBatch()`, `finishExport()` |
+| `sent-cache.js` | `cacheSentItems()`, `processSentBatch()` |
+| `file-save.js` | `saveExportFile()`, `openWebApp()`, `openDownloads()` |
 
-Das Script:
-1. Verbindet sich mit Outlook
-2. Exportiert ausgewahlte Emails oder einen ganzen Ordner
-3. Speichert als JSON-Datei
+### js/import/ - Import
 
-### JSON-Format
+| Modul | Funktionen |
+|-------|-----------|
+| `core.js` | `startImport()`, `doImport()`, `loadJsonFile()` |
+| `excel-connect.js` | `detectExcelForExport()`, `detectExcel()`, `checkImportReady()` |
+| `excel-write.js` | `writeEmailRow()`, `formatReplies()`, `boldTimestamps()` |
+
+## JSON-Format
 
 ```json
 [
   {
-    "datum": "2025-11-14T10:30:00",
-    "von_email": "max.mueller@agentur.de",
-    "von_name": "Max Muller",
-    "betreff": "Provisionsreklamation b24",
-    "text": "reklamation_provision : true\nvermittlernummer_vermittler : 00400288\n...",
-    "anhaenge": ["dokument.pdf"]
+    "emailId": "EntryID",
+    "conversationId": "ConversationID",
+    "internetMessageId": "<message-id@domain>",
+    "datum": "2025-12-09T14:16:36",
+    "conversationStartDate": "2025-12-09T14:16:36",
+    "lastActivityDate": "2025-12-11T10:30:00",
+    "von_email": "max.mueller@example.de",
+    "von_name": "Max Müller",
+    "betreff": "Anfrage zur Provisionsabrechnung",
+    "text": "Nur der neue Inhalt (ohne Zitate)",
+    "threadPosition": 1,
+    "threadDepth": 0,
+    "isThreadRoot": true,
+    "messageCount": 5,
+    "antworten": [
+      {
+        "datum": "2025-12-09T15:30:00",
+        "von": "Support Team",
+        "text": "Antwort-Text",
+        "threadPosition": 2,
+        "threadDepth": 1,
+        "isIncoming": false,
+        "replyId": "EntryID"
+      }
+    ]
   }
 ]
 ```
 
----
-
 ## Cloudflare Pages Deployment
 
-### Option 1: Via GitHub
+### Via GitHub
 
 1. Repository zu GitHub pushen
 2. Cloudflare Dashboard > Pages > Create a project
-3. "Connect to Git" > Repository auswahlen
+3. "Connect to Git" > Repository auswählen
 4. Settings:
    - Build command: (leer)
    - Build output directory: `/`
 5. Deploy!
 
-### Option 2: Direct Upload
+### Direct Upload
 
 1. Cloudflare Dashboard > Pages > Create a project
-2. "Upload assets" auswahlen
+2. "Upload assets" auswählen
 3. `index.html` hochladen
 4. Deploy!
 
----
-
-## Dateien-Ubersicht
-
-| Datei | Beschreibung |
-|-------|-------------|
-| `index.html` | **Moderne Web-App** - Fur Cloudflare Pages |
-| `bgav-hypercare-standalone.hta` | Windows HTA mit Outlook-Integration |
-| `bgav-hypercare-email-review.html` | Legacy HTML-Version |
-| `Export-OutlookEmails.ps1` | PowerShell Export-Script |
-| `beispiel-emails.json` | Test-Daten |
-
----
-
 ## Datenschutz
 
-Alle Daten bleiben lokal im Browser. Es werden keine Daten an externe Server ubertragen.
+Alle Daten bleiben lokal. Es werden keine Daten an externe Server übertragen.
+Die Web-App läuft komplett im Browser.
 
 ## Lizenz
 
-Internes Tool fur Barmenia/Gothaer BGAV Hypercare Projekt.
+Internes Tool für Barmenia/Gothaer BGAV Hypercare Projekt.
