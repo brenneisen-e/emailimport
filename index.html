@@ -999,11 +999,6 @@
             border-bottom-color: #22c55e;
         }
 
-        .keyword-highlight[data-cluster="KFZ"] {
-            background: linear-gradient(120deg, #bfdbfe 0%, #93c5fd 100%);
-            border-bottom-color: #3b82f6;
-        }
-
         .keyword-highlight[data-cluster="SHUK"] {
             background: linear-gradient(120deg, #fed7aa 0%, #fdba74 100%);
             border-bottom-color: #f97316;
@@ -1017,11 +1012,6 @@
         .keyword-highlight[data-cluster="Provisionierung"] {
             background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
             border-bottom-color: #eab308;
-        }
-
-        .keyword-highlight[data-cluster="Produktzuordnung"] {
-            background: linear-gradient(120deg, #fbcfe8 0%, #f9a8d4 100%);
-            border-bottom-color: #ec4899;
         }
 
         /* Schlagwortverzeichnis Tab */
@@ -1284,7 +1274,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 24px; color: #666; font-size: 12px;">
-                Version 1.1.0
+                Version 1.1.1
             </div>
         </div>
     </div>
@@ -1419,9 +1409,11 @@
                                     <option value="Kim">Kim</option>
                                     <option value="Kristin">Kristin</option>
                                     <option value="Loredana">Loredana</option>
-                                    <option value="Magdalena">Magdalena</option>
                                     <option value="Maren">Maren</option>
                                     <option value="Meike">Meike</option>
+                                    <option value="Sarina">Sarina</option>
+                                    <option value="Susanne">Susanne</option>
+                                    <option value="Ulrika">Ulrika</option>
                                 </select>
                             </div>
 
@@ -1517,27 +1509,8 @@
 
                 <div class="keyword-category">
                     <div class="keyword-category-header">
-                        <span class="keyword-category-color" style="background: #3b82f6;"></span>
-                        KFZ (Kraftfahrzeug)
-                    </div>
-                    <div class="keyword-list">
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">kfz</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">auto</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">fahrzeug</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">kasko</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">vollkasko</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">teilkasko</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">pkw</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">kennzeichen</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">motorrad</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="KFZ">anhänger</span>
-                    </div>
-                </div>
-
-                <div class="keyword-category">
-                    <div class="keyword-category-header">
                         <span class="keyword-category-color" style="background: #f97316;"></span>
-                        SHUK (Sach/Haftpflicht/Unfall/Komposit)
+                        SHUK (Sach/Haftpflicht/Unfall/KFZ/Komposit)
                     </div>
                     <div class="keyword-list">
                         <span class="keyword-item keyword-highlight" data-cluster="SHUK">shuk</span>
@@ -1553,6 +1526,12 @@
                         <span class="keyword-item keyword-highlight" data-cluster="SHUK">pferd</span>
                         <span class="keyword-item keyword-highlight" data-cluster="SHUK">gewässer</span>
                         <span class="keyword-item keyword-highlight" data-cluster="SHUK">photovoltaik</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">kfz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">auto</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">fahrzeug</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">kasko</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">pkw</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">motorrad</span>
                     </div>
                 </div>
 
@@ -1594,20 +1573,6 @@
                     </div>
                 </div>
 
-                <div class="keyword-category">
-                    <div class="keyword-category-header">
-                        <span class="keyword-category-color" style="background: #ec4899;"></span>
-                        Produktzuordnung
-                    </div>
-                    <div class="keyword-list">
-                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">zuordnung</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">produkt</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">tarif</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">umstellung</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">migration</span>
-                        <span class="keyword-item keyword-highlight" data-cluster="Produktzuordnung">tarifwechsel</span>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -1625,16 +1590,14 @@
         let nextId = 1;
         let currentStep = 1;  // 1: Auswählen, 2: Kategorisieren, 3: Speichern
 
-        const allClusters = ['KV', 'KFZ', 'SHUK', 'LV', 'Provisionierung', 'Produktzuordnung', 'Bestand', 'Absatzeinheiten', 'Allgemein'];
+        const allClusters = ['KV', 'SHUK', 'LV', 'Provisionierung', 'Bestand', 'Absatzeinheiten'];
 
         // Schlagwort-Cluster-Mapping für Highlighting
         const keywordClusterMap = {
             'KV': ['kv', 'kranken', 'gesundheit', 'pflege', 'auslandsreise', 'reisekranken', 'bkk', 'zahnzusatz', 'krankenzusatz', 'ambulant', 'stationär', 'krankentagegeld'],
-            'KFZ': ['kfz', 'auto', 'fahrzeug', 'kasko', 'vollkasko', 'teilkasko', 'pkw', 'kennzeichen', 'motorrad', 'anhänger'],
-            'SHUK': ['shuk', 'sach', 'haft', 'unfall', 'hausrat', 'wohngebäude', 'gebäude', 'rechtsschutz', 'tierhalter', 'hund', 'pferd', 'gewässer', 'photovoltaik'],
+            'SHUK': ['shuk', 'sach', 'haft', 'unfall', 'hausrat', 'wohngebäude', 'gebäude', 'rechtsschutz', 'tierhalter', 'hund', 'pferd', 'gewässer', 'photovoltaik', 'kfz', 'auto', 'fahrzeug', 'kasko', 'vollkasko', 'teilkasko', 'pkw', 'kennzeichen', 'motorrad', 'anhänger'],
             'LV': ['lv', 'leben', 'rente', 'vorsorge', 'altersvorsorge', 'riester', 'rürup', 'bav', 'betrieblich', 'sterbegeld', 'berufsunfähigkeit', 'bu'],
             'Provisionierung': ['provision', 'vergütung', 'courtage', 'abrechnung', 'storno', 'dynamisierung', 'bestandspflege'],
-            'Produktzuordnung': ['produkt', 'tarif', 'angebot', 'deckung', 'zuordnung', 'umstellung', 'migration', 'tarifwechsel'],
             'Bestand': ['bestand', 'bestandskunde', 'bestandsvertrag', 'bestandsdaten'],
             'Absatzeinheiten': ['ae', 'absatzeinheit', 'absatzeinheiten']
         };
@@ -2767,22 +2730,18 @@
 
             // KV - Krankenversicherung (präzise Wortgrenzen)
             if (combined.match(/\bkv\b|\bkrankenversicherung\b|\bkrankenkasse\b|\bgesundheit\b|\bpflegeversicherung\b|\bauslandsreise\b|\breisekranken\b|\bbkk\b|\bzahnzusatz\b|\bkrankenzusatz\b|\bambulant\b|\bstationär\b|\bkrankentagegeld\b/)) clusters.push('KV');
-            // KFZ - Kraftfahrzeug (präzise Wortgrenzen)
-            if (combined.match(/\bkfz\b|\bkraftfahrzeug\b|\bfahrzeugversicherung\b|\bkasko\b|\bvollkasko\b|\bteilkasko\b|\bpkw\b|\bkennzeichen\b|\bmotorrad\b|\banhängerversicherung\b/)) clusters.push('KFZ');
-            // SHUK - Sach/Haftpflicht/Unfall/Komposit (präzise Wortgrenzen)
-            if (combined.match(/\bshuk\b|\bsachversicherung\b|\bhaftpflicht\b|\bunfallversicherung\b|\bhausrat\b|\bwohngebäude\b|\brechtsschutz\b|\btierhalter\b|\bgewässerschaden\b|\bphotovoltaik\b/)) clusters.push('SHUK');
+            // SHUK - Sach/Haftpflicht/Unfall/KFZ/Komposit (präzise Wortgrenzen)
+            if (combined.match(/\bshuk\b|\bsachversicherung\b|\bhaftpflicht\b|\bunfallversicherung\b|\bhausrat\b|\bwohngebäude\b|\brechtsschutz\b|\btierhalter\b|\bgewässerschaden\b|\bphotovoltaik\b|\bkfz\b|\bkraftfahrzeug\b|\bfahrzeugversicherung\b|\bkasko\b|\bvollkasko\b|\bteilkasko\b|\bpkw\b|\bkennzeichen\b|\bmotorrad\b|\banhängerversicherung\b/)) clusters.push('SHUK');
             // LV - Lebensversicherung (präzise Wortgrenzen)
             if (combined.match(/\blv\b|\blebensversicherung\b|\brentenversicherung\b|\baltersvorsorge\b|\briester\b|\brürup\b|\bbav\b|\bsterbegeld\b|\bberufsunfähigkeit\b|\bbu-versicherung\b/)) clusters.push('LV');
             // Provisionierung (präzise Wortgrenzen)
             if (combined.match(/\bprovision\b|\bprovisionsreklamation\b|\bvergütung\b|\bcourtage\b|\bstorno\b|\bdynamisierung\b|\bbestandspflege\b/)) clusters.push('Provisionierung');
-            // Produktzuordnung (präzise Wortgrenzen)
-            if (combined.match(/\bproduktzuordnung\b|\btarifwechsel\b|\bmigration\b|\bumstellung\b/)) clusters.push('Produktzuordnung');
             // Bestand (präzise Wortgrenzen)
             if (combined.match(/\bbestand\b|\bbestandskunde\b|\bbestandsvertrag\b|\bbestandsdaten\b/)) clusters.push('Bestand');
             // Absatzeinheiten (AE)
             if (combined.match(/\bae\b|\babsatzeinheit\b|\babsatzeinheiten\b/)) clusters.push('Absatzeinheiten');
 
-            return clusters.length > 0 ? clusters : ['Allgemein'];
+            return clusters;
         }
 
         function isProvisionEmail(subject, text, fromEmail) {
@@ -3317,11 +3276,8 @@
             const idx = email.clusters.indexOf(cluster);
             if (idx > -1) {
                 email.clusters.splice(idx, 1);
-                if (email.clusters.length === 0) email.clusters.push('Allgemein');
             } else {
                 email.clusters.push(cluster);
-                const allgIdx = email.clusters.indexOf('Allgemein');
-                if (allgIdx > -1 && email.clusters.length > 1) email.clusters.splice(allgIdx, 1);
             }
 
             updateClusterTags(email);

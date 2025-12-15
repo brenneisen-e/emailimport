@@ -357,12 +357,9 @@ function convertToLegacyFormat(conversations) {
 
         if (!rootMsg) continue;
 
-        // Skip conversations that only have sent replies (no inbox root)
-        // BUT keep if the sent message is depth 0 (we started the conversation)
-        // These are replies to old inquiries outside the export date range
-        if (!hasInboxRoot && rootMsg.folder === 'sent' && rootMsg.depth > 0) {
-            continue;
-        }
+        // Check if this is a sent-only conversation (no inbox root)
+        // These should only be used to add replies to EXISTING cases, not create new ones
+        var sentOnlyConversation = !hasInboxRoot;
 
         // Normal processing: Build legacy email object
         var legacyEmail = {
@@ -375,6 +372,7 @@ function convertToLegacyFormat(conversations) {
             text: removeEmailQuotes(rootMsg.body || ''),
             anhaenge: rootMsg.anhaenge || [],
             kategorie: rootMsg.kategorie || '',
+            sentOnly: sentOnlyConversation,  // Flag for import to handle
             antworten: []
         };
 
