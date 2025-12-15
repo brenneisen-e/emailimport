@@ -357,9 +357,10 @@ function convertToLegacyFormat(conversations) {
 
         if (!rootMsg) continue;
 
-        // Skip conversations that only have sent items (no inbox root)
+        // Skip conversations that only have sent replies (no inbox root)
+        // BUT keep if the sent message is depth 0 (we started the conversation)
         // These are replies to old inquiries outside the export date range
-        if (!hasInboxRoot && rootMsg.folder === 'sent') {
+        if (!hasInboxRoot && rootMsg.folder === 'sent' && rootMsg.depth > 0) {
             continue;
         }
 
