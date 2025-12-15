@@ -2,201 +2,452 @@
 
 Tool zur Überprüfung und Kategorisierung von Hypercare-Emails für das Barmenia/Gothaer-Projekt.
 
+**Version 1.1.1**
+
+---
+
+## Übersicht
+
+Das Tool besteht aus zwei Komponenten:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           WORKFLOW ÜBERSICHT                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+  │   OUTLOOK    │         │   WEB-APP    │         │    EXCEL     │
+  │   Postfach   │         │   Browser    │         │   Tracking   │
+  └──────┬───────┘         └──────┬───────┘         └──────┬───────┘
+         │                        │                        │
+         │  1. HTA Export Tool    │                        │
+         │  ─────────────────►    │                        │
+         │     JSON-Datei         │                        │
+         │                        │                        │
+         │                        │  2. Kategorisieren     │
+         │                        │  ◄────────────────►    │
+         │                        │     Bearbeiten         │
+         │                        │                        │
+         │                        │  3. HTA Import         │
+         │                        │  ─────────────────►    │
+         │                        │     Excel Update       │
+         │                        │                        │
+         └────────────────────────┴────────────────────────┘
+```
+
+---
+
+## Teil 1: Email-Export (HTA Tool)
+
+### Was ist das HTA Tool?
+
+Das **HTA (HTML Application)** ist ein Windows-Desktop-Tool, das direkt auf Outlook zugreift und Emails exportiert. Es läuft nur auf Windows mit installiertem Outlook.
+
+### Download
+
+Die Datei `Email-Export-Tool.zip` enthält:
+```
+Email-Export-Tool/
+├── outlook-export-modular.hta    # Hauptdatei (Doppelklick zum Starten)
+├── js/                           # JavaScript-Module
+└── css/                          # Stylesheets
+```
+
+### Funktionsweise Export
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         HTA EXPORT PROZESS                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  SCHRITT 1: Excel verbinden
+  ┌────────────────────────────────────────────┐
+  │ • Tracking_Hypercare.xlsm muss offen sein  │
+  │ • Tool erkennt automatisch die Datei       │
+  │ • Liest existierende Vorgänge aus Excel    │
+  │   (zur Duplikat-Erkennung)                 │
+  └────────────────────────────────────────────┘
+                      ↓
+  SCHRITT 2: Outlook Postfach wählen
+  ┌────────────────────────────────────────────┐
+  │ • Postfach auswählen (z.B. Hypercare)      │
+  │ • Ordner wählen (Inbox)                    │
+  │ • Zeitraum festlegen (z.B. 30 Tage)        │
+  └────────────────────────────────────────────┘
+                      ↓
+  SCHRITT 3: Export durchführen
+  ┌────────────────────────────────────────────┐
+  │ Phase 1: Inbox-Emails lesen                │
+  │ Phase 2: Sent-Items lesen                  │
+  │ Phase 3: Konversationen gruppieren         │
+  │ Phase 4: JSON-Datei speichern              │
+  └────────────────────────────────────────────┘
+                      ↓
+  ERGEBNIS: hypercare_conversations_2025-12-15.json
+```
+
+### Konversations-Gruppierung
+
+Das Tool gruppiert Emails automatisch nach **ConversationID** (Outlook-intern):
+
+```
+Beispiel: Konversation über Provisionsreklamation
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ConversationID: AAA-BBB-CCC                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  01.12. 10:00  [INBOX]  Kunde → Uns     "Provisionsreklamation..."          │
+│       │        depth=0  ← ANFRAGE (Root)                                    │
+│       │                                                                      │
+│       └─► 01.12. 14:00  [SENT]  Wir → Kunde  "Danke für Ihre Anfrage..."   │
+│                 depth=1  ← ANTWORT                                          │
+│                    │                                                         │
+│                    └─► 02.12. 09:00  [INBOX]  Kunde → Uns  "Rückfrage..."  │
+│                              depth=2  ← ANTWORT                             │
+│                                 │                                            │
+│                                 └─► 02.12. 11:00  [SENT]  "Erledigt..."    │
+│                                           depth=3  ← ANTWORT                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+JSON-Ausgabe:
+{
+  "conversationID": "AAA-BBB-CCC",
+  "messages": [
+    { "folder": "inbox", "depth": 0, "subject": "Provisionsreklamation..." },
+    { "folder": "sent",  "depth": 1, "subject": "AW: Provisionsreklamation..." },
+    { "folder": "inbox", "depth": 2, "subject": "AW: AW: Provisionsreklamation..." },
+    { "folder": "sent",  "depth": 3, "subject": "AW: AW: AW: Provisionsreklamation..." }
+  ]
+}
+```
+
+### Sent-Only Konversationen
+
+Manchmal liegt die ursprüngliche Anfrage außerhalb des Export-Zeitraums:
+
+```
+Szenario: Export der letzten 7 Tage, aber Anfrage ist 30 Tage alt
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ConversationID: XYZ-123                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  15.11. 10:00  [INBOX]  Kunde → Uns     "Anfrage..."                        │
+│       │        ↑ AUSSERHALB DES EXPORT-ZEITRAUMS (nicht im JSON!)           │
+│       │                                                                      │
+│       └─► 10.12. 14:00  [SENT]  Wir → Kunde  "Antwort..."                  │
+│                 depth=1  ← Nur diese Nachricht im Export                    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+→ Diese Konversation wird als "sentOnly: true" markiert
+→ Beim Import: Nur zu EXISTIERENDEN Fällen hinzufügen, keine neue Anfrage erstellen
+```
+
+---
+
+## Teil 2: Web-App (Kategorisierung)
+
+### Was ist die Web-App?
+
+Die **Web-App** (`index.html`) ist ein Browser-Tool zum Anzeigen, Kategorisieren und Bearbeiten der exportierten Emails.
+
+### Zugang
+
+- **Online**: https://emailimport.pages.dev (oder eigene Cloudflare Pages URL)
+- **Lokal**: `index.html` direkt im Browser öffnen
+
+### Funktionen
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         WEB-APP FUNKTIONEN                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  1. JSON LADEN
+  ┌────────────────────────────────────────────┐
+  │ • Drag & Drop der JSON-Datei               │
+  │ • Oder Datei-Auswahl per Button            │
+  │ • Automatische Cluster-Erkennung           │
+  └────────────────────────────────────────────┘
+
+  2. EMAILS DURCHSEHEN
+  ┌────────────────────────────────────────────┐
+  │ • Liste aller Vorgänge links               │
+  │ • Detail-Ansicht rechts                    │
+  │ • Anfrage + alle Antworten sichtbar        │
+  │ • Schlagwort-Highlighting                  │
+  └────────────────────────────────────────────┘
+
+  3. KATEGORISIEREN
+  ┌────────────────────────────────────────────┐
+  │ Cluster:                                   │
+  │ • KV (Krankenversicherung)                 │
+  │ • SHUK (Sach/Haftpflicht/Unfall/KFZ)      │
+  │ • LV (Lebensversicherung)                  │
+  │ • Provisionierung                          │
+  │ • Bestand                                  │
+  │ • Absatzeinheiten                          │
+  │                                            │
+  │ Status: Neu / In Bearbeitung / Erledigt    │
+  │ Bearbeiter: Dropdown-Auswahl               │
+  └────────────────────────────────────────────┘
+
+  4. EXPORTIEREN
+  ┌────────────────────────────────────────────┐
+  │ • Bearbeitete JSON speichern               │
+  │ • Nur ausgewählte Emails exportieren       │
+  └────────────────────────────────────────────┘
+```
+
+### Schlagwort-Erkennung
+
+Die Web-App erkennt automatisch Cluster anhand von Schlagwörtern:
+
+| Cluster | Erkannte Begriffe |
+|---------|-------------------|
+| **KV** | kv, kranken, pflege, zahnzusatz, ambulant, stationär... |
+| **SHUK** | shuk, haftpflicht, hausrat, kfz, kasko, unfall, rechtsschutz... |
+| **LV** | lv, leben, rente, riester, rürup, berufsunfähigkeit... |
+| **Provisionierung** | provision, courtage, storno, vergütung... |
+| **Bestand** | bestand, bestandskunde, bestandsvertrag... |
+| **Absatzeinheiten** | ae, absatzeinheit... |
+
+---
+
+## Teil 3: Excel-Import (HTA Tool)
+
+### Funktionsweise Import
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         HTA IMPORT PROZESS                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  SCHRITT 1: Excel verbinden
+  ┌────────────────────────────────────────────┐
+  │ • Tracking_Hypercare.xlsm muss offen sein  │
+  │ • Blatt "Uebersicht" wird verwendet        │
+  └────────────────────────────────────────────┘
+                      ↓
+  SCHRITT 2: JSON laden
+  ┌────────────────────────────────────────────┐
+  │ • JSON-Datei auswählen                     │
+  │ • Konversationen werden geladen            │
+  └────────────────────────────────────────────┘
+                      ↓
+  SCHRITT 3: Import durchführen
+  ┌────────────────────────────────────────────┐
+  │ Für jede Konversation:                     │
+  │                                            │
+  │ 1. Suche in Excel nach ConversationID      │
+  │    oder Datum+Betreff                      │
+  │                                            │
+  │ 2a. GEFUNDEN:                              │
+  │     → Prüfe auf neue Antworten (ReplyID)   │
+  │     → Füge nur NEUE Antworten hinzu        │
+  │                                            │
+  │ 2b. NICHT GEFUNDEN:                        │
+  │     → sentOnly=true? → Überspringen        │
+  │     → sonst: Neue Zeile anlegen            │
+  └────────────────────────────────────────────┘
+```
+
+### Duplikat-Erkennung (ReplyID)
+
+Jede Antwort hat eine eindeutige **ReplyID** (= Outlook EntryID):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ BEISPIEL: Zweiter Import der gleichen Konversation                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  EXCEL (nach erstem Import):
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ Zeile 5:                                                                  │
+  │ Spalte 14 (Antworten): "=== 02.12. [Von: Ich] === Antwort 1..."          │
+  │ Spalte 24 (ReplyIDs):  "AAA111,BBB222"                                   │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  JSON (neuer Export):
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ Konversation mit 3 Antworten:                                            │
+  │ • Antwort 1: replyId="AAA111"  → bereits in Excel ✗                      │
+  │ • Antwort 2: replyId="BBB222"  → bereits in Excel ✗                      │
+  │ • Antwort 3: replyId="CCC333"  → NEU! ✓                                  │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  ERGEBNIS:
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │ Zeile 5 (aktualisiert):                                                  │
+  │ Spalte 14: "=== 05.12. [Von: Ich] === Antwort 3..." + alte Antworten    │
+  │ Spalte 24: "AAA111,BBB222,CCC333"                                        │
+  └──────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Typischer Arbeitsablauf
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      TÄGLICHER WORKFLOW                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  MORGENS:
+  ────────
+  1. Excel öffnen (Tracking_Hypercare.xlsm)
+  2. HTA Tool starten (outlook-export-modular.hta)
+  3. Export durchführen (letzte 7 Tage)
+     → JSON wird in Downloads gespeichert
+
+  BEARBEITUNG:
+  ────────────
+  4. Web-App öffnen (emailimport.pages.dev)
+  5. JSON per Drag & Drop laden
+  6. Neue Vorgänge durchsehen und kategorisieren:
+     • Cluster zuweisen
+     • Status setzen
+     • Bearbeiter zuweisen
+     • Kommentare hinzufügen
+  7. Bearbeitete JSON speichern
+
+  ABENDS:
+  ───────
+  8. HTA Tool → Import-Tab
+  9. Bearbeitete JSON laden
+  10. Import durchführen
+      → Excel wird aktualisiert
+
+  ┌────────────────────────────────────────────┐
+  │ Ergebnis:                                  │
+  │ • X neue Vorgänge importiert              │
+  │ • Y Antworten aktualisiert                │
+  │ • Z Duplikate übersprungen                │
+  └────────────────────────────────────────────┘
+```
+
+---
+
 ## Projektstruktur
 
 ```
 emailimport/
-├── index.html                    # Web-App für Cloudflare Pages
-├── outlook-export.hta            # Monolithische HTA (Legacy)
-├── outlook-export-modular.hta    # Modulare HTA (Neu)
+├── index.html                    # Web-App (Cloudflare Pages)
+├── outlook-export-modular.hta    # HTA Export/Import Tool
+├── Email-Export-Tool.zip         # Download-Paket für HTA
 │
 ├── css/
-│   └── main.css                  # Haupt-Stylesheet
+│   └── main.css                  # Stylesheet für HTA
 │
 ├── js/
-│   ├── config.js                 # Globale Konfiguration und State
+│   ├── config.js                 # Globale Konfiguration
 │   │
-│   ├── utils/                    # Utility-Funktionen
+│   ├── utils/                    # Hilfsfunktionen
 │   │   ├── json-polyfill.js      # JSON für IE/HTA
-│   │   ├── date-utils.js         # Datumsformatierung und -parsing
-│   │   ├── text-utils.js         # Text-Bereinigung und Encoding
-│   │   └── html-parser.js        # HTML-Extraktion für Emails
+│   │   ├── date-utils.js         # Datumsformatierung
+│   │   ├── text-utils.js         # Text-Bereinigung, Encoding
+│   │   └── html-parser.js        # HTML-Extraktion
 │   │
-│   ├── ui/                       # UI-Komponenten
-│   │   ├── step-indicator.js     # Workflow-Schrittanzeige
-│   │   ├── tabs.js               # Tab-Wechsel
-│   │   └── progress.js           # Fortschrittsanzeigen
+│   ├── outlook/                  # Outlook-Zugriff
+│   │   ├── init.js               # Initialisierung
+│   │   ├── mapi.js               # MAPI-Properties
+│   │   └── extract.js            # Email-Extraktion
 │   │
-│   ├── outlook/                  # Outlook-Integration
-│   │   ├── init.js               # Outlook-Initialisierung
-│   │   ├── mapi.js               # MAPI-Property-Extraktion
-│   │   └── extract.js            # Email-Daten-Extraktion
+│   ├── conversation/             # Konversations-Logik
+│   │   ├── builder.js            # Konversations-Aufbau
+│   │   └── extractor.js          # ConversationIndex-Parsing
 │   │
-│   ├── threads/                  # Thread-Verarbeitung
-│   │   ├── grouping.js           # Konversations-Gruppierung
-│   │   ├── depth.js              # Thread-Tiefenberechnung
-│   │   └── matching.js           # Reply-Matching
-│   │
-│   ├── export/                   # Export-Funktionalität
+│   ├── export/                   # Export-Funktionen
 │   │   ├── core.js               # Export-Hauptlogik
-│   │   ├── sent-cache.js         # Gesendete-Items-Cache
-│   │   └── file-save.js          # JSON-Speicherung
+│   │   ├── sent-cache.js         # Sent-Items-Cache
+│   │   └── file-save.js          # Datei-Speicherung
 │   │
-│   └── import/                   # Import-Funktionalität
+│   └── import/                   # Import-Funktionen
 │       ├── core.js               # Import-Hauptlogik
 │       ├── excel-connect.js      # Excel-Verbindung
 │       └── excel-write.js        # Excel-Schreibfunktionen
 │
-└── Export-OutlookEmails.ps1      # PowerShell Export-Script
+└── README.md                     # Diese Datei
 ```
 
-## Versionen
-
-### Web-Version (Cloudflare Pages)
-
-**`index.html`** - Moderne Web-App mit Dark Mode Design
-
-- Modernes Dark-Mode UI mit Animationen
-- Funktioniert in jedem Browser
-- Kann auf Cloudflare Pages gehostet werden
-- JSON-Import per Drag & Drop
-- CSV-Export für bearbeitete Emails
-
-### HTA-Version (Windows-Desktop)
-
-Zwei Varianten verfügbar:
-
-#### 1. Modulare Version (Empfohlen)
-**`outlook-export-modular.hta`** - Neue Version mit modularem Code
-
-- Lädt JavaScript-Module zur Laufzeit
-- Bessere Wartbarkeit und Übersichtlichkeit
-- Einfacher zu debuggen
-- Benötigt alle Dateien im `js/` Ordner
-
-#### 2. Monolithische Version (Legacy)
-**`outlook-export.hta`** - Alles in einer Datei (~4800 Zeilen)
-
-- Einzelne Datei, keine Abhängigkeiten
-- Einfacher zu verteilen
-- Schwerer zu warten
-
-### Features beider HTA-Versionen
-
-- **Direkter Outlook-Zugriff** - Liest Emails direkt aus Outlook
-- **Excel-Duplikaterkennung** - Prüft bestehende Einträge
-- **Thread-Erkennung** - Gruppiert Konversationen automatisch
-- **Antwort-Matching** - Findet zugehörige gesendete Emails
-- **Auto-Erledigt** - Markiert gelöste Vorgänge automatisch
-
-## Workflow
-
-1. **Excel verbinden** - Tracking_Hypercare.xlsm öffnen und verbinden
-2. **Postfach auswählen** - Mailbox und Ordner wählen
-3. **Emails exportieren** - JSON-Datei wird erstellt
-4. **Web-App** - Emails kategorisieren und bearbeiten
-5. **Excel Import** - Bearbeitete Daten importieren
-
-## Module-Dokumentation
-
-### js/utils/ - Utilities
-
-| Modul | Funktionen |
-|-------|-----------|
-| `json-polyfill.js` | `JSON.stringify()`, `JSON.parse()` für IE |
-| `date-utils.js` | `formatDate()`, `formatDateKey()`, `extractOldestDateFromQuotes()`, `extractDateFromHtmlHeader()` |
-| `text-utils.js` | `sanitizeText()`, `fixEncoding()`, `normalizeSubject()`, `removeEmailQuotes()`, `htmlToPlainText()` |
-| `html-parser.js` | `extractNewContentFromHtml()` - Entfernt zitierte Texte aus HTML |
-
-### js/outlook/ - Outlook-Integration
-
-| Modul | Funktionen |
-|-------|-----------|
-| `init.js` | `initOutlook()`, `loadMailboxes()`, `loadFolders()` |
-| `mapi.js` | `getEmailHeaders()` - Extrahiert Message-ID, In-Reply-To, References |
-| `extract.js` | `extractEmail()`, `extractEmailUnified()` |
-
-### js/threads/ - Thread-Verarbeitung
-
-| Modul | Funktionen |
-|-------|-----------|
-| `grouping.js` | `groupByConversation()`, `removeDuplicateEmails()`, `assignParentRelationships()` |
-| `depth.js` | `calculateThreadDepthsUnified()`, `assignThreadPositionsUnified()`, `processConversationUnified()` |
-| `matching.js` | `findRepliesMultiLayer()`, `filterNewReplies()`, `createReplyObject()` |
-
-### js/export/ - Export
-
-| Modul | Funktionen |
-|-------|-----------|
-| `core.js` | `startExport()`, `doExport()`, `processEmailBatch()`, `finishExport()` |
-| `sent-cache.js` | `cacheSentItems()`, `processSentBatch()` |
-| `file-save.js` | `saveExportFile()`, `openWebApp()`, `openDownloads()` |
-
-### js/import/ - Import
-
-| Modul | Funktionen |
-|-------|-----------|
-| `core.js` | `startImport()`, `doImport()`, `loadJsonFile()` |
-| `excel-connect.js` | `detectExcelForExport()`, `detectExcel()`, `checkImportReady()` |
-| `excel-write.js` | `writeEmailRow()`, `formatReplies()`, `boldTimestamps()` |
+---
 
 ## JSON-Format
 
+### Konversations-Format (Export)
+
 ```json
-[
-  {
-    "emailId": "EntryID",
-    "conversationId": "ConversationID",
-    "internetMessageId": "<message-id@domain>",
-    "datum": "2025-12-09T14:16:36",
-    "conversationStartDate": "2025-12-09T14:16:36",
-    "lastActivityDate": "2025-12-11T10:30:00",
-    "von_email": "max.mueller@example.de",
-    "von_name": "Max Müller",
-    "betreff": "Anfrage zur Provisionsabrechnung",
-    "text": "Nur der neue Inhalt (ohne Zitate)",
-    "threadPosition": 1,
-    "threadDepth": 0,
-    "isThreadRoot": true,
-    "messageCount": 5,
-    "antworten": [
-      {
-        "datum": "2025-12-09T15:30:00",
-        "von": "Support Team",
-        "text": "Antwort-Text",
-        "threadPosition": 2,
-        "threadDepth": 1,
-        "isIncoming": false,
-        "replyId": "EntryID"
-      }
-    ]
+{
+  "exportDate": "2025-12-15T10:00:00.000Z",
+  "mailboxName": "Hypercare Postfach",
+  "totalEmails": 150,
+  "conversationCount": 45,
+  "conversations": {
+    "ConvID-123": {
+      "conversationID": "ConvID-123",
+      "subject": "Provisionsreklamation",
+      "messageCount": 3,
+      "firstMessageDate": "2025-12-10T08:00:00.000Z",
+      "lastMessageDate": "2025-12-12T14:30:00.000Z",
+      "messages": [
+        {
+          "entryID": "Email-ABC",
+          "folder": "inbox",
+          "depth": 0,
+          "subject": "Provisionsreklamation",
+          "senderEmail": "kunde@example.de",
+          "senderName": "Max Kunde",
+          "receivedTime": "2025-12-10T08:00:00.000Z",
+          "body": "Nachrichtentext..."
+        },
+        {
+          "entryID": "Email-DEF",
+          "folder": "sent",
+          "depth": 1,
+          "subject": "AW: Provisionsreklamation",
+          "sentOn": "2025-12-10T10:30:00.000Z",
+          "body": "Antwort..."
+        }
+      ]
+    }
   }
-]
+}
 ```
 
-## Cloudflare Pages Deployment
-
-### Via GitHub
-
-1. Repository zu GitHub pushen
-2. Cloudflare Dashboard > Pages > Create a project
-3. "Connect to Git" > Repository auswählen
-4. Settings:
-   - Build command: (leer)
-   - Build output directory: `/`
-5. Deploy!
-
-### Direct Upload
-
-1. Cloudflare Dashboard > Pages > Create a project
-2. "Upload assets" auswählen
-3. `index.html` hochladen
-4. Deploy!
+---
 
 ## Datenschutz
 
-Alle Daten bleiben lokal. Es werden keine Daten an externe Server übertragen.
-Die Web-App läuft komplett im Browser.
+- **Alle Daten bleiben lokal** - Keine Übertragung an externe Server
+- **Web-App läuft im Browser** - Kein Backend, keine Datenbank
+- **JSON-Dateien** - Werden nur lokal gespeichert (Downloads-Ordner)
+
+---
+
+## Fehlerbehebung
+
+### HTA startet nicht
+- Windows-Sicherheitswarnung bestätigen
+- Rechtsklick → "Eigenschaften" → "Zulassen" aktivieren
+
+### Outlook-Verbindung fehlgeschlagen
+- Outlook muss gestartet sein
+- Postfach muss eingerichtet sein
+- Als Administrator ausführen probieren
+
+### Excel wird nicht erkannt
+- Excel-Datei muss geöffnet sein
+- Dateiname muss "Tracking" oder "Hypercare" enthalten
+
+### Import-Fehler
+- Excel-Datei nicht schreibgeschützt?
+- Tabelle "Uebersicht" vorhanden?
+- JSON-Format korrekt?
+
+---
 
 ## Lizenz
 
