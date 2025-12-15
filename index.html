@@ -3,766 +3,1577 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ERGO Hypercare - Email Review</title>
+    <title>BGAV Hypercare - Email Review Tool</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --primary: #0078d4;
+            --primary-dark: #106ebe;
+            --primary-light: #deecf9;
+            --success: #107c10;
+            --success-light: #dff6dd;
+            --warning: #ffb900;
+            --warning-light: #fff4ce;
+            --danger: #d13438;
+            --danger-light: #fde7e9;
+            --purple: #8764b8;
+            --purple-light: #e8dff5;
+
+            --bg-primary: #ffffff;
+            --bg-secondary: #faf9f8;
+            --bg-tertiary: #f3f2f1;
+            --border-color: #e1dfdd;
+            --text-primary: #323130;
+            --text-secondary: #605e5c;
+            --text-muted: #a19f9d;
         }
 
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f7fa;
-            color: #333;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            min-height: 100vh;
             line-height: 1.5;
         }
 
         /* Header */
         .header {
-            background: #fff;
-            border-bottom: 1px solid #e0e4e8;
-            padding: 16px 24px;
+            background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .logo {
+        .header-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 0.75rem;
         }
 
-        .logo-icon {
+        .header-logo {
             width: 36px;
             height: 36px;
-            background: linear-gradient(135deg, #d4145a 0%, #ff6b6b 100%);
+            background: rgba(255,255,255,0.2);
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #fff;
-            font-weight: 700;
-            font-size: 14px;
         }
 
-        .logo h1 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1a1a2e;
-        }
+        .header-title { font-size: 1.125rem; font-weight: 600; }
+        .header-subtitle { font-size: 0.6875rem; opacity: 0.9; }
 
-        .logo span {
-            font-size: 12px;
-            color: #666;
-            font-weight: 400;
-        }
+        .header-actions { display: flex; gap: 0.5rem; align-items: center; }
 
-        .header-actions {
+        .header-stats {
             display: flex;
-            gap: 12px;
-            align-items: center;
+            gap: 1.5rem;
+            margin-right: 1rem;
         }
+
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.25rem; font-weight: 700; }
+        .stat-label { font-size: 0.625rem; opacity: 0.9; text-transform: uppercase; }
 
         /* Buttons */
         .btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
             font-weight: 500;
             cursor: pointer;
             border: none;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            transition: all 0.15s;
         }
 
         .btn-primary {
-            background: #d4145a;
-            color: #fff;
+            background: var(--primary);
+            color: white;
         }
 
-        .btn-primary:hover {
-            background: #b8114d;
-        }
-
-        .btn-secondary {
-            background: #fff;
-            color: #333;
-            border: 1px solid #ddd;
-        }
-
-        .btn-secondary:hover {
-            background: #f5f5f5;
-            border-color: #ccc;
-        }
+        .btn-primary:hover { background: var(--primary-dark); }
 
         .btn-success {
-            background: #10b981;
-            color: #fff;
+            background: var(--success);
+            color: white;
         }
 
-        .btn-success:hover {
-            background: #059669;
+        .btn-success:hover { background: #0b5a0b; }
+
+        .btn-white {
+            background: white;
+            color: var(--primary);
+            border: 1px solid rgba(255,255,255,0.3);
         }
 
-        /* Stats Bar */
-        .stats-bar {
-            background: #fff;
-            border-bottom: 1px solid #e0e4e8;
-            padding: 16px 24px;
-            display: flex;
-            gap: 32px;
+        .btn-white:hover { background: rgba(255,255,255,0.9); }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
         }
 
-        .stat-item {
-            display: flex;
-            flex-direction: column;
+        .btn-outline:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--primary);
+            color: var(--primary);
         }
 
-        .stat-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: #1a1a2e;
-        }
-
-        .stat-label {
-            font-size: 13px;
-            color: #666;
-        }
-
-        .stat-item.highlight .stat-value {
-            color: #d4145a;
-        }
-
-        /* Navigation Tabs */
-        .nav-tabs {
-            background: #fff;
-            border-bottom: 1px solid #e0e4e8;
-            padding: 0 24px;
-            display: flex;
-            gap: 0;
-        }
-
-        .nav-tab {
-            padding: 16px 24px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #666;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-        }
-
-        .nav-tab:hover {
-            color: #333;
-            background: #f9fafb;
-        }
-
-        .nav-tab.active {
-            color: #d4145a;
-            border-bottom-color: #d4145a;
-        }
-
-        /* Main Layout */
-        .main-container {
-            display: flex;
-            height: calc(100vh - 180px);
-        }
-
-        /* Sidebar - List */
-        .sidebar {
-            width: 380px;
-            background: #fff;
-            border-right: 1px solid #e0e4e8;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar-header {
-            padding: 16px;
-            border-bottom: 1px solid #e0e4e8;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .search-box {
-            flex: 1;
-            padding: 10px 14px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-        }
-
-        .search-box:focus {
-            border-color: #d4145a;
-            box-shadow: 0 0 0 3px rgba(212, 20, 90, 0.1);
-        }
-
-        .sidebar-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        /* Group Header */
-        .group-header {
-            padding: 12px 16px;
-            background: #f5f7fa;
-            border-bottom: 1px solid #e0e4e8;
-            font-weight: 600;
-            font-size: 13px;
-            color: #666;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            position: sticky;
-            top: 0;
-        }
-
-        .group-header:hover {
-            background: #eef1f5;
-        }
-
-        .group-count {
-            background: #e0e4e8;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 12px;
-        }
-
-        /* Email Item */
-        .email-item {
-            padding: 14px 16px;
-            border-bottom: 1px solid #f0f0f0;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        .email-item:hover {
-            background: #f9fafb;
-        }
-
-        .email-item.selected {
-            background: #fef2f5;
-            border-left: 3px solid #d4145a;
-        }
-
-        .email-item.unread {
-            background: #fffbeb;
-        }
-
-        .email-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 6px;
-        }
-
-        .email-sender {
-            font-weight: 600;
-            font-size: 14px;
-            color: #1a1a2e;
-        }
-
-        .email-date {
-            font-size: 12px;
-            color: #888;
-            white-space: nowrap;
-        }
-
-        .email-subject {
-            font-size: 13px;
-            color: #333;
-            margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .email-preview {
-            font-size: 12px;
-            color: #888;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .email-meta {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .email-tag {
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-weight: 500;
-        }
-
-        .tag-kunde {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .tag-replies {
-            background: #f0fdf4;
-            color: #166534;
-        }
-
-        .tag-status-neu {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .tag-status-bearbeitung {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .tag-status-erledigt {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        /* Detail Panel */
-        .detail-panel {
-            flex: 1;
-            background: #fff;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .detail-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid #e0e4e8;
-        }
-
-        .detail-subject {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1a1a2e;
-            margin-bottom: 8px;
-        }
-
-        .detail-meta {
-            display: flex;
-            gap: 24px;
-            font-size: 13px;
-            color: #666;
-        }
-
-        .detail-meta strong {
-            color: #333;
-        }
-
-        .detail-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-        }
-
-        /* Message Block */
-        .message-block {
-            margin-bottom: 24px;
-            border: 1px solid #e0e4e8;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .message-header {
-            padding: 14px 18px;
-            background: #f9fafb;
-            border-bottom: 1px solid #e0e4e8;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .message-header.incoming {
-            background: #fef2f5;
-        }
-
-        .message-header.outgoing {
-            background: #f0fdf4;
-        }
-
-        .message-from {
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .message-date {
-            font-size: 12px;
-            color: #888;
-        }
-
-        .message-body {
-            padding: 18px;
-            font-size: 14px;
-            line-height: 1.7;
-            white-space: pre-wrap;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .message-label {
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-
-        .message-label.anfrage {
-            color: #d4145a;
-        }
-
-        .message-label.antwort {
-            color: #10b981;
-        }
-
-        /* Edit Panel */
-        .edit-panel {
-            padding: 20px 24px;
-            background: #f9fafb;
-            border-top: 1px solid #e0e4e8;
-        }
-
-        .edit-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .form-group.wide {
-            grid-column: span 2;
-        }
-
-        .form-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .form-input, .form-select {
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            background: #fff;
-        }
-
-        .form-input:focus, .form-select:focus {
-            outline: none;
-            border-color: #d4145a;
-            box-shadow: 0 0 0 3px rgba(212, 20, 90, 0.1);
-        }
-
-        /* Empty State */
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #888;
-            text-align: center;
-            padding: 40px;
-        }
-
-        .empty-state svg {
-            width: 80px;
-            height: 80px;
-            margin-bottom: 20px;
-            opacity: 0.3;
-        }
-
-        .empty-state h3 {
-            font-size: 18px;
-            margin-bottom: 8px;
-            color: #666;
-        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Upload Screen */
         .upload-screen {
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: calc(100vh - 100px);
-            padding: 40px;
+            min-height: calc(100vh - 60px);
+            padding: 2rem;
         }
 
-        .upload-box {
-            width: 100%;
+        .upload-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
             max-width: 500px;
-            padding: 60px 40px;
-            border: 2px dashed #ddd;
-            border-radius: 16px;
+            width: 100%;
             text-align: center;
-            background: #fff;
-            transition: all 0.2s;
-        }
-
-        .upload-box:hover, .upload-box.dragover {
-            border-color: #d4145a;
-            background: #fef2f5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
         .upload-icon {
             width: 64px;
             height: 64px;
-            margin: 0 auto 20px;
-            background: #f5f7fa;
+            background: var(--primary-light);
+            color: var(--primary);
             border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 1.75rem;
+        }
+
+        .upload-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .upload-subtitle { color: var(--text-secondary); margin-bottom: 2rem; }
+
+        .upload-buttons { display: flex; flex-direction: column; gap: 0.75rem; }
+
+        .upload-btn {
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        .upload-info {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .upload-info-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .upload-info ol {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            padding-left: 1.25rem;
+        }
+
+        /* Main Layout */
+        .main-content {
+            display: none;
+            height: calc(100vh - 52px);
+        }
+
+        .main-content.active { display: flex; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 380px;
+            background: white;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            padding: 0.25rem 0.625rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .filter-chip:hover { border-color: var(--primary); }
+        .filter-chip.active {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Email List */
+        .email-list { flex: 1; overflow-y: auto; }
+
+        .email-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.1s;
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+
+        .email-item:hover { background: var(--bg-tertiary); }
+        .email-item.selected {
+            background: var(--primary-light);
+            border-left: 3px solid var(--primary);
+        }
+
+        .email-checkbox {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .email-item-content { flex: 1; min-width: 0; }
+
+        .email-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+
+        .select-all-row {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .select-all-row label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .selected-count {
+            margin-left: auto;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .email-sender { font-weight: 600; font-size: 0.875rem; }
+        .email-date { font-size: 0.75rem; color: var(--text-muted); }
+        .email-subject { font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .email-preview { font-size: 0.75rem; color: var(--text-muted); }
+
+        .email-badges { display: flex; gap: 0.25rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+        .badge {
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            font-size: 0.625rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-provision { background: var(--warning-light); color: #996600; }
+        .badge-incident { background: var(--danger-light); color: var(--danger); }
+        .badge-question { background: var(--purple-light); color: var(--purple); }
+        .badge-cluster { background: var(--bg-tertiary); color: var(--text-secondary); }
+        .badge-update { background: #dbeafe; color: #1d4ed8; }
+        .badge-reply { background: #d1fae5; color: #065f46; }
+        .badge-unread { background: #fef3c7; color: #92400e; font-weight: 600; }
+        .badge-read { background: var(--bg-tertiary); color: var(--text-muted); }
+
+        /* Day Header */
+        .day-header {
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        /* Detail Panel */
+        .detail-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-secondary);
+        }
+
+        .detail-empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .email-detail { display: none; flex-direction: column; height: 100%; }
+        .email-detail.active { display: flex; }
+
+        .detail-header {
+            padding: 1rem 1.5rem;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-subject { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; }
+
+        .detail-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .detail-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Email Content */
+        .email-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            background: white;
+            margin: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .email-text {
+            white-space: pre-wrap;
+            font-size: 0.9375rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+
+        .html-email-frame {
+            width: 100%;
+            min-height: 400px;
+            height: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+        }
+
+        .reply-html-frame {
+            width: 100%;
+            min-height: 200px;
+            height: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: white;
+            margin-top: 0.5rem;
+        }
+
+        /* Provision Data Box */
+        .provision-box {
+            background: var(--warning-light);
+            border: 1px solid #e6a700;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .provision-box-title {
+            font-weight: 600;
+            color: #996600;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .provision-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .provision-field-small {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .provision-field-label {
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.125rem;
+        }
+
+        .provision-field-value { font-size: 0.8125rem; font-weight: 500; }
+
+        /* Right Form Panel */
+        .form-panel {
+            width: 350px;
+            background: white;
+            border-left: 1px solid var(--border-color);
+            padding: 1rem;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .form-section {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-section-title {
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .form-group { margin-bottom: 0.75rem; }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 0.5rem 0.625rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.8125rem;
+            background: white;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-textarea { resize: vertical; min-height: 60px; }
+
+        /* Cluster Tags */
+        .cluster-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+
+        .cluster-tag {
+            padding: 0.375rem 0.625rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .cluster-tag:hover { border-color: var(--primary); }
+
+        .cluster-tag.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* Status Select Colors */
+        .status-neu { color: var(--text-muted); }
+        .status-bearbeitung { color: var(--warning); }
+        .status-erledigt { color: var(--success); }
+
+        /* Notifications */
+        .notification-container {
+            position: fixed;
+            top: 60px;
+            right: 1rem;
+            z-index: 1000;
+        }
+
+        .notification {
+            background: white;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .notification.success { border-left: 4px solid var(--success); }
+        .notification.error { border-left: 4px solid var(--danger); }
+        .notification.warning { border-left: 4px solid var(--warning); }
+
+        .notification-icon { font-size: 1.25rem; }
+        .notification-text { font-size: 0.875rem; }
+
+        /* Replies Section */
+        .replies-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .replies-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .reply-item {
+            background: var(--success-light);
+            border: 1px solid #0b5a0b;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .reply-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.8125rem;
+        }
+
+        .reply-to { color: var(--success); font-weight: 600; }
+        .reply-date { color: var(--text-muted); }
+
+        .reply-text {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        /* PHASE 5: Thread Visualization Styles */
+        .thread-visualization {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .thread-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        .thread-connector {
+            width: 20px;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .thread-connector .connector-line {
+            position: absolute;
+            left: 8px;
+            top: -10px;
+            width: 2px;
+            height: 20px;
+            background: var(--border-color);
+        }
+
+        .thread-connector .connector-line::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 10px;
+            height: 2px;
+            background: var(--border-color);
+        }
+
+        .thread-content {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: white;
+        }
+
+        .thread-content.incoming {
+            background: #f0f7ff;
+            border-color: #bdd8f5;
+        }
+
+        .thread-content.outgoing {
+            background: #f0fff4;
+            border-color: #b8e6c4;
+        }
+
+        .thread-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .thread-sender {
+            font-weight: 600;
+            font-size: 0.8125rem;
+            color: var(--text-primary);
+        }
+
+        .thread-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .thread-badge {
+            font-size: 0.625rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .thread-badge.original {
+            background: var(--primary);
+            color: white;
+        }
+
+        .thread-badge.new {
+            background: var(--warning);
+            color: white;
+        }
+
+        .thread-root .thread-content {
+            border-width: 2px;
+        }
+
+        /* Thread Summary in Email List */
+        .thread-summary {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .thread-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .thread-summary-item svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* Content Tabs */
+        .content-tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 1rem;
+            margin: 1rem 1rem 0 1rem;
+            border-radius: 8px 8px 0 0;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+        }
+
+        .content-tab {
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -1px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.15s;
+        }
+
+        .content-tab:hover {
+            color: var(--primary);
+            background: var(--bg-tertiary);
+        }
+
+        .content-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: white;
+        }
+
+        .content-tab .tab-badge {
+            background: var(--success);
+            color: white;
+            font-size: 0.625rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .content-tab.disabled {
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .content-tab.disabled:hover {
+            background: transparent;
+            color: var(--text-muted);
+        }
+
+        .tab-content-area {
+            display: none;
+        }
+
+        .tab-content-area.active {
+            display: block;
+        }
+
+        .email-content-tabbed {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            background: white;
+            margin: 0 1rem 1rem 1rem;
+            border-radius: 0 0 8px 8px;
+            border: 1px solid var(--border-color);
+            border-top: none;
+        }
+
+        /* Reply card improvements */
+        .reply-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--success);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .reply-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .reply-card-from {
+            font-weight: 600;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .reply-card-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .reply-card-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        /* New reply indicator */
+        .reply-card.reply-new {
+            border-left-color: #10b981;
+            background: linear-gradient(to right, rgba(16, 185, 129, 0.05), white);
+        }
+
+        .reply-card.reply-existing {
+            border-left-color: #94a3b8;
+            background: #f8fafc;
+            opacity: 0.8;
+        }
+
+        .reply-status-new {
+            background: #10b981;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .reply-status-existing {
+            background: #e2e8f0;
+            color: #64748b;
+            font-size: 0.65rem;
+            font-weight: 500;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .no-replies {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .no-replies-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-tertiary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* Step Indicator */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            margin-right: 1rem;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.5);
+            transition: all 0.3s ease;
+        }
+
+        .step-item.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            animation: stepPulse 2s ease-in-out infinite;
+        }
+
+        .step-item.completed {
+            background: rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .step-item .step-icon {
+            width: 20px;
+            height: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .upload-icon svg {
-            width: 32px;
-            height: 32px;
-            color: #888;
+        .step-arrow {
+            color: rgba(255,255,255,0.3);
+            font-size: 0.75rem;
         }
 
-        .upload-title {
-            font-size: 18px;
+        @keyframes stepPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Search Highlight */
+        .search-highlight {
+            background: #ff6b6b;
+            color: white;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
             font-weight: 600;
-            margin-bottom: 8px;
+            box-shadow: 0 1px 3px rgba(255, 107, 107, 0.4);
         }
 
-        .upload-subtitle {
-            font-size: 14px;
-            color: #888;
-            margin-bottom: 20px;
+        /* Keyword Highlight */
+        .keyword-highlight {
+            background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
+            padding: 0.1rem 0.25rem;
+            border-radius: 3px;
+            font-weight: 500;
+            cursor: help;
+            border-bottom: 2px solid #eab308;
         }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
+        .keyword-highlight[data-cluster="KV"] {
+            background: linear-gradient(120deg, #bbf7d0 0%, #86efac 100%);
+            border-bottom-color: #22c55e;
         }
 
-        ::-webkit-scrollbar-track {
-            background: #f5f7fa;
+        .keyword-highlight[data-cluster="SHUK"] {
+            background: linear-gradient(120deg, #fed7aa 0%, #fdba74 100%);
+            border-bottom-color: #f97316;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: #ddd;
+        .keyword-highlight[data-cluster="LV"] {
+            background: linear-gradient(120deg, #ddd6fe 0%, #c4b5fd 100%);
+            border-bottom-color: #8b5cf6;
+        }
+
+        .keyword-highlight[data-cluster="Provisionierung"] {
+            background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
+            border-bottom-color: #eab308;
+        }
+
+        /* Schlagwortverzeichnis Tab */
+        .keyword-reference {
+            padding: 1rem;
+        }
+
+        .keyword-category {
+            margin-bottom: 1.5rem;
+        }
+
+        .keyword-category-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .keyword-category-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .keyword-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        .keyword-item {
+            padding: 0.25rem 0.625rem;
             border-radius: 4px;
+            font-size: 0.8125rem;
+            font-family: 'Consolas', 'Monaco', monospace;
         }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: #ccc;
-        }
-
-        /* Hidden */
-        .hidden {
-            display: none !important;
-        }
-
-        /* Notification */
-        .notification {
+        /* Keyword Modal */
+        .modal-overlay {
+            display: none;
             position: fixed;
-            bottom: 24px;
-            right: 24px;
-            padding: 16px 24px;
-            background: #1a1a2e;
-            color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
             z-index: 1000;
-            animation: slideIn 0.3s ease;
+            justify-content: center;
+            align-items: center;
         }
 
-        @keyframes slideIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+        .modal-overlay.active { display: flex; }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 700px;
+            max-height: 80vh;
+            width: 90%;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 1;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            color: var(--text-secondary);
+        }
+
+        .modal-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        /* SVG Icons */
+        .icon {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+            vertical-align: middle;
+            fill: currentColor;
+        }
+
+        .icon-lg { width: 1.5em; height: 1.5em; }
+        .icon-xl { width: 2em; height: 2em; }
     </style>
 </head>
 <body>
     <!-- Header -->
     <header class="header">
-        <div class="logo">
-            <div class="logo-icon">E</div>
+        <div class="header-brand">
+            <div class="header-logo">
+                <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </div>
             <div>
-                <h1>ERGO Hypercare</h1>
-                <span>Email Review Tool</span>
+                <div class="header-title">BGAV Hypercare</div>
+                <div class="header-subtitle">Email Review Tool</div>
             </div>
         </div>
+
         <div class="header-actions">
-            <input type="file" id="fileInput" accept=".json" style="display: none;">
-            <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
+            <!-- Schlagwörter Button (links vom Step Indicator) -->
+            <button class="btn" id="btnKeywords" style="display: none;" onclick="showKeywordModal()">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                    <line x1="7" y1="7" x2="7.01" y2="7"/>
                 </svg>
-                JSON laden
+                Schlagwörter
             </button>
-            <button class="btn btn-success" onclick="exportCSV()" id="exportBtn" disabled>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
+
+            <!-- Step Indicator -->
+            <div class="step-indicator" id="stepIndicator" style="display: none;">
+                <div class="step-item active" id="step1">
+                    <span class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                    </span>
+                    <span>Auswählen</span>
+                </div>
+                <span class="step-arrow">→</span>
+                <div class="step-item" id="step2">
+                    <span class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </span>
+                    <span>Kategorisieren</span>
+                </div>
+                <span class="step-arrow">→</span>
+                <div class="step-item" id="step3">
+                    <span class="step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                    </span>
+                    <span>Speichern</span>
+                </div>
+            </div>
+
+            <div class="header-stats" id="headerStats" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">Gesamt</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="statDone">0</div>
+                    <div class="stat-label">Erledigt</div>
+                </div>
+            </div>
+
+            <button class="btn btn-white" id="btnExport" style="display: none;" onclick="saveAsJson()">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
                 </svg>
-                CSV Export
+                JSON speichern
             </button>
         </div>
     </header>
 
     <!-- Upload Screen -->
-    <div id="uploadScreen" class="upload-screen">
-        <div class="upload-box" id="uploadBox">
+    <div class="upload-screen" id="uploadScreen">
+        <div class="upload-card">
             <div class="upload-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
+                <svg class="icon icon-xl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
             </div>
-            <div class="upload-title">JSON-Datei hier ablegen</div>
-            <div class="upload-subtitle">oder klicken zum Auswählen</div>
-            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                Datei auswählen
-            </button>
+            <h1 class="upload-title">Emails importieren</h1>
+            <p class="upload-subtitle">JSON-Datei aus dem Outlook Export laden</p>
+
+            <div class="upload-buttons">
+                <button class="btn btn-primary upload-btn" onclick="openFilePicker()">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    Datei auswählen
+                </button>
+            </div>
+
+            <div class="upload-info">
+                <div class="upload-info-title">So geht's:</div>
+                <ol>
+                    <li>Export-Tool herunterladen (siehe unten)</li>
+                    <li>outlook-export-modular.hta starten</li>
+                    <li>Postfach wählen und exportieren</li>
+                    <li>Hier die JSON-Datei aus Downloads laden</li>
+                </ol>
+            </div>
+
+            <div class="download-section" style="margin-top: 24px; padding: 20px; background: linear-gradient(135deg, #f0f7ff 0%, #e8f4fd 100%); border-radius: 12px; border: 1px solid #cce5ff;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 40px; height: 40px; background: #0078d4; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" width="20" height="20">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; color: #0078d4;">Outlook Export Tool</div>
+                        <div style="font-size: 12px; color: #666;">Windows HTA-Anwendung</div>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: #444; margin-bottom: 12px;">
+                    Das Export-Tool extrahiert Emails aus Outlook und speichert sie als JSON-Datei.
+                </p>
+                <a href="Email-Export-Tool.zip" download class="btn btn-primary" style="text-decoration: none;">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Email-Export-Tool.zip herunterladen
+                </a>
+                <div style="margin-top: 10px; font-size: 11px; color: #888;">
+                    Enthält: outlook-export-modular.hta + js/ Ordner mit allen Modulen
+                </div>
+            </div>
+
+            <div class="version-info" style="margin-top: 24px; color: #666; font-size: 12px;">
+                Version 1.1.1
+            </div>
         </div>
     </div>
 
-    <!-- Main App (hidden until data loaded) -->
-    <div id="mainApp" class="hidden">
-        <!-- Stats Bar -->
-        <div class="stats-bar">
-            <div class="stat-item highlight">
-                <div class="stat-value" id="statTotal">0</div>
-                <div class="stat-label">Vorgänge gesamt</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="statKunden">0</div>
-                <div class="stat-label">Kunden</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="statMakler">0</div>
-                <div class="stat-label">Makler</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="statNeu">0</div>
-                <div class="stat-label">Neu</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="statBearbeitung">0</div>
-                <div class="stat-label">In Bearbeitung</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="statErledigt">0</div>
-                <div class="stat-label">Erledigt</div>
-            </div>
-        </div>
-
-        <!-- Navigation Tabs -->
-        <nav class="nav-tabs">
-            <div class="nav-tab active" data-view="emails" onclick="switchView('emails')">
-                Alle Emails
-            </div>
-            <div class="nav-tab" data-view="kunden" onclick="switchView('kunden')">
-                Nach Kunde
-            </div>
-            <div class="nav-tab" data-view="makler" onclick="switchView('makler')">
-                Nach Makler
-            </div>
-        </nav>
-
-        <!-- Main Container -->
-        <div class="main-container">
-            <!-- Sidebar -->
-            <aside class="sidebar">
-                <div class="sidebar-header">
-                    <input type="text" class="search-box" placeholder="Suchen..." id="searchInput" oninput="filterEmails()">
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="search-box">
+                    <span class="search-icon">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </span>
+                    <input type="text" placeholder="Suchen..." id="searchInput" oninput="applyFilters()">
                 </div>
-                <div class="sidebar-list" id="emailList">
-                    <!-- Email items will be rendered here -->
-                </div>
-            </aside>
+            </div>
 
-            <!-- Detail Panel -->
-            <main class="detail-panel">
-                <div id="detailEmpty" class="empty-state">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                        <polyline points="22,6 12,13 2,6"/>
-                    </svg>
-                    <h3>Keine Email ausgewählt</h3>
-                    <p>Wählen Sie eine Email aus der Liste aus</p>
+            <div class="filter-bar">
+                <span class="filter-chip active" data-filter="all" onclick="setFilter('all')">Alle</span>
+                <span class="filter-chip" data-filter="unread" onclick="setFilter('unread')">Ungelesen</span>
+                <span class="filter-chip" data-filter="read" onclick="setFilter('read')">Gelesen</span>
+            </div>
+
+            <div class="select-all-row" id="selectAllRow" style="display: none;">
+                <label>
+                    <input type="checkbox" id="selectAllCheckbox" class="email-checkbox" onchange="toggleSelectAll()">
+                    Alle auswählen
+                </label>
+                <span class="selected-count" id="selectedCount">0 ausgewählt</span>
+            </div>
+
+            <div class="email-list" id="emailList"></div>
+        </aside>
+
+        <!-- Detail Panel -->
+        <main class="detail-panel">
+            <div class="detail-empty" id="detailEmpty">
+                <div>
+                    <div style="margin-bottom: 1rem; color: var(--text-muted);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="64" height="64">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                    </div>
+                    <p>Email auswählen um Details anzuzeigen</p>
+                </div>
+            </div>
+
+            <div class="email-detail" id="emailDetail">
+                <div class="detail-header">
+                    <div class="detail-subject" id="detailSubject"></div>
+                    <div class="detail-meta">
+                        <span><strong>Von:</strong> <span id="detailFrom"></span></span>
+                        <span><strong>Anfrage:</strong> <span id="detailDate"></span></span>
+                        <span><strong>Letzte Antwort:</strong> <span id="detailLastReplyDate">-</span></span>
+                    </div>
                 </div>
 
-                <div id="detailContent" class="hidden">
-                    <div class="detail-header">
-                        <div class="detail-subject" id="detailSubject">Betreff</div>
-                        <div class="detail-meta">
-                            <span><strong>Von:</strong> <span id="detailFrom"></span></span>
-                            <span><strong>Datum:</strong> <span id="detailDate"></span></span>
-                            <span><strong>Antworten:</strong> <span id="detailReplies"></span></span>
+                <div class="detail-body">
+                    <!-- Content Tabs -->
+                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                        <div class="content-tabs">
+                            <div class="content-tab active" id="tabAnfrage" onclick="switchContentTab('anfrage')">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+                                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                                </svg>
+                                Anfrage
+                            </div>
+                            <div class="content-tab" id="tabAntworten" onclick="switchContentTab('antworten')">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                                Antworten <span class="tab-badge" id="replyCount" style="display: none;">0</span>
+                            </div>
+                        </div>
+
+                        <div class="email-content-tabbed">
+                            <!-- Tab: Anfrage -->
+                            <div class="tab-content-area active" id="contentAnfrage">
+                                <div id="provisionBox"></div>
+                                <div class="email-text" id="detailText"></div>
+                            </div>
+
+                            <!-- Tab: Antworten -->
+                            <div class="tab-content-area" id="contentAntworten">
+                                <div id="repliesList"></div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="detail-content" id="detailMessages">
-                        <!-- Messages will be rendered here -->
-                    </div>
+                    <!-- Right Form Panel -->
+                    <div class="form-panel">
+                        <div class="form-section">
+                            <div class="form-section-title">Kategorisierung</div>
 
-                    <div class="edit-panel">
-                        <div class="edit-grid">
+                            <div class="form-group">
+                                <label class="form-label">Kategorie</label>
+                                <select class="form-select" id="formKategorie" onchange="updateField('kategorie')">
+                                    <option value="Provisionsreklamation">Provisionsreklamation</option>
+                                    <option value="Fachliche Rückfrage">Fachliche Rückfrage</option>
+                                    <option value="Incident (Leicht)">Incident (Leicht)</option>
+                                    <option value="Incident (Mittel)">Incident (Mittel)</option>
+                                    <option value="Incident (Schwer)">Incident (Schwer)</option>
+                                    <option value="Sonstiges">Sonstiges</option>
+                                    <option value="Keine BGAV Relevanz">Keine BGAV Relevanz</option>
+                                </select>
+                            </div>
+
                             <div class="form-group">
                                 <label class="form-label">Status</label>
-                                <select class="form-select" id="editStatus" onchange="updateEmail('status')">
+                                <select class="form-select" id="formStatus" onchange="updateField('status')">
                                     <option value="Neu">Neu</option>
                                     <option value="In Bearbeitung">In Bearbeitung</option>
                                     <option value="Erledigt">Erledigt</option>
+                                    <option value="Keine BGAV Relevanz">Keine BGAV Relevanz</option>
                                 </select>
                             </div>
+
                             <div class="form-group">
-                                <label class="form-label">Bearbeiter</label>
-                                <select class="form-select" id="editBearbeiter" onchange="updateEmail('bearbeiter')">
+                                <label class="form-label">In Bearbeitung von</label>
+                                <select class="form-select" id="formBearbeiter" onchange="updateField('bearbeiter')">
                                     <option value="">-- Auswählen --</option>
+                                    <option value="Birgit">Birgit</option>
+                                    <option value="Daniela">Daniela</option>
+                                    <option value="Drita">Drita</option>
+                                    <option value="Ewelina">Ewelina</option>
+                                    <option value="Julia">Julia</option>
+                                    <option value="Kerstin">Kerstin</option>
+                                    <option value="Kim">Kim</option>
+                                    <option value="Kristin">Kristin</option>
+                                    <option value="Loredana">Loredana</option>
+                                    <option value="Maren">Maren</option>
+                                    <option value="Meike">Meike</option>
                                     <option value="Sarina">Sarina</option>
                                     <option value="Susanne">Susanne</option>
                                     <option value="Ulrika">Ulrika</option>
                                 </select>
                             </div>
+
                             <div class="form-group">
-                                <label class="form-label">Kunde</label>
-                                <input type="text" class="form-input" id="editKunde" onchange="updateEmail('kunde')">
+                                <label class="form-label">Cluster (Mehrfachauswahl)</label>
+                                <div class="cluster-tags" id="clusterTags"></div>
                             </div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="form-section-title">Details</div>
+
                             <div class="form-group">
-                                <label class="form-label">VS-Nr.</label>
-                                <input type="text" class="form-input" id="editVsnr" onchange="updateEmail('vsnr')">
+                                <label class="form-label">Vermittler</label>
+                                <input type="text" class="form-input" id="formAgentur" onchange="updateField('agentur')">
                             </div>
-                            <div class="form-group wide">
+
+                            <div class="form-group">
+                                <label class="form-label">Vermittlernummer</label>
+                                <input type="text" class="form-input" id="formVermittlernr" onchange="updateField('vermittlernr')">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Versicherungsnummer</label>
+                                <input type="text" class="form-input" id="formVsnr" onchange="updateField('vsnr')">
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="form-section-title">Bearbeitung</div>
+
+                            <div class="form-group">
+                                <label class="form-label">Antwort / Lösung</label>
+                                <textarea class="form-textarea" id="formAntwort" rows="3" onchange="updateField('antwort')"></textarea>
+                            </div>
+
+                            <div class="form-group">
                                 <label class="form-label">Kommentar</label>
-                                <input type="text" class="form-input" id="editKommentar" onchange="updateEmail('kommentar')">
+                                <textarea class="form-textarea" id="formKommentar" rows="2" onchange="updateField('kommentar')"></textarea>
                             </div>
                         </div>
                     </div>
                 </div>
-            </main>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notifications -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <!-- Keyword Modal -->
+    <div class="modal-overlay" id="keywordModal" onclick="closeKeywordModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                        <line x1="7" y1="7" x2="7.01" y2="7"/>
+                    </svg>
+                    Schlagwortverzeichnis
+                </div>
+                <button class="modal-close" onclick="closeKeywordModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    Diese Schlagwörter werden automatisch erkannt und führen zur Zuordnung der entsprechenden Cluster:
+                </p>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #22c55e;"></span>
+                        KV (Krankenversicherung)
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">kv</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">kranken</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">gesundheit</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">pflege</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">auslandsreise</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">reisekranken</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">bkk</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">zahnzusatz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">krankenzusatz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">ambulant</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">stationär</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="KV">krankentagegeld</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #f97316;"></span>
+                        SHUK (Sach/Haftpflicht/Unfall/KFZ/Komposit)
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">shuk</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">sach</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">haftpflicht</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">unfall</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">hausrat</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">wohngebäude</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">gebäude</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">rechtsschutz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">tierhalter</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">hund</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">pferd</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">gewässer</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">photovoltaik</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">kfz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">auto</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">fahrzeug</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">kasko</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">pkw</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="SHUK">motorrad</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #8b5cf6;"></span>
+                        LV (Lebensversicherung)
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">lv</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">leben</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">rente</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">altersvorsorge</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">riester</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">rürup</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">bav</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">betrieblich</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">sterbegeld</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">berufsunfähigkeit</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="LV">bu</span>
+                    </div>
+                </div>
+
+                <div class="keyword-category">
+                    <div class="keyword-category-header">
+                        <span class="keyword-category-color" style="background: #eab308;"></span>
+                        Provisionierung
+                    </div>
+                    <div class="keyword-list">
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">provision</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">vergütung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">courtage</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">abrechnung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">storno</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">dynamisierung</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">bestandspflege</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">absatz</span>
+                        <span class="keyword-item keyword-highlight" data-cluster="Provisionierung">bestand</span>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 
@@ -773,38 +1584,122 @@
         let emails = [];
         let filteredEmails = [];
         let selectedEmailId = null;
-        let currentView = 'emails';
+        let selectedForExport = new Set();  // IDs der für Export ausgewählten Emails
+        let readEmails = new Set();  // IDs der gelesenen Emails
+        let currentFilter = 'all';
+        let nextId = 1;
+        let currentStep = 1;  // 1: Auswählen, 2: Kategorisieren, 3: Speichern
+
+        const allClusters = ['KV', 'SHUK', 'LV', 'Provisionierung', 'Bestand', 'Absatzeinheiten'];
+
+        // Schlagwort-Cluster-Mapping für Highlighting
+        const keywordClusterMap = {
+            'KV': ['kv', 'kranken', 'gesundheit', 'pflege', 'auslandsreise', 'reisekranken', 'bkk', 'zahnzusatz', 'krankenzusatz', 'ambulant', 'stationär', 'krankentagegeld'],
+            'SHUK': ['shuk', 'sach', 'haft', 'unfall', 'hausrat', 'wohngebäude', 'gebäude', 'rechtsschutz', 'tierhalter', 'hund', 'pferd', 'gewässer', 'photovoltaik', 'kfz', 'auto', 'fahrzeug', 'kasko', 'vollkasko', 'teilkasko', 'pkw', 'kennzeichen', 'motorrad', 'anhänger'],
+            'LV': ['lv', 'leben', 'rente', 'vorsorge', 'altersvorsorge', 'riester', 'rürup', 'bav', 'betrieblich', 'sterbegeld', 'berufsunfähigkeit', 'bu'],
+            'Provisionierung': ['provision', 'vergütung', 'courtage', 'abrechnung', 'storno', 'dynamisierung', 'bestandspflege'],
+            'Bestand': ['bestand', 'bestandskunde', 'bestandsvertrag', 'bestandsdaten'],
+            'Absatzeinheiten': ['ae', 'absatzeinheit', 'absatzeinheiten']
+        };
 
         // ============================================================================
-        // FILE LOADING
+        // STEP INDICATOR
         // ============================================================================
-        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        function updateStepIndicator(step) {
+            currentStep = step;
+            const step1 = document.getElementById('step1');
+            const step2 = document.getElementById('step2');
+            const step3 = document.getElementById('step3');
 
-        const uploadBox = document.getElementById('uploadBox');
-        uploadBox.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadBox.classList.add('dragover');
-        });
-        uploadBox.addEventListener('dragleave', () => {
-            uploadBox.classList.remove('dragover');
-        });
-        uploadBox.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadBox.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file && file.name.endsWith('.json')) {
-                loadFile(file);
+            // Reset all
+            [step1, step2, step3].forEach(s => {
+                s.classList.remove('active', 'completed');
+            });
+
+            // Set states
+            if (step >= 1) step1.classList.add(step > 1 ? 'completed' : 'active');
+            if (step >= 2) step2.classList.add(step > 2 ? 'completed' : 'active');
+            if (step >= 3) step3.classList.add('active');
+        }
+
+        // ============================================================================
+        // KEYWORD HIGHLIGHTING
+        // ============================================================================
+        function highlightKeywords(text, includeSearchTerm = true) {
+            if (!text) return '';
+
+            // Escape HTML first
+            let result = escapeHtml(text);
+
+            // Highlight search term first (if exists)
+            if (includeSearchTerm) {
+                const searchTerm = document.getElementById('searchInput')?.value?.trim();
+                if (searchTerm && searchTerm.length >= 2) {
+                    const escapedSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const searchRegex = new RegExp(`(${escapedSearch})`, 'gi');
+                    result = result.replace(searchRegex, '<mark class="search-highlight">$1</mark>');
+                }
             }
-        });
-        uploadBox.addEventListener('click', () => {
-            document.getElementById('fileInput').click();
+
+            // Build regex pattern for all keywords
+            for (const [cluster, keywords] of Object.entries(keywordClusterMap)) {
+                keywords.forEach(keyword => {
+                    // Case-insensitive word boundary match
+                    const regex = new RegExp(`(\\b)(${keyword})(\\w*)`, 'gi');
+                    result = result.replace(regex, (match, boundary, word, rest) => {
+                        return `${boundary}<span class="keyword-highlight" data-cluster="${cluster}" title="→ ${cluster}">${word}${rest}</span>`;
+                    });
+                });
+            }
+
+            return result;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Nothing to auto-load - user can drag & drop or click button
         });
 
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if (file) {
-                loadFile(file);
+        function getBearbeiterName() {
+            return localStorage.getItem('bearbeiterName') || '';
+        }
+
+        function saveBearbeiterToLocalStorage(name) {
+            localStorage.setItem('bearbeiterName', name);
+        }
+
+        // ============================================================================
+        // FILE HANDLING
+        // ============================================================================
+        async function openFilePicker() {
+            // Try modern File System Access API (opens in Downloads directly)
+            if ('showOpenFilePicker' in window) {
+                try {
+                    const [handle] = await window.showOpenFilePicker({
+                        startIn: 'downloads',
+                        types: [{
+                            description: 'JSON Dateien',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    const file = await handle.getFile();
+                    loadFile(file);
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return; // User cancelled
+                }
             }
+
+            // Fallback for older browsers
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    loadFile(e.target.files[0]);
+                }
+            };
+            input.click();
         }
 
         function loadFile(file) {
@@ -812,294 +1707,1661 @@
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    processData(data);
-                    showNotification('Datei geladen: ' + file.name);
+
+                    let emails;
+                    let exportInfo = null;
+
+                    // Format 1: New conversation-based export { conversations: {...}, ... }
+                    if (data && data.conversations && typeof data.conversations === 'object') {
+                        console.log('Detected: Conversation format');
+                        emails = convertConversationsToLegacy(data.conversations);
+                        exportInfo = {
+                            exportDate: data.exportDate,
+                            totalEmails: data.totalEmails,
+                            conversationCount: data.conversationCount,
+                            mailboxName: data.mailboxName
+                        };
+                        showNotification('Konversations-Export geladen: ' + data.totalEmails + ' Emails in ' +
+                            data.conversationCount + ' Konversationen', 'success');
+                    }
+                    // Format 2: Debug info wrapper { _exportInfo: {...}, emails: [...] }
+                    else if (data && data._exportInfo && data.emails) {
+                        console.log('Detected: Debug info format');
+                        exportInfo = data._exportInfo;
+                        emails = data.emails;
+                        if (exportInfo.replyRate) {
+                            showNotification('Export geladen: ' + exportInfo.totalEmails + ' Emails, ' +
+                                exportInfo.replyRate + ' mit Antworten', 'success');
+                        }
+                    }
+                    // Format 3: Direct array of emails
+                    else if (Array.isArray(data)) {
+                        console.log('Detected: Direct array format');
+                        emails = data;
+                    }
+                    // Format 4: Single email object
+                    else {
+                        console.log('Detected: Single email');
+                        emails = [data];
+                    }
+
+                    // Store export info for AI assistant
+                    window.lastExportInfo = exportInfo;
+
+                    processEmails(emails);
                 } catch (err) {
-                    showNotification('Fehler beim Laden: ' + err.message);
+                    showNotification('Fehler beim Laden: ' + err.message, 'error');
                 }
             };
             reader.readAsText(file);
         }
 
-        function processData(data) {
-            // Handle different JSON formats
-            if (data.conversations) {
-                emails = convertConversations(data.conversations);
-            } else if (Array.isArray(data)) {
-                emails = data.map((e, i) => ({
-                    id: i + 1,
-                    ...normalizeEmail(e)
-                }));
-            } else {
-                emails = [{ id: 1, ...normalizeEmail(data) }];
-            }
-
-            // Initialize fields
-            emails.forEach(email => {
-                email.status = email.status || 'Neu';
-                email.bearbeiter = email.bearbeiter || '';
-                email.kunde = email.kunde || extractKunde(email);
-                email.makler = email.makler || email.von_name || '';
-                email.vsnr = email.vsnr || '';
-                email.kommentar = email.kommentar || '';
-            });
-
-            filteredEmails = [...emails];
-
-            document.getElementById('uploadScreen').classList.add('hidden');
-            document.getElementById('mainApp').classList.remove('hidden');
-            document.getElementById('exportBtn').disabled = false;
-
-            updateStats();
-            renderEmailList();
-        }
-
-        function convertConversations(conversations) {
+        /**
+         * Convert new conversation format to legacy email format
+         * @param {Object} conversations - Conversations object from new export
+         * @returns {Array} Legacy email array
+         */
+        function convertConversationsToLegacy(conversations) {
             const result = [];
-            let id = 1;
+            let totalMessages = 0;
+            let totalAntworten = 0;
 
             for (const convId in conversations) {
                 const conv = conversations[convId];
                 const messages = conv.messages || [];
-                if (messages.length === 0) continue;
 
-                // Sort by time
-                messages.sort((a, b) => {
+                if (messages.length === 0) continue;
+                totalMessages += messages.length;
+
+                // Sort messages by timestamp (earliest first)
+                const sortedMessages = [...messages].sort((a, b) => {
                     const timeA = a.receivedTime || a.sentOn || '';
                     const timeB = b.receivedTime || b.sentOn || '';
-                    return timeA < timeB ? -1 : 1;
+                    return timeA < timeB ? -1 : (timeA > timeB ? 1 : 0);
                 });
 
-                // Find inbox root
-                let rootMsg = messages.find(m => m.folder === 'inbox') || messages[0];
+                // Root message is always the FIRST (oldest) message - this is who started the conversation
+                // Whether it's from inbox (someone wrote to me) or sent (I started it)
+                const rootMsg = sortedMessages.length > 0 ? sortedMessages[0] : null;
+                if (!rootMsg) continue;
 
-                const email = {
-                    id: id++,
-                    emailId: rootMsg.entryID || '',
+                // Determine display sender based on folder type
+                const isRootSent = rootMsg.folder === 'sent';
+                let displaySender = rootMsg.senderName || rootMsg.senderEmail || 'Unbekannt';
+
+                if (isRootSent) {
+                    // For sent messages (I started the conversation), show my name + "(Ausgehend)"
+                    displaySender = (rootMsg.senderName || 'Ich') + ' (Ausgehend)';
+                }
+
+                // Build legacy email object
+                const legacyEmail = {
+                    emailId: rootMsg.entryID,
                     conversationId: convId,
                     datum: rootMsg.receivedTime || rootMsg.sentOn || '',
-                    von_email: rootMsg.senderEmail || '',
-                    von_name: rootMsg.senderName || '',
+                    von_email: rootMsg.senderEmail,
+                    von_name: rootMsg.senderName,
+                    displaySender: displaySender,
+                    isOutgoing: isRootSent,
                     betreff: rootMsg.subject || conv.subject || '',
                     text: rootMsg.body || rootMsg.bodyPreview || '',
-                    antworten: []
+                    htmlBody: rootMsg.htmlBody || '',
+                    anhaenge: rootMsg.anhaenge || [],
+                    kategorie: rootMsg.kategorie || '',
+                    hasAttachments: rootMsg.hasAttachments,
+                    // WICHTIG: alleAntworten enthält ALLE messages (inkl. Root)
+                    // Die Anzeige-Logik nimmt die älteste als "Anfrage" und Rest als "Antworten"
+                    alleAntworten: [],
+                    antworten: [],
+                    // Metadata from conversation
+                    participantCount: conv.participantCount,
+                    messageCount: conv.messageCount,
+                    firstMessageDate: conv.firstMessageDate,
+                    lastMessageDate: conv.lastMessageDate
                 };
 
-                // Add replies
-                messages.forEach(msg => {
-                    if (msg.entryID === rootMsg.entryID) return;
+                // Add ALL messages to alleAntworten (including root!)
+                // The display logic will sort and use oldest as Anfrage
+                for (const msg of sortedMessages) {
+                    const msgTime = msg.sentOn || msg.receivedTime || '';
                     const isSent = msg.folder === 'sent';
-                    email.antworten.push({
-                        datum: msg.sentOn || msg.receivedTime || '',
-                        von: isSent ? 'ERGO (gesendet)' : (msg.senderName || msg.senderEmail || ''),
-                        text: msg.body || msg.bodyPreview || '',
-                        isIncoming: !isSent
-                    });
-                });
 
-                result.push(email);
+                    // Get recipient info safely
+                    let recipientInfo = '';
+                    if (msg.recipients && msg.recipients.length > 0) {
+                        recipientInfo = msg.recipients[0].email || msg.recipients[0].name || '';
+                    }
+
+                    const msgObj = {
+                        datum: msgTime,
+                        an: isSent ? recipientInfo : '',
+                        von: !isSent ? msg.senderName : (msg.senderName || 'Ich'),
+                        vonEmail: msg.senderEmail,
+                        text: msg.body || msg.bodyPreview || '',
+                        htmlBody: msg.htmlBody || '',
+                        replyId: msg.entryID,
+                        isIncoming: !isSent,
+                        folder: msg.folder,
+                        subject: msg.subject,
+                        hasAttachments: msg.hasAttachments,
+                        anhaenge: msg.anhaenge || []
+                    };
+
+                    legacyEmail.alleAntworten.push(msgObj);
+
+                    // Also add to antworten if not the root message
+                    if (msg.entryID !== rootMsg.entryID) {
+                        legacyEmail.antworten.push(msgObj);
+                        totalAntworten++;
+                    }
+                }
+
+                result.push(legacyEmail);
             }
 
-            // Sort by date descending
-            result.sort((a, b) => (b.datum || '') > (a.datum || '') ? 1 : -1);
+            // Sort conversations by most recent activity
+            result.sort((a, b) => {
+                const dateA = a.lastMessageDate || a.datum || '';
+                const dateB = b.lastMessageDate || b.datum || '';
+                return dateB > dateA ? 1 : -1;
+            });
+
+            console.log('Konvertierung: ' + result.length + ' Konversationen, ' +
+                        totalMessages + ' Messages total, ' + totalAntworten + ' als Antworten');
 
             return result;
         }
 
-        function normalizeEmail(e) {
+        // ============================================================================
+        // EMAIL PROCESSING
+        // ============================================================================
+
+        // ============================================================================
+        // PHASE 1: Subject Normalization for Thread-Matching
+        // ============================================================================
+
+        // Normalize subject by removing Re:/AW:/Fwd:/WG: prefixes (JavaScript version)
+        // Returns lowercase normalized subject for comparison
+        function normalizeSubjectJS(subject) {
+            if (!subject) return '';
+
+            let normalized = subject;
+
+            // Remove common reply/forward prefixes (case-insensitive, can repeat)
+            // German: AW: (Antwort), WG: (Weitergeleitet)
+            // English: Re:, Fwd:, Fw:
+            // French: Rép:, Tr:
+            // Spanish: Re:, RV:
+            const prefixPattern = /^[\s]*(RE|AW|FWD|FW|WG|Antwort|Weitergeleitet|Rép|Tr|RV)[\s]*:[\s]*/i;
+
+            // Keep removing prefixes until none left
+            let prevLength;
+            do {
+                prevLength = normalized.length;
+                normalized = normalized.replace(prefixPattern, '');
+            } while (normalized.length < prevLength);
+
+            // Also remove [EXT], [EXTERNAL], etc. tags
+            normalized = normalized.replace(/^\s*\[[^\]]{1,20}\]\s*/gi, '');
+
+            // Trim and lowercase for comparison
+            return normalized.trim().toLowerCase();
+        }
+
+        // Compute thread ID using multi-layer fallback (JavaScript version)
+        // Mirrors the HTA computeThreadId() function
+        function computeThreadIdJS(email) {
+            // Primary: Outlook ConversationID (most reliable when available)
+            if (email.conversationId) {
+                return 'conv:' + email.conversationId;
+            }
+
+            // Secondary: First message in References chain (the thread root)
+            if (email.references && email.references.length > 0) {
+                return 'ref:' + email.references[0];
+            }
+
+            // Tertiary: In-Reply-To (parent message)
+            if (email.inReplyTo) {
+                return 'reply:' + email.inReplyTo;
+            }
+
+            // Quaternary: Normalized subject (fallback)
+            if (email.normalizedSubject) {
+                return 'subj:' + email.normalizedSubject;
+            }
+
+            // Last resort: unique ID for orphan emails
+            return 'orphan:' + (email.emailId || email.internetMessageId || Math.random().toString(36));
+        }
+
+        // ============================================================================
+        // PHASE 5: Thread Tree Building & Visualization
+        // ============================================================================
+
+        // Build a tree structure from flat email list with replies
+        // Returns: { root: email, children: [{node, children}...] }
+        function buildThreadTree(email) {
+            const root = {
+                email: email,
+                children: [],
+                depth: 0,
+                position: 1
+            };
+
+            // Get replies from email
+            const replies = email.antworten || email.alleAntworten || [];
+            if (replies.length === 0) {
+                return root;
+            }
+
+            // Build lookup by message ID for parent finding
+            const nodesByMsgId = {};
+            if (email.internetMessageId) {
+                nodesByMsgId[email.internetMessageId] = root;
+            }
+
+            // Create nodes for all replies
+            const replyNodes = replies.map((reply, idx) => ({
+                reply: reply,
+                children: [],
+                depth: reply.threadDepth || 1,
+                position: idx + 2,
+                parentMessageId: reply.parentMessageId || reply.inReplyTo || email.internetMessageId
+            }));
+
+            // Index reply nodes by their message ID
+            replyNodes.forEach(node => {
+                if (node.reply.internetMessageId) {
+                    nodesByMsgId[node.reply.internetMessageId] = node;
+                }
+            });
+
+            // Assign children to parents
+            replyNodes.forEach(node => {
+                const parentId = node.parentMessageId;
+                const parentNode = nodesByMsgId[parentId];
+
+                if (parentNode && parentNode !== node) {
+                    parentNode.children.push(node);
+                    node.depth = parentNode.depth + 1;
+                } else {
+                    // No parent found - attach to root
+                    root.children.push(node);
+                }
+            });
+
+            // Recursive function to sort children by date
+            function sortChildren(node) {
+                if (node.children.length > 0) {
+                    node.children.sort((a, b) => {
+                        const dateA = new Date(a.reply?.datum || a.email?.datum);
+                        const dateB = new Date(b.reply?.datum || b.email?.datum);
+                        return dateA - dateB;
+                    });
+                    node.children.forEach(sortChildren);
+                }
+            }
+            sortChildren(root);
+
+            return root;
+        }
+
+        // Flatten thread tree to array with depth info (depth-first traversal)
+        // sortOrder: 'chronological' | 'threaded' | 'reverse'
+        function flattenThreadTree(tree, sortOrder = 'threaded') {
+            const result = [];
+            let position = 1;
+
+            function traverse(node, depth) {
+                if (node.email) {
+                    result.push({
+                        type: 'root',
+                        email: node.email,
+                        depth: depth,
+                        position: position++,
+                        isRoot: true
+                    });
+                } else if (node.reply) {
+                    result.push({
+                        type: 'reply',
+                        reply: node.reply,
+                        depth: depth,
+                        position: position++,
+                        isRoot: false
+                    });
+                }
+
+                // Process children
+                node.children.forEach(child => traverse(child, depth + 1));
+            }
+
+            traverse(tree, 0);
+
+            // Re-sort if needed
+            if (sortOrder === 'chronological') {
+                result.sort((a, b) => {
+                    const dateA = new Date(a.email?.datum || a.reply?.datum);
+                    const dateB = new Date(b.email?.datum || b.reply?.datum);
+                    return dateA - dateB;
+                });
+            } else if (sortOrder === 'reverse') {
+                result.sort((a, b) => {
+                    const dateA = new Date(a.email?.datum || a.reply?.datum);
+                    const dateB = new Date(b.email?.datum || b.reply?.datum);
+                    return dateB - dateA;
+                });
+            }
+
+            // Update positions after sorting
+            result.forEach((item, idx) => item.position = idx + 1);
+
+            return result;
+        }
+
+        // Generate HTML for thread visualization with indentation
+        function renderThreadVisualization(email) {
+            const tree = buildThreadTree(email);
+            const flatList = flattenThreadTree(tree, 'threaded');
+
+            let html = '<div class="thread-visualization">';
+
+            flatList.forEach(item => {
+                const indent = item.depth * 20; // 20px per level
+                const isIncoming = item.reply?.isIncoming !== false;
+                const direction = isIncoming ? 'incoming' : 'outgoing';
+
+                if (item.isRoot) {
+                    html += `
+                        <div class="thread-item thread-root" style="margin-left: ${indent}px;">
+                            <div class="thread-connector"></div>
+                            <div class="thread-content ${direction}">
+                                <div class="thread-header">
+                                    <span class="thread-sender">${escapeHtml(item.email.von_name || item.email.displaySender || 'Unbekannt')}</span>
+                                    <span class="thread-date">${formatDateDisplay(item.email.datum)}</span>
+                                    <span class="thread-badge original">Original</span>
+                                </div>
+                            </div>
+                        </div>`;
+                } else {
+                    const sender = item.reply.von || item.reply.vonEmail || item.reply.an || 'Unbekannt';
+                    html += `
+                        <div class="thread-item thread-reply" style="margin-left: ${indent}px;">
+                            <div class="thread-connector">
+                                <span class="connector-line"></span>
+                            </div>
+                            <div class="thread-content ${direction}">
+                                <div class="thread-header">
+                                    <span class="thread-sender">${escapeHtml(sender)}</span>
+                                    <span class="thread-date">${formatDateDisplay(item.reply.datum)}</span>
+                                    ${item.reply.isNew ? '<span class="thread-badge new">Neu</span>' : ''}
+                                </div>
+                            </div>
+                        </div>`;
+                }
+            });
+
+            html += '</div>';
+            return html;
+        }
+
+        // Helper: Format date for display
+        function formatDateDisplay(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr;
+
+            const now = new Date();
+            const diffMs = now - date;
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            // Relative time for recent dates
+            if (diffHours < 1) return 'vor wenigen Minuten';
+            if (diffHours < 24) return `vor ${diffHours} Stunde${diffHours > 1 ? 'n' : ''}`;
+            if (diffDays < 7) return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
+
+            // Absolute date for older dates
+            return date.toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Helper: Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Get thread summary for email list display
+        function getThreadSummary(email) {
+            const replies = email.antworten || [];
+            const allReplies = email.alleAntworten || replies;
+
+            const participants = new Set();
+            participants.add(email.von_email || email.von_name);
+
+            replies.forEach(r => {
+                if (r.von) participants.add(r.von);
+                if (r.vonEmail) participants.add(r.vonEmail);
+                if (r.an) participants.add(r.an);
+            });
+
+            const lastReply = replies.length > 0 ? replies[replies.length - 1] : null;
+            const newReplies = replies.filter(r => r.isNew).length;
+
             return {
-                emailId: e.emailId || e.entryID || '',
-                conversationId: e.conversationId || '',
-                datum: e.datum || e.receivedTime || '',
-                von_email: e.von_email || e.senderEmail || '',
-                von_name: e.von_name || e.senderName || '',
-                betreff: e.betreff || e.subject || '',
-                text: e.text || e.body || '',
-                antworten: e.antworten || []
+                messageCount: 1 + allReplies.length,
+                participantCount: participants.size,
+                participants: Array.from(participants).slice(0, 3),
+                lastActivityDate: lastReply ? lastReply.datum : email.datum,
+                newRepliesCount: newReplies,
+                hasNewReplies: newReplies > 0
             };
         }
 
-        function extractKunde(email) {
-            // Try to extract customer name from email body
-            const text = email.text || '';
+        // Remove email quotes and signatures from text
+        function removeEmailQuotes(text) {
+            if (!text) return '';
+
+            // Find where quoted content starts and cut it off
             const patterns = [
-                /Kunde[:\s]+([^\n,]+)/i,
-                /Versicherungsnehmer[:\s]+([^\n,]+)/i,
-                /VN[:\s]+([^\n,]+)/i,
-                /Name[:\s]+([^\n,]+)/i
+                /_{5,}\s*\r?\n\s*Von:/i,
+                /\r?\n\s*Von:\s+.+\r?\n\s*Gesendet:/im,
+                /-{3,}\s*Urspr[uü]ngliche\s+Nachricht/i,
+                /-{3,}\s*Original\s*Message/i,
+                /-{3,}\s*Weitergeleitete\s+Nachricht/i,
+                /_{5,}\s*\r?\n\s*From:/i,
+                /\r?\n\s*From:\s+.+\r?\n\s*Sent:/im,
+                /\r?\n\s*Am\s+\d.+\s+schrieb\s+.+:/im,
+                /\r?\n\s*On\s+.+\s+wrote:/im
             ];
+
+            let result = text;
             for (const pattern of patterns) {
-                const match = text.match(pattern);
-                if (match) return match[1].trim();
+                const match = result.search(pattern);
+                if (match > 0) {
+                    result = result.substring(0, match);
+                    break;
+                }
             }
-            return '';
+
+            // Remove trailing signature
+            result = result.replace(/\r?\n--\s*\r?\n[\s\S]*$/, '');
+
+            return result.trim();
         }
 
         // ============================================================================
-        // VIEWS
+        // PHASE 4: Multi-Client HTML Thread Parsing
         // ============================================================================
-        function switchView(view) {
-            currentView = view;
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-                tab.classList.toggle('active', tab.dataset.view === view);
-            });
-            renderEmailList();
+
+        // Month mappings for date parsing
+        const MONTH_MAPS = {
+            // German
+            'januar': 0, 'februar': 1, 'märz': 2, 'april': 3, 'mai': 4, 'juni': 5,
+            'juli': 6, 'august': 7, 'september': 8, 'oktober': 9, 'november': 10, 'dezember': 11,
+            // English
+            'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
+            'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11,
+            // English short
+            'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'jun': 5,
+            'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+        };
+
+        // Detect email client from HTML structure
+        function detectEmailClient(html) {
+            if (!html) return 'unknown';
+
+            // Outlook: border-top solid separators
+            if (/<div[^>]*style=['"][^'"]*border(?:-top)?:\s*solid/i.test(html)) {
+                return 'outlook';
+            }
+
+            // Gmail: gmail_quote class
+            if (/<div[^>]*class=['"][^'"]*gmail_quote/i.test(html)) {
+                return 'gmail';
+            }
+
+            // Apple Mail / Thunderbird: blockquote with type="cite"
+            if (/<blockquote[^>]*type=['"]cite['"]/i.test(html)) {
+                return 'apple-thunderbird';
+            }
+
+            // Generic blockquote
+            if (/<blockquote/i.test(html)) {
+                return 'generic-blockquote';
+            }
+
+            // Plain text quote markers in HTML
+            if (/&gt;\s*&gt;|>\s*>/i.test(html)) {
+                return 'plaintext-quote';
+            }
+
+            return 'unknown';
         }
 
-        function filterEmails() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            filteredEmails = emails.filter(email => {
-                const searchable = [
-                    email.von_name,
-                    email.von_email,
-                    email.betreff,
-                    email.text,
-                    email.kunde,
-                    email.makler
-                ].join(' ').toLowerCase();
-                return searchable.includes(search);
-            });
-            renderEmailList();
+        // Parse date string from various formats
+        function parseDateMultiFormat(dateStr) {
+            if (!dateStr) return null;
+
+            const cleaned = dateStr.trim();
+
+            // German format: "14. November 2025 10:30" or "14.11.2025 10:30"
+            let match = cleaned.match(/(\d{1,2})\.?\s*(\w+|\d{1,2})\.?\s*(\d{4})\s+(?:um\s+)?(\d{1,2}):(\d{2})/i);
+            if (match) {
+                let month;
+                if (/^\d+$/.test(match[2])) {
+                    month = parseInt(match[2]) - 1;
+                } else {
+                    month = MONTH_MAPS[match[2].toLowerCase()];
+                }
+                if (month !== undefined) {
+                    return new Date(parseInt(match[3]), month, parseInt(match[1]), parseInt(match[4]), parseInt(match[5]));
+                }
+            }
+
+            // English format: "November 14, 2025 at 10:30 AM" or "Nov 14, 2025 10:30"
+            match = cleaned.match(/(\w+)\s+(\d{1,2}),?\s*(\d{4})\s+(?:at\s+)?(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+            if (match) {
+                const month = MONTH_MAPS[match[1].toLowerCase()];
+                if (month !== undefined) {
+                    let hours = parseInt(match[4]);
+                    if (match[6]) {
+                        if (match[6].toUpperCase() === 'PM' && hours < 12) hours += 12;
+                        if (match[6].toUpperCase() === 'AM' && hours === 12) hours = 0;
+                    }
+                    return new Date(parseInt(match[3]), month, parseInt(match[2]), hours, parseInt(match[5]));
+                }
+            }
+
+            // ISO format: "2025-11-14T10:30:00"
+            match = cleaned.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), parseInt(match[4]), parseInt(match[5]));
+            }
+
+            // US format: "11/14/2025 10:30"
+            match = cleaned.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+            if (match) {
+                return new Date(parseInt(match[3]), parseInt(match[1]) - 1, parseInt(match[2]), parseInt(match[4]), parseInt(match[5]));
+            }
+
+            // Try native Date parsing as fallback
+            const fallback = new Date(cleaned);
+            return isNaN(fallback.getTime()) ? null : fallback;
         }
 
+        // Extract sender from various formats
+        function extractSenderFromHtml(html, client) {
+            let match;
+
+            // Outlook patterns
+            if (client === 'outlook') {
+                match = html.match(/<b>\s*Von:\s*<\/b>\s*<\/span>([^<]+)/i) ||
+                        html.match(/Von:\s*<\/span>\s*([^<]+)/i) ||
+                        html.match(/<b>Von:<\/b>([^<]+)/i) ||
+                        html.match(/Von:[\s\S]*?<\/tr>[\s\S]*?<tr[^>]*>[\s\S]*?<td[^>]*>([^<]+)/i) ||
+                        html.match(/Von:[\s\S]*?<\/span><\/b>[\s\S]*?<span[^>]*>([^<&]+)/i) ||
+                        html.match(/<b>\s*From:\s*<\/b>\s*<\/span>([^<]+)/i) ||
+                        html.match(/From:\s*<\/b>\s*([^<]+)/i);
+            }
+
+            // Gmail patterns
+            if (client === 'gmail') {
+                // "On Nov 14, 2025, Name <email> wrote:"
+                match = html.match(/On\s+[\w\s,]+,\s+([^<]+)<[^>]+>\s+wrote:/i) ||
+                        html.match(/Am\s+[\d\.\s]+(?:um\s+[\d:]+)?\s+schrieb\s+([^<:]+)/i);
+            }
+
+            // Apple Mail / Thunderbird patterns
+            if (client === 'apple-thunderbird') {
+                match = html.match(/On\s+[\w\s,]+,?\s+at\s+[\d:]+\s*(?:AM|PM)?,\s+([^<]+)<[^>]+>\s+wrote:/i) ||
+                        html.match(/Am\s+[\d\.\s]+(?:um\s+[\d:]+)?\s+schrieb\s+([^<:]+)/i) ||
+                        html.match(/Von:\s*([^<\n]+)/i) ||
+                        html.match(/From:\s*([^<\n]+)/i);
+            }
+
+            // Generic fallback patterns
+            if (!match) {
+                match = html.match(/Von:\s*([^<\n]+)/i) ||
+                        html.match(/From:\s*([^<\n]+)/i) ||
+                        html.match(/wrote:/i) && html.match(/([^<,]+)<[^>]+>\s+wrote:/i) ||
+                        html.match(/schrieb\s+([^<:]+)/i);
+            }
+
+            if (match && match[1]) {
+                // Clean up the sender name
+                return match[1]
+                    .replace(/&lt;.*$/, '')
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/&[a-z]+;/gi, ' ')
+                    .trim();
+            }
+
+            return null;
+        }
+
+        // Extract date from various HTML formats
+        function extractDateFromHtml(html, client) {
+            let match;
+
+            // Outlook patterns
+            if (client === 'outlook') {
+                match = html.match(/<b>\s*Gesendet:\s*<\/b>\s*([^<]+)/i) ||
+                        html.match(/Gesendet:\s*<\/b>\s*([^<]+)/i) ||
+                        html.match(/<b>Gesendet:<\/b>([^<]+)/i) ||
+                        html.match(/Gesendet:[\s\S]*?<\/span>[\s\S]*?<span[^>]*>([^<]+)/i) ||
+                        html.match(/<b>\s*Sent:\s*<\/b>\s*([^<]+)/i) ||
+                        html.match(/Sent:\s*<\/b>\s*([^<]+)/i);
+            }
+
+            // Gmail patterns: "On Nov 14, 2025, at 10:30 AM"
+            if (client === 'gmail') {
+                match = html.match(/On\s+([\w\s,]+\d{4}[^,]*),/i) ||
+                        html.match(/Am\s+([\d\.\s]+(?:um\s+[\d:]+)?)/i);
+            }
+
+            // Apple Mail / Thunderbird
+            if (client === 'apple-thunderbird') {
+                match = html.match(/On\s+([\w\s,]+at\s+[\d:]+\s*(?:AM|PM)?)/i) ||
+                        html.match(/Am\s+([\d\.\s]+(?:um\s+[\d:]+)?)/i);
+            }
+
+            // Generic fallback
+            if (!match) {
+                match = html.match(/Gesendet:\s*([^<\n]+)/i) ||
+                        html.match(/Sent:\s*([^<\n]+)/i) ||
+                        html.match(/Date:\s*([^<\n]+)/i) ||
+                        html.match(/Datum:\s*([^<\n]+)/i);
+            }
+
+            if (match && match[1]) {
+                return parseDateMultiFormat(match[1]);
+            }
+
+            return null;
+        }
+
+        // Parse Outlook-style threads
+        function parseOutlookThread(html) {
+            const separatorRegex = /<div[^>]*style=['"][^'"]*border(?:-top)?:\s*(?:none;border-top:)?solid[^'"]*['"][^>]*>/gi;
+            const separatorPositions = [];
+            let match;
+            while ((match = separatorRegex.exec(html)) !== null) {
+                separatorPositions.push(match.index);
+            }
+
+            if (separatorPositions.length === 0) return [];
+
+            const parts = [];
+
+            // First part: from start to first separator
+            if (separatorPositions[0] > 100) {
+                parts.push({ html: html.substring(0, separatorPositions[0]), hasHeader: false });
+            }
+
+            // Remaining parts
+            for (let i = 0; i < separatorPositions.length; i++) {
+                const start = separatorPositions[i];
+                const end = i < separatorPositions.length - 1 ? separatorPositions[i + 1] : html.length;
+                parts.push({ html: html.substring(start, end), hasHeader: true });
+            }
+
+            return parts.map(part => ({
+                html: part.html,
+                von: extractSenderFromHtml(part.html, 'outlook'),
+                datum: extractDateFromHtml(part.html, 'outlook'),
+                client: 'outlook',
+                confidence: 0.9
+            })).filter(m => m.html && m.html.length > 50);
+        }
+
+        // Parse Gmail-style threads
+        function parseGmailThread(html) {
+            const parts = [];
+            const gmailQuoteRegex = /<div[^>]*class=['"][^'"]*gmail_quote[^'"]*['"][^>]*>/gi;
+            const positions = [];
+            let match;
+            while ((match = gmailQuoteRegex.exec(html)) !== null) {
+                positions.push(match.index);
+            }
+
+            if (positions.length === 0) return [];
+
+            // First part before any quote
+            if (positions[0] > 100) {
+                parts.push({ html: html.substring(0, positions[0]), hasHeader: false });
+            }
+
+            // Each quoted section
+            for (let i = 0; i < positions.length; i++) {
+                const start = positions[i];
+                const end = i < positions.length - 1 ? positions[i + 1] : html.length;
+                parts.push({ html: html.substring(start, end), hasHeader: true });
+            }
+
+            return parts.map(part => ({
+                html: part.html,
+                von: extractSenderFromHtml(part.html, 'gmail'),
+                datum: extractDateFromHtml(part.html, 'gmail'),
+                client: 'gmail',
+                confidence: 0.85
+            })).filter(m => m.html && m.html.length > 50);
+        }
+
+        // Parse blockquote-style threads (Apple Mail, Thunderbird)
+        function parseBlockquoteThread(html) {
+            const parts = [];
+            const blockquoteRegex = /<blockquote[^>]*(?:type=['"]cite['"])?[^>]*>/gi;
+            const positions = [];
+            let match;
+            while ((match = blockquoteRegex.exec(html)) !== null) {
+                positions.push(match.index);
+            }
+
+            if (positions.length === 0) return [];
+
+            // First part before any blockquote
+            if (positions[0] > 100) {
+                parts.push({ html: html.substring(0, positions[0]), hasHeader: false });
+            }
+
+            // Each blockquote section
+            for (let i = 0; i < positions.length; i++) {
+                const start = positions[i];
+                // Find matching closing tag (simplified - may need improvement for nested)
+                const closeMatch = html.substring(start).match(/<\/blockquote>/i);
+                const end = closeMatch ? start + closeMatch.index + closeMatch[0].length : html.length;
+                parts.push({ html: html.substring(start, end), hasHeader: true });
+            }
+
+            return parts.map(part => ({
+                html: part.html,
+                von: extractSenderFromHtml(part.html, 'apple-thunderbird'),
+                datum: extractDateFromHtml(part.html, 'apple-thunderbird'),
+                client: 'apple-thunderbird',
+                confidence: 0.8
+            })).filter(m => m.html && m.html.length > 50);
+        }
+
+        // Main function: Parse HTML email thread into individual messages
+        // Supports multiple email clients: Outlook, Gmail, Apple Mail, Thunderbird
+        function parseEmailThreadHtml(html) {
+            if (!html) return [];
+
+            // Detect email client
+            const client = detectEmailClient(html);
+            let messages = [];
+
+            // Parse based on detected client
+            switch (client) {
+                case 'outlook':
+                    messages = parseOutlookThread(html);
+                    break;
+                case 'gmail':
+                    messages = parseGmailThread(html);
+                    break;
+                case 'apple-thunderbird':
+                case 'generic-blockquote':
+                    messages = parseBlockquoteThread(html);
+                    break;
+                default:
+                    // Try all parsers and use the one with best results
+                    const outlookResult = parseOutlookThread(html);
+                    const gmailResult = parseGmailThread(html);
+                    const blockquoteResult = parseBlockquoteThread(html);
+
+                    // Use the result with most messages found
+                    if (outlookResult.length >= gmailResult.length && outlookResult.length >= blockquoteResult.length) {
+                        messages = outlookResult;
+                    } else if (gmailResult.length >= blockquoteResult.length) {
+                        messages = gmailResult;
+                    } else {
+                        messages = blockquoteResult;
+                    }
+            }
+
+            if (messages.length === 0) {
+                // No thread structure found - single email
+                return [];
+            }
+
+            // Sort by date (oldest first)
+            messages.sort((a, b) => {
+                if (!a.datum && !b.datum) return 0;
+                if (!a.datum) return 1;
+                if (!b.datum) return -1;
+                return a.datum.getTime() - b.datum.getTime();
+            });
+
+            // Mark oldest as original and add metadata
+            messages.forEach((msg, idx) => {
+                msg.isOriginal = (idx === 0);
+                msg.threadPosition = idx + 1;
+                msg.threadDepth = idx; // Simple linear depth
+            });
+
+            return messages;
+        }
+
+        // Remove quoted email content from HTML body
+        function removeEmailQuotesHtml(html) {
+            if (!html) return '';
+
+            // Find where quoted content starts in HTML (Outlook style)
+            const quotePatterns = [
+                /<div[^>]*style=['"][^'"]*border-top:\s*solid[^'"]*['"][^>]*>/i,  // Outlook quote separator
+                /<div[^>]*style=['"][^'"]*border:none;border-top:solid[^'"]*['"][^>]*>/i,  // Outlook variant
+                /<div[^>]*class=['"][^'"]*gmail_quote[^'"]*['"][^>]*>/i,          // Gmail quote
+                /<blockquote[^>]*>/i,                                              // Standard blockquote
+                /<!--\s*Original\s*Message\s*-->/i,                                // HTML comment
+            ];
+
+            let result = html;
+            let cutIndex = -1;
+
+            for (const pattern of quotePatterns) {
+                const match = result.search(pattern);
+                if (match > 0 && (cutIndex === -1 || match < cutIndex)) {
+                    cutIndex = match;
+                }
+            }
+
+            if (cutIndex > 0) {
+                result = result.substring(0, cutIndex);
+            }
+
+            // Extract just the body content if present, stripping outer tags
+            const bodyMatch = result.match(/<body[^>]*>([\s\S]*?)(?:<\/body>|$)/i);
+            if (bodyMatch) {
+                return bodyMatch[1];
+            }
+
+            // Otherwise return as-is (might be partial HTML)
+            return result;
+        }
+
+        function processEmails(rawEmails) {
+            // Filter out emails with subject containing "Online-Abschluss Vermittlerzuordnung ändern"
+            rawEmails = rawEmails.filter(email => {
+                const subject = (email.betreff || email.subject || '').toLowerCase();
+                return !subject.includes('online-abschluss vermittlerzuordnung ändern');
+            });
+
+            emails = rawEmails.map(email => {
+                const text = email.text || email.body || '';
+                const subject = email.betreff || email.subject || '';
+                const fromEmail = email.von_email || email.from_email || '';
+                const fromName = email.von_name || email.from_name || email.von || '';
+
+                // Pre-parse HTML thread to find original sender
+                const htmlBody = email.htmlBody || '';
+                const parsedThread = parseEmailThreadHtml(htmlBody);
+                const originalMessage = parsedThread.find(m => m.isOriginal);
+
+                // Determine the display sender:
+                // 1. Keep existing displaySender if set (from conversation conversion)
+                // 2. Otherwise use original sender from parsed HTML thread
+                // 3. Fallback to fromName/fromEmail
+                let displaySender = email.displaySender || fromName || fromEmail;
+                if (!email.displaySender && originalMessage && originalMessage.von) {
+                    displaySender = originalMessage.von;
+                }
+
+                // Auto-categorize
+                const kategorie = categorizeEmail(subject, text, fromEmail);
+                const clusters = identifyClusters(subject, text);
+                const isProvision = isProvisionEmail(subject, text, fromEmail);
+                const provisionData = isProvision ? parseProvisionData(text) : null;
+                // Vermittler: prefer provisionData's vermittler name, fallback to extracted
+                const vermittlerName = provisionData ?
+                    ((provisionData.vorname_vermittler || '') + ' ' + (provisionData.nachname_vermittler || '')).trim() : '';
+                const agentur = vermittlerName || extractAgentur(fromName, subject);
+                const vermittlernr = provisionData?.vermittlernummer_vermittler || extractVermittlernr(text);
+                const vsnr = provisionData?.versicherungsnummer_kunde || extractVsnr(text);
+
+                return {
+                    id: nextId++,
+                    datum: email.datum || email.date || new Date().toISOString(),
+                    von_email: fromEmail,
+                    von_name: fromName,
+                    betreff: subject || '(Kein Betreff)',
+                    text: text,
+                    htmlBody: email.htmlBody || '',  // HTML version for tables/formatting
+                    anhaenge: email.anhaenge || email.attachments || [],
+                    antworten: email.antworten || [],  // Replies from HTA export (nur neue bei Duplikaten)
+                    alleAntworten: email.alleAntworten || email.antworten || [],  // Alle Antworten (für Anzeige)
+                    existingReplies: email.existingReplies || '',  // Bereits in Excel vorhandene Antworten
+                    isDuplicateWithNewReplies: email.isDuplicateWithNewReplies || false,
+                    conversationId: email.conversationId || '',  // Outlook ConversationID für Duplikatsprüfung
+
+                    // PHASE 1: Extended thread-mapping fields
+                    emailId: email.emailId || '',                    // Outlook EntryID
+                    internetMessageId: email.internetMessageId || '', // RFC 2822 Message-ID
+                    inReplyTo: email.inReplyTo || '',                // Parent message ID
+                    references: email.references || [],              // Full thread chain
+                    conversationIndex: email.conversationIndex || '', // Outlook internal index
+                    normalizedSubject: email.normalizedSubject || normalizeSubjectJS(subject), // Normalized for matching
+                    threadId: email.threadId || '',                  // Computed thread ID from HTA
+
+                    // Pre-filled fields
+                    kategorie: kategorie,
+                    status: 'Neu',
+                    clusters: clusters,
+                    agentur: agentur,
+                    vermittlernr: vermittlernr,
+                    vsnr: vsnr,
+                    // anfrage: stored for text fallback (actual display uses HTML parsing)
+                    anfrage: email.anfrage || (provisionData?.nachricht) || removeEmailQuotes(text),
+                    antwort: email.antwort || '',
+                    kommentar: email.kommentar || '',
+                    bearbeiter: email.bearbeiter || email.outlookKategorie || '',  // From saved or Outlook category
+
+                    isProvision: isProvision,
+                    provisionData: provisionData,
+                    outlookKategorie: email.outlookKategorie || '',  // Outlook category for Bearbeiter
+
+                    // Display sender info (from HTML parsing)
+                    displaySender: displaySender,
+                    _parsedThread: parsedThread  // Cache parsed thread for later use
+                };
+            });
+
+            filteredEmails = [...emails];
+
+            // Show main content
+            document.getElementById('uploadScreen').style.display = 'none';
+            document.getElementById('mainContent').classList.add('active');
+            document.getElementById('headerStats').style.display = 'flex';
+            document.getElementById('btnExport').style.display = 'flex';
+            document.getElementById('btnKeywords').style.display = 'flex';
+            document.getElementById('stepIndicator').style.display = 'flex';
+
+            // Initialize step indicator to step 1 (Auswählen)
+            updateStepIndicator(1);
+
+            // Select all emails for export by default
+            selectedForExport = new Set(emails.map(e => e.id));
+
+            renderEmailList();
+            updateStats();
+            initClusterTags();
+
+            showNotification(emails.length + ' Emails geladen', 'success');
+        }
+
+        // ============================================================================
+        // AUTO-CATEGORIZATION
+        // ============================================================================
+        function categorizeEmail(subject, text, fromEmail) {
+            const s = subject.toLowerCase();
+            const t = text.toLowerCase();
+            const f = fromEmail.toLowerCase();
+
+            if (s.includes('provisionsreklamation') || s.includes('provision') || f.includes('redaktion@barmenia')) {
+                return 'Provisionsreklamation';
+            }
+            if (s.includes('incident') || s.includes('störung') || s.includes('fehler')) {
+                if (s.includes('schwer') || s.includes('kritisch') || s.includes('dringend')) return 'Incident (Schwer)';
+                if (s.includes('mittel')) return 'Incident (Mittel)';
+                return 'Incident (Leicht)';
+            }
+            if (s.includes('frage') || s.includes('rückfrage') || s.includes('anfrage') || t.includes('können sie mir')) {
+                return 'Fachliche Rückfrage';
+            }
+            return 'Sonstiges';
+        }
+
+        function identifyClusters(subject, text) {
+            const clusters = [];
+            const s = subject.toLowerCase();
+            const t = text.toLowerCase();
+            const combined = s + ' ' + t;
+
+            // KV - Krankenversicherung (präzise Wortgrenzen)
+            if (combined.match(/\bkv\b|\bkrankenversicherung\b|\bkrankenkasse\b|\bgesundheit\b|\bpflegeversicherung\b|\bauslandsreise\b|\breisekranken\b|\bbkk\b|\bzahnzusatz\b|\bkrankenzusatz\b|\bambulant\b|\bstationär\b|\bkrankentagegeld\b/)) clusters.push('KV');
+            // SHUK - Sach/Haftpflicht/Unfall/KFZ/Komposit (präzise Wortgrenzen)
+            if (combined.match(/\bshuk\b|\bsachversicherung\b|\bhaftpflicht\b|\bunfallversicherung\b|\bhausrat\b|\bwohngebäude\b|\brechtsschutz\b|\btierhalter\b|\bgewässerschaden\b|\bphotovoltaik\b|\bkfz\b|\bkraftfahrzeug\b|\bfahrzeugversicherung\b|\bkasko\b|\bvollkasko\b|\bteilkasko\b|\bpkw\b|\bkennzeichen\b|\bmotorrad\b|\banhängerversicherung\b/)) clusters.push('SHUK');
+            // LV - Lebensversicherung (präzise Wortgrenzen)
+            if (combined.match(/\blv\b|\blebensversicherung\b|\brentenversicherung\b|\baltersvorsorge\b|\briester\b|\brürup\b|\bbav\b|\bsterbegeld\b|\bberufsunfähigkeit\b|\bbu-versicherung\b/)) clusters.push('LV');
+            // Provisionierung (präzise Wortgrenzen)
+            if (combined.match(/\bprovision\b|\bprovisionsreklamation\b|\bvergütung\b|\bcourtage\b|\bstorno\b|\bdynamisierung\b|\bbestandspflege\b/)) clusters.push('Provisionierung');
+            // Bestand (präzise Wortgrenzen)
+            if (combined.match(/\bbestand\b|\bbestandskunde\b|\bbestandsvertrag\b|\bbestandsdaten\b/)) clusters.push('Bestand');
+            // Absatzeinheiten (AE)
+            if (combined.match(/\bae\b|\babsatzeinheit\b|\babsatzeinheiten\b/)) clusters.push('Absatzeinheiten');
+
+            return clusters;
+        }
+
+        function isProvisionEmail(subject, text, fromEmail) {
+            const s = subject.toLowerCase();
+            const f = fromEmail.toLowerCase();
+            return s.includes('provisionsreklamation') || s.includes('provision') || f.includes('redaktion@barmenia') ||
+                   text.includes('reklamation_provision') || text.includes('vermittlernummer_vermittler');
+        }
+
+        function parseProvisionData(text) {
+            const data = {};
+            const allFields = [
+                'reklamation_provision', 'reklamation_absatz',
+                'vorname_vermittler', 'nachname_vermittler', 'vermittlernummer_vermittler',
+                'versicherungsnummer_kunde', 'vorname_kunde', 'nachname_kunde',
+                'adresse_kunde', 'nachricht', 'datenschutz'
+            ];
+
+            // Build lookahead pattern for all field names (to stop at next field)
+            const fieldLookahead = allFields.map(f => f + '\\s*:').join('|');
+
+            // Parse simple single-line fields
+            allFields.forEach(field => {
+                if (field === 'nachricht' || field === 'adresse_kunde') return; // Handle separately
+
+                // Match field value until next field name, newline, or end
+                const regex = new RegExp(field + '\\s*:\\s*(.+?)(?=\\s+(?:' + fieldLookahead + ')|\\n|$)', 'i');
+                const match = text.match(regex);
+                if (match) {
+                    let value = match[1].trim();
+                    // Clean up any trailing field names that might have been captured
+                    value = value.replace(/\s+(reklamation_|vorname_|nachname_|vermittlernummer_|versicherungsnummer_|adresse_|nachricht|datenschutz).*$/i, '').trim();
+                    if (value) data[field] = value;
+                }
+            });
+
+            // Parse 'nachricht' specially - it's multiline
+            // Extract from "nachricht :" until "datenschutz" or signature
+            const nachrichtMatch = text.match(/nachricht\s*:\s*([\s\S]*?)(?=datenschutz\s*:|_{5,}|Datenschutzhinweise|Vertraulichkeitshinweis|Confidentiality|________________________________|$)/i);
+            if (nachrichtMatch) {
+                let nachricht = nachrichtMatch[1].trim();
+                // Clean up extra whitespace and remove any trailing signature parts
+                nachricht = nachricht
+                    .replace(/\n{3,}/g, '\n\n')  // Reduce multiple newlines
+                    .replace(/[\r\n]+$/g, '')     // Remove trailing newlines
+                    .trim();
+                if (nachricht) data.nachricht = nachricht;
+            }
+
+            return Object.keys(data).length > 0 ? data : null;
+        }
+
+        function extractAgentur(fromName, subject) {
+            // Try to extract agency name from sender or subject
+            const patterns = [/agentur\s+([^\s,]+)/i, /([A-Z][a-zäöü]+)\s+(?:GmbH|AG|Versicherung)/];
+            for (const pattern of patterns) {
+                const match = (fromName + ' ' + subject).match(pattern);
+                if (match) return match[1];
+            }
+            return fromName || '';
+        }
+
+        function extractVermittlernr(text) {
+            const match = text.match(/vermittler(?:nummer|nr)?[:\s]*(\d{5,10})/i);
+            return match ? match[1] : '';
+        }
+
+        function extractVsnr(text) {
+            const match = text.match(/versicherungs(?:nummer|nr|schein)?[:\s]*(\d{5,15})/i);
+            return match ? match[1] : '';
+        }
+
+        // ============================================================================
+        // RENDER EMAIL LIST
+        // ============================================================================
         function renderEmailList() {
-            const container = document.getElementById('emailList');
+            const list = document.getElementById('emailList');
 
-            if (currentView === 'kunden') {
-                renderGroupedList(container, 'kunde', 'Kein Kunde');
-            } else if (currentView === 'makler') {
-                renderGroupedList(container, 'makler', 'Unbekannter Makler');
-            } else {
-                renderFlatList(container);
+            if (filteredEmails.length === 0) {
+                list.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">Keine Emails gefunden</div>';
+                document.getElementById('selectAllRow').style.display = 'none';
+                return;
             }
-        }
 
-        function renderFlatList(container) {
-            const sorted = [...filteredEmails].sort((a, b) =>
-                (b.datum || '') > (a.datum || '') ? 1 : -1
-            );
+            // Sort by date descending (newest first)
+            filteredEmails.sort((a, b) => new Date(b.datum) - new Date(a.datum));
 
-            container.innerHTML = sorted.map(email => renderEmailItem(email)).join('');
-        }
+            // Show select-all row
+            document.getElementById('selectAllRow').style.display = 'flex';
+            updateSelectedCount();
 
-        function renderGroupedList(container, groupBy, defaultGroup) {
-            const groups = {};
+            // Group emails by day
+            let currentDay = null;
+            let html = '';
+
             filteredEmails.forEach(email => {
-                const key = email[groupBy] || defaultGroup;
-                if (!groups[key]) groups[key] = [];
-                groups[key].push(email);
-            });
+                const date = new Date(email.datum);
+                const dayKey = date.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 
-            const sortedGroups = Object.keys(groups).sort();
+                // Add day header if new day
+                if (dayKey !== currentDay) {
+                    currentDay = dayKey;
+                    html += `<div class="day-header">${dayKey}</div>`;
+                }
 
-            container.innerHTML = sortedGroups.map(group => `
-                <div class="group-header">
-                    <span>${escapeHtml(group)}</span>
-                    <span class="group-count">${groups[group].length}</span>
-                </div>
-                ${groups[group].map(email => renderEmailItem(email)).join('')}
-            `).join('');
-        }
+                const dateStr = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                const preview = (email.text || '').substring(0, 60).replace(/\n/g, ' ') + '...';
+                const selectedClass = email.id === selectedEmailId ? ' selected' : '';
+                const isChecked = selectedForExport.has(email.id) ? 'checked' : '';
 
-        function renderEmailItem(email) {
-            const statusClass = {
-                'Neu': 'tag-status-neu',
-                'In Bearbeitung': 'tag-status-bearbeitung',
-                'Erledigt': 'tag-status-erledigt'
-            }[email.status] || 'tag-status-neu';
+                // Count replies - alleAntworten includes root, so subtract 1
+                const alleCount = email.alleAntworten?.length || 0;
+                const antwortenCount = email.antworten?.length || 0;
+                // If alleAntworten is used, it includes the root message, so real reply count = length - 1
+                // If only antworten is used, it already excludes root
+                const uniqueReplyCount = alleCount > 0 ? Math.max(0, alleCount - 1) : antwortenCount;
 
-            return `
-                <div class="email-item ${email.id === selectedEmailId ? 'selected' : ''}"
-                     onclick="selectEmail(${email.id})">
-                    <div class="email-header">
-                        <span class="email-sender">${escapeHtml(email.von_name || email.von_email || 'Unbekannt')}</span>
-                        <span class="email-date">${formatDate(email.datum)}</span>
-                    </div>
-                    <div class="email-subject">${escapeHtml(email.betreff || '(Kein Betreff)')}</div>
-                    <div class="email-preview">${escapeHtml(truncate(email.text, 80))}</div>
-                    <div class="email-meta">
-                        ${email.kunde ? `<span class="email-tag tag-kunde">${escapeHtml(email.kunde)}</span>` : ''}
-                        ${email.antworten.length > 0 ? `<span class="email-tag tag-replies">${email.antworten.length} Antworten</span>` : ''}
-                        <span class="email-tag ${statusClass}">${email.status}</span>
-                    </div>
-                </div>
-            `;
-        }
+                // Read/Unread badge (separate - goes next to name)
+                let readBadge = '';
+                if (readEmails.has(email.id)) {
+                    readBadge = '<span class="badge badge-read">Gelesen</span>';
+                } else {
+                    readBadge = '<span class="badge badge-unread">Ungelesen</span>';
+                }
 
-        // ============================================================================
-        // DETAIL VIEW
-        // ============================================================================
-        function selectEmail(id) {
-            selectedEmailId = id;
-            const email = emails.find(e => e.id === id);
+                let badges = '';
+                // Show reply count badge
+                if (uniqueReplyCount > 0) {
+                    badges += '<span class="badge badge-reply">' + uniqueReplyCount + ' Antw.</span>';
+                }
+                // Show update badge for duplicates with new replies
+                if (email.isDuplicateWithNewReplies) {
+                    badges += '<span class="badge badge-update">Update</span>';
+                }
+                if (email.isProvision) badges += '<span class="badge badge-provision">Provision</span>';
+                else if (email.kategorie.includes('Incident')) badges += '<span class="badge badge-incident">Incident</span>';
+                else if (email.kategorie === 'Fachliche Rückfrage') badges += '<span class="badge badge-question">Frage</span>';
 
-            if (!email) return;
+                email.clusters.slice(0, 2).forEach(c => {
+                    badges += '<span class="badge badge-cluster">' + c + '</span>';
+                });
 
-            document.getElementById('detailEmpty').classList.add('hidden');
-            document.getElementById('detailContent').classList.remove('hidden');
+                // Use displaySender (from HTML parsing)
+                const senderDisplay = email.displaySender || email.von_name || email.von_email;
 
-            document.getElementById('detailSubject').textContent = email.betreff || '(Kein Betreff)';
-            document.getElementById('detailFrom').textContent = email.von_name || email.von_email || 'Unbekannt';
-            document.getElementById('detailDate').textContent = formatDateTime(email.datum);
-            document.getElementById('detailReplies').textContent = email.antworten.length;
-
-            // Render messages
-            let messagesHtml = `
-                <div class="message-block">
-                    <div class="message-header incoming">
-                        <div>
-                            <div class="message-label anfrage">Anfrage</div>
-                            <div class="message-from">${escapeHtml(email.von_name || email.von_email)}</div>
-                        </div>
-                        <div class="message-date">${formatDateTime(email.datum)}</div>
-                    </div>
-                    <div class="message-body">${escapeHtml(email.text || '(Kein Inhalt)')}</div>
-                </div>
-            `;
-
-            email.antworten.forEach((reply, idx) => {
-                const isOutgoing = !reply.isIncoming;
-                messagesHtml += `
-                    <div class="message-block">
-                        <div class="message-header ${isOutgoing ? 'outgoing' : 'incoming'}">
-                            <div>
-                                <div class="message-label antwort">Antwort ${idx + 1}</div>
-                                <div class="message-from">${escapeHtml(reply.von || 'Unbekannt')}</div>
+                html += `
+                    <div class="email-item${selectedClass}">
+                        <input type="checkbox" class="email-checkbox" ${isChecked}
+                               onclick="event.stopPropagation(); toggleEmailSelection(${email.id})">
+                        <div class="email-item-content" onclick="selectEmail(${email.id})">
+                            <div class="email-item-header">
+                                <span class="email-sender">${escapeHtml(senderDisplay)}</span>
+                                ${readBadge}
+                                <span class="email-date">${dateStr}</span>
                             </div>
-                            <div class="message-date">${formatDateTime(reply.datum)}</div>
+                            <div class="email-subject">${escapeHtml(email.betreff)}</div>
+                            <div class="email-preview">${escapeHtml(preview)}</div>
+                            <div class="email-badges">${badges}</div>
                         </div>
-                        <div class="message-body">${escapeHtml(reply.text || '(Kein Inhalt)')}</div>
                     </div>
                 `;
             });
 
-            document.getElementById('detailMessages').innerHTML = messagesHtml;
+            list.innerHTML = html;
+        }
 
-            // Fill edit form
-            document.getElementById('editStatus').value = email.status || 'Neu';
-            document.getElementById('editBearbeiter').value = email.bearbeiter || '';
-            document.getElementById('editKunde').value = email.kunde || '';
-            document.getElementById('editVsnr').value = email.vsnr || '';
-            document.getElementById('editKommentar').value = email.kommentar || '';
+        function toggleEmailSelection(id) {
+            if (selectedForExport.has(id)) {
+                selectedForExport.delete(id);
+            } else {
+                selectedForExport.add(id);
+            }
+            updateSelectedCount();
+        }
 
+        function toggleSelectAll() {
+            const checkbox = document.getElementById('selectAllCheckbox');
+            if (checkbox.checked) {
+                // Select all visible emails
+                filteredEmails.forEach(email => selectedForExport.add(email.id));
+            } else {
+                // Deselect all visible emails
+                filteredEmails.forEach(email => selectedForExport.delete(email.id));
+            }
             renderEmailList();
         }
 
-        function updateEmail(field) {
+        function updateSelectedCount() {
+            const count = selectedForExport.size;
+            document.getElementById('selectedCount').textContent = count + ' ausgewählt';
+
+            // Update select-all checkbox state
+            const allSelected = filteredEmails.length > 0 &&
+                               filteredEmails.every(e => selectedForExport.has(e.id));
+            document.getElementById('selectAllCheckbox').checked = allSelected;
+        }
+
+        // ============================================================================
+        // SELECT EMAIL
+        // ============================================================================
+        function selectEmail(id) {
+            selectedEmailId = id;
+            const email = emails.find(e => e.id === id);
+            if (!email) return;
+
+            // Mark as read
+            readEmails.add(id);
+
+            // Update list
+            renderEmailList();
+
+            // Show detail
+            document.getElementById('detailEmpty').style.display = 'none';
+            document.getElementById('emailDetail').classList.add('active');
+
+            // Build list of ALL messages from antworten array to find the oldest (original request)
+            const allMessages = [...(email.alleAntworten || email.antworten || [])].map(reply => ({
+                von: reply.von || reply.vonEmail || 'Unbekannt',
+                datum: reply.datum ? new Date(reply.datum) : null,
+                htmlBody: reply.htmlBody,
+                text: reply.text,
+                isFromAntworten: true
+            }));
+
+            // Sort by date (oldest first) - messages without dates go to the end
+            allMessages.sort((a, b) => {
+                if (!a.datum && !b.datum) return 0;
+                if (!a.datum) return 1;
+                if (!b.datum) return -1;
+                return a.datum.getTime() - b.datum.getTime();
+            });
+
+            // The oldest message is the original request (Anfrage)
+            const originalMessage = allMessages.length > 0 ? allMessages[0] : null;
+
+            // Keep parsedThread for backwards compatibility with other parts of the code
+            const parsedThread = email._parsedThread || (email.htmlBody ? parseEmailThreadHtml(email.htmlBody) : []);
+            if (!email._parsedThread) email._parsedThread = parsedThread;
+
+            // Fill header - use original sender from parsed thread if available
+            document.getElementById('detailSubject').textContent = email.betreff;
+            const originalSender = (originalMessage && originalMessage.von)
+                ? originalMessage.von
+                : email.von_name + ' <' + email.von_email + '>';
+            document.getElementById('detailFrom').textContent = originalSender;
+            const originalDate = (originalMessage && originalMessage.datum)
+                ? originalMessage.datum
+                : new Date(email.datum);
+            document.getElementById('detailDate').textContent = originalDate.toLocaleString('de-DE');
+
+            // Calculate and show latest reply date
+            let latestReplyDate = null;
+            const allReplies = email.alleAntworten || email.antworten || [];
+            for (const reply of allReplies) {
+                if (reply.datum) {
+                    const replyDate = new Date(reply.datum);
+                    if (!isNaN(replyDate.getTime())) {
+                        if (!latestReplyDate || replyDate > latestReplyDate) {
+                            latestReplyDate = replyDate;
+                        }
+                    }
+                }
+            }
+            document.getElementById('detailLastReplyDate').textContent = latestReplyDate
+                ? latestReplyDate.toLocaleString('de-DE')
+                : '-';
+
+            // Provision box
+            const provisionBox = document.getElementById('provisionBox');
+            if (email.provisionData) {
+                const pd = email.provisionData;
+                provisionBox.innerHTML = `
+                    <div class="provision-box">
+                        <div class="provision-box-title"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Provisionsreklamation - Extrahierte Daten</div>
+                        <div class="provision-grid">
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Vermittler</div>
+                                <div class="provision-field-value">${escapeHtml((pd.vorname_vermittler || '') + ' ' + (pd.nachname_vermittler || ''))}</div>
+                            </div>
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Vermittlernr.</div>
+                                <div class="provision-field-value">${escapeHtml(pd.vermittlernummer_vermittler || '-')}</div>
+                            </div>
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Kunde</div>
+                                <div class="provision-field-value">${escapeHtml((pd.vorname_kunde || '') + ' ' + (pd.nachname_kunde || ''))}</div>
+                            </div>
+                            <div class="provision-field-small">
+                                <div class="provision-field-label">Versicherungsnr.</div>
+                                <div class="provision-field-value">${escapeHtml(pd.versicherungsnummer_kunde || '-')}</div>
+                            </div>
+                        </div>
+                        ${pd.nachricht ? '<div style="margin-top: 0.75rem; font-size: 0.8125rem;"><strong>Nachricht:</strong> ' + escapeHtml(pd.nachricht) + '</div>' : ''}
+                    </div>
+                `;
+            } else {
+                provisionBox.innerHTML = '';
+            }
+
+            // Email text with keyword highlighting
+            const detailTextEl = document.getElementById('detailText');
+
+            // Use originalMessage from antworten array (oldest message = original request)
+            if (originalMessage && originalMessage.htmlBody && originalMessage.htmlBody.length > 50) {
+                // Display the original (oldest) email from thread as HTML with quotes removed
+                const iframe = document.createElement('iframe');
+                iframe.className = 'html-email-frame';
+                detailTextEl.innerHTML = '';
+
+                const cleanedOriginalHtml = removeEmailQuotesHtml(originalMessage.htmlBody);
+                const wrappedHtml = `<!DOCTYPE html>
+                    <html><head><meta charset="UTF-8">
+                    <style>
+                        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; margin: 10px; }
+                        table { border-collapse: collapse; width: 100%; }
+                        td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        tr:nth-child(even) { background-color: #fafafa; }
+                    </style></head><body>${cleanedOriginalHtml}</body></html>`;
+
+                iframe.srcdoc = wrappedHtml;
+                detailTextEl.appendChild(iframe);
+            } else if (originalMessage && originalMessage.text) {
+                // Display original message as plain text (conversation format without HTML)
+                const displayText = removeEmailQuotes(originalMessage.text || '');
+                detailTextEl.innerHTML = highlightKeywords(displayText);
+            } else if (email.htmlBody && (
+                email.htmlBody.toLowerCase().includes('<table') ||
+                email.htmlBody.toLowerCase().includes('<div')
+            )) {
+                // No thread parsed, show full HTML with quotes removed
+                const iframe = document.createElement('iframe');
+                iframe.className = 'html-email-frame';
+                detailTextEl.innerHTML = '';
+
+                const cleanedHtmlBody = removeEmailQuotesHtml(email.htmlBody);
+                const wrappedHtml = `<!DOCTYPE html>
+                    <html><head><meta charset="UTF-8">
+                    <style>
+                        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; margin: 10px; }
+                        table { border-collapse: collapse; width: 100%; }
+                        td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        tr:nth-child(even) { background-color: #fafafa; }
+                    </style></head><body>${cleanedHtmlBody}</body></html>`;
+
+                iframe.srcdoc = wrappedHtml;
+                detailTextEl.appendChild(iframe);
+            } else {
+                // Plain text display
+                const displayText = email.anfrage || removeEmailQuotes(email.text || '');
+                detailTextEl.innerHTML = highlightKeywords(displayText);
+            }
+
+            // Update step indicator to "Kategorisieren"
+            updateStepIndicator(2);
+
+            // Fill form
+            document.getElementById('formKategorie').value = email.kategorie;
+            document.getElementById('formStatus').value = email.status;
+            document.getElementById('formAgentur').value = email.agentur;
+            document.getElementById('formVermittlernr').value = email.vermittlernr;
+            document.getElementById('formVsnr').value = email.vsnr;
+            document.getElementById('formBearbeiter').value = email.bearbeiter || '';
+            document.getElementById('formAntwort').value = email.antwort;
+            document.getElementById('formKommentar').value = email.kommentar;
+
+            // Update cluster tags
+            updateClusterTags(email);
+
+            // Reset to Anfrage tab when selecting new email
+            switchContentTab('anfrage');
+
+            // Handle replies tab
+            const repliesList = document.getElementById('repliesList');
+            const replyCountBadge = document.getElementById('replyCount');
+            const tabAntworten = document.getElementById('tabAntworten');
+
+            // Use allMessages (already sorted oldest first) - skip the first one (Anfrage)
+            // All remaining messages are replies (Antworten)
+            let displayReplies = [];
+            const rawReplies = email.alleAntworten || email.antworten || [];
+
+            if (allMessages.length > 1) {
+                // Skip the first (oldest = Anfrage), show the rest as replies
+                const replyMessages = allMessages.slice(1);
+                const seenTexts = new Set();
+
+                for (const reply of replyMessages) {
+                    // Extract cleaned content - prefer htmlBody, fall back to text
+                    let cleanedHtml = '';
+                    let cleanedText = '';
+
+                    if (reply.htmlBody && reply.htmlBody.length > 50) {
+                        // Has HTML content - clean it and extract text
+                        cleanedHtml = removeEmailQuotesHtml(reply.htmlBody);
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = cleanedHtml;
+                        cleanedText = (tempDiv.textContent || tempDiv.innerText || '').trim();
+                    } else if (reply.text) {
+                        // No HTML - use plain text directly (conversation format)
+                        cleanedText = removeEmailQuotes(reply.text || '');
+                        cleanedHtml = ''; // No HTML to display
+                    }
+
+                    const compareText = cleanedText.toLowerCase().substring(0, 150);
+
+                    // Skip empty content (but allow short replies like "ok", "ja")
+                    if (!cleanedText || cleanedText.length < 2) continue;
+                    if (seenTexts.has(compareText)) continue;
+
+                    seenTexts.add(compareText);
+
+                    // Find the original reply object to get isNew status
+                    const originalReply = rawReplies.find(r =>
+                        r.datum === (reply.datum ? reply.datum.toISOString().replace('.000Z', '') : null) ||
+                        (r.datum && reply.datum && new Date(r.datum).getTime() === reply.datum.getTime())
+                    );
+
+                    displayReplies.push({
+                        von: reply.von,
+                        datum: reply.datum,
+                        cleanedText: cleanedText,
+                        cleanedHtml: cleanedHtml && cleanedHtml.length > 50 ? cleanedHtml : null,
+                        isNew: originalReply?.isNew || false
+                    });
+                }
+            }
+
+            // displayReplies is already sorted by date (oldest first) from allMessages
+
+            const newRepliesCount = (email.antworten || []).filter(r => r.isNew).length;
+
+            if (displayReplies.length > 0) {
+                // Show reply count badge with new indicator
+                if (email.isDuplicateWithNewReplies && newRepliesCount > 0) {
+                    replyCountBadge.textContent = displayReplies.length + ' (' + newRepliesCount + ' neu)';
+                } else {
+                    replyCountBadge.textContent = displayReplies.length;
+                }
+                replyCountBadge.style.display = 'inline';
+                tabAntworten.classList.remove('disabled');
+
+                // Render replies in card format
+                repliesList.innerHTML = displayReplies.map((reply, idx) => {
+                    const replyDate = new Date(reply.datum || reply.date);
+                    const dateStr = replyDate && !isNaN(replyDate) ? replyDate.toLocaleString('de-DE') : '';
+                    const isNew = reply.isNew === true;
+                    const statusClass = isNew ? 'reply-new' : '';
+                    const statusLabel = isNew ? '<span class="reply-status-new">NEU</span>' : '';
+
+                    // Get sender name from JSON data
+                    const personName = reply.von || reply.vonEmail || reply.from || 'Unbekannt';
+
+                    // Use iframe for HTML content, otherwise plain text
+                    const hasHtml = reply.cleanedHtml && reply.cleanedHtml.length > 50;
+
+                    let contentHtml;
+                    if (hasHtml) {
+                        contentHtml = `<iframe class="reply-html-frame" id="replyFrame${idx}" srcdoc=""></iframe>`;
+                    } else {
+                        contentHtml = `<div class="reply-card-text">${highlightKeywords(reply.cleanedText || '')}</div>`;
+                    }
+
+                    return `
+                        <div class="reply-card ${statusClass}">
+                            <div class="reply-card-header">
+                                <span class="reply-card-from">Von: ${escapeHtml(personName)}</span>
+                                ${statusLabel}
+                                <span class="reply-card-date">${dateStr}</span>
+                            </div>
+                            ${contentHtml}
+                        </div>
+                    `;
+                }).join('');
+
+                // Set iframe srcdoc after DOM is updated (for HTML replies)
+                displayReplies.forEach((reply, idx) => {
+                    const iframe = document.getElementById(`replyFrame${idx}`);
+                    if (!iframe) return;
+
+                    let htmlContent = reply.cleanedHtml || '';
+
+                    if (htmlContent) {
+                        const wrappedHtml = `<!DOCTYPE html>
+                            <html><head><meta charset="UTF-8">
+                            <style>
+                                body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; margin: 10px; }
+                                table { border-collapse: collapse; width: 100%; }
+                                td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                th { background-color: #f5f5f5; }
+                                tr:nth-child(even) { background-color: #fafafa; }
+                            </style></head><body>${htmlContent}</body></html>`;
+                        iframe.srcdoc = wrappedHtml;
+                    }
+                });
+            } else {
+                // Hide reply count badge and show empty state
+                replyCountBadge.style.display = 'none';
+                tabAntworten.classList.add('disabled');
+                repliesList.innerHTML = `
+                    <div class="no-replies">
+                        <div class="no-replies-icon">📭</div>
+                        <p>Keine Antworten zu dieser Anfrage gefunden</p>
+                    </div>
+                `;
+            }
+        }
+
+        // ============================================================================
+        // CLUSTER TAGS
+        // ============================================================================
+        function initClusterTags() {
+            const container = document.getElementById('clusterTags');
+            container.innerHTML = allClusters.map(c =>
+                `<span class="cluster-tag" data-cluster="${c}" onclick="toggleCluster('${c}')">${c}</span>`
+            ).join('');
+        }
+
+        function updateClusterTags(email) {
+            document.querySelectorAll('.cluster-tag').forEach(tag => {
+                const cluster = tag.dataset.cluster;
+                tag.classList.toggle('active', email.clusters.includes(cluster));
+            });
+        }
+
+        function toggleCluster(cluster) {
             if (!selectedEmailId) return;
             const email = emails.find(e => e.id === selectedEmailId);
             if (!email) return;
 
-            const fieldMap = {
-                'status': 'editStatus',
-                'bearbeiter': 'editBearbeiter',
-                'kunde': 'editKunde',
-                'vsnr': 'editVsnr',
-                'kommentar': 'editKommentar'
-            };
+            const idx = email.clusters.indexOf(cluster);
+            if (idx > -1) {
+                email.clusters.splice(idx, 1);
+            } else {
+                email.clusters.push(cluster);
+            }
 
-            email[field] = document.getElementById(fieldMap[field]).value;
-            updateStats();
+            updateClusterTags(email);
+            renderEmailList();
+        }
+
+        // ============================================================================
+        // FORM UPDATES
+        // ============================================================================
+        function updateField(field) {
+            if (!selectedEmailId) return;
+            const email = emails.find(e => e.id === selectedEmailId);
+            if (!email) return;
+
+            const elementId = 'form' + field.charAt(0).toUpperCase() + field.slice(1);
+            const element = document.getElementById(elementId);
+            if (element) {
+                email[field] = element.value;
+            }
+
+            // Auto-set status when "Keine BGAV Relevanz" category is selected
+            if (field === 'kategorie' && email.kategorie === 'Keine BGAV Relevanz') {
+                email.status = 'Keine BGAV Relevanz';
+                document.getElementById('formStatus').value = 'Keine BGAV Relevanz';
+            }
+
+            if (field === 'status' || field === 'kategorie') updateStats();
+            renderEmailList();
+        }
+
+        // ============================================================================
+        // FILTERS
+        // ============================================================================
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.filter === filter);
+            });
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            filteredEmails = emails.filter(email => {
+                // Search - including replies and all text fields
+                let matchesSearch = !searchTerm;
+                if (searchTerm) {
+                    // Basic fields
+                    matchesSearch = email.betreff.toLowerCase().includes(searchTerm) ||
+                        email.von_name.toLowerCase().includes(searchTerm) ||
+                        email.von_email.toLowerCase().includes(searchTerm) ||
+                        email.text.toLowerCase().includes(searchTerm) ||
+                        (email.anfrage || '').toLowerCase().includes(searchTerm) ||
+                        (email.antwort || '').toLowerCase().includes(searchTerm) ||
+                        (email.kommentar || '').toLowerCase().includes(searchTerm);
+
+                    // Search in replies array (antworten)
+                    if (!matchesSearch && email.antworten && email.antworten.length > 0) {
+                        matchesSearch = email.antworten.some(reply => {
+                            const replyText = (reply.text || reply.body || '').toLowerCase();
+                            const replySubject = (reply.betreff || reply.subject || '').toLowerCase();
+                            return replyText.includes(searchTerm) || replySubject.includes(searchTerm);
+                        });
+                    }
+
+                    // Search in all replies (alleAntworten)
+                    if (!matchesSearch && email.alleAntworten && email.alleAntworten.length > 0) {
+                        matchesSearch = email.alleAntworten.some(reply => {
+                            const replyText = (reply.text || reply.body || '').toLowerCase();
+                            const replySubject = (reply.betreff || reply.subject || '').toLowerCase();
+                            return replyText.includes(searchTerm) || replySubject.includes(searchTerm);
+                        });
+                    }
+                }
+
+                // Filter
+                let matchesFilter = true;
+                if (currentFilter === 'unread') matchesFilter = !readEmails.has(email.id);
+                else if (currentFilter === 'read') matchesFilter = readEmails.has(email.id);
+
+                return matchesSearch && matchesFilter;
+            });
+
             renderEmailList();
         }
 
@@ -1108,108 +3370,134 @@
         // ============================================================================
         function updateStats() {
             document.getElementById('statTotal').textContent = emails.length;
-
-            const kunden = new Set(emails.map(e => e.kunde).filter(k => k));
-            document.getElementById('statKunden').textContent = kunden.size;
-
-            const makler = new Set(emails.map(e => e.makler).filter(m => m));
-            document.getElementById('statMakler').textContent = makler.size;
-
-            document.getElementById('statNeu').textContent = emails.filter(e => e.status === 'Neu').length;
-            document.getElementById('statBearbeitung').textContent = emails.filter(e => e.status === 'In Bearbeitung').length;
-            document.getElementById('statErledigt').textContent = emails.filter(e => e.status === 'Erledigt').length;
+            document.getElementById('statDone').textContent = emails.filter(e => e.status === 'Erledigt').length;
         }
 
         // ============================================================================
-        // CSV EXPORT
+        // SAVE AS JSON (for Excel Import HTA)
         // ============================================================================
-        function exportCSV() {
-            const headers = [
-                'ID', 'Datum', 'Makler', 'Makler Email', 'Kunde', 'VS-Nr',
-                'Betreff', 'Anfrage', 'Status', 'Bearbeiter', 'Kommentar',
-                'Anzahl Antworten'
-            ];
+        async function saveAsJson() {
+            // Update step indicator to "Speichern"
+            updateStepIndicator(3);
 
-            const rows = emails.map(email => [
-                email.id,
-                formatDate(email.datum),
-                email.makler || email.von_name || '',
-                email.von_email || '',
-                email.kunde || '',
-                email.vsnr || '',
-                email.betreff || '',
-                truncate(email.text, 500).replace(/[\n\r]+/g, ' '),
-                email.status || '',
-                email.bearbeiter || '',
-                email.kommentar || '',
-                email.antworten.length
-            ]);
+            // Export only selected emails, or all if none selected
+            let emailsToExport = emails;
+            if (selectedForExport.size > 0) {
+                emailsToExport = emails.filter(e => selectedForExport.has(e.id));
+            }
 
-            const csvContent = [
-                headers.join(';'),
-                ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
-            ].join('\n');
+            if (emailsToExport.length === 0) {
+                showNotification('Keine Emails zum Exportieren ausgewählt', 'error');
+                updateStepIndicator(2);  // Go back to step 2
+                return;
+            }
 
-            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const jsonData = JSON.stringify(emailsToExport, null, 2);
+            const filename = 'hypercare_bearbeitet_' + new Date().toISOString().slice(0, 10) + '.json';
+
+            // Try modern File System Access API (saves to Downloads directly)
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: filename,
+                        startIn: 'downloads',
+                        types: [{
+                            description: 'JSON Dateien',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(jsonData);
+                    await writable.close();
+                    showNotification(emailsToExport.length + ' Emails gespeichert - jetzt mit Excel Import Tab importieren', 'success');
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                }
+            }
+
+            // Fallback: Download file
+            const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ergo_vorgaenge_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
+            showNotification(emailsToExport.length + ' Emails gespeichert - jetzt mit Excel Import Tab importieren', 'success');
+        }
 
-            showNotification(`${emails.length} Vorgänge exportiert`);
+        // ============================================================================
+        // KEYWORD MODAL
+        // ============================================================================
+        function showKeywordModal() {
+            document.getElementById('keywordModal').classList.add('active');
+        }
+
+        function closeKeywordModal(event) {
+            if (!event || event.target === document.getElementById('keywordModal')) {
+                document.getElementById('keywordModal').classList.remove('active');
+            }
+        }
+
+        // ============================================================================
+        // RESET
+        // ============================================================================
+        function resetApp() {
+            emails = [];
+            filteredEmails = [];
+            selectedEmailId = null;
+            selectedForExport = new Set();
+            nextId = 1;
+
+            document.getElementById('uploadScreen').style.display = 'flex';
+            document.getElementById('mainContent').classList.remove('active');
+            document.getElementById('headerStats').style.display = 'none';
+            document.getElementById('btnExport').style.display = 'none';
+            document.getElementById('btnKeywords').style.display = 'none';
+        }
+
+        // ============================================================================
+        // NOTIFICATIONS
+        // ============================================================================
+        function showNotification(message, type = 'success') {
+            const container = document.getElementById('notificationContainer');
+            const icons = { success: '✅', error: '❌', warning: '⚠️' };
+
+            const notif = document.createElement('div');
+            notif.className = 'notification ' + type;
+            notif.innerHTML = `
+                <span class="notification-icon">${icons[type]}</span>
+                <span class="notification-text">${message}</span>
+            `;
+
+            container.appendChild(notif);
+            setTimeout(() => notif.remove(), 4000);
+        }
+
+        // ============================================================================
+        // CONTENT TAB SWITCHING
+        // ============================================================================
+        function switchContentTab(tab) {
+            // Update tab buttons
+            document.getElementById('tabAnfrage').classList.toggle('active', tab === 'anfrage');
+            document.getElementById('tabAntworten').classList.toggle('active', tab === 'antworten');
+
+            // Update content areas
+            document.getElementById('contentAnfrage').classList.toggle('active', tab === 'anfrage');
+            document.getElementById('contentAntworten').classList.toggle('active', tab === 'antworten');
         }
 
         // ============================================================================
         // UTILITIES
         // ============================================================================
-        function formatDate(dateStr) {
-            if (!dateStr) return '';
-            try {
-                const d = new Date(dateStr);
-                return d.toLocaleDateString('de-DE');
-            } catch {
-                return dateStr;
-            }
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
         }
 
-        function formatDateTime(dateStr) {
-            if (!dateStr) return '';
-            try {
-                const d = new Date(dateStr);
-                return d.toLocaleDateString('de-DE') + ', ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            } catch {
-                return dateStr;
-            }
-        }
-
-        function truncate(str, len) {
-            if (!str) return '';
-            str = str.replace(/\s+/g, ' ').trim();
-            return str.length > len ? str.substring(0, len) + '...' : str;
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
-        }
-
-        function showNotification(message) {
-            const existing = document.querySelector('.notification');
-            if (existing) existing.remove();
-
-            const notif = document.createElement('div');
-            notif.className = 'notification';
-            notif.textContent = message;
-            document.body.appendChild(notif);
-
-            setTimeout(() => notif.remove(), 3000);
-        }
     </script>
 </body>
 </html>
+<!-- Deployment trigger: 2025-12-04_10:18:55 -->
