@@ -326,6 +326,7 @@ function convertToLegacyFormat(conversations) {
         // Find root message (depth 0 or earliest)
         var rootMsg = null;
         var rootTime = null;
+        var hasInboxRoot = false;
 
         for (var i = 0; i < messages.length; i++) {
             var msg = messages[i];
@@ -337,6 +338,7 @@ function convertToLegacyFormat(conversations) {
                 if (!rootMsg || (msgTime && (!rootTime || msgTime < rootTime))) {
                     rootMsg = msg;
                     rootTime = msgTime;
+                    hasInboxRoot = true;
                 }
             }
         }
@@ -355,7 +357,14 @@ function convertToLegacyFormat(conversations) {
 
         if (!rootMsg) continue;
 
-        // Build legacy email object
+        // Skip conversations that only have sent replies (no inbox root)
+        // BUT keep if the sent message is depth 0 (we started the conversation)
+        // These are replies to old inquiries outside the export date range
+        if (!hasInboxRoot && rootMsg.folder === 'sent' && rootMsg.depth > 0) {
+            continue;
+        }
+
+        // Normal processing: Build legacy email object
         var legacyEmail = {
             emailId: rootMsg.entryID,
             conversationId: convId,
