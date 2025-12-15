@@ -357,15 +357,9 @@ function convertToLegacyFormat(conversations) {
 
         if (!rootMsg) continue;
 
-        // Skip conversations that only have sent messages (no inbox root)
-        // The "Anfrage" must always be an incoming message from a customer
-        // Sent-only conversations are either:
-        // - Replies to old cases outside the date range
-        // - Forwarded emails (WG:/FW:)
-        // - Outgoing inquiries without customer reply (not relevant for tracking)
-        if (!hasInboxRoot) {
-            continue;
-        }
+        // Check if this is a sent-only conversation (no inbox root)
+        // These should only be used to add replies to EXISTING cases, not create new ones
+        var sentOnlyConversation = !hasInboxRoot;
 
         // Normal processing: Build legacy email object
         var legacyEmail = {
@@ -378,6 +372,7 @@ function convertToLegacyFormat(conversations) {
             text: removeEmailQuotes(rootMsg.body || ''),
             anhaenge: rootMsg.anhaenge || [],
             kategorie: rootMsg.kategorie || '',
+            sentOnly: sentOnlyConversation,  // Flag for import to handle
             antworten: []
         };
 

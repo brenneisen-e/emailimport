@@ -129,9 +129,11 @@ function convertConversationsToEmailArray(conversations) {
 
         // Find root (first inbox message, or first message)
         var rootMsg = null;
+        var hasInboxRoot = false;
         for (var i = 0; i < messages.length; i++) {
             if (messages[i].folder === 'inbox') {
                 rootMsg = messages[i];
+                hasInboxRoot = true;
                 break;
             }
         }
@@ -151,13 +153,15 @@ function convertConversationsToEmailArray(conversations) {
             status: '',
             antwort: '',
             kommentar: '',
+            sentOnly: !hasInboxRoot,  // Flag: only sent messages, no inbox root
             antworten: []
         };
 
-        // Add non-root messages as antworten
+        // Add non-root messages as antworten (for sentOnly, add ALL messages including root)
         for (var j = 0; j < messages.length; j++) {
             var msg = messages[j];
-            if (msg.entryID === rootMsg.entryID) continue;
+            // For normal conversations: skip root. For sentOnly: include all as potential replies
+            if (!email.sentOnly && msg.entryID === rootMsg.entryID) continue;
 
             var isSent = msg.folder === 'sent';
             email.antworten.push({
@@ -274,6 +278,8 @@ function doImport() {
             if (existingRow) {
                 // Email exists - check for new replies using ReplyIDs
                 currentStep = 'Email ' + (i+1) + ' Antworten prüfen';
+                // For sentOnly conversations, mark that we found a match
+                var matchedSentOnly = email.sentOnly ? true : false;
                 if (email.antworten && email.antworten.length > 0) {
                     // Get existing ReplyIDs from Excel
                     var currentReplyIdsStr = '';
@@ -349,7 +355,14 @@ function doImport() {
                     skipCount++;
                 }
             } else {
-                // New email
+                // New email - but skip if sentOnly (no matching case in Excel)
+                if (email.sentOnly) {
+                    // sentOnly conversation with no matching case - skip entirely
+                    // These are replies to old cases not in this Excel file
+                    skipCount++;
+                    continue;
+                }
+
                 currentStep = 'Email ' + (i+1) + ' schreiben (Zeile ' + nextRow + ')';
                 try {
                     var actualRow = nextRow;
