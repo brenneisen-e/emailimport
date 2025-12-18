@@ -3397,14 +3397,23 @@
             // Update step indicator to "Speichern"
             updateStepIndicator(3);
 
-            // Export only selected emails, or all if none selected
-            let emailsToExport = emails;
+            // WICHTIG: Nur gelesene Emails exportieren!
+            let emailsToExport = emails.filter(e => readEmails.has(e.id));
+
+            // Falls explizit ausgewählt, nur diese (aber trotzdem nur gelesene)
             if (selectedForExport.size > 0) {
-                emailsToExport = emails.filter(e => selectedForExport.has(e.id));
+                emailsToExport = emailsToExport.filter(e => selectedForExport.has(e.id));
             }
 
+            // Count unread for info
+            const unreadCount = emails.length - emails.filter(e => readEmails.has(e.id)).length;
+
             if (emailsToExport.length === 0) {
-                showNotification('Keine Emails zum Exportieren ausgewählt', 'error');
+                if (unreadCount > 0) {
+                    showNotification('Keine gelesenen Emails zum Exportieren. ' + unreadCount + ' ungelesene Emails wurden übersprungen.', 'error');
+                } else {
+                    showNotification('Keine Emails zum Exportieren ausgewählt', 'error');
+                }
                 updateStepIndicator(2);  // Go back to step 2
                 return;
             }
@@ -3426,7 +3435,8 @@
                     const writable = await handle.createWritable();
                     await writable.write(jsonData);
                     await writable.close();
-                    showNotification(emailsToExport.length + ' Emails gespeichert - jetzt mit Excel Import Tab importieren', 'success');
+                    const skipMsg = unreadCount > 0 ? ' (' + unreadCount + ' ungelesene übersprungen)' : '';
+                    showNotification(emailsToExport.length + ' gelesene Emails gespeichert' + skipMsg, 'success');
                     return;
                 } catch (err) {
                     if (err.name === 'AbortError') return;
@@ -3441,7 +3451,8 @@
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
-            showNotification(emailsToExport.length + ' Emails gespeichert - jetzt mit Excel Import Tab importieren', 'success');
+            const skipMsg = unreadCount > 0 ? ' (' + unreadCount + ' ungelesene übersprungen)' : '';
+            showNotification(emailsToExport.length + ' gelesene Emails gespeichert' + skipMsg, 'success');
         }
 
         // ============================================================================
