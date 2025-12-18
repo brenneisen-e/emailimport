@@ -31,6 +31,8 @@ function writeEmailRow(worksheet, row, email) {
     var repliesText = '';
     try {
         repliesText = formatReplies(email.antworten);
+        // Sanitize to remove \r characters that cause _x000D_ in Excel
+        repliesText = sanitizeForExcel(repliesText);
         // Excel cell limit is 32767 chars, keep it safe at 30000
         if (repliesText.length > 30000) {
             repliesText = repliesText.substring(0, 30000) + '\n\n[... weitere Antworten gekürzt ...]';
@@ -48,48 +50,48 @@ function writeEmailRow(worksheet, row, email) {
     if (pd.vorname_vermittler || pd.nachname_vermittler) {
         absender = ((pd.vorname_vermittler || '') + ' ' + (pd.nachname_vermittler || '')).trim();
     }
-    absender = fixEncoding(absender);
+    absender = sanitizeForExcel(fixEncoding(absender));
 
     // Agentur
     _writeRowCurrentField = 'Agentur erstellen';
-    var agentur = fixEncoding(email.agentur || '');
+    var agentur = sanitizeForExcel(fixEncoding(email.agentur || ''));
 
     // Anfrage (mit Quote-Entfernung fuer Memory-Schutz)
     _writeRowCurrentField = 'Anfrage erstellen';
     var anfrage = '';
     if (email.anfrage && email.anfrage.trim()) {
         anfrage = removeQuotedContent(email.anfrage);
-        anfrage = fixEncoding(anfrage);
+        anfrage = sanitizeForExcel(fixEncoding(anfrage));
     } else if (pd.nachricht) {
-        anfrage = fixEncoding(pd.nachricht);
+        anfrage = sanitizeForExcel(fixEncoding(pd.nachricht));
     } else {
         anfrage = removeQuotedContent(email.text || '');
-        anfrage = fixEncoding(anfrage);
+        anfrage = sanitizeForExcel(fixEncoding(anfrage));
     }
 
     // BD-Nummer
     _writeRowCurrentField = 'BD-Nummer erstellen';
-    var bdNummer = pd.vermittlernummer_vermittler || email.vermittlernr || '';
+    var bdNummer = sanitizeForExcel(pd.vermittlernummer_vermittler || email.vermittlernr || '');
 
     // Betreff
     _writeRowCurrentField = 'Betreff erstellen';
-    var betreff = fixEncoding(email.betreff || '');
+    var betreff = sanitizeForExcel(fixEncoding(email.betreff || ''));
 
     // Kategorie
     _writeRowCurrentField = 'Kategorie erstellen';
-    var kategorie = fixEncoding(email.kategorie || '');
+    var kategorie = sanitizeForExcel(fixEncoding(email.kategorie || ''));
 
     // Status
     _writeRowCurrentField = 'Status erstellen';
-    var status = fixEncoding(email.status || 'Neu');
+    var status = sanitizeForExcel(fixEncoding(email.status || 'Neu'));
 
     // Clusters
     _writeRowCurrentField = 'Clusters erstellen';
-    var clusters = fixEncoding((email.clusters || []).join(', '));
+    var clusters = sanitizeForExcel(fixEncoding((email.clusters || []).join(', ')));
 
     // Kommentar
     _writeRowCurrentField = 'Kommentar erstellen';
-    var kommentar = fixEncoding(email.kommentar || '');
+    var kommentar = sanitizeForExcel(fixEncoding(email.kommentar || ''));
 
     // Bearbeiter
     _writeRowCurrentField = 'Bearbeiter erstellen';
@@ -107,7 +109,7 @@ function writeEmailRow(worksheet, row, email) {
     try {
         if (email.antwort) {
             userAntwort = String(email.antwort);
-            userAntwort = fixEncoding(userAntwort);
+            userAntwort = sanitizeForExcel(fixEncoding(userAntwort));
         }
     } catch (e) {
         userAntwort = '[Fehler beim Lesen der Benutzerantwort]';
@@ -118,6 +120,8 @@ function writeEmailRow(worksheet, row, email) {
     } else {
         antwortText = userAntwort || repliesText || '';
     }
+    // Final sanitization to ensure no \r chars
+    antwortText = sanitizeForExcel(antwortText);
 
     // Calculate "Datum neuste Antwort" (latest reply date)
     _writeRowCurrentField = 'Neuste Antwort berechnen';

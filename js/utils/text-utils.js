@@ -5,13 +5,15 @@
 
 /**
  * Sanitize text for safe display (remove null bytes, normalize whitespace)
+ * IMPORTANT: Always removes \r to prevent _x000D_ in Excel
  */
 function sanitizeText(text) {
     if (!text) return '';
     return text
         .replace(/\x00/g, '')  // Remove null bytes
-        .replace(/\r\n/g, '\n')  // Normalize line endings
-        .replace(/\r/g, '\n')
+        .replace(/\r\n/g, '\n')  // Normalize line endings (CRLF -> LF)
+        .replace(/\r/g, '\n')   // Remove stray CR
+        .replace(/_x000D_/g, '') // Remove Excel-escaped CR if present
         .trim();
 }
 
@@ -103,12 +105,19 @@ function truncateForExcel(text, maxLength) {
 
 /**
  * Sanitize text for Excel (handle special characters)
+ * CRITICAL: This function MUST remove \r to prevent _x000D_ appearing in Excel cells
  */
 function sanitizeForExcel(text) {
     if (!text) return '';
 
+    // FIRST: Remove carriage returns to prevent _x000D_ in Excel
+    var result = text.replace(/\r\n/g, '\n').replace(/\r/g, '');
+
+    // Remove any existing _x000D_ sequences (already escaped)
+    result = result.replace(/_x000D_/g, '');
+
     // Remove control characters except newlines and tabs
-    var result = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    result = result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 
     // Remove emojis and other 4-byte UTF-8 characters (surrogate pairs)
     // This prevents issues in HTA/JScript and Excel
