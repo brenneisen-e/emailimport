@@ -1771,6 +1771,11 @@
                 const messages = conv.messages || [];
 
                 if (messages.length === 0) continue;
+
+                // Skip sent-only conversations (no inbox messages = outgoing without incoming request)
+                const hasInboxMessage = messages.some(m => m.folder === 'inbox');
+                if (!hasInboxMessage) continue;
+
                 totalMessages += messages.length;
 
                 // Sort messages by timestamp (earliest first)
