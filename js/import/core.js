@@ -79,10 +79,14 @@ function loadJsonFile(path) {
         } else if (parsed && parsed._exportInfo && parsed.emails) {
             // Debug format with export info
             jsonData = parsed.emails;
+            // Add sentOnly flag for bearbeitet format if missing
+            jsonData = addSentOnlyFlagIfMissing(jsonData);
             document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
         } else if (Array.isArray(parsed)) {
-            // Direct array
+            // Direct array (bearbeitet_*.json format)
             jsonData = parsed;
+            // Add sentOnly flag for bearbeitet format if missing
+            jsonData = addSentOnlyFlagIfMissing(jsonData);
             document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
         } else {
             // Single email
@@ -103,6 +107,72 @@ function loadJsonFile(path) {
         jsonData = null;
         checkImportReady();
     }
+}
+
+/**
+ * Add sentOnly flag to emails if missing (for bearbeitet format)
+ * Detects sent-only conversations (replies without original incoming request).
+ *
+ * A conversation is "sentOnly" when:
+ * - The root message was SENT by us (not received in inbox)
+ * - There are no incoming messages in the conversation
+ *
+ * This typically happens when we reply to an old request that's outside
+ * the export timeframe - we have our reply but not the original request.
+ *
+ * @param {Array} emails - Array of email objects
+ * @returns {Array} Emails with sentOnly flag set
+ */
+function addSentOnlyFlagIfMissing(emails) {
+    if (!emails || !Array.isArray(emails)) return emails;
+
+    // Known mailbox addresses that indicate "sent from us"
+    var mailboxPatterns = [
+        'provisionsservice@barmenia.de',
+        'provisionsservice@'
+    ];
+
+    for (var i = 0; i < emails.length; i++) {
+        var email = emails[i];
+
+        // Skip if sentOnly is already explicitly set
+        if (email.sentOnly === true || email.sentOnly === false) continue;
+
+        var vonEmail = (email.von_email || '').toLowerCase();
+
+        // Check if the root message was sent FROM our mailbox (not received)
+        var isSentFromMailbox = false;
+        for (var m = 0; m < mailboxPatterns.length; m++) {
+            if (vonEmail.indexOf(mailboxPatterns[m]) !== -1) {
+                isSentFromMailbox = true;
+                break;
+            }
+        }
+
+        // Check if there are any INCOMING messages (received from external)
+        var hasIncomingMessage = false;
+        var antworten = email.antworten || email.alleAntworten || [];
+        for (var j = 0; j < antworten.length; j++) {
+            var reply = antworten[j];
+            // isIncoming=true means the reply was received (not sent by us)
+            if (reply.isIncoming === true) {
+                hasIncomingMessage = true;
+                break;
+            }
+        }
+
+        // Mark as sentOnly if:
+        // - Root message was sent FROM our mailbox (we sent it, not received)
+        // - AND there are no incoming replies in the conversation
+        // This indicates we only have outgoing messages - likely replies to old requests
+        if (isSentFromMailbox && !hasIncomingMessage) {
+            email.sentOnly = true;
+        } else {
+            email.sentOnly = false;
+        }
+    }
+
+    return emails;
 }
 
 /**
@@ -326,7 +396,8 @@ function doImport() {
                             currentReplies = worksheet.Cells(existingRow, 14).Value || '';
                         } catch (e) {}
                         var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
-                        combinedReplies = sanitizeText(combinedReplies);
+                        // Use sanitizeForExcel to remove \r chars that cause _x000D_
+                        combinedReplies = sanitizeForExcel(combinedReplies);
                         worksheet.Cells(existingRow, 14).Value = combinedReplies;
 
                         currentStep = 'Email ' + (i+1) + ' Timestamps fetten';
