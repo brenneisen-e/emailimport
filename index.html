@@ -2203,15 +2203,7 @@
             // Remove trailing signature
             result = result.replace(/\r?\n--\s*\r?\n[\s\S]*$/, '');
 
-            const trimmed = result.trim();
-
-            // If after removing quotes only whitespace remains, return original text
-            // This handles forwarded emails where the actual content is inside the quoted part
-            if (!trimmed || trimmed.length < 10) {
-                return text.trim();
-            }
-
-            return trimmed;
+            return result.trim();
         }
 
         // ============================================================================
@@ -2598,17 +2590,6 @@
             const bodyMatch = result.match(/<body[^>]*>([\s\S]*?)(?:<\/body>|$)/i);
             if (bodyMatch) {
                 result = bodyMatch[1];
-            }
-
-            // Check if result has meaningful text content
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = result;
-            const textContent = (tempDiv.textContent || tempDiv.innerText || '').trim();
-
-            // If after removing quotes only whitespace/very little remains, return original HTML
-            // This handles forwarded emails where actual content is inside the quoted part
-            if (!textContent || textContent.length < 10) {
-                return html;
             }
 
             return result;

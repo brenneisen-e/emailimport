@@ -212,15 +212,7 @@ function removeQuotedContent(text) {
         result = result.substring(0, earliestCut);
     }
 
-    var trimmed = result.trim();
-
-    // If after removing quotes only whitespace/very short text remains,
-    // return original text - handles forwarded emails where content is inside quotes
-    if (!trimmed || trimmed.length < 10) {
-        return safeText.trim();
-    }
-
-    return trimmed;
+    return result.trim();
 }
 
 /**

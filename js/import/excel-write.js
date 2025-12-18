@@ -56,17 +56,15 @@ function writeEmailRow(worksheet, row, email) {
     _writeRowCurrentField = 'Agentur erstellen';
     var agentur = sanitizeForExcel(fixEncoding(email.agentur || ''));
 
-    // Anfrage (mit Quote-Entfernung fuer Memory-Schutz)
+    // Anfrage - VOLLER TEXT ohne Quote-Entfernung (erste Mail wird nie beschnitten!)
     _writeRowCurrentField = 'Anfrage erstellen';
     var anfrage = '';
     if (email.anfrage && email.anfrage.trim()) {
-        anfrage = removeQuotedContent(email.anfrage);
-        anfrage = sanitizeForExcel(fixEncoding(anfrage));
+        anfrage = sanitizeForExcel(fixEncoding(email.anfrage));
     } else if (pd.nachricht) {
         anfrage = sanitizeForExcel(fixEncoding(pd.nachricht));
     } else {
-        anfrage = removeQuotedContent(email.text || '');
-        anfrage = sanitizeForExcel(fixEncoding(anfrage));
+        anfrage = sanitizeForExcel(fixEncoding(email.text || ''));
     }
 
     // BD-Nummer
