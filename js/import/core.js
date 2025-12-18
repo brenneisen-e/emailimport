@@ -395,7 +395,7 @@ function doImport() {
                         try {
                             currentReplies = worksheet.Cells(existingRow, 14).Value || '';
                         } catch (e) {}
-                        var combinedReplies = currentReplies ? newRepliesText + '\n\n' + currentReplies : newRepliesText;
+                        var combinedReplies = currentReplies ? currentReplies + '\n\n' + newRepliesText : newRepliesText;
                         // Use sanitizeForExcel to remove \r chars that cause _x000D_
                         combinedReplies = sanitizeForExcel(combinedReplies);
                         worksheet.Cells(existingRow, 14).Value = combinedReplies;
