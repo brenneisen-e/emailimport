@@ -2589,10 +2589,9 @@
             // Extract just the body content if present, stripping outer tags
             const bodyMatch = result.match(/<body[^>]*>([\s\S]*?)(?:<\/body>|$)/i);
             if (bodyMatch) {
-                return bodyMatch[1];
+                result = bodyMatch[1];
             }
 
-            // Otherwise return as-is (might be partial HTML)
             return result;
         }
 
@@ -3050,13 +3049,20 @@
             const detailTextEl = document.getElementById('detailText');
 
             // Use originalMessage from antworten array (oldest message = original request)
+            // WICHTIG: Erste Mail (Anfrage) wird NICHT beschnitten - voller Text anzeigen!
             if (originalMessage && originalMessage.htmlBody && originalMessage.htmlBody.length > 50) {
-                // Display the original (oldest) email from thread as HTML with quotes removed
+                // Display the original (oldest) email from thread as full HTML (no quote removal!)
                 const iframe = document.createElement('iframe');
                 iframe.className = 'html-email-frame';
                 detailTextEl.innerHTML = '';
 
-                const cleanedOriginalHtml = removeEmailQuotesHtml(originalMessage.htmlBody);
+                // Extract body content if present, but don't remove quotes
+                let displayHtml = originalMessage.htmlBody;
+                const bodyMatch = displayHtml.match(/<body[^>]*>([\s\S]*?)(?:<\/body>|$)/i);
+                if (bodyMatch) {
+                    displayHtml = bodyMatch[1];
+                }
+
                 const wrappedHtml = `<!DOCTYPE html>
                     <html><head><meta charset="UTF-8">
                     <style>
@@ -3065,24 +3071,30 @@
                         td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
                         th { background-color: #f5f5f5; }
                         tr:nth-child(even) { background-color: #fafafa; }
-                    </style></head><body>${cleanedOriginalHtml}</body></html>`;
+                    </style></head><body>${displayHtml}</body></html>`;
 
                 iframe.srcdoc = wrappedHtml;
                 detailTextEl.appendChild(iframe);
             } else if (originalMessage && originalMessage.text) {
-                // Display original message as plain text (conversation format without HTML)
-                const displayText = removeEmailQuotes(originalMessage.text || '');
+                // Display original message as full plain text (no quote removal for first email!)
+                const displayText = originalMessage.text || '';
                 detailTextEl.innerHTML = highlightKeywords(displayText);
             } else if (email.htmlBody && (
                 email.htmlBody.toLowerCase().includes('<table') ||
                 email.htmlBody.toLowerCase().includes('<div')
             )) {
-                // No thread parsed, show full HTML with quotes removed
+                // No thread parsed, show full HTML (no quote removal for Anfrage!)
                 const iframe = document.createElement('iframe');
                 iframe.className = 'html-email-frame';
                 detailTextEl.innerHTML = '';
 
-                const cleanedHtmlBody = removeEmailQuotesHtml(email.htmlBody);
+                // Extract body content if present, but don't remove quotes
+                let displayHtml = email.htmlBody;
+                const bodyMatch = displayHtml.match(/<body[^>]*>([\s\S]*?)(?:<\/body>|$)/i);
+                if (bodyMatch) {
+                    displayHtml = bodyMatch[1];
+                }
+
                 const wrappedHtml = `<!DOCTYPE html>
                     <html><head><meta charset="UTF-8">
                     <style>
@@ -3091,13 +3103,13 @@
                         td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
                         th { background-color: #f5f5f5; }
                         tr:nth-child(even) { background-color: #fafafa; }
-                    </style></head><body>${cleanedHtmlBody}</body></html>`;
+                    </style></head><body>${displayHtml}</body></html>`;
 
                 iframe.srcdoc = wrappedHtml;
                 detailTextEl.appendChild(iframe);
             } else {
-                // Plain text display
-                const displayText = email.anfrage || removeEmailQuotes(email.text || '');
+                // Plain text display - show full text (no quote removal for Anfrage!)
+                const displayText = email.anfrage || email.text || '';
                 detailTextEl.innerHTML = highlightKeywords(displayText);
             }
 
