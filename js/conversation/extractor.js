@@ -456,9 +456,10 @@ function buildConversationHierarchy(emails) {
  * Create export JSON structure
  * @param {Object} conversations - Grouped conversations
  * @param {string} mailboxName - Name of the mailbox
+ * @param {Array} stillInInbox - All ConversationIDs still present in inbox (for Auto-Erledigt)
  * @returns {Object} Export-ready JSON structure
  */
-function createExportStructure(conversations, mailboxName) {
+function createExportStructure(conversations, mailboxName, stillInInbox) {
     var totalEmails = 0;
     var byEntryID = {};
     var byConversationIndex = {};
@@ -516,6 +517,7 @@ function createExportStructure(conversations, mailboxName) {
         totalEmails: totalEmails,
         conversationCount: Object.keys(filteredConversations).length,
         conversations: filteredConversations,
+        stillInInbox: stillInInbox || [],  // All ConversationIDs still in inbox (for Auto-Erledigt)
         index: {
             byEntryID: byEntryID,
             byConversationIndex: byConversationIndex

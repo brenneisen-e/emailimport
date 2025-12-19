@@ -1587,6 +1587,7 @@
         let selectedEmailId = null;
         let selectedForExport = new Set();  // IDs der für Export ausgewählten Emails
         let readEmails = new Set();  // IDs der gelesenen Emails
+        let stillInInbox = [];  // ConversationIDs still in inbox (for Auto-Erledigt)
         let currentFilter = 'all';
         let nextId = 1;
         let currentStep = 1;  // 1: Auswählen, 2: Kategorisieren, 3: Speichern
@@ -1777,6 +1778,8 @@
                     if (data && data.conversations && typeof data.conversations === 'object') {
                         console.log('Detected: Conversation format');
                         emails = convertConversationsToLegacy(data.conversations);
+                        // Preserve stillInInbox for Auto-Erledigt feature
+                        stillInInbox = data.stillInInbox || [];
                         exportInfo = {
                             exportDate: data.exportDate,
                             totalEmails: data.totalEmails,
@@ -3494,7 +3497,12 @@
                 return;
             }
 
-            const jsonData = JSON.stringify(emailsToExport, null, 2);
+            // Export with stillInInbox for Auto-Erledigt feature
+            const exportObject = {
+                emails: emailsToExport,
+                stillInInbox: stillInInbox || []
+            };
+            const jsonData = JSON.stringify(exportObject, null, 2);
             const filename = 'hypercare_bearbeitet_' + new Date().toISOString().slice(0, 10) + '.json';
 
             // Build status message
