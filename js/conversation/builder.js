@@ -275,10 +275,6 @@ function saveConversationExport() {
         var updatedConvCount = 0;   // Existing conversations with new replies
         var newRepliesInUpdated = 0; // Actual count of new replies in existing conversations
 
-        // DEBUG: Log conversation analysis
-        var debugLines = [];
-        debugLines.push('=== Konversations-Analyse ===');
-
         for (var convId in convExportState.conversations) {
             var conv = convExportState.conversations[convId];
             var messages = conv.messages || [];
@@ -306,23 +302,16 @@ function saveConversationExport() {
             var hasNewEmail = false;
             var hasExistingEmail = false;
             var newInConv = 0;
-            var existingInConv = 0;
 
             for (var mj = 0; mj < messages.length; mj++) {
                 totalEmailCount++;
                 if (messages[mj].alreadyInExcel) {
                     hasExistingEmail = true;
-                    existingInConv++;
                 } else {
                     hasNewEmail = true;
                     newInConv++;
                 }
             }
-
-            // DEBUG: Log each conversation
-            var convShortId = convId.substring(0, 8) + '...';
-            var convDebug = convShortId + ' "' + (convSubject || '').substring(0, 25) + '": ' +
-                            messages.length + ' msgs (' + existingInConv + ' in Excel, ' + newInConv + ' neu)';
 
             if (hasNewEmail) {
                 filteredConversations[convId] = conv;
@@ -331,23 +320,14 @@ function saveConversationExport() {
                     // At least one message existed in Excel = existing conversation with updates
                     updatedConvCount++;
                     newRepliesInUpdated += newInConv;
-                    convDebug += ' -> BESTEHEND+UPDATE';
                 } else {
                     // No messages existed in Excel = brand new conversation
                     brandNewConvCount++;
-                    convDebug += ' -> NEU';
                 }
             } else {
                 skippedConvCount++;
-                convDebug += ' -> SKIP';
             }
-            debugLines.push(convDebug);
         }
-
-        // Show debug in alert
-        debugLines.push('');
-        debugLines.push('Ergebnis: ' + brandNewConvCount + ' neu, ' + updatedConvCount + ' bestehend mit ' + newRepliesInUpdated + ' Antworten, ' + skippedConvCount + ' skip');
-        alert(debugLines.join('\n'));
 
         // Check if there are any new conversations
         var filteredCount = Object.keys(filteredConversations).length;
