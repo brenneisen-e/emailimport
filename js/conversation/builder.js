@@ -318,11 +318,7 @@ function saveConversationExport() {
 
         // Check if all conversations were filtered out
         if (finalConvCount === 0) {
-            var skippedTotal = (filterInfo.skippedSentOnly || 0) + (filterInfo.skippedOnlineAbschluss || 0);
-            var noNewMsg = 'Keine relevanten Vorg&auml;nge gefunden.';
-            if (skippedTotal > 0) {
-                noNewMsg += '<br><em style="color:#666">(' + skippedTotal + ' irrelevante Konversationen gefiltert)</em>';
-            }
+            var noNewMsg = 'Keine neuen Vorg&auml;nge gefunden.';
             showExportSuccess(noNewMsg);
             document.getElementById('exportProgressFill').style.width = '100%';
             document.getElementById('exportProgressText').innerText = 'Keine relevanten Vorgaenge';
@@ -352,15 +348,15 @@ function saveConversationExport() {
         file.Close();
 
         // Show success with final filtered count
-        var successMsg = '<strong>' + exportData.totalEmails + '</strong> Emails in <strong>' + finalConvCount + '</strong> Vorg&auml;ngen';
-        if (filterInfo.skippedSentOnly > 0 || filterInfo.skippedOnlineAbschluss > 0) {
-            var skippedTotal = (filterInfo.skippedSentOnly || 0) + (filterInfo.skippedOnlineAbschluss || 0);
-            successMsg += '<br><em style="color:#666">(' + skippedTotal + ' irrelevante Konversationen gefiltert)</em>';
+        // Count new replies (total emails minus one root per conversation)
+        var newReplies = exportData.totalEmails - finalConvCount;
+        var successMsg = '<strong>' + finalConvCount + '</strong> neue Vorg' + (finalConvCount > 1 ? '&auml;nge' : 'ang');
+        if (newReplies > 0) {
+            successMsg += ' mit <strong>' + newReplies + '</strong> Antwort' + (newReplies > 1 ? 'en' : '');
         }
         if (skippedConvCount > 0) {
-            successMsg += '<br><strong>' + skippedConvCount + '</strong> Konversationen bereits vollst&auml;ndig in Excel';
+            successMsg += '<br>' + skippedConvCount + ' Vorg' + (skippedConvCount > 1 ? '&auml;nge' : 'ang') + ' bereits vollst&auml;ndig in Excel';
         }
-        successMsg += '<br>Gespeichert: ' + filename;
 
         showExportSuccess(successMsg);
         completeStep(3);
