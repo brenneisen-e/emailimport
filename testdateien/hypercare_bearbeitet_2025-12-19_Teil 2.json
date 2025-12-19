@@ -1,6 +1,534 @@
 [
   {
     "id": 1,
+    "datum": "2025-12-19T14:34:49.269Z",
+    "von_email": "redaktion@barmenia.de",
+    "von_name": "Redaktion",
+    "betreff": "Provisionsreklamation b24",
+    "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Anke \r\nnachname_vermittler : Hardam \r\nvermittlernummer_vermittler : 00550133 \r\nversicherungsnummer_kunde : 02 427 830 A 00 \r\nvorname_kunde : Corinna \r\nnachname_kunde : Schäfer \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Mit der Bitte die AES und Provision meinem Konto gutzuschreiben\r\nDanke\r\n\r\n \r\ndatenschutz : true \r\n",
+    "htmlBody": "",
+    "anhaenge": [],
+    "antworten": [],
+    "alleAntworten": [
+      {
+        "datum": "2025-12-19T14:34:49.000Z",
+        "an": "",
+        "von": "Redaktion",
+        "vonEmail": "redaktion@barmenia.de",
+        "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Anke \r\nnachname_vermittler : Hardam \r\nvermittlernummer_vermittler : 00550133 \r\nversicherungsnummer_kunde : 02 427 830 A 00 \r\nvorname_kunde : Corinna \r\nnachname_kunde : Schäfer \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Mit der Bitte die AES und Provision meinem Konto gutzuschreiben\r\nDanke\r\n\r\n \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993620000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "Provisionsreklamation b24",
+        "hasAttachments": false,
+        "anhaenge": []
+      }
+    ],
+    "existingReplies": "",
+    "isDuplicateWithNewReplies": false,
+    "conversationId": "F7EEC62403D45A41A732183A1EA20D88",
+    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993620000",
+    "internetMessageId": "",
+    "inReplyTo": "",
+    "references": [],
+    "conversationIndex": "",
+    "normalizedSubject": "provisionsreklamation b24",
+    "threadId": "",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
+    "clusters": [
+      "Provisionierung"
+    ],
+    "agentur": "Anke Hardam",
+    "vermittlernr": "00550133",
+    "vsnr": "02 427 830 A 00",
+    "anfrage": "Mit der Bitte die AES und Provision meinem Konto gutzuschreiben\r\nDanke",
+    "antwort": "",
+    "kommentar": "",
+    "bearbeiter": "",
+    "isProvision": true,
+    "provisionData": {
+      "reklamation_provision": "true",
+      "reklamation_absatz": "true",
+      "vorname_vermittler": "Anke",
+      "nachname_vermittler": "Hardam",
+      "vermittlernummer_vermittler": "00550133",
+      "versicherungsnummer_kunde": "02 427 830 A 00",
+      "vorname_kunde": "Corinna",
+      "nachname_kunde": "Schäfer",
+      "nachricht": "Mit der Bitte die AES und Provision meinem Konto gutzuschreiben\r\nDanke"
+    },
+    "outlookKategorie": "",
+    "displaySender": "Redaktion",
+    "_parsedThread": []
+  },
+  {
+    "id": 2,
+    "datum": "2025-12-19T11:55:00.000Z",
+    "von_email": "provisionsservice@barmenia.de",
+    "von_name": "Provisionsservice",
+    "betreff": "AW: Provisionsreklamation b24",
+    "text": "Hallo Herr Burdeka,\r\n\r\n \r\n\r\nein Lead reicht leider nicht aus, da es nicht auf Barmenia direkt, sondern auf einen anderen Vermittler läuft.\r\n\r\n \r\n\r\nBitte lassen Sie mir einen entsprechenden Beratungsnachweis zukommen.\r\n\r\n \r\n\r\nLG\r\n\r\n \r\n\r\nKimberley Spintzyk\r\n\r\n \r\n\r\nVon: Steven Burdeska <steven.burdeska@barmenia.de> \r\nGesendet: Dienstag, 16. Dezember 2025 17:44\r\nAn: Provisionsservice <provisionsservice@barmenia.de>\r\nBetreff: AW: Provisionsreklamation b24\r\n\r\n \r\n\r\nHallo Frau Spintzyk, \r\n\r\n \r\n\r\nvielen Dank für die Rückmeldung. \r\n\r\n \r\n\r\nWie bereits angesprochen, handelte es sich hierbei auch um ein Lead von mir und der Vertrag kam über meine Angebote zu Stande. \r\n\r\n \r\n\r\nBitte deshalb auch um den Absatz, inkl. Provision. \r\n\r\nHoffe das ist möglich. \r\n\r\n \r\n\r\nMit freundlichen Grüßen \r\n\r\n\r\nSteven Burdeska\r\n\r\n \r\n\r\nKaufmann für Versicherungen & Finanzanlagen (IHK)\r\n\r\nSpezialist für private Finanzanalyse nach DIN 77230\r\n\r\nScherreiks & Vogel OHG\r\n\r\nBreddestraße 11,45894 Gelsenkirchen\r\n\r\n \r\n\r\nBarmenia Versicherungen & Finanzierungen\r\n\r\n📲Mobil:     0176 61431393 <tel:0176%2061431393> \r\n\r\n☎️Telefon: 0209 51300822 <tel:0209%2051300822>  \r\n📧E-Mail:  steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> \r\n\r\n \r\n\r\n \r\n\r\n💡 Ihre Rente wird nicht reichen – handeln Sie jetzt!\r\n\r\nDie Versorgungslücke im Alter wächst jedes Jahr. Die gesetzliche Rente deckt oft nur noch einen Bruchteil des gewohnten Einkommens.\r\nWer heute nichts unternimmt, riskiert später deutliche finanzielle Einbußen und Einschränkungen im Alltag.\r\nJe früher Sie vorsorgen, desto kleiner ist der notwendige Aufwand – und desto sicherer Ihre Zukunft.\r\nVereinbaren Sie jetzt einen Termin, bevor wertvolle Zeit verstreicht.\r\n\r\nMeine Beratungsgrundlage\r\n\r\nIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\nBarmenia Versicherungen a. G.\r\nBarmenia Krankenversicherung AG\r\nBarmenia Allgemeine Versicherungs-AG\r\nGothaer Lebensversicherung AG\r\nGothaer Krankenversicherung AG\r\nRoland Rechtsschutz-Versicherungs-AG\r\nRoland Schutzbrief-Versicherung AG\r\n\r\nFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\nSchlichtungsstellen\r\nFür Lebens- und Sachversicherungen:\r\nVerein Versicherungsombudsmann e. V.\r\nPostfach 080632\r\n10006 Berlin\r\nFür private Krankenversicherungen:\r\nOmbudsmann für private Kranken- und Pflegeversicherung\r\nPostfach 06 02 22\r\n10052 Berlin\r\n\r\n \r\n\r\n________________________________\r\n\r\nVon: Provisionsservice\r\nGesendet: Dienstag, 16. Dezember 2025 14:45:28\r\nAn: Steven Burdeska\r\nBetreff: WG: Provisionsreklamation b24 \r\n\r\n \r\n\r\nHallo Herr Burdeska,\r\n\r\nder Bestand wird aufgrund des Kundenwunsches am 08.01.26 auf Sie umgeschlüsselt.\r\n\r\nDer Vertrag wird aktuell noch über ein anderes VZ geführt.\r\n\r\n        \r\nLG\r\nKimberley Spintzyk\r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Redaktion <redaktion@barmenia.de <mailto:redaktion@barmenia.de> > \r\nGesendet: Mittwoch, 10. Dezember 2025 14:42\r\nAn: Provisionsservice <provisionsservice@barmenia.de <mailto:provisionsservice@barmenia.de> >\r\nBetreff: Provisionsreklamation b24\r\n\r\nreklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Steven  \r\nnachname_vermittler : Burdeska \r\nvermittlernummer_vermittler : 00550261 \r\nversicherungsnummer_kunde : 114049690 \r\nvorname_kunde : Lara \r\nnachname_kunde : Krüskemper \r\nadresse_kunde : {\r\n   plz : 45711 \r\n   ort : Datteln \r\n   street : In den Wellen \r\n   streetNumber : 52a \r\n}\r\nnachricht : Der Vertrag kam über meine Angebote zustande, außerdem handelt es sich um ein Lead von mir. Anbei auch der unterschriebene Betreuungswechsel, sowie die Mail mit den Angeboten vom Juli.  \r\ndatenschutz : true \r\n",
+    "htmlBody": "",
+    "anhaenge": [],
+    "antworten": [
+      {
+        "datum": "2025-12-19T13:34:48.000Z",
+        "an": "",
+        "von": "Steven Burdeska",
+        "vonEmail": "steven.burdeska@barmenia.de",
+        "text": "Hallo Frau Spintzyk, \r\n\r\n\r\n\r\n\r\nhier die Nachrichten sowie die Angebote als Nachweis. \r\n\r\n\r\n\r\n\r\nVielen Dank. \r\n\r\n\r\n\r\n\r\nMit freundlichen Grüßen \r\n\r\nSteven Burdeska\r\n\r\n\r\nKaufmann für Versicherungen & Finanzanlagen (IHK)\r\nSpezialist für private Finanzanalyse nach DIN 77230\r\nScherreiks & Vogel OHG\r\n\r\nBreddestraße 11,45894 Gelsenkirchen\r\n\r\n\r\nBarmenia Versicherungen & Finanzierungen\r\n📲Mobil:     0176 61431393 <tel:0176 61431393> \r\n\r\n☎️Telefon: 0209 51300822 <tel:0209 51300822>  \r\n📧E-Mail:  steven.burdeska@barmenia.de\r\n\r\n\r\n\r\n💡 Ihre Rente wird nicht reichen – handeln Sie jetzt!\r\nDie Versorgungslücke im Alter wächst jedes Jahr. Die gesetzliche Rente deckt oft nur noch einen Bruchteil des gewohnten Einkommens.\r\nWer heute nichts unternimmt, riskiert später deutliche finanzielle Einbußen und Einschränkungen im Alltag.\r\nJe früher Sie vorsorgen, desto kleiner ist der notwendige Aufwand – und desto sicherer Ihre Zukunft.\r\nVereinbaren Sie jetzt einen Termin, bevor wertvolle Zeit verstreicht.\r\n\r\nMeine Beratungsgrundlage\r\n\r\n\r\nIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\nBarmenia Versicherungen a. G.\r\nBarmenia Krankenversicherung AG\r\nBarmenia Allgemeine Versicherungs-AG\r\nGothaer Lebensversicherung AG\r\nGothaer Krankenversicherung AG\r\nRoland Rechtsschutz-Versicherungs-AG\r\nRoland Schutzbrief-Versicherung AG\r\n\r\nFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\nSchlichtungsstellen\r\nFür Lebens- und Sachversicherungen:\r\nVerein Versicherungsombudsmann e. V.\r\nPostfach 080632\r\n10006 Berlin\r\nFür private Krankenversicherungen:\r\nOmbudsmann für private Kranken- und Pflegeversicherung\r\nPostfach 06 02 22\r\n10052 Berlin\r\n\r\n\r\n\r\n\r\n\r\n\r\n________________________________\r\n\r\nVon: Lara Krüskemper <lara.krueskemper@gmail.com>\r\nGesendet: Donnerstag, 31. Juli 2025 10:49\r\nAn: Steven Burdeska\r\nBetreff: Re: Angebote über eine Pferde-OP Versicherung \r\n \r\n\tSie erhalten nicht häufig E-Mails von lara.krueskemper@gmail.com. Erfahren Sie, warum dies wichtig ist <https://aka.ms/LearnAboutSenderIdentification> \r\n\t\r\nGuten Morgen Herr Burdeska,\r\n\r\nvielen Dank für Ihre Rückmeldung.\r\nGibt es einen Nachlass, wenn man jährlich zahlt?\r\n\r\nViele Grüße,\r\nLara Krüskemper\r\n\r\nAm Do., 31. Juli 2025 um 09:21 Uhr schrieb Steven Burdeska <steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> >:\r\n\r\n\r\n\tGuten Morgen Frau Krüskemper, \r\n\r\n\t\r\n\t\r\n\r\n\tvielen Dank für ihr Interesse an unserer OP-Versicherung. \r\n\r\n\t\r\n\t\r\n\r\n\tIm Anhang finden Sie die gewünschten Angebote, \r\n\r\n\tbei Fragen oder dem Wunsch nach einem Abschluss rufen Sie mich einfach an. \r\n\r\n\t\r\n\t\r\n\r\n\tFreue mich auf ihre Rückmeldung. \r\n\r\n\t\r\n\t\r\n\r\n\t\r\n\r\n\tMit freundlichen Grüßen\r\n\t\r\n\tSteven Burdeska\r\n\t\r\n\t\r\n\tKaufmann für Versicherungen & Finanzanlagen (IHK)\r\n\tBarmenia Versicherungen & Finanzierungen\r\n\t\r\n\t\r\n\t\r\n\tScherreiks & Vogel OHG\r\n\tBreddestraße 11,45894 Gelsenkirchen\r\n\t\r\n\t\r\n\t\r\n\t📲Mobil:     0176 61431393 <tel:0176%2061431393> \r\n\t☎️Telefon: 0209 51300822 <tel:0209%2051300822>  \r\n\t📧E-Mail:  steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> \r\n\t\r\n\tMeine Beratungsgrundlage\r\n\t\r\n\r\n\tIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\n\tBarmenia Versicherungen a. G.\r\n\tBarmenia Krankenversicherung AG\r\n\tBarmenia Allgemeine Versicherungs-AG\r\n\tGothaer Lebensversicherung AG\r\n\tGothaer Krankenversicherung AG\r\n\tRoland Rechtsschutz-Versicherungs-AG\r\n\tRoland Schutzbrief-Versicherung AG\r\n\r\n\tFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\n\tSchlichtungsstellen\r\n\tFür Lebens- und Sachversicherungen:\r\n\tVerein Versicherungsombudsmann e. V.\r\n\tPostfach 080632\r\n\t10006 Berlin\r\n\tFür private Krankenversicherungen:\r\n\tOmbudsmann für private Kranken- und Pflegeversicherung\r\n\tPostfach 06 02 22\r\n\t10052 Berlin\r\n\r\n\t\r\n\r\n\tFacebook BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.facebook.com%2Fprofile.php%3Fid%3D61552694782392&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158214972%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=sB6qZbbc5EfapT%2FetpDO4kQNE8eUU0XEqhv8WUCwSYI%3D&reserved=0>  -  Instagram BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.instagram.com%2Fbarmeniagothaer%2F&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158250125%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=cl0OH%2BbJAtzG2bN5yimGdkSr%2B0%2Fpo9ug7dP3vIKdWJg%3D&reserved=0>  -  YouTube BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.youtube.com%2Fuser%2Fbarmenia&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158266619%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=%2BnBufxm84sBQnEvXNFRQWBxd8Lh6E1Nd7jx9DMkmbEY%3D&reserved=0>  -  LinkedIn BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.linkedin.com%2Fcompany%2Fbarmeniagothaer%2F&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158282659%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=UbQWtyZo0zxQKzIUvuW%2Bky6w546ueWIB7%2BWdu5Lb728%3D&reserved=0> \r\n\r\n\tBarmenia Allgemeine Versicherungs-AG\r\n\tVorstand: Thomas Bischof (Vorsitzender) • Dr. Sylvia Eichelberg • Harald Ingo Epple • Dr. Andreas Eurich • Frank Lamsfuß • Christian Ritz\r\n\tOliver Schoeller • Aufsichtsratsvorsitzender: Dr. h. c. Josef Beutelmann\r\n\tRechtsform des Unternehmens: Aktiengesellschaft • Sitz: Wuppertal • Amtsgericht Wuppertal HRB 3033 • USt-IdNr. DE81142591\r\n\t\r\n\tBarmenia Krankenversicherung AG\r\n\tVorstand: Christian Ritz (Vorsitzender) • Thomas Bischof • Dr. Sylvia Eichelberg • Harald Ingo Epple • Dr. Andreas Eurich • Frank Lamsfuß\r\n\tOliver Schoeller • Alina vom Bruck • Aufsichtsratsvorsitzender: Dr. h. c. Josef Beutelmann\r\n\tRechtsform des Unternehmens: Aktiengesellschaft • Sitz: Wuppertal • Amtsgericht Wuppertal HRB 28475 • USt-IdNr. DE318683048\r\n\t\r\n\tGothaer Lebensversicherung AG\r\n\tVorstand: Alina vom Bruck (Vorsitzende) • Thomas Bischof • Dr. Sylvia Eichelberg • Harald Ingo Epple\r\n\tDr. Andreas Eurich • Frank Lamsfuß • Christian Ritz • Oliver Schoeller • Aufsichtsrat: Prof. Dr. Werner Görg (Vorsitzender)\r\n\tRechtsform des Unternehmens: Aktiengesellschaft • Sitz: Köln • Amtsgericht Köln HRB 56769 • USt-IdNr. DE207591682\r\n\r\n\r\n\r\n-- \r\n\r\nLara Krüskemper\r\nIn den Wellen 52a\r\n45711 Datteln\r\n\r\n0157/80410157 <tel:0157/80410157> \r\n\r\n________________________________\r\n\r\nVon: Provisionsservice\r\nGesendet: Freitag, 19. Dezember 2025 12:55\r\nAn: Steven Burdeska\r\nBetreff: AW: Provisionsreklamation b24 \r\n \r\n\r\nHallo Herr Burdeka,\r\n\r\n \r\n\r\nein Lead reicht leider nicht aus, da es nicht auf Barmenia direkt, sondern auf einen anderen Vermittler läuft.\r\n\r\n \r\n\r\nBitte lassen Sie mir einen entsprechenden Beratungsnachweis zukommen.\r\n\r\n \r\n\r\nLG\r\n\r\n \r\n\r\nKimberley Spintzyk\r\n\r\n \r\n\r\nVon: Steven Burdeska <steven.burdeska@barmenia.de> \r\nGesendet: Dienstag, 16. Dezember 2025 17:44\r\nAn: Provisionsservice <provisionsservice@barmenia.de>\r\nBetreff: AW: Provisionsreklamation b24\r\n\r\n \r\n\r\nHallo Frau Spintzyk, \r\n\r\n \r\n\r\nvielen Dank für die Rückmeldung. \r\n\r\n \r\n\r\nWie bereits angesprochen, handelte es sich hierbei auch um ein Lead von mir und der Vertrag kam über meine Angebote zu Stande. \r\n\r\n \r\n\r\nBitte deshalb auch um den Absatz, inkl. Provision. \r\n\r\nHoffe das ist möglich. \r\n\r\n \r\n\r\nMit freundlichen Grüßen \r\n\r\n\r\nSteven Burdeska\r\n\r\n \r\n\r\nKaufmann für Versicherungen & Finanzanlagen (IHK)\r\n\r\nSpezialist für private Finanzanalyse nach DIN 77230\r\n\r\nScherreiks & Vogel OHG\r\n\r\nBreddestraße 11,45894 Gelsenkirchen\r\n\r\n \r\n\r\nBarmenia Versicherungen & Finanzierungen\r\n\r\n📲Mobil:     0176 61431393 <tel:0176%2061431393> \r\n\r\n☎️Telefon: 0209 51300822 <tel:0209%2051300822>  \r\n📧E-Mail:  steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> \r\n\r\n \r\n\r\n \r\n\r\n💡 Ihre Rente wird nicht reichen – handeln Sie jetzt!\r\n\r\nDie Versorgungslücke im Alter wächst jedes Jahr. Die gesetzliche Rente deckt oft nur noch einen Bruchteil des gewohnten Einkommens.\r\nWer heute nichts unternimmt, riskiert später deutliche finanzielle Einbußen und Einschränkungen im Alltag.\r\nJe früher Sie vorsorgen, desto kleiner ist der notwendige Aufwand – und desto sicherer Ihre Zukunft.\r\nVereinbaren Sie jetzt einen Termin, bevor wertvolle Zeit verstreicht.\r\n\r\nMeine Beratungsgrundlage\r\n\r\nIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\nBarmenia Versicherungen a. G.\r\nBarmenia Krankenversicherung AG\r\nBarmenia Allgemeine Versicherungs-AG\r\nGothaer Lebensversicherung AG\r\nGothaer Krankenversicherung AG\r\nRoland Rechtsschutz-Versicherungs-AG\r\nRoland Schutzbrief-Versicherung AG\r\n\r\nFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\nSchlichtungsstellen\r\nFür Lebens- und Sachversicherungen:\r\nVerein Versicherungsombudsmann e. V.\r\nPostfach 080632\r\n10006 Berlin\r\nFür private Krankenversicherungen:\r\nOmbudsmann für private Kranken- und Pflegeversicherung\r\nPostfach 06 02 22\r\n10052 Berlin\r\n\r\n \r\n\r\n________________________________\r\n\r\nVon: Provisionsservice\r\nGesendet: Dienstag, 16. Dezember 2025 14:45:28\r\nAn: Steven Burdeska\r\nBetreff: WG: Provisionsreklamation b24 \r\n\r\n \r\n\r\nHallo Herr Burdeska,\r\n\r\nder Bestand wird aufgrund des Kundenwunsches am 08.01.26 auf Sie umgeschlüsselt.\r\n\r\nDer Vertrag wird aktuell noch über ein anderes VZ geführt.\r\n\r\n        \r\nLG\r\nKimberley Spintzyk\r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Redaktion <redaktion@barmenia.de <mailto:redaktion@barmenia.de> > \r\nGesendet: Mittwoch, 10. Dezember 2025 14:42\r\nAn: Provisionsservice <provisionsservice@barmenia.de <mailto:provisionsservice@barmenia.de> >\r\nBetreff: Provisionsreklamation b24\r\n\r\nreklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Steven  \r\nnachname_vermittler : Burdeska \r\nvermittlernummer_vermittler : 00550261 <tel:00550261>  \r\nversicherungsnummer_kunde : 114049690 \r\nvorname_kunde : Lara \r\nnachname_kunde : Krüskemper \r\nadresse_kunde : {\r\n   plz : 45711 \r\n   ort : Datteln \r\n   street : In den Wellen \r\n   streetNumber : 52a \r\n}\r\nnachricht : Der Vertrag kam über meine Angebote zustande, außerdem handelt es sich um ein Lead von mir. Anbei auch der unterschriebene Betreuungswechsel, sowie die Mail mit den Angeboten vom Juli.  \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F179935D0000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "AW: Provisionsreklamation b24",
+        "hasAttachments": true,
+        "anhaenge": [
+          "Angebote_über_eine_Pferde-OP_Versicherung_.zip"
+        ]
+      }
+    ],
+    "alleAntworten": [
+      {
+        "datum": "2025-12-19T11:55:17.223Z",
+        "an": "steven.burdeska@barmenia.de",
+        "von": "Provisionsservice",
+        "vonEmail": "provisionsservice@barmenia.de",
+        "text": "Hallo Herr Burdeka,\r\n\r\n \r\n\r\nein Lead reicht leider nicht aus, da es nicht auf Barmenia direkt, sondern auf einen anderen Vermittler läuft.\r\n\r\n \r\n\r\nBitte lassen Sie mir einen entsprechenden Beratungsnachweis zukommen.\r\n\r\n \r\n\r\nLG\r\n\r\n \r\n\r\nKimberley Spintzyk\r\n\r\n \r\n\r\nVon: Steven Burdeska <steven.burdeska@barmenia.de> \r\nGesendet: Dienstag, 16. Dezember 2025 17:44\r\nAn: Provisionsservice <provisionsservice@barmenia.de>\r\nBetreff: AW: Provisionsreklamation b24\r\n\r\n \r\n\r\nHallo Frau Spintzyk, \r\n\r\n \r\n\r\nvielen Dank für die Rückmeldung. \r\n\r\n \r\n\r\nWie bereits angesprochen, handelte es sich hierbei auch um ein Lead von mir und der Vertrag kam über meine Angebote zu Stande. \r\n\r\n \r\n\r\nBitte deshalb auch um den Absatz, inkl. Provision. \r\n\r\nHoffe das ist möglich. \r\n\r\n \r\n\r\nMit freundlichen Grüßen \r\n\r\n\r\nSteven Burdeska\r\n\r\n \r\n\r\nKaufmann für Versicherungen & Finanzanlagen (IHK)\r\n\r\nSpezialist für private Finanzanalyse nach DIN 77230\r\n\r\nScherreiks & Vogel OHG\r\n\r\nBreddestraße 11,45894 Gelsenkirchen\r\n\r\n \r\n\r\nBarmenia Versicherungen & Finanzierungen\r\n\r\n📲Mobil:     0176 61431393 <tel:0176%2061431393> \r\n\r\n☎️Telefon: 0209 51300822 <tel:0209%2051300822>  \r\n📧E-Mail:  steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> \r\n\r\n \r\n\r\n \r\n\r\n💡 Ihre Rente wird nicht reichen – handeln Sie jetzt!\r\n\r\nDie Versorgungslücke im Alter wächst jedes Jahr. Die gesetzliche Rente deckt oft nur noch einen Bruchteil des gewohnten Einkommens.\r\nWer heute nichts unternimmt, riskiert später deutliche finanzielle Einbußen und Einschränkungen im Alltag.\r\nJe früher Sie vorsorgen, desto kleiner ist der notwendige Aufwand – und desto sicherer Ihre Zukunft.\r\nVereinbaren Sie jetzt einen Termin, bevor wertvolle Zeit verstreicht.\r\n\r\nMeine Beratungsgrundlage\r\n\r\nIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\nBarmenia Versicherungen a. G.\r\nBarmenia Krankenversicherung AG\r\nBarmenia Allgemeine Versicherungs-AG\r\nGothaer Lebensversicherung AG\r\nGothaer Krankenversicherung AG\r\nRoland Rechtsschutz-Versicherungs-AG\r\nRoland Schutzbrief-Versicherung AG\r\n\r\nFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\nSchlichtungsstellen\r\nFür Lebens- und Sachversicherungen:\r\nVerein Versicherungsombudsmann e. V.\r\nPostfach 080632\r\n10006 Berlin\r\nFür private Krankenversicherungen:\r\nOmbudsmann für private Kranken- und Pflegeversicherung\r\nPostfach 06 02 22\r\n10052 Berlin\r\n\r\n \r\n\r\n________________________________\r\n\r\nVon: Provisionsservice\r\nGesendet: Dienstag, 16. Dezember 2025 14:45:28\r\nAn: Steven Burdeska\r\nBetreff: WG: Provisionsreklamation b24 \r\n\r\n \r\n\r\nHallo Herr Burdeska,\r\n\r\nder Bestand wird aufgrund des Kundenwunsches am 08.01.26 auf Sie umgeschlüsselt.\r\n\r\nDer Vertrag wird aktuell noch über ein anderes VZ geführt.\r\n\r\n        \r\nLG\r\nKimberley Spintzyk\r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Redaktion <redaktion@barmenia.de <mailto:redaktion@barmenia.de> > \r\nGesendet: Mittwoch, 10. Dezember 2025 14:42\r\nAn: Provisionsservice <provisionsservice@barmenia.de <mailto:provisionsservice@barmenia.de> >\r\nBetreff: Provisionsreklamation b24\r\n\r\nreklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Steven  \r\nnachname_vermittler : Burdeska \r\nvermittlernummer_vermittler : 00550261 \r\nversicherungsnummer_kunde : 114049690 \r\nvorname_kunde : Lara \r\nnachname_kunde : Krüskemper \r\nadresse_kunde : {\r\n   plz : 45711 \r\n   ort : Datteln \r\n   street : In den Wellen \r\n   streetNumber : 52a \r\n}\r\nnachricht : Der Vertrag kam über meine Angebote zustande, außerdem handelt es sich um ein Lead von mir. Anbei auch der unterschriebene Betreuungswechsel, sowie die Mail mit den Angeboten vom Juli.  \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D20000000001090000285B57B68DAA44418ADEBB29BA06A7D200048860B46F0000",
+        "isIncoming": false,
+        "folder": "sent",
+        "subject": "AW: Provisionsreklamation b24",
+        "hasAttachments": false,
+        "anhaenge": []
+      },
+      {
+        "datum": "2025-12-19T13:34:48.000Z",
+        "an": "",
+        "von": "Steven Burdeska",
+        "vonEmail": "steven.burdeska@barmenia.de",
+        "text": "Hallo Frau Spintzyk, \r\n\r\n\r\n\r\n\r\nhier die Nachrichten sowie die Angebote als Nachweis. \r\n\r\n\r\n\r\n\r\nVielen Dank. \r\n\r\n\r\n\r\n\r\nMit freundlichen Grüßen \r\n\r\nSteven Burdeska\r\n\r\n\r\nKaufmann für Versicherungen & Finanzanlagen (IHK)\r\nSpezialist für private Finanzanalyse nach DIN 77230\r\nScherreiks & Vogel OHG\r\n\r\nBreddestraße 11,45894 Gelsenkirchen\r\n\r\n\r\nBarmenia Versicherungen & Finanzierungen\r\n📲Mobil:     0176 61431393 <tel:0176 61431393> \r\n\r\n☎️Telefon: 0209 51300822 <tel:0209 51300822>  \r\n📧E-Mail:  steven.burdeska@barmenia.de\r\n\r\n\r\n\r\n💡 Ihre Rente wird nicht reichen – handeln Sie jetzt!\r\nDie Versorgungslücke im Alter wächst jedes Jahr. Die gesetzliche Rente deckt oft nur noch einen Bruchteil des gewohnten Einkommens.\r\nWer heute nichts unternimmt, riskiert später deutliche finanzielle Einbußen und Einschränkungen im Alltag.\r\nJe früher Sie vorsorgen, desto kleiner ist der notwendige Aufwand – und desto sicherer Ihre Zukunft.\r\nVereinbaren Sie jetzt einen Termin, bevor wertvolle Zeit verstreicht.\r\n\r\nMeine Beratungsgrundlage\r\n\r\n\r\nIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\nBarmenia Versicherungen a. G.\r\nBarmenia Krankenversicherung AG\r\nBarmenia Allgemeine Versicherungs-AG\r\nGothaer Lebensversicherung AG\r\nGothaer Krankenversicherung AG\r\nRoland Rechtsschutz-Versicherungs-AG\r\nRoland Schutzbrief-Versicherung AG\r\n\r\nFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\nSchlichtungsstellen\r\nFür Lebens- und Sachversicherungen:\r\nVerein Versicherungsombudsmann e. V.\r\nPostfach 080632\r\n10006 Berlin\r\nFür private Krankenversicherungen:\r\nOmbudsmann für private Kranken- und Pflegeversicherung\r\nPostfach 06 02 22\r\n10052 Berlin\r\n\r\n\r\n\r\n\r\n\r\n\r\n________________________________\r\n\r\nVon: Lara Krüskemper <lara.krueskemper@gmail.com>\r\nGesendet: Donnerstag, 31. Juli 2025 10:49\r\nAn: Steven Burdeska\r\nBetreff: Re: Angebote über eine Pferde-OP Versicherung \r\n \r\n\tSie erhalten nicht häufig E-Mails von lara.krueskemper@gmail.com. Erfahren Sie, warum dies wichtig ist <https://aka.ms/LearnAboutSenderIdentification> \r\n\t\r\nGuten Morgen Herr Burdeska,\r\n\r\nvielen Dank für Ihre Rückmeldung.\r\nGibt es einen Nachlass, wenn man jährlich zahlt?\r\n\r\nViele Grüße,\r\nLara Krüskemper\r\n\r\nAm Do., 31. Juli 2025 um 09:21 Uhr schrieb Steven Burdeska <steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> >:\r\n\r\n\r\n\tGuten Morgen Frau Krüskemper, \r\n\r\n\t\r\n\t\r\n\r\n\tvielen Dank für ihr Interesse an unserer OP-Versicherung. \r\n\r\n\t\r\n\t\r\n\r\n\tIm Anhang finden Sie die gewünschten Angebote, \r\n\r\n\tbei Fragen oder dem Wunsch nach einem Abschluss rufen Sie mich einfach an. \r\n\r\n\t\r\n\t\r\n\r\n\tFreue mich auf ihre Rückmeldung. \r\n\r\n\t\r\n\t\r\n\r\n\t\r\n\r\n\tMit freundlichen Grüßen\r\n\t\r\n\tSteven Burdeska\r\n\t\r\n\t\r\n\tKaufmann für Versicherungen & Finanzanlagen (IHK)\r\n\tBarmenia Versicherungen & Finanzierungen\r\n\t\r\n\t\r\n\t\r\n\tScherreiks & Vogel OHG\r\n\tBreddestraße 11,45894 Gelsenkirchen\r\n\t\r\n\t\r\n\t\r\n\t📲Mobil:     0176 61431393 <tel:0176%2061431393> \r\n\t☎️Telefon: 0209 51300822 <tel:0209%2051300822>  \r\n\t📧E-Mail:  steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> \r\n\t\r\n\tMeine Beratungsgrundlage\r\n\t\r\n\r\n\tIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\n\tBarmenia Versicherungen a. G.\r\n\tBarmenia Krankenversicherung AG\r\n\tBarmenia Allgemeine Versicherungs-AG\r\n\tGothaer Lebensversicherung AG\r\n\tGothaer Krankenversicherung AG\r\n\tRoland Rechtsschutz-Versicherungs-AG\r\n\tRoland Schutzbrief-Versicherung AG\r\n\r\n\tFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\n\tSchlichtungsstellen\r\n\tFür Lebens- und Sachversicherungen:\r\n\tVerein Versicherungsombudsmann e. V.\r\n\tPostfach 080632\r\n\t10006 Berlin\r\n\tFür private Krankenversicherungen:\r\n\tOmbudsmann für private Kranken- und Pflegeversicherung\r\n\tPostfach 06 02 22\r\n\t10052 Berlin\r\n\r\n\t\r\n\r\n\tFacebook BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.facebook.com%2Fprofile.php%3Fid%3D61552694782392&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158214972%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=sB6qZbbc5EfapT%2FetpDO4kQNE8eUU0XEqhv8WUCwSYI%3D&reserved=0>  -  Instagram BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.instagram.com%2Fbarmeniagothaer%2F&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158250125%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=cl0OH%2BbJAtzG2bN5yimGdkSr%2B0%2Fpo9ug7dP3vIKdWJg%3D&reserved=0>  -  YouTube BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.youtube.com%2Fuser%2Fbarmenia&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158266619%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=%2BnBufxm84sBQnEvXNFRQWBxd8Lh6E1Nd7jx9DMkmbEY%3D&reserved=0>  -  LinkedIn BarmeniaGothaer <https://eur05.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.linkedin.com%2Fcompany%2Fbarmeniagothaer%2F&data=05%7C02%7Csteven.burdeska%40barmenia.de%7C1db2b9dac8654e130f0b08ddd00f40f1%7C793d6b78869c4239b824370e5e59e166%7C0%7C0%7C638895486158282659%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=UbQWtyZo0zxQKzIUvuW%2Bky6w546ueWIB7%2BWdu5Lb728%3D&reserved=0> \r\n\r\n\tBarmenia Allgemeine Versicherungs-AG\r\n\tVorstand: Thomas Bischof (Vorsitzender) • Dr. Sylvia Eichelberg • Harald Ingo Epple • Dr. Andreas Eurich • Frank Lamsfuß • Christian Ritz\r\n\tOliver Schoeller • Aufsichtsratsvorsitzender: Dr. h. c. Josef Beutelmann\r\n\tRechtsform des Unternehmens: Aktiengesellschaft • Sitz: Wuppertal • Amtsgericht Wuppertal HRB 3033 • USt-IdNr. DE81142591\r\n\t\r\n\tBarmenia Krankenversicherung AG\r\n\tVorstand: Christian Ritz (Vorsitzender) • Thomas Bischof • Dr. Sylvia Eichelberg • Harald Ingo Epple • Dr. Andreas Eurich • Frank Lamsfuß\r\n\tOliver Schoeller • Alina vom Bruck • Aufsichtsratsvorsitzender: Dr. h. c. Josef Beutelmann\r\n\tRechtsform des Unternehmens: Aktiengesellschaft • Sitz: Wuppertal • Amtsgericht Wuppertal HRB 28475 • USt-IdNr. DE318683048\r\n\t\r\n\tGothaer Lebensversicherung AG\r\n\tVorstand: Alina vom Bruck (Vorsitzende) • Thomas Bischof • Dr. Sylvia Eichelberg • Harald Ingo Epple\r\n\tDr. Andreas Eurich • Frank Lamsfuß • Christian Ritz • Oliver Schoeller • Aufsichtsrat: Prof. Dr. Werner Görg (Vorsitzender)\r\n\tRechtsform des Unternehmens: Aktiengesellschaft • Sitz: Köln • Amtsgericht Köln HRB 56769 • USt-IdNr. DE207591682\r\n\r\n\r\n\r\n-- \r\n\r\nLara Krüskemper\r\nIn den Wellen 52a\r\n45711 Datteln\r\n\r\n0157/80410157 <tel:0157/80410157> \r\n\r\n________________________________\r\n\r\nVon: Provisionsservice\r\nGesendet: Freitag, 19. Dezember 2025 12:55\r\nAn: Steven Burdeska\r\nBetreff: AW: Provisionsreklamation b24 \r\n \r\n\r\nHallo Herr Burdeka,\r\n\r\n \r\n\r\nein Lead reicht leider nicht aus, da es nicht auf Barmenia direkt, sondern auf einen anderen Vermittler läuft.\r\n\r\n \r\n\r\nBitte lassen Sie mir einen entsprechenden Beratungsnachweis zukommen.\r\n\r\n \r\n\r\nLG\r\n\r\n \r\n\r\nKimberley Spintzyk\r\n\r\n \r\n\r\nVon: Steven Burdeska <steven.burdeska@barmenia.de> \r\nGesendet: Dienstag, 16. Dezember 2025 17:44\r\nAn: Provisionsservice <provisionsservice@barmenia.de>\r\nBetreff: AW: Provisionsreklamation b24\r\n\r\n \r\n\r\nHallo Frau Spintzyk, \r\n\r\n \r\n\r\nvielen Dank für die Rückmeldung. \r\n\r\n \r\n\r\nWie bereits angesprochen, handelte es sich hierbei auch um ein Lead von mir und der Vertrag kam über meine Angebote zu Stande. \r\n\r\n \r\n\r\nBitte deshalb auch um den Absatz, inkl. Provision. \r\n\r\nHoffe das ist möglich. \r\n\r\n \r\n\r\nMit freundlichen Grüßen \r\n\r\n\r\nSteven Burdeska\r\n\r\n \r\n\r\nKaufmann für Versicherungen & Finanzanlagen (IHK)\r\n\r\nSpezialist für private Finanzanalyse nach DIN 77230\r\n\r\nScherreiks & Vogel OHG\r\n\r\nBreddestraße 11,45894 Gelsenkirchen\r\n\r\n \r\n\r\nBarmenia Versicherungen & Finanzierungen\r\n\r\n📲Mobil:     0176 61431393 <tel:0176%2061431393> \r\n\r\n☎️Telefon: 0209 51300822 <tel:0209%2051300822>  \r\n📧E-Mail:  steven.burdeska@barmenia.de <mailto:steven.burdeska@barmenia.de> \r\n\r\n \r\n\r\n \r\n\r\n💡 Ihre Rente wird nicht reichen – handeln Sie jetzt!\r\n\r\nDie Versorgungslücke im Alter wächst jedes Jahr. Die gesetzliche Rente deckt oft nur noch einen Bruchteil des gewohnten Einkommens.\r\nWer heute nichts unternimmt, riskiert später deutliche finanzielle Einbußen und Einschränkungen im Alltag.\r\nJe früher Sie vorsorgen, desto kleiner ist der notwendige Aufwand – und desto sicherer Ihre Zukunft.\r\nVereinbaren Sie jetzt einen Termin, bevor wertvolle Zeit verstreicht.\r\n\r\nMeine Beratungsgrundlage\r\n\r\nIch bin für die Barmenia Krankenversicherung AG als angestellte/r Außendienstmitarbeiter/in tätig und berate Sie ausschließlich über die Produkte der\r\n\r\nBarmenia Versicherungen a. G.\r\nBarmenia Krankenversicherung AG\r\nBarmenia Allgemeine Versicherungs-AG\r\nGothaer Lebensversicherung AG\r\nGothaer Krankenversicherung AG\r\nRoland Rechtsschutz-Versicherungs-AG\r\nRoland Schutzbrief-Versicherung AG\r\n\r\nFür meine Tätigkeit erhalte ich eine neben den Vergütungen gemäß dem gültigen Tarifvertrag für die private Versicherungswirtschaft eine Provision und sonstige Vergütungen, die in der zu entrichtenden Versicherungsprämie enthalten sind.\r\n\r\nSchlichtungsstellen\r\nFür Lebens- und Sachversicherungen:\r\nVerein Versicherungsombudsmann e. V.\r\nPostfach 080632\r\n10006 Berlin\r\nFür private Krankenversicherungen:\r\nOmbudsmann für private Kranken- und Pflegeversicherung\r\nPostfach 06 02 22\r\n10052 Berlin\r\n\r\n \r\n\r\n________________________________\r\n\r\nVon: Provisionsservice\r\nGesendet: Dienstag, 16. Dezember 2025 14:45:28\r\nAn: Steven Burdeska\r\nBetreff: WG: Provisionsreklamation b24 \r\n\r\n \r\n\r\nHallo Herr Burdeska,\r\n\r\nder Bestand wird aufgrund des Kundenwunsches am 08.01.26 auf Sie umgeschlüsselt.\r\n\r\nDer Vertrag wird aktuell noch über ein anderes VZ geführt.\r\n\r\n        \r\nLG\r\nKimberley Spintzyk\r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Redaktion <redaktion@barmenia.de <mailto:redaktion@barmenia.de> > \r\nGesendet: Mittwoch, 10. Dezember 2025 14:42\r\nAn: Provisionsservice <provisionsservice@barmenia.de <mailto:provisionsservice@barmenia.de> >\r\nBetreff: Provisionsreklamation b24\r\n\r\nreklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Steven  \r\nnachname_vermittler : Burdeska \r\nvermittlernummer_vermittler : 00550261 <tel:00550261>  \r\nversicherungsnummer_kunde : 114049690 \r\nvorname_kunde : Lara \r\nnachname_kunde : Krüskemper \r\nadresse_kunde : {\r\n   plz : 45711 \r\n   ort : Datteln \r\n   street : In den Wellen \r\n   streetNumber : 52a \r\n}\r\nnachricht : Der Vertrag kam über meine Angebote zustande, außerdem handelt es sich um ein Lead von mir. Anbei auch der unterschriebene Betreuungswechsel, sowie die Mail mit den Angeboten vom Juli.  \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F179935D0000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "AW: Provisionsreklamation b24",
+        "hasAttachments": true,
+        "anhaenge": [
+          "Angebote_über_eine_Pferde-OP_Versicherung_.zip"
+        ]
+      }
+    ],
+    "existingReplies": "",
+    "isDuplicateWithNewReplies": false,
+    "conversationId": "F653D0639A42D34EAB2E0616F54DA9DF",
+    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D20000000001090000285B57B68DAA44418ADEBB29BA06A7D200048860B46F0000",
+    "internetMessageId": "",
+    "inReplyTo": "",
+    "references": [],
+    "conversationIndex": "",
+    "normalizedSubject": "provisionsreklamation b24",
+    "threadId": "",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
+    "clusters": [
+      "KV",
+      "SHUK",
+      "LV",
+      "Provisionierung",
+      "Bestand"
+    ],
+    "agentur": "Steven Burdeska",
+    "vermittlernr": "00550261",
+    "vsnr": "114049690",
+    "anfrage": "Der Vertrag kam über meine Angebote zustande, außerdem handelt es sich um ein Lead von mir. Anbei auch der unterschriebene Betreuungswechsel, sowie die Mail mit den Angeboten vom Juli.",
+    "antwort": "",
+    "kommentar": "",
+    "bearbeiter": "",
+    "isProvision": true,
+    "provisionData": {
+      "reklamation_provision": "true",
+      "reklamation_absatz": "true",
+      "vorname_vermittler": "Steven",
+      "nachname_vermittler": "Burdeska",
+      "vermittlernummer_vermittler": "00550261",
+      "versicherungsnummer_kunde": "114049690",
+      "vorname_kunde": "Lara",
+      "nachname_kunde": "Krüskemper",
+      "nachricht": "Der Vertrag kam über meine Angebote zustande, außerdem handelt es sich um ein Lead von mir. Anbei auch der unterschriebene Betreuungswechsel, sowie die Mail mit den Angeboten vom Juli."
+    },
+    "outlookKategorie": "",
+    "displaySender": "Provisionsservice (Ausgehend)",
+    "_parsedThread": []
+  },
+  {
+    "id": 3,
+    "datum": "2025-12-19T13:30:01.699Z",
+    "von_email": "redaktion@barmenia.de",
+    "von_name": "Redaktion",
+    "betreff": "Provisionsreklamation b24",
+    "text": "reklamation_provision : true \r\nreklamation_absatz : nicht gesetzt\r\nvorname_vermittler : Florian \r\nnachname_vermittler : Müller \r\nvermittlernummer_vermittler : 00620654 \r\nversicherungsnummer_kunde : 06962902Z00 \r\nvorname_kunde : Florian  \r\nnachname_kunde : Müller \r\nadresse_kunde : {\r\n   plz : 53925 \r\n   ort : Kall \r\n   street : Lourdesstrasse \r\n   streetNumber : 14 \r\n}\r\nnachricht : Mir fehlt noch die Provision von der T14+ ab dem 15.Tag (100,00 EUR). Die Absatzeinheiten hatte ich erhalten. \r\ndatenschutz : true \r\n",
+    "htmlBody": "",
+    "anhaenge": [
+      "file1.pdf"
+    ],
+    "antworten": [],
+    "alleAntworten": [
+      {
+        "datum": "2025-12-19T13:30:01.000Z",
+        "an": "",
+        "von": "Redaktion",
+        "vonEmail": "redaktion@barmenia.de",
+        "text": "reklamation_provision : true \r\nreklamation_absatz : nicht gesetzt\r\nvorname_vermittler : Florian \r\nnachname_vermittler : Müller \r\nvermittlernummer_vermittler : 00620654 \r\nversicherungsnummer_kunde : 06962902Z00 \r\nvorname_kunde : Florian  \r\nnachname_kunde : Müller \r\nadresse_kunde : {\r\n   plz : 53925 \r\n   ort : Kall \r\n   street : Lourdesstrasse \r\n   streetNumber : 14 \r\n}\r\nnachricht : Mir fehlt noch die Provision von der T14+ ab dem 15.Tag (100,00 EUR). Die Absatzeinheiten hatte ich erhalten. \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F179935C0000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "Provisionsreklamation b24",
+        "hasAttachments": true,
+        "anhaenge": [
+          "file1.pdf"
+        ]
+      }
+    ],
+    "existingReplies": "",
+    "isDuplicateWithNewReplies": false,
+    "conversationId": "69145E39B4A79D4CAF80E5AA3EF481C0",
+    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F179935C0000",
+    "internetMessageId": "",
+    "inReplyTo": "",
+    "references": [],
+    "conversationIndex": "",
+    "normalizedSubject": "provisionsreklamation b24",
+    "threadId": "",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
+    "clusters": [
+      "Provisionierung",
+      "Absatzeinheiten"
+    ],
+    "agentur": "Florian Müller",
+    "vermittlernr": "00620654",
+    "vsnr": "06962902Z00",
+    "anfrage": "Mir fehlt noch die Provision von der T14+ ab dem 15.Tag (100,00 EUR). Die Absatzeinheiten hatte ich erhalten.",
+    "antwort": "",
+    "kommentar": "",
+    "bearbeiter": "",
+    "isProvision": true,
+    "provisionData": {
+      "reklamation_provision": "true",
+      "reklamation_absatz": "nicht gesetzt",
+      "vorname_vermittler": "Florian",
+      "nachname_vermittler": "Müller",
+      "vermittlernummer_vermittler": "00620654",
+      "versicherungsnummer_kunde": "06962902Z00",
+      "vorname_kunde": "Florian",
+      "nachname_kunde": "Müller",
+      "nachricht": "Mir fehlt noch die Provision von der T14+ ab dem 15.Tag (100,00 EUR). Die Absatzeinheiten hatte ich erhalten."
+    },
+    "outlookKategorie": "",
+    "displaySender": "Redaktion",
+    "_parsedThread": []
+  },
+  {
+    "id": 4,
+    "datum": "2025-12-19T11:45:00.000Z",
+    "von_email": "provisionsservice@barmenia.de",
+    "von_name": "Provisionsservice",
+    "betreff": "WG: Provisionsreklamation b24",
+    "text": "Hallo Sascha,\r\n\r\nhabe den ADP in Absatz und Provision geändert. \r\n\r\nLeider lässt er mich jedoch die beiden neuesten Fälle nicht ändern!?\r\n\r\nKönntest Du bitte einmal nachschauen?\r\n\r\nVielen Dank!\r\n\r\nLG\r\nKim\r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Redaktion <redaktion@barmenia.de> \r\nGesendet: Montag, 15. Dezember 2025 15:26\r\nAn: Provisionsservice <provisionsservice@barmenia.de>\r\nBetreff: Provisionsreklamation b24\r\n\r\nreklamation_provision : true\r\nreklamation_absatz : true\r\nvorname_vermittler : Talha\r\nnachname_vermittler : Atalay\r\nvermittlernummer_vermittler : 00550320\r\nversicherungsnummer_kunde : 01 129 529 P 00 vorname_kunde : Christof nachname_kunde : Scheit adresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt\r\n}\r\nnachricht : Hallo zusammen,  habe  bei dem Kunden eine Aufstockung durchgeführt und den John Scheit aus dem Vertrag rausgenommen (Vertragstrennung). Ein Bestandswechsel wurde auch durchgeführt, jedoch fehlen mir die Absatz und Provisionen für die Aufstockung. \r\n \r\ndatenschutz : true \r\n",
+    "htmlBody": "",
+    "anhaenge": [
+      "file1.pdf"
+    ],
+    "antworten": [
+      {
+        "datum": "2025-12-19T12:52:28.000Z",
+        "an": "",
+        "von": "Sascha Borsz",
+        "vonEmail": "sascha.borsz@barmenia.de",
+        "text": "Hallo Kim, \r\n\r\n \r\n\r\ndie Bedienungsanleitung zu dem Fall steht hier:\r\n\r\n \r\n\r\nhttps://barmeniagothaer.atlassian.net/wiki/spaces/CCVUS/pages/608242148/Einzelthemen#Anschlussversicherung-%2F-Umb%C3%BCndelung\r\n\r\n \r\n\r\ndirekt der erste Punkt. Falls es dann nicht klappt, nochmal melden.\r\n\r\n \r\n\r\nLG und schöne Feiertage\r\n\r\nSascha\r\n\r\n \r\n\r\n \r\n\r\n@Meike Bauer <mailto:meike.bauer@barmenia.de>  hi Meike, nimm das Thema bitte mit in eine der nächsten MABs - danke.  LG \r\n\r\n \r\n\r\n \r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Provisionsservice <provisionsservice@barmenia.de> \r\nGesendet: Freitag, 19. Dezember 2025 12:46\r\nAn: Sascha Borsz <sascha.borsz@barmenia.de>\r\nBetreff: WG: Provisionsreklamation b24\r\n\r\n \r\n\r\nHallo Sascha,\r\n\r\n \r\n\r\nhabe den ADP in Absatz und Provision geändert. \r\n\r\n \r\n\r\nLeider lässt er mich jedoch die beiden neuesten Fälle nicht ändern!?\r\n\r\n \r\n\r\nKönntest Du bitte einmal nachschauen?\r\n\r\n \r\n\r\nVielen Dank!\r\n\r\n \r\n\r\nLG\r\n\r\nKim\r\n\r\n \r\n\r\n-----Ursprüngliche Nachricht-----\r\n\r\nVon: Redaktion <redaktion@barmenia.de <mailto:redaktion@barmenia.de> > \r\n\r\nGesendet: Montag, 15. Dezember 2025 15:26\r\n\r\nAn: Provisionsservice <provisionsservice@barmenia.de <mailto:provisionsservice@barmenia.de> >\r\n\r\nBetreff: Provisionsreklamation b24\r\n\r\n \r\n\r\nreklamation_provision : true\r\n\r\nreklamation_absatz : true\r\n\r\nvorname_vermittler : Talha\r\n\r\nnachname_vermittler : Atalay\r\n\r\nvermittlernummer_vermittler : 00550320\r\n\r\nversicherungsnummer_kunde : 01 129 529 P 00 vorname_kunde : Christof nachname_kunde : Scheit adresse_kunde : {\r\n\r\n   plz : nicht gesetzt \r\n\r\n   ort : nicht gesetzt \r\n\r\n   street : nicht gesetzt \r\n\r\n   streetNumber : nicht gesetzt\r\n\r\n}\r\n\r\nnachricht : Hallo zusammen,  habe  bei dem Kunden eine Aufstockung durchgeführt und den John Scheit aus dem Vertrag rausgenommen (Vertragstrennung). Ein Bestandswechsel wurde auch durchgeführt, jedoch fehlen mir die Absatz und Provisionen für die Aufstockung. \r\n\r\n \r\n\r\ndatenschutz : true \r\n\r\n \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F179935B0000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "AW: Provisionsreklamation b24",
+        "hasAttachments": false,
+        "anhaenge": []
+      }
+    ],
+    "alleAntworten": [
+      {
+        "datum": "2025-12-19T11:45:31.994Z",
+        "an": "sascha.borsz@barmenia.de",
+        "von": "Provisionsservice",
+        "vonEmail": "provisionsservice@barmenia.de",
+        "text": "Hallo Sascha,\r\n\r\nhabe den ADP in Absatz und Provision geändert. \r\n\r\nLeider lässt er mich jedoch die beiden neuesten Fälle nicht ändern!?\r\n\r\nKönntest Du bitte einmal nachschauen?\r\n\r\nVielen Dank!\r\n\r\nLG\r\nKim\r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Redaktion <redaktion@barmenia.de> \r\nGesendet: Montag, 15. Dezember 2025 15:26\r\nAn: Provisionsservice <provisionsservice@barmenia.de>\r\nBetreff: Provisionsreklamation b24\r\n\r\nreklamation_provision : true\r\nreklamation_absatz : true\r\nvorname_vermittler : Talha\r\nnachname_vermittler : Atalay\r\nvermittlernummer_vermittler : 00550320\r\nversicherungsnummer_kunde : 01 129 529 P 00 vorname_kunde : Christof nachname_kunde : Scheit adresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt\r\n}\r\nnachricht : Hallo zusammen,  habe  bei dem Kunden eine Aufstockung durchgeführt und den John Scheit aus dem Vertrag rausgenommen (Vertragstrennung). Ein Bestandswechsel wurde auch durchgeführt, jedoch fehlen mir die Absatz und Provisionen für die Aufstockung. \r\n \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D20000000001090000285B57B68DAA44418ADEBB29BA06A7D200048860B46D0000",
+        "isIncoming": false,
+        "folder": "sent",
+        "subject": "WG: Provisionsreklamation b24",
+        "hasAttachments": true,
+        "anhaenge": [
+          "file1.pdf"
+        ]
+      },
+      {
+        "datum": "2025-12-19T12:52:28.000Z",
+        "an": "",
+        "von": "Sascha Borsz",
+        "vonEmail": "sascha.borsz@barmenia.de",
+        "text": "Hallo Kim, \r\n\r\n \r\n\r\ndie Bedienungsanleitung zu dem Fall steht hier:\r\n\r\n \r\n\r\nhttps://barmeniagothaer.atlassian.net/wiki/spaces/CCVUS/pages/608242148/Einzelthemen#Anschlussversicherung-%2F-Umb%C3%BCndelung\r\n\r\n \r\n\r\ndirekt der erste Punkt. Falls es dann nicht klappt, nochmal melden.\r\n\r\n \r\n\r\nLG und schöne Feiertage\r\n\r\nSascha\r\n\r\n \r\n\r\n \r\n\r\n@Meike Bauer <mailto:meike.bauer@barmenia.de>  hi Meike, nimm das Thema bitte mit in eine der nächsten MABs - danke.  LG \r\n\r\n \r\n\r\n \r\n\r\n-----Ursprüngliche Nachricht-----\r\nVon: Provisionsservice <provisionsservice@barmenia.de> \r\nGesendet: Freitag, 19. Dezember 2025 12:46\r\nAn: Sascha Borsz <sascha.borsz@barmenia.de>\r\nBetreff: WG: Provisionsreklamation b24\r\n\r\n \r\n\r\nHallo Sascha,\r\n\r\n \r\n\r\nhabe den ADP in Absatz und Provision geändert. \r\n\r\n \r\n\r\nLeider lässt er mich jedoch die beiden neuesten Fälle nicht ändern!?\r\n\r\n \r\n\r\nKönntest Du bitte einmal nachschauen?\r\n\r\n \r\n\r\nVielen Dank!\r\n\r\n \r\n\r\nLG\r\n\r\nKim\r\n\r\n \r\n\r\n-----Ursprüngliche Nachricht-----\r\n\r\nVon: Redaktion <redaktion@barmenia.de <mailto:redaktion@barmenia.de> > \r\n\r\nGesendet: Montag, 15. Dezember 2025 15:26\r\n\r\nAn: Provisionsservice <provisionsservice@barmenia.de <mailto:provisionsservice@barmenia.de> >\r\n\r\nBetreff: Provisionsreklamation b24\r\n\r\n \r\n\r\nreklamation_provision : true\r\n\r\nreklamation_absatz : true\r\n\r\nvorname_vermittler : Talha\r\n\r\nnachname_vermittler : Atalay\r\n\r\nvermittlernummer_vermittler : 00550320\r\n\r\nversicherungsnummer_kunde : 01 129 529 P 00 vorname_kunde : Christof nachname_kunde : Scheit adresse_kunde : {\r\n\r\n   plz : nicht gesetzt \r\n\r\n   ort : nicht gesetzt \r\n\r\n   street : nicht gesetzt \r\n\r\n   streetNumber : nicht gesetzt\r\n\r\n}\r\n\r\nnachricht : Hallo zusammen,  habe  bei dem Kunden eine Aufstockung durchgeführt und den John Scheit aus dem Vertrag rausgenommen (Vertragstrennung). Ein Bestandswechsel wurde auch durchgeführt, jedoch fehlen mir die Absatz und Provisionen für die Aufstockung. \r\n\r\n \r\n\r\ndatenschutz : true \r\n\r\n \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F179935B0000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "AW: Provisionsreklamation b24",
+        "hasAttachments": false,
+        "anhaenge": []
+      }
+    ],
+    "existingReplies": "",
+    "isDuplicateWithNewReplies": false,
+    "conversationId": "C8962AD1198CEB4B849A03CD0CB3C7FF",
+    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D20000000001090000285B57B68DAA44418ADEBB29BA06A7D200048860B46D0000",
+    "internetMessageId": "",
+    "inReplyTo": "",
+    "references": [],
+    "conversationIndex": "",
+    "normalizedSubject": "provisionsreklamation b24",
+    "threadId": "",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
+    "clusters": [
+      "Provisionierung"
+    ],
+    "agentur": "Talha Atalay",
+    "vermittlernr": "00550320",
+    "vsnr": "01 129 529 P 00",
+    "anfrage": "Hallo zusammen,  habe  bei dem Kunden eine Aufstockung durchgeführt und den John Scheit aus dem Vertrag rausgenommen (Vertragstrennung). Ein Bestandswechsel wurde auch durchgeführt, jedoch fehlen mir die Absatz und Provisionen für die Aufstockung.",
+    "antwort": "",
+    "kommentar": "",
+    "bearbeiter": "",
+    "isProvision": true,
+    "provisionData": {
+      "reklamation_provision": "true",
+      "reklamation_absatz": "true",
+      "vorname_vermittler": "Talha",
+      "nachname_vermittler": "Atalay",
+      "vermittlernummer_vermittler": "00550320",
+      "versicherungsnummer_kunde": "01 129 529 P 00",
+      "vorname_kunde": "Christof",
+      "nachname_kunde": "Scheit",
+      "nachricht": "Hallo zusammen,  habe  bei dem Kunden eine Aufstockung durchgeführt und den John Scheit aus dem Vertrag rausgenommen (Vertragstrennung). Ein Bestandswechsel wurde auch durchgeführt, jedoch fehlen mir die Absatz und Provisionen für die Aufstockung."
+    },
+    "outlookKategorie": "",
+    "displaySender": "Provisionsservice (Ausgehend)",
+    "_parsedThread": []
+  },
+  {
+    "id": 5,
+    "datum": "2025-12-19T12:30:51.482Z",
+    "von_email": "redaktion@barmenia.de",
+    "von_name": "Redaktion",
+    "betreff": "Provisionsreklamation b24",
+    "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Ingelore \r\nnachname_vermittler : Müller \r\nvermittlernummer_vermittler : 00791120 \r\nversicherungsnummer_kunde : 116939142 \r\nvorname_kunde : Philipp \r\nnachname_kunde : Dr.jur.Roeckl \r\nadresse_kunde : {\r\n   plz : 81925 \r\n   ort : München \r\n   street : Denninger Str. \r\n   streetNumber : 110 \r\n}\r\nnachricht : Mein Kunde hat ? eine Hausratversicherung über meinen Büro link abgeschlossen. Die Kopie der Police , erstellt am 18.12. habe ich  erhalten.\r\nLeider bisher noch keinen Absatz / AE. Bitte um Korrektur. Danke und schöne Weihnachten. \r\ndatenschutz : true \r\n",
+    "htmlBody": "",
+    "anhaenge": [],
+    "antworten": [],
+    "alleAntworten": [
+      {
+        "datum": "2025-12-19T12:30:51.000Z",
+        "an": "",
+        "von": "Redaktion",
+        "vonEmail": "redaktion@barmenia.de",
+        "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Ingelore \r\nnachname_vermittler : Müller \r\nvermittlernummer_vermittler : 00791120 \r\nversicherungsnummer_kunde : 116939142 \r\nvorname_kunde : Philipp \r\nnachname_kunde : Dr.jur.Roeckl \r\nadresse_kunde : {\r\n   plz : 81925 \r\n   ort : München \r\n   street : Denninger Str. \r\n   streetNumber : 110 \r\n}\r\nnachricht : Mein Kunde hat ? eine Hausratversicherung über meinen Büro link abgeschlossen. Die Kopie der Police , erstellt am 18.12. habe ich  erhalten.\r\nLeider bisher noch keinen Absatz / AE. Bitte um Korrektur. Danke und schöne Weihnachten. \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993590000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "Provisionsreklamation b24",
+        "hasAttachments": false,
+        "anhaenge": []
+      }
+    ],
+    "existingReplies": "",
+    "isDuplicateWithNewReplies": false,
+    "conversationId": "709394B3BBF6CF4087501E4D177ECABF",
+    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993590000",
+    "internetMessageId": "",
+    "inReplyTo": "",
+    "references": [],
+    "conversationIndex": "",
+    "normalizedSubject": "provisionsreklamation b24",
+    "threadId": "",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
+    "clusters": [
+      "Provisionierung",
+      "Absatzeinheiten"
+    ],
+    "agentur": "Ingelore Müller",
+    "vermittlernr": "00791120",
+    "vsnr": "116939142",
+    "anfrage": "Mein Kunde hat ? eine Hausratversicherung über meinen Büro link abgeschlossen. Die Kopie der Police , erstellt am 18.12. habe ich  erhalten.\r\nLeider bisher noch keinen Absatz / AE. Bitte um Korrektur. Danke und schöne Weihnachten.",
+    "antwort": "",
+    "kommentar": "",
+    "bearbeiter": "",
+    "isProvision": true,
+    "provisionData": {
+      "reklamation_provision": "true",
+      "reklamation_absatz": "true",
+      "vorname_vermittler": "Ingelore",
+      "nachname_vermittler": "Müller",
+      "vermittlernummer_vermittler": "00791120",
+      "versicherungsnummer_kunde": "116939142",
+      "vorname_kunde": "Philipp",
+      "nachname_kunde": "Dr.jur.Roeckl",
+      "nachricht": "Mein Kunde hat ? eine Hausratversicherung über meinen Büro link abgeschlossen. Die Kopie der Police , erstellt am 18.12. habe ich  erhalten.\r\nLeider bisher noch keinen Absatz / AE. Bitte um Korrektur. Danke und schöne Weihnachten."
+    },
+    "outlookKategorie": "",
+    "displaySender": "Redaktion",
+    "_parsedThread": []
+  },
+  {
+    "id": 6,
+    "datum": "2025-12-19T12:14:02.970Z",
+    "von_email": "redaktion@barmenia.de",
+    "von_name": "Redaktion",
+    "betreff": "Provisionsreklamation b24",
+    "text": "reklamation_provision : true \r\nreklamation_absatz : nicht gesetzt\r\nvorname_vermittler : Johannes \r\nnachname_vermittler : Net \r\nvermittlernummer_vermittler : 00700700 \r\nversicherungsnummer_kunde : 04633034K00 \r\nvorname_kunde : Samuel \r\nnachname_kunde : Zimmermann \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Hallo Liebe Kolleginnen, leider fehlt immer noch die Gutschrift von dem Vertrag. Es wurden direkt ca. 3000€ ins Minus gebucht, obwohl der Vertrag noch läuft. Es gibt auch einen Ausgleich, bitte das Geld umgehend anweisen. \r\ndatenschutz : true \r\n",
+    "htmlBody": "",
+    "anhaenge": [
+      "file1.pdf"
+    ],
+    "antworten": [],
+    "alleAntworten": [
+      {
+        "datum": "2025-12-19T12:14:02.000Z",
+        "an": "",
+        "von": "Redaktion",
+        "vonEmail": "redaktion@barmenia.de",
+        "text": "reklamation_provision : true \r\nreklamation_absatz : nicht gesetzt\r\nvorname_vermittler : Johannes \r\nnachname_vermittler : Net \r\nvermittlernummer_vermittler : 00700700 \r\nversicherungsnummer_kunde : 04633034K00 \r\nvorname_kunde : Samuel \r\nnachname_kunde : Zimmermann \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Hallo Liebe Kolleginnen, leider fehlt immer noch die Gutschrift von dem Vertrag. Es wurden direkt ca. 3000€ ins Minus gebucht, obwohl der Vertrag noch läuft. Es gibt auch einen Ausgleich, bitte das Geld umgehend anweisen. \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993580000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "Provisionsreklamation b24",
+        "hasAttachments": true,
+        "anhaenge": [
+          "file1.pdf"
+        ]
+      }
+    ],
+    "existingReplies": "",
+    "isDuplicateWithNewReplies": false,
+    "conversationId": "764BAF85BFB3204CB9C9C43FF44B392D",
+    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993580000",
+    "internetMessageId": "",
+    "inReplyTo": "",
+    "references": [],
+    "conversationIndex": "",
+    "normalizedSubject": "provisionsreklamation b24",
+    "threadId": "",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
+    "clusters": [
+      "Provisionierung"
+    ],
+    "agentur": "Johannes Net",
+    "vermittlernr": "00700700",
+    "vsnr": "04633034K00",
+    "anfrage": "Hallo Liebe Kolleginnen, leider fehlt immer noch die Gutschrift von dem Vertrag. Es wurden direkt ca. 3000€ ins Minus gebucht, obwohl der Vertrag noch läuft. Es gibt auch einen Ausgleich, bitte das Geld umgehend anweisen.",
+    "antwort": "",
+    "kommentar": "",
+    "bearbeiter": "",
+    "isProvision": true,
+    "provisionData": {
+      "reklamation_provision": "true",
+      "reklamation_absatz": "nicht gesetzt",
+      "vorname_vermittler": "Johannes",
+      "nachname_vermittler": "Net",
+      "vermittlernummer_vermittler": "00700700",
+      "versicherungsnummer_kunde": "04633034K00",
+      "vorname_kunde": "Samuel",
+      "nachname_kunde": "Zimmermann",
+      "nachricht": "Hallo Liebe Kolleginnen, leider fehlt immer noch die Gutschrift von dem Vertrag. Es wurden direkt ca. 3000€ ins Minus gebucht, obwohl der Vertrag noch läuft. Es gibt auch einen Ausgleich, bitte das Geld umgehend anweisen."
+    },
+    "outlookKategorie": "",
+    "displaySender": "Redaktion",
+    "_parsedThread": []
+  },
+  {
+    "id": 7,
+    "datum": "2025-12-19T10:10:49.915Z",
+    "von_email": "redaktion@barmenia.de",
+    "von_name": "Redaktion",
+    "betreff": "Provisionsreklamation b24",
+    "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Flath&Sohn \r\nnachname_vermittler : OHG \r\nvermittlernummer_vermittler : 00012655 \r\nversicherungsnummer_kunde : nicht gesetzt\r\nvorname_kunde : Christin \r\nnachname_kunde : Meyer \r\nadresse_kunde : {\r\n   plz : 15732 \r\n   ort : Schulzendorf \r\n   street : Puschkinstr. \r\n   streetNumber : 37 \r\n}\r\nnachricht : Hier wurde eine Bausparer vermittelt mit einer BS von 100.000 €, Abschlussgebühr noch nicht vollst- gezahlt, jedoch nützt mir der Absatz in 2026 nichts mehr. Wie gehen wir damit um? \r\ndatenschutz : true \r\n",
+    "htmlBody": "",
+    "anhaenge": [],
+    "antworten": [],
+    "alleAntworten": [
+      {
+        "datum": "2025-12-19T10:10:49.000Z",
+        "an": "",
+        "von": "Redaktion",
+        "vonEmail": "redaktion@barmenia.de",
+        "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Flath&Sohn \r\nnachname_vermittler : OHG \r\nvermittlernummer_vermittler : 00012655 \r\nversicherungsnummer_kunde : nicht gesetzt\r\nvorname_kunde : Christin \r\nnachname_kunde : Meyer \r\nadresse_kunde : {\r\n   plz : 15732 \r\n   ort : Schulzendorf \r\n   street : Puschkinstr. \r\n   streetNumber : 37 \r\n}\r\nnachricht : Hier wurde eine Bausparer vermittelt mit einer BS von 100.000 €, Abschlussgebühr noch nicht vollst- gezahlt, jedoch nützt mir der Absatz in 2026 nichts mehr. Wie gehen wir damit um? \r\ndatenschutz : true \r\n",
+        "htmlBody": "",
+        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993540000",
+        "isIncoming": true,
+        "folder": "inbox",
+        "subject": "Provisionsreklamation b24",
+        "hasAttachments": false,
+        "anhaenge": []
+      }
+    ],
+    "existingReplies": "",
+    "isDuplicateWithNewReplies": false,
+    "conversationId": "F89ECA04F7662F4FB467D98E543CFC5B",
+    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993540000",
+    "internetMessageId": "",
+    "inReplyTo": "",
+    "references": [],
+    "conversationIndex": "",
+    "normalizedSubject": "provisionsreklamation b24",
+    "threadId": "",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
+    "clusters": [
+      "Provisionierung"
+    ],
+    "agentur": "Flath&Sohn OHG",
+    "vermittlernr": "00012655",
+    "vsnr": "nicht gesetzt",
+    "anfrage": "Hier wurde eine Bausparer vermittelt mit einer BS von 100.000 €, Abschlussgebühr noch nicht vollst- gezahlt, jedoch nützt mir der Absatz in 2026 nichts mehr. Wie gehen wir damit um?",
+    "antwort": "",
+    "kommentar": "",
+    "bearbeiter": "",
+    "isProvision": true,
+    "provisionData": {
+      "reklamation_provision": "true",
+      "reklamation_absatz": "true",
+      "vorname_vermittler": "Flath&Sohn",
+      "nachname_vermittler": "OHG",
+      "vermittlernummer_vermittler": "00012655",
+      "versicherungsnummer_kunde": "nicht gesetzt",
+      "vorname_kunde": "Christin",
+      "nachname_kunde": "Meyer",
+      "nachricht": "Hier wurde eine Bausparer vermittelt mit einer BS von 100.000 €, Abschlussgebühr noch nicht vollst- gezahlt, jedoch nützt mir der Absatz in 2026 nichts mehr. Wie gehen wir damit um?"
+    },
+    "outlookKategorie": "",
+    "displaySender": "Redaktion",
+    "_parsedThread": []
+  },
+  {
+    "id": 8,
     "datum": "2025-12-19T10:08:18.574Z",
     "von_email": "redaktion@barmenia.de",
     "von_name": "Redaktion",
@@ -35,8 +563,8 @@
     "conversationIndex": "",
     "normalizedSubject": "provisionsreklamation b24",
     "threadId": "",
-    "kategorie": "Keine BGAV Relevanz",
-    "status": "Keine BGAV Relevanz",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
     "clusters": [
       "Provisionierung"
     ],
@@ -64,7 +592,7 @@
     "_parsedThread": []
   },
   {
-    "id": 2,
+    "id": 9,
     "datum": "2025-12-19T10:06:16.325Z",
     "von_email": "redaktion@barmenia.de",
     "von_name": "Redaktion",
@@ -99,8 +627,8 @@
     "conversationIndex": "",
     "normalizedSubject": "provisionsreklamation b24",
     "threadId": "",
-    "kategorie": "Keine BGAV Relevanz",
-    "status": "Keine BGAV Relevanz",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
     "clusters": [
       "Provisionierung"
     ],
@@ -128,7 +656,7 @@
     "_parsedThread": []
   },
   {
-    "id": 3,
+    "id": 10,
     "datum": "2025-12-19T09:49:43.930Z",
     "von_email": "redaktion@barmenia.de",
     "von_name": "Redaktion",
@@ -166,8 +694,7 @@
     "kategorie": "Provisionsreklamation",
     "status": "Neu",
     "clusters": [
-      "Provisionierung",
-      "KV"
+      "Provisionierung"
     ],
     "agentur": "Frank Boos",
     "vermittlernr": "00541019",
@@ -175,7 +702,7 @@
     "anfrage": "Sehr geehrte Damen und Herren, meines Erachtens fehlt zu diesem Vertrag die Provision. Beste Grüße und schöne Feiertage, Frank Boos",
     "antwort": "",
     "kommentar": "",
-    "bearbeiter": "Ulrika",
+    "bearbeiter": "",
     "isProvision": true,
     "provisionData": {
       "reklamation_provision": "true",
@@ -193,7 +720,7 @@
     "_parsedThread": []
   },
   {
-    "id": 4,
+    "id": 11,
     "datum": "2025-12-18T15:56:00.648Z",
     "von_email": "redaktion@barmenia.de",
     "von_name": "Redaktion",
@@ -228,12 +755,11 @@
     "conversationIndex": "",
     "normalizedSubject": "provisionsreklamation b24",
     "threadId": "",
-    "kategorie": "Keine BGAV Relevanz",
-    "status": "Keine BGAV Relevanz",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
     "clusters": [
       "Provisionierung",
-      "Absatzeinheiten",
-      "SHUK"
+      "Absatzeinheiten"
     ],
     "agentur": "Michael Sieben",
     "vermittlernr": "00640594",
@@ -259,7 +785,7 @@
     "_parsedThread": []
   },
   {
-    "id": 5,
+    "id": 12,
     "datum": "2025-12-18T15:14:38.689Z",
     "von_email": "redaktion@barmenia.de",
     "von_name": "Redaktion",
@@ -294,8 +820,8 @@
     "conversationIndex": "",
     "normalizedSubject": "provisionsreklamation b24",
     "threadId": "",
-    "kategorie": "Keine BGAV Relevanz",
-    "status": "Keine BGAV Relevanz",
+    "kategorie": "Provisionsreklamation",
+    "status": "Neu",
     "clusters": [
       "KV",
       "Provisionierung"
@@ -318,210 +844,6 @@
       "vorname_kunde": "Olivia",
       "nachname_kunde": "Hain",
       "nachricht": "VP (Lennart Hain) in Vertragsnummer 01 119 784 N 00 per 25.8.2025 versicherungspflichtig geworden. Das wurde am 2.12. bearbeitet. Wir haben aus KV-Voll umgestellt auf Anwartschaft mit Zusatzversicherungen. Bitte Absatz für Zusatzversicherung gutschreiben."
-    },
-    "outlookKategorie": "",
-    "displaySender": "Redaktion",
-    "_parsedThread": []
-  },
-  {
-    "id": 6,
-    "datum": "2025-12-18T13:47:29.990Z",
-    "von_email": "redaktion@barmenia.de",
-    "von_name": "Redaktion",
-    "betreff": "Provisionsreklamation b24",
-    "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Luca \r\nnachname_vermittler : Aholt \r\nvermittlernummer_vermittler : 00630475 \r\nversicherungsnummer_kunde : 004857693E00 \r\nvorname_kunde : Bernadette \r\nnachname_kunde : Wietkamp \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Der genannte Vertrag wurde inzwischen policiert und mir wurden hierfür 43,30 AE gutgeschrieben.\r\nDa ich jedoch die Beitragsanpassung zum 01.01. mitverkauft habe, fehlen hier noch 5,50 AE.\r\n\r\nBei Ihrem Mann, Hubert Wietkamp, liegt derselbe Sachverhalt vor ? dort hat die Gutschrift jedoch direkt korrekt funktioniert.\r\n\r\nIch bitte daher um entsprechende Korrektur.\r\nVielen Dank. \r\ndatenschutz : true \r\n",
-    "htmlBody": "",
-    "anhaenge": [],
-    "antworten": [],
-    "alleAntworten": [
-      {
-        "datum": "2025-12-18T13:47:29.000Z",
-        "an": "",
-        "von": "Redaktion",
-        "vonEmail": "redaktion@barmenia.de",
-        "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Luca \r\nnachname_vermittler : Aholt \r\nvermittlernummer_vermittler : 00630475 \r\nversicherungsnummer_kunde : 004857693E00 \r\nvorname_kunde : Bernadette \r\nnachname_kunde : Wietkamp \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Der genannte Vertrag wurde inzwischen policiert und mir wurden hierfür 43,30 AE gutgeschrieben.\r\nDa ich jedoch die Beitragsanpassung zum 01.01. mitverkauft habe, fehlen hier noch 5,50 AE.\r\n\r\nBei Ihrem Mann, Hubert Wietkamp, liegt derselbe Sachverhalt vor ? dort hat die Gutschrift jedoch direkt korrekt funktioniert.\r\n\r\nIch bitte daher um entsprechende Korrektur.\r\nVielen Dank. \r\ndatenschutz : true \r\n",
-        "htmlBody": "",
-        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993490000",
-        "isIncoming": true,
-        "folder": "inbox",
-        "subject": "Provisionsreklamation b24",
-        "hasAttachments": false,
-        "anhaenge": []
-      }
-    ],
-    "existingReplies": "",
-    "isDuplicateWithNewReplies": false,
-    "conversationId": "777E6861F3ED6345B078DE187A2023D5",
-    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993490000",
-    "internetMessageId": "",
-    "inReplyTo": "",
-    "references": [],
-    "conversationIndex": "",
-    "normalizedSubject": "provisionsreklamation b24",
-    "threadId": "",
-    "kategorie": "Keine BGAV Relevanz",
-    "status": "Keine BGAV Relevanz",
-    "clusters": [
-      "Provisionierung",
-      "Absatzeinheiten"
-    ],
-    "agentur": "Luca Aholt",
-    "vermittlernr": "00630475",
-    "vsnr": "004857693E00",
-    "anfrage": "Der genannte Vertrag wurde inzwischen policiert und mir wurden hierfür 43,30 AE gutgeschrieben.\r\nDa ich jedoch die Beitragsanpassung zum 01.01. mitverkauft habe, fehlen hier noch 5,50 AE.\r\n\r\nBei Ihrem Mann, Hubert Wietkamp, liegt derselbe Sachverhalt vor ? dort hat die Gutschrift jedoch direkt korrekt funktioniert.\r\n\r\nIch bitte daher um entsprechende Korrektur.\r\nVielen Dank.",
-    "antwort": "",
-    "kommentar": "",
-    "bearbeiter": "",
-    "isProvision": true,
-    "provisionData": {
-      "reklamation_provision": "true",
-      "reklamation_absatz": "true",
-      "vorname_vermittler": "Luca",
-      "nachname_vermittler": "Aholt",
-      "vermittlernummer_vermittler": "00630475",
-      "versicherungsnummer_kunde": "004857693E00",
-      "vorname_kunde": "Bernadette",
-      "nachname_kunde": "Wietkamp",
-      "nachricht": "Der genannte Vertrag wurde inzwischen policiert und mir wurden hierfür 43,30 AE gutgeschrieben.\r\nDa ich jedoch die Beitragsanpassung zum 01.01. mitverkauft habe, fehlen hier noch 5,50 AE.\r\n\r\nBei Ihrem Mann, Hubert Wietkamp, liegt derselbe Sachverhalt vor ? dort hat die Gutschrift jedoch direkt korrekt funktioniert.\r\n\r\nIch bitte daher um entsprechende Korrektur.\r\nVielen Dank."
-    },
-    "outlookKategorie": "",
-    "displaySender": "Redaktion",
-    "_parsedThread": []
-  },
-  {
-    "id": 7,
-    "datum": "2025-12-18T12:07:39.078Z",
-    "von_email": "redaktion@barmenia.de",
-    "von_name": "Redaktion",
-    "betreff": "Provisionsreklamation b24",
-    "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Florian \r\nnachname_vermittler : Löffler \r\nvermittlernummer_vermittler : 00840513 \r\nversicherungsnummer_kunde : 006518152X00 \r\nvorname_kunde : Jan \r\nnachname_kunde : Knoblich \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Guten Tag,\r\n\r\nzum 01.01. ist Mael (VP 63) dazu mit 223,44€ Mtl. Prämie hinzu.\r\nJetzt wurde Rückwirkend die Versicherungspflicht von Jule Sommer (VP 32) zum 01.05. Dokumentiert. Nun wurden mir 151,51 AE abgezogen.\r\nDa es sich hier um zwei verschiedene Versicherte Personen handelt, bitte ich Sie gemäß der Anlage den Absatz von 151,51 AE noch in diesem Jahr gutzuschreiben. \r\ndatenschutz : true \r\n",
-    "htmlBody": "",
-    "anhaenge": [
-      "file1.de",
-      "file2.pdf"
-    ],
-    "antworten": [],
-    "alleAntworten": [
-      {
-        "datum": "2025-12-18T12:07:38.000Z",
-        "an": "",
-        "von": "Redaktion",
-        "vonEmail": "redaktion@barmenia.de",
-        "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Florian \r\nnachname_vermittler : Löffler \r\nvermittlernummer_vermittler : 00840513 \r\nversicherungsnummer_kunde : 006518152X00 \r\nvorname_kunde : Jan \r\nnachname_kunde : Knoblich \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Guten Tag,\r\n\r\nzum 01.01. ist Mael (VP 63) dazu mit 223,44€ Mtl. Prämie hinzu.\r\nJetzt wurde Rückwirkend die Versicherungspflicht von Jule Sommer (VP 32) zum 01.05. Dokumentiert. Nun wurden mir 151,51 AE abgezogen.\r\nDa es sich hier um zwei verschiedene Versicherte Personen handelt, bitte ich Sie gemäß der Anlage den Absatz von 151,51 AE noch in diesem Jahr gutzuschreiben. \r\ndatenschutz : true \r\n",
-        "htmlBody": "",
-        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993470000",
-        "isIncoming": true,
-        "folder": "inbox",
-        "subject": "Provisionsreklamation b24",
-        "hasAttachments": true,
-        "anhaenge": [
-          "file1.de",
-          "file2.pdf"
-        ]
-      }
-    ],
-    "existingReplies": "",
-    "isDuplicateWithNewReplies": false,
-    "conversationId": "567CBC26946CC24C8E95CC8BCA858F53",
-    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993470000",
-    "internetMessageId": "",
-    "inReplyTo": "",
-    "references": [],
-    "conversationIndex": "",
-    "normalizedSubject": "provisionsreklamation b24",
-    "threadId": "",
-    "kategorie": "Keine BGAV Relevanz",
-    "status": "Keine BGAV Relevanz",
-    "clusters": [
-      "Provisionierung",
-      "Absatzeinheiten"
-    ],
-    "agentur": "Florian Löffler",
-    "vermittlernr": "00840513",
-    "vsnr": "006518152X00",
-    "anfrage": "Guten Tag,\r\n\r\nzum 01.01. ist Mael (VP 63) dazu mit 223,44€ Mtl. Prämie hinzu.\r\nJetzt wurde Rückwirkend die Versicherungspflicht von Jule Sommer (VP 32) zum 01.05. Dokumentiert. Nun wurden mir 151,51 AE abgezogen.\r\nDa es sich hier um zwei verschiedene Versicherte Personen handelt, bitte ich Sie gemäß der Anlage den Absatz von 151,51 AE noch in diesem Jahr gutzuschreiben.",
-    "antwort": "",
-    "kommentar": "",
-    "bearbeiter": "",
-    "isProvision": true,
-    "provisionData": {
-      "reklamation_provision": "true",
-      "reklamation_absatz": "true",
-      "vorname_vermittler": "Florian",
-      "nachname_vermittler": "Löffler",
-      "vermittlernummer_vermittler": "00840513",
-      "versicherungsnummer_kunde": "006518152X00",
-      "vorname_kunde": "Jan",
-      "nachname_kunde": "Knoblich",
-      "nachricht": "Guten Tag,\r\n\r\nzum 01.01. ist Mael (VP 63) dazu mit 223,44€ Mtl. Prämie hinzu.\r\nJetzt wurde Rückwirkend die Versicherungspflicht von Jule Sommer (VP 32) zum 01.05. Dokumentiert. Nun wurden mir 151,51 AE abgezogen.\r\nDa es sich hier um zwei verschiedene Versicherte Personen handelt, bitte ich Sie gemäß der Anlage den Absatz von 151,51 AE noch in diesem Jahr gutzuschreiben."
-    },
-    "outlookKategorie": "",
-    "displaySender": "Redaktion",
-    "_parsedThread": []
-  },
-  {
-    "id": 8,
-    "datum": "2025-12-18T11:41:54.358Z",
-    "von_email": "redaktion@barmenia.de",
-    "von_name": "Redaktion",
-    "betreff": "Provisionsreklamation b24",
-    "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Steven \r\nnachname_vermittler : Burdeska \r\nvermittlernummer_vermittler : 00550261 \r\nversicherungsnummer_kunde : AD109451132 \r\nvorname_kunde : Lukas Henrik \r\nnachname_kunde : Josuhn \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Hallo Zusammen, bitte um Rückbuchung der AEs, der Scherreiks und Vogel OHG sollen lediglich die AEs für den Mehrbeitrag zugehen. Leider ist mir jedoch der gesamte Absatz genommen worden. Dies ist soweit auch mit Herrn Scherreiks besprochen. Gerne können wir auch telefonische Rücksprache unter der Numer 0209/51300822 halten.  \r\ndatenschutz : true \r\n",
-    "htmlBody": "",
-    "anhaenge": [
-      "file1.pdf"
-    ],
-    "antworten": [],
-    "alleAntworten": [
-      {
-        "datum": "2025-12-18T11:41:53.000Z",
-        "an": "",
-        "von": "Redaktion",
-        "vonEmail": "redaktion@barmenia.de",
-        "text": "reklamation_provision : true \r\nreklamation_absatz : true \r\nvorname_vermittler : Steven \r\nnachname_vermittler : Burdeska \r\nvermittlernummer_vermittler : 00550261 \r\nversicherungsnummer_kunde : AD109451132 \r\nvorname_kunde : Lukas Henrik \r\nnachname_kunde : Josuhn \r\nadresse_kunde : {\r\n   plz : nicht gesetzt \r\n   ort : nicht gesetzt \r\n   street : nicht gesetzt \r\n   streetNumber : nicht gesetzt \r\n}\r\nnachricht : Hallo Zusammen, bitte um Rückbuchung der AEs, der Scherreiks und Vogel OHG sollen lediglich die AEs für den Mehrbeitrag zugehen. Leider ist mir jedoch der gesamte Absatz genommen worden. Dies ist soweit auch mit Herrn Scherreiks besprochen. Gerne können wir auch telefonische Rücksprache unter der Numer 0209/51300822 halten.  \r\ndatenschutz : true \r\n",
-        "htmlBody": "",
-        "replyId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993460000",
-        "isIncoming": true,
-        "folder": "inbox",
-        "subject": "Provisionsreklamation b24",
-        "hasAttachments": true,
-        "anhaenge": [
-          "file1.pdf"
-        ]
-      }
-    ],
-    "existingReplies": "",
-    "isDuplicateWithNewReplies": false,
-    "conversationId": "311879B360E0134F86DF4D689211A5C0",
-    "emailId": "0000000017A8FF4B9F8BBA43B0B3AEC85D7E29420700285B57B68DAA44418ADEBB29BA06A7D200000000010C0000285B57B68DAA44418ADEBB29BA06A7D20005F17993460000",
-    "internetMessageId": "",
-    "inReplyTo": "",
-    "references": [],
-    "conversationIndex": "",
-    "normalizedSubject": "provisionsreklamation b24",
-    "threadId": "",
-    "kategorie": "Keine BGAV Relevanz",
-    "status": "Keine BGAV Relevanz",
-    "clusters": [
-      "Provisionierung"
-    ],
-    "agentur": "Steven Burdeska",
-    "vermittlernr": "00550261",
-    "vsnr": "AD109451132",
-    "anfrage": "Hallo Zusammen, bitte um Rückbuchung der AEs, der Scherreiks und Vogel OHG sollen lediglich die AEs für den Mehrbeitrag zugehen. Leider ist mir jedoch der gesamte Absatz genommen worden. Dies ist soweit auch mit Herrn Scherreiks besprochen. Gerne können wir auch telefonische Rücksprache unter der Numer 0209/51300822 halten.",
-    "antwort": "",
-    "kommentar": "",
-    "bearbeiter": "",
-    "isProvision": true,
-    "provisionData": {
-      "reklamation_provision": "true",
-      "reklamation_absatz": "true",
-      "vorname_vermittler": "Steven",
-      "nachname_vermittler": "Burdeska",
-      "vermittlernummer_vermittler": "00550261",
-      "versicherungsnummer_kunde": "AD109451132",
-      "vorname_kunde": "Lukas Henrik",
-      "nachname_kunde": "Josuhn",
-      "nachricht": "Hallo Zusammen, bitte um Rückbuchung der AEs, der Scherreiks und Vogel OHG sollen lediglich die AEs für den Mehrbeitrag zugehen. Leider ist mir jedoch der gesamte Absatz genommen worden. Dies ist soweit auch mit Herrn Scherreiks besprochen. Gerne können wir auch telefonische Rücksprache unter der Numer 0209/51300822 halten."
     },
     "outlookKategorie": "",
     "displaySender": "Redaktion",
