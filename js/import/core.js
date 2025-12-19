@@ -540,21 +540,6 @@ function doImport() {
             }
         }
 
-        // Auto-Erledigt
-        currentStep = 'Auto-Erledigt prüfen';
-        var erledigtCount = 0;
-        try {
-            for (var convId in existingExcelRows) {
-                if (existingExcelRows.hasOwnProperty(convId) && !foundInInbox[convId]) {
-                    var erledigtRow = existingExcelRows[convId];
-                    try {
-                        worksheet.Cells(erledigtRow, 9).Value = 'Erledigt';
-                        erledigtCount++;
-                    } catch (erlErr) {}
-                }
-            }
-        } catch (autoErr) {}
-
         currentStep = 'Speichern';
         updateImportProgress(total, total);
         targetWorkbook.Save();
@@ -574,9 +559,6 @@ function doImport() {
         }
         if (existingCount > 0) {
             successMsg += '<br><em style="color:#666">(Excel hatte bereits ' + existingCount + ' Vorgange)</em>';
-        }
-        if (erledigtCount > 0) {
-            successMsg += '<br><strong>' + erledigtCount + '</strong> Vorgange auf Erledigt gesetzt';
         }
         document.getElementById('importSuccessMsg').innerHTML = successMsg;
         document.getElementById('btnImport').disabled = false;
