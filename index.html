@@ -1298,6 +1298,7 @@
                 <span class="filter-chip active" data-filter="all" onclick="setFilter('all')">Alle</span>
                 <span class="filter-chip" data-filter="unread" onclick="setFilter('unread')">Ungelesen</span>
                 <span class="filter-chip" data-filter="read" onclick="setFilter('read')">Gelesen</span>
+                <span class="filter-chip" style="margin-left: auto; background: #4CAF50; color: white;" onclick="markAllAsRead()">Alle gelesen</span>
             </div>
 
             <div class="select-all-row" id="selectAllRow" style="display: none;">
@@ -1592,6 +1593,65 @@
 
         const allClusters = ['KV', 'SHUK', 'LV', 'Provisionierung', 'Bestand', 'Absatzeinheiten'];
 
+        // LocalStorage key for read status persistence
+        const READ_STATUS_KEY = 'emailimport_readConversations';
+
+        // Save read status to localStorage
+        function saveReadStatus(conversationId) {
+            try {
+                const stored = JSON.parse(localStorage.getItem(READ_STATUS_KEY) || '[]');
+                if (!stored.includes(conversationId)) {
+                    stored.push(conversationId);
+                    localStorage.setItem(READ_STATUS_KEY, JSON.stringify(stored));
+                }
+            } catch (e) {
+                console.error('Error saving read status:', e);
+            }
+        }
+
+        // Load read status from localStorage and apply to current emails
+        function loadReadStatusFromStorage() {
+            try {
+                const stored = JSON.parse(localStorage.getItem(READ_STATUS_KEY) || '[]');
+                let restored = 0;
+                emails.forEach(email => {
+                    if (email.conversationId && stored.includes(email.conversationId)) {
+                        readEmails.add(email.id);
+                        restored++;
+                    }
+                });
+                if (restored > 0) {
+                    console.log(`Restored read status for ${restored} emails from localStorage`);
+                }
+            } catch (e) {
+                console.error('Error loading read status:', e);
+            }
+        }
+
+        // Clear read status (call when loading new file to start fresh)
+        function clearReadStatus() {
+            try {
+                localStorage.removeItem(READ_STATUS_KEY);
+                readEmails.clear();
+            } catch (e) {
+                console.error('Error clearing read status:', e);
+            }
+        }
+
+        // Mark all emails as read
+        function markAllAsRead(silent = false) {
+            emails.forEach(email => {
+                readEmails.add(email.id);
+                if (email.conversationId) {
+                    saveReadStatus(email.conversationId);
+                }
+            });
+            renderEmailList();
+            if (!silent) {
+                showNotification('Alle ' + emails.length + ' Emails als gelesen markiert', 'success');
+            }
+        }
+
         // Schlagwort-Cluster-Mapping für Highlighting
         const keywordClusterMap = {
             'KV': ['kv', 'kranken', 'gesundheit', 'pflege', 'auslandsreise', 'reisekranken', 'bkk', 'zahnzusatz', 'krankenzusatz', 'ambulant', 'stationär', 'krankentagegeld'],
@@ -1734,10 +1794,15 @@
                                 exportInfo.replyRate + ' mit Antworten', 'success');
                         }
                     }
-                    // Format 3: Direct array of emails
+                    // Format 3: Direct array of emails (bearbeitet JSON)
                     else if (Array.isArray(data)) {
-                        console.log('Detected: Direct array format');
+                        console.log('Detected: Direct array format (bearbeitet)');
                         emails = data;
+                        // Bearbeitet files: all emails should be marked as read
+                        // They were already processed in a previous session
+                        setTimeout(() => {
+                            markAllAsRead(true);  // silent mode
+                        }, 100);
                     }
                     // Format 4: Single email object
                     else {
@@ -1775,6 +1840,10 @@
                 // Skip sent-only conversations (no inbox messages = outgoing without incoming request)
                 const hasInboxMessage = messages.some(m => m.folder === 'inbox');
                 if (!hasInboxMessage) continue;
+
+                // Skip "Online-Abschluss Vermittlerzuordnung" emails - these are not needed
+                const convSubject = (conv.subject || '').toLowerCase();
+                if (convSubject.includes('online-abschluss vermittlerzuordnung')) continue;
 
                 totalMessages += messages.length;
 
@@ -2697,6 +2766,9 @@
             // Select all emails for export by default
             selectedForExport = new Set(emails.map(e => e.id));
 
+            // Restore read status from localStorage
+            loadReadStatusFromStorage();
+
             renderEmailList();
             updateStats();
             initClusterTags();
@@ -2953,6 +3025,11 @@
 
             // Mark as read
             readEmails.add(id);
+
+            // Persist read status using conversationId (stable identifier)
+            if (email.conversationId) {
+                saveReadStatus(email.conversationId);
+            }
 
             // Update list
             renderEmailList();
@@ -3421,6 +3498,14 @@
             const jsonData = JSON.stringify(emailsToExport, null, 2);
             const filename = 'hypercare_bearbeitet_' + new Date().toISOString().slice(0, 10) + '.json';
 
+            // Build status message
+            let statusMsg;
+            if (unreadCount === 0) {
+                statusMsg = 'Alle ' + emailsToExport.length + ' Emails wurden gelesen und gespeichert';
+            } else {
+                statusMsg = emailsToExport.length + ' Emails gespeichert. ACHTUNG: ' + unreadCount + ' Emails waren ungelesen und wurden NICHT exportiert!';
+            }
+
             // Try modern File System Access API (saves to Downloads directly)
             if ('showSaveFilePicker' in window) {
                 try {
@@ -3435,8 +3520,7 @@
                     const writable = await handle.createWritable();
                     await writable.write(jsonData);
                     await writable.close();
-                    const skipMsg = unreadCount > 0 ? ' (' + unreadCount + ' ungelesene übersprungen)' : '';
-                    showNotification(emailsToExport.length + ' gelesene Emails gespeichert' + skipMsg, 'success');
+                    showNotification(statusMsg, unreadCount > 0 ? 'warning' : 'success');
                     return;
                 } catch (err) {
                     if (err.name === 'AbortError') return;
@@ -3451,8 +3535,7 @@
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
-            const skipMsg = unreadCount > 0 ? ' (' + unreadCount + ' ungelesene übersprungen)' : '';
-            showNotification(emailsToExport.length + ' gelesene Emails gespeichert' + skipMsg, 'success');
+            showNotification(statusMsg, unreadCount > 0 ? 'warning' : 'success');
         }
 
         // ============================================================================
