@@ -270,19 +270,22 @@ function saveConversationExport() {
         // Filter conversations: keep only those with at least one NEW email
         var filteredConversations = {};
         var skippedConvCount = 0;
-        var newEmailCount = 0;
         var totalEmailCount = 0;
         var brandNewConvCount = 0;  // Completely new conversations
         var updatedConvCount = 0;   // Existing conversations with new replies
+        var newRepliesInUpdated = 0; // Actual count of new replies in existing conversations
 
         for (var convId in convExportState.conversations) {
             var conv = convExportState.conversations[convId];
             var hasNewEmail = false;
+            var hasExistingEmail = false;  // Does any email already exist in Excel?
             var newInConv = 0;
 
             for (var mi = 0; mi < conv.messages.length; mi++) {
                 totalEmailCount++;
-                if (!conv.messages[mi].alreadyInExcel) {
+                if (conv.messages[mi].alreadyInExcel) {
+                    hasExistingEmail = true;  // Conversation exists in Excel
+                } else {
                     hasNewEmail = true;
                     newInConv++;
                 }
@@ -290,12 +293,14 @@ function saveConversationExport() {
 
             if (hasNewEmail) {
                 filteredConversations[convId] = conv;
-                newEmailCount += newInConv;
                 // Track: is this completely new or existing with updates?
-                if (newInConv === conv.messages.length) {
-                    brandNewConvCount++;  // All messages are new = brand new conversation
+                if (hasExistingEmail) {
+                    // At least one message existed in Excel = existing conversation with updates
+                    updatedConvCount++;
+                    newRepliesInUpdated += newInConv;
                 } else {
-                    updatedConvCount++;   // Some messages existed = existing with new replies
+                    // No messages existed in Excel = brand new conversation
+                    brandNewConvCount++;
                 }
             } else {
                 skippedConvCount++;
@@ -364,12 +369,8 @@ function saveConversationExport() {
         }
 
         // Existing conversations with new replies
-        if (updatedConvCount > 0) {
-            // Count new replies in updated conversations
-            var newRepliesInUpdated = newEmailCount - brandNewConvCount; // new emails minus one root per new conv
-            if (newRepliesInUpdated > 0) {
-                msgParts.push('<strong>' + newRepliesInUpdated + '</strong> neue Antwort' + (newRepliesInUpdated > 1 ? 'en' : '') + ' in <strong>' + updatedConvCount + '</strong> bestehende' + (updatedConvCount > 1 ? 'n Vorg&auml;ngen' : 'm Vorgang'));
-            }
+        if (updatedConvCount > 0 && newRepliesInUpdated > 0) {
+            msgParts.push('<strong>' + newRepliesInUpdated + '</strong> neue Antwort' + (newRepliesInUpdated > 1 ? 'en' : '') + ' in <strong>' + updatedConvCount + '</strong> bestehende' + (updatedConvCount > 1 ? 'n Vorg&auml;ngen' : 'm Vorgang'));
         }
 
         var successMsg = msgParts.join('<br>');
