@@ -564,6 +564,14 @@ function doImport() {
         var successMsg = '<strong>' + newCount + '</strong> neue Vorgange importiert<br>' +
             '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
             '<strong>' + skipCount + '</strong> Duplikate/Sent-Only ubersprungen';
+
+        // Show debug summary as alert if there were skips
+        if (skipCount > 0) {
+            var debugOutput = document.getElementById('debugOutput');
+            if (debugOutput && debugOutput.value) {
+                alert('DEBUG INFO (Version 2.2):\n\n' + debugOutput.value);
+            }
+        }
         if (existingCount > 0) {
             successMsg += '<br><em style="color:#666">(Excel hatte bereits ' + existingCount + ' Vorgange)</em>';
         }
