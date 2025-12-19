@@ -319,13 +319,13 @@ function saveConversationExport() {
         // Check if all conversations were filtered out
         if (finalConvCount === 0) {
             var skippedTotal = (filterInfo.skippedSentOnly || 0) + (filterInfo.skippedOnlineAbschluss || 0);
-            var noNewMsg = 'Keine relevanten Vorgänge gefunden.';
+            var noNewMsg = 'Keine relevanten Vorg&auml;nge gefunden.';
             if (skippedTotal > 0) {
                 noNewMsg += '<br><em style="color:#666">(' + skippedTotal + ' irrelevante Konversationen gefiltert)</em>';
             }
             showExportSuccess(noNewMsg);
             document.getElementById('exportProgressFill').style.width = '100%';
-            document.getElementById('exportProgressText').innerText = 'Keine relevanten Vorgänge';
+            document.getElementById('exportProgressText').innerText = 'Keine relevanten Vorgaenge';
             return;
         }
 
@@ -352,13 +352,13 @@ function saveConversationExport() {
         file.Close();
 
         // Show success with final filtered count
-        var successMsg = '<strong>' + exportData.totalEmails + '</strong> Emails in <strong>' + finalConvCount + '</strong> Vorgängen';
+        var successMsg = '<strong>' + exportData.totalEmails + '</strong> Emails in <strong>' + finalConvCount + '</strong> Vorg&auml;ngen';
         if (filterInfo.skippedSentOnly > 0 || filterInfo.skippedOnlineAbschluss > 0) {
             var skippedTotal = (filterInfo.skippedSentOnly || 0) + (filterInfo.skippedOnlineAbschluss || 0);
             successMsg += '<br><em style="color:#666">(' + skippedTotal + ' irrelevante Konversationen gefiltert)</em>';
         }
         if (skippedConvCount > 0) {
-            successMsg += '<br><strong>' + skippedConvCount + '</strong> Konversationen bereits vollstaendig in Excel';
+            successMsg += '<br><strong>' + skippedConvCount + '</strong> Konversationen bereits vollst&auml;ndig in Excel';
         }
         successMsg += '<br>Gespeichert: ' + filename;
 
