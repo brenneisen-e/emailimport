@@ -397,10 +397,6 @@ function saveConversationExport() {
 
         var successMsg = msgParts.join('<br>');
 
-        if (skippedConvCount > 0) {
-            successMsg += '<br>' + skippedConvCount + ' Vorg' + (skippedConvCount > 1 ? '&auml;nge' : 'ang') + ' bereits vollst&auml;ndig in Excel';
-        }
-
         showExportSuccess(successMsg);
         completeStep(3);
 
