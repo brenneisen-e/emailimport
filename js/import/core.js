@@ -87,7 +87,13 @@ function loadJsonFile(path) {
             jsonData = parsed;
             // Add sentOnly flag for bearbeitet format if missing
             jsonData = addSentOnlyFlagIfMissing(jsonData);
-            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
+            // DEBUG: Count sentOnly
+            var sentOnlyCount = 0;
+            for (var si = 0; si < jsonData.length; si++) {
+                if (jsonData[si].sentOnly) sentOnlyCount++;
+            }
+            console.log('=== DEBUG: ' + sentOnlyCount + ' von ' + jsonData.length + ' als sentOnly markiert ===');
+            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen' + (sentOnlyCount > 0 ? ' (' + sentOnlyCount + ' sentOnly)' : '');
         } else {
             // Single email
             jsonData = [parsed];
@@ -314,7 +320,15 @@ function doImport() {
         // Count existing entries for debugging
         var existingCount = Object.keys(existingData.byConvId).length;
         var existingKeyCount = Object.keys(existingData.byKey).length;
-        console.log('Existing data: ' + existingCount + ' by ConvID, ' + existingKeyCount + ' by Key');
+        console.log('=== DEBUG: Excel hat ' + existingCount + ' Eintraege by ConvID, ' + existingKeyCount + ' by Key ===');
+
+        // Show existing convIds
+        if (existingCount > 0) {
+            console.log('Existing ConvIDs in Excel:');
+            for (var ecid in existingData.byConvId) {
+                console.log('  ' + ecid + ' -> row ' + existingData.byConvId[ecid]);
+            }
+        }
 
         currentStep = 'Letzte Zeile finden';
         var lastRow;
@@ -361,6 +375,17 @@ function doImport() {
                     existingRow = existingData.byKey[emailKey];
                 }
             }
+
+            // DEBUG: Log why email is being processed
+            var debugReason = '';
+            if (existingRow) {
+                debugReason = 'EXISTING (row ' + existingRow + ')';
+            } else if (email.sentOnly) {
+                debugReason = 'SENT-ONLY';
+            } else {
+                debugReason = 'NEW';
+            }
+            console.log('Email ' + (i+1) + ': ' + debugReason + ' - ' + (email.betreff || '').substring(0, 40) + ' [convId=' + (email.conversationId || 'none').substring(0, 8) + ']');
 
             if (existingRow) {
                 // Email exists - check for new replies using ReplyIDs
