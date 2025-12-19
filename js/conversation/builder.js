@@ -278,11 +278,14 @@ function saveConversationExport() {
         for (var convId in convExportState.conversations) {
             var conv = convExportState.conversations[convId];
             var hasNewEmail = false;
+            var hasExistingEmail = false;  // Does any email already exist in Excel?
             var newInConv = 0;
 
             for (var mi = 0; mi < conv.messages.length; mi++) {
                 totalEmailCount++;
-                if (!conv.messages[mi].alreadyInExcel) {
+                if (conv.messages[mi].alreadyInExcel) {
+                    hasExistingEmail = true;  // Conversation exists in Excel
+                } else {
                     hasNewEmail = true;
                     newInConv++;
                 }
@@ -291,11 +294,13 @@ function saveConversationExport() {
             if (hasNewEmail) {
                 filteredConversations[convId] = conv;
                 // Track: is this completely new or existing with updates?
-                if (newInConv === conv.messages.length) {
-                    brandNewConvCount++;  // All messages are new = brand new conversation
+                if (hasExistingEmail) {
+                    // At least one message existed in Excel = existing conversation with updates
+                    updatedConvCount++;
+                    newRepliesInUpdated += newInConv;
                 } else {
-                    updatedConvCount++;   // Some messages existed = existing with new replies
-                    newRepliesInUpdated += newInConv;  // Count the actual new emails in this updated conv
+                    // No messages existed in Excel = brand new conversation
+                    brandNewConvCount++;
                 }
             } else {
                 skippedConvCount++;
