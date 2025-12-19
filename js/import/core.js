@@ -4,6 +4,30 @@
  */
 
 /**
+ * Debug logging helper - writes to visible debug textarea
+ */
+function debugLog(msg) {
+    try {
+        var debugSection = document.getElementById('debugSection');
+        var debugOutput = document.getElementById('debugOutput');
+        if (debugSection && debugOutput) {
+            debugSection.style.display = 'block';
+            debugOutput.value += msg + '\n';
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+        }
+    } catch (e) {}
+}
+
+function clearDebugLog() {
+    try {
+        var debugOutput = document.getElementById('debugOutput');
+        if (debugOutput) {
+            debugOutput.value = '';
+        }
+    } catch (e) {}
+}
+
+/**
  * Select JSON file via file dialog
  */
 function selectJsonFile() {
@@ -87,7 +111,13 @@ function loadJsonFile(path) {
             jsonData = parsed;
             // Add sentOnly flag for bearbeitet format if missing
             jsonData = addSentOnlyFlagIfMissing(jsonData);
-            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
+            // DEBUG: Count sentOnly
+            var sentOnlyCount = 0;
+            for (var si = 0; si < jsonData.length; si++) {
+                if (jsonData[si].sentOnly) sentOnlyCount++;
+            }
+            debugLog('=== ' + sentOnlyCount + ' von ' + jsonData.length + ' als sentOnly markiert ===');
+            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen' + (sentOnlyCount > 0 ? ' (' + sentOnlyCount + ' sentOnly)' : '');
         } else {
             // Single email
             jsonData = [parsed];
@@ -314,7 +344,15 @@ function doImport() {
         // Count existing entries for debugging
         var existingCount = Object.keys(existingData.byConvId).length;
         var existingKeyCount = Object.keys(existingData.byKey).length;
-        console.log('Existing data: ' + existingCount + ' by ConvID, ' + existingKeyCount + ' by Key');
+        clearDebugLog();
+        debugLog('=== Excel hat ' + existingCount + ' Eintraege (ConvID) ===');
+
+        // Show existing convIds
+        if (existingCount > 0) {
+            for (var ecid in existingData.byConvId) {
+                debugLog('  Excel: ' + ecid.substring(0, 8) + '... -> Zeile ' + existingData.byConvId[ecid]);
+            }
+        }
 
         currentStep = 'Letzte Zeile finden';
         var lastRow;
@@ -361,6 +399,17 @@ function doImport() {
                     existingRow = existingData.byKey[emailKey];
                 }
             }
+
+            // DEBUG: Log why email is being processed
+            var debugReason = '';
+            if (existingRow) {
+                debugReason = 'EXISTING (row ' + existingRow + ')';
+            } else if (email.sentOnly) {
+                debugReason = 'SENT-ONLY';
+            } else {
+                debugReason = 'NEW';
+            }
+            debugLog('Email ' + (i+1) + ': ' + debugReason + ' - ' + (email.betreff || '').substring(0, 30));
 
             if (existingRow) {
                 // Email exists - check for new replies using ReplyIDs
