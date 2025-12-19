@@ -350,9 +350,13 @@ function saveConversationExport() {
         // Show success with final filtered count
         // Count new replies (total emails minus one root per conversation)
         var newReplies = exportData.totalEmails - finalConvCount;
-        var successMsg = '<strong>' + finalConvCount + '</strong> neue Vorg' + (finalConvCount > 1 ? '&auml;nge' : 'ang');
+        var successMsg;
         if (newReplies > 0) {
-            successMsg += ' mit <strong>' + newReplies + '</strong> Antwort' + (newReplies > 1 ? 'en' : '');
+            // Focus on replies: "X neue Antworten in Y Vorgängen"
+            successMsg = '<strong>' + newReplies + '</strong> neue Antwort' + (newReplies > 1 ? 'en' : '') + ' in <strong>' + finalConvCount + '</strong> Vorg' + (finalConvCount > 1 ? '&auml;ngen' : 'ang');
+        } else {
+            // Only new root emails: "Y neue Vorgänge"
+            successMsg = '<strong>' + finalConvCount + '</strong> neue Vorg' + (finalConvCount > 1 ? '&auml;nge' : 'ang');
         }
         if (skippedConvCount > 0) {
             successMsg += '<br>' + skippedConvCount + ' Vorg' + (skippedConvCount > 1 ? '&auml;nge' : 'ang') + ' bereits vollst&auml;ndig in Excel';
