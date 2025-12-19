@@ -4,6 +4,30 @@
  */
 
 /**
+ * Debug logging helper - writes to visible debug textarea
+ */
+function debugLog(msg) {
+    try {
+        var debugSection = document.getElementById('debugSection');
+        var debugOutput = document.getElementById('debugOutput');
+        if (debugSection && debugOutput) {
+            debugSection.style.display = 'block';
+            debugOutput.value += msg + '\n';
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+        }
+    } catch (e) {}
+}
+
+function clearDebugLog() {
+    try {
+        var debugOutput = document.getElementById('debugOutput');
+        if (debugOutput) {
+            debugOutput.value = '';
+        }
+    } catch (e) {}
+}
+
+/**
  * Select JSON file via file dialog
  */
 function selectJsonFile() {
@@ -92,7 +116,7 @@ function loadJsonFile(path) {
             for (var si = 0; si < jsonData.length; si++) {
                 if (jsonData[si].sentOnly) sentOnlyCount++;
             }
-            console.log('=== DEBUG: ' + sentOnlyCount + ' von ' + jsonData.length + ' als sentOnly markiert ===');
+            debugLog('=== ' + sentOnlyCount + ' von ' + jsonData.length + ' als sentOnly markiert ===');
             document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen' + (sentOnlyCount > 0 ? ' (' + sentOnlyCount + ' sentOnly)' : '');
         } else {
             // Single email
@@ -320,13 +344,13 @@ function doImport() {
         // Count existing entries for debugging
         var existingCount = Object.keys(existingData.byConvId).length;
         var existingKeyCount = Object.keys(existingData.byKey).length;
-        console.log('=== DEBUG: Excel hat ' + existingCount + ' Eintraege by ConvID, ' + existingKeyCount + ' by Key ===');
+        clearDebugLog();
+        debugLog('=== Excel hat ' + existingCount + ' Eintraege (ConvID) ===');
 
         // Show existing convIds
         if (existingCount > 0) {
-            console.log('Existing ConvIDs in Excel:');
             for (var ecid in existingData.byConvId) {
-                console.log('  ' + ecid + ' -> row ' + existingData.byConvId[ecid]);
+                debugLog('  Excel: ' + ecid.substring(0, 8) + '... -> Zeile ' + existingData.byConvId[ecid]);
             }
         }
 
@@ -385,7 +409,7 @@ function doImport() {
             } else {
                 debugReason = 'NEW';
             }
-            console.log('Email ' + (i+1) + ': ' + debugReason + ' - ' + (email.betreff || '').substring(0, 40) + ' [convId=' + (email.conversationId || 'none').substring(0, 8) + ']');
+            debugLog('Email ' + (i+1) + ': ' + debugReason + ' - ' + (email.betreff || '').substring(0, 30));
 
             if (existingRow) {
                 // Email exists - check for new replies using ReplyIDs

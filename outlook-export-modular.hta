@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.7"
+        VERSION="2.8"
         WINDOWSTATE="normal"
     />
     <style>
@@ -191,6 +191,12 @@
                         <span id="importSuccessMsg"></span>
                     </div>
                     <div class="status error" id="importError"><span id="importErrorMsg"></span></div>
+
+                    <!-- Debug Output -->
+                    <div id="debugSection" style="display:none; margin-top: 1rem;">
+                        <label>Debug-Ausgabe:</label>
+                        <textarea id="debugOutput" readonly style="width:100%; height:200px; font-size:11px; font-family:monospace; background:#1a1a2e; color:#4ade80; border:1px solid #333; padding:8px;"></textarea>
+                    </div>
 
                     <div class="info-box">
                         <strong>Hinweis:</strong> Offne zuerst die Tracking_Hypercare.xlsm in Excel, dann klicke "Excel erkennen"
