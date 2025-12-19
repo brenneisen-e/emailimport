@@ -2,7 +2,7 @@
 
 Tool zur Überprüfung und Kategorisierung von Hypercare-Emails für das Barmenia/Gothaer-Projekt.
 
-**Version 1.3.0**
+**Version 1.5.0**
 
 ---
 
