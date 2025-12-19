@@ -272,6 +272,8 @@ function saveConversationExport() {
         var skippedConvCount = 0;
         var newEmailCount = 0;
         var totalEmailCount = 0;
+        var brandNewConvCount = 0;  // Completely new conversations
+        var updatedConvCount = 0;   // Existing conversations with new replies
 
         for (var convId in convExportState.conversations) {
             var conv = convExportState.conversations[convId];
@@ -289,6 +291,12 @@ function saveConversationExport() {
             if (hasNewEmail) {
                 filteredConversations[convId] = conv;
                 newEmailCount += newInConv;
+                // Track: is this completely new or existing with updates?
+                if (newInConv === conv.messages.length) {
+                    brandNewConvCount++;  // All messages are new = brand new conversation
+                } else {
+                    updatedConvCount++;   // Some messages existed = existing with new replies
+                }
             } else {
                 skippedConvCount++;
             }
@@ -347,13 +355,25 @@ function saveConversationExport() {
         file.Write(JSON.stringify(exportData, null, 2));
         file.Close();
 
-        // Show success with final filtered count
-        // Count new replies (total emails minus one root per conversation)
-        var newReplies = exportData.totalEmails - finalConvCount;
-        var successMsg = '<strong>' + finalConvCount + '</strong> neue Vorg' + (finalConvCount > 1 ? '&auml;nge' : 'ang');
-        if (newReplies > 0) {
-            successMsg += ' mit <strong>' + newReplies + '</strong> Antwort' + (newReplies > 1 ? 'en' : '');
+        // Show success message with detailed counts
+        var msgParts = [];
+
+        // New conversations (completely new)
+        if (brandNewConvCount > 0) {
+            msgParts.push('<strong>' + brandNewConvCount + '</strong> neue' + (brandNewConvCount > 1 ? ' Vorg&auml;nge' : 'r Vorgang'));
         }
+
+        // Existing conversations with new replies
+        if (updatedConvCount > 0) {
+            // Count new replies in updated conversations
+            var newRepliesInUpdated = newEmailCount - brandNewConvCount; // new emails minus one root per new conv
+            if (newRepliesInUpdated > 0) {
+                msgParts.push('<strong>' + newRepliesInUpdated + '</strong> neue Antwort' + (newRepliesInUpdated > 1 ? 'en' : '') + ' in <strong>' + updatedConvCount + '</strong> bestehende' + (updatedConvCount > 1 ? 'n Vorg&auml;ngen' : 'm Vorgang'));
+            }
+        }
+
+        var successMsg = msgParts.join('<br>');
+
         if (skippedConvCount > 0) {
             successMsg += '<br>' + skippedConvCount + ' Vorg' + (skippedConvCount > 1 ? '&auml;nge' : 'ang') + ' bereits vollst&auml;ndig in Excel';
         }
