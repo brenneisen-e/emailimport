@@ -3498,6 +3498,14 @@
             const jsonData = JSON.stringify(emailsToExport, null, 2);
             const filename = 'hypercare_bearbeitet_' + new Date().toISOString().slice(0, 10) + '.json';
 
+            // Build status message
+            let statusMsg;
+            if (unreadCount === 0) {
+                statusMsg = 'Alle ' + emailsToExport.length + ' Emails wurden gelesen und gespeichert';
+            } else {
+                statusMsg = emailsToExport.length + ' Emails gespeichert. ACHTUNG: ' + unreadCount + ' Emails waren ungelesen und wurden NICHT exportiert!';
+            }
+
             // Try modern File System Access API (saves to Downloads directly)
             if ('showSaveFilePicker' in window) {
                 try {
@@ -3512,8 +3520,7 @@
                     const writable = await handle.createWritable();
                     await writable.write(jsonData);
                     await writable.close();
-                    const skipMsg = unreadCount > 0 ? ' (' + unreadCount + ' ungelesene übersprungen)' : '';
-                    showNotification(emailsToExport.length + ' gelesene Emails gespeichert' + skipMsg, 'success');
+                    showNotification(statusMsg, unreadCount > 0 ? 'warning' : 'success');
                     return;
                 } catch (err) {
                     if (err.name === 'AbortError') return;
@@ -3528,8 +3535,7 @@
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
-            const skipMsg = unreadCount > 0 ? ' (' + unreadCount + ' ungelesene übersprungen)' : '';
-            showNotification(emailsToExport.length + ' gelesene Emails gespeichert' + skipMsg, 'success');
+            showNotification(statusMsg, unreadCount > 0 ? 'warning' : 'success');
         }
 
         // ============================================================================
