@@ -281,15 +281,37 @@ function saveConversationExport() {
 
         for (var convId in convExportState.conversations) {
             var conv = convExportState.conversations[convId];
+            var messages = conv.messages || [];
+
+            // Pre-filter 1: Check if sent-only (no inbox messages)
+            var hasInboxMessage = false;
+            for (var mi = 0; mi < messages.length; mi++) {
+                if (messages[mi].folder === 'inbox') {
+                    hasInboxMessage = true;
+                    break;
+                }
+            }
+            if (!hasInboxMessage) {
+                // Sent-only conversation - skip entirely, don't count
+                continue;
+            }
+
+            // Pre-filter 2: Skip "Online-Abschluss Vermittlerzuordnung"
+            var convSubject = messages[0] ? messages[0].subject : '';
+            if ((convSubject || '').toLowerCase().indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+                continue;
+            }
+
+            // Now count new vs existing emails
             var hasNewEmail = false;
-            var hasExistingEmail = false;  // Does any email already exist in Excel?
+            var hasExistingEmail = false;
             var newInConv = 0;
             var existingInConv = 0;
 
-            for (var mi = 0; mi < conv.messages.length; mi++) {
+            for (var mj = 0; mj < messages.length; mj++) {
                 totalEmailCount++;
-                if (conv.messages[mi].alreadyInExcel) {
-                    hasExistingEmail = true;  // Conversation exists in Excel
+                if (messages[mj].alreadyInExcel) {
+                    hasExistingEmail = true;
                     existingInConv++;
                 } else {
                     hasNewEmail = true;
@@ -298,10 +320,9 @@ function saveConversationExport() {
             }
 
             // DEBUG: Log each conversation
-            var convSubject = conv.messages[0] ? conv.messages[0].subject : '?';
             var convShortId = convId.substring(0, 8) + '...';
             var convDebug = convShortId + ' "' + (convSubject || '').substring(0, 25) + '": ' +
-                            conv.messages.length + ' msgs (' + existingInConv + ' in Excel, ' + newInConv + ' neu)';
+                            messages.length + ' msgs (' + existingInConv + ' in Excel, ' + newInConv + ' neu)';
 
             if (hasNewEmail) {
                 filteredConversations[convId] = conv;
