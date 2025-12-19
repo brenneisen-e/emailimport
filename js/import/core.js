@@ -27,6 +27,9 @@ function clearDebugLog() {
     } catch (e) {}
 }
 
+// Global variable for Auto-Erledigt feature
+var stillInInbox = [];
+
 /**
  * Select JSON file via file dialog
  */
@@ -106,6 +109,25 @@ function loadJsonFile(path) {
             // Add sentOnly flag for bearbeitet format if missing
             jsonData = addSentOnlyFlagIfMissing(jsonData);
             document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Emails geladen';
+        } else if (parsed && Array.isArray(parsed.emails)) {
+            // Bearbeitet format: { emails: [...], stillInInbox: [...] }
+            jsonData = parsed.emails;
+            stillInInbox = parsed.stillInInbox || [];  // May be empty for older exports
+            // Add sentOnly flag for bearbeitet format if missing
+            jsonData = addSentOnlyFlagIfMissing(jsonData);
+            // DEBUG: Count sentOnly
+            var sentOnlyCount = 0;
+            for (var si = 0; si < jsonData.length; si++) {
+                if (jsonData[si].sentOnly) sentOnlyCount++;
+            }
+            debugLog('=== ' + sentOnlyCount + ' von ' + jsonData.length + ' als sentOnly markiert ===');
+            if (stillInInbox.length > 0) {
+                debugLog('=== ' + stillInInbox.length + ' ConversationIDs noch in Inbox (fuer Auto-Erledigt) ===');
+            }
+            var statusText = jsonData.length + ' Emails geladen';
+            if (sentOnlyCount > 0) statusText += ' (' + sentOnlyCount + ' sentOnly)';
+            if (stillInInbox.length > 0) statusText += ' + ' + stillInInbox.length + ' Inbox-IDs';
+            document.getElementById('jsonStatus').innerHTML = statusText;
         } else if (Array.isArray(parsed)) {
             // Direct array (bearbeitet_*.json format)
             jsonData = parsed;
@@ -540,6 +562,39 @@ function doImport() {
             }
         }
 
+        // Auto-Erledigt: Mark Excel rows as "Erledigt" if their ConversationID is no longer in inbox
+        var erledigtCount = 0;
+        if (stillInInbox && stillInInbox.length > 0) {
+            currentStep = 'Auto-Erledigt prüfen';
+            debugLog('=== Auto-Erledigt: Prüfe ' + Object.keys(existingData.byConvId).length + ' Excel-Zeilen gegen ' + stillInInbox.length + ' Inbox-IDs ===');
+
+            // Build lookup for faster checking
+            var inboxLookup = {};
+            for (var sii = 0; sii < stillInInbox.length; sii++) {
+                inboxLookup[stillInInbox[sii]] = true;
+            }
+
+            // Check each Excel row with a ConversationID
+            for (var exConvId in existingData.byConvId) {
+                if (existingData.byConvId.hasOwnProperty(exConvId)) {
+                    var exRow = existingData.byConvId[exConvId];
+                    // Check current status - only update if not already Erledigt
+                    try {
+                        var currentStatus = worksheet.Cells(exRow, 9).Value || '';
+                        if (currentStatus.toLowerCase() !== 'erledigt') {
+                            // Not already erledigt - check if still in inbox
+                            if (!inboxLookup[exConvId]) {
+                                // NOT in inbox anymore -> set to Erledigt
+                                worksheet.Cells(exRow, 9).Value = 'Erledigt';
+                                erledigtCount++;
+                                debugLog('  Erledigt: Zeile ' + exRow + ' (nicht mehr in Inbox)');
+                            }
+                        }
+                    } catch (erlErr) {}
+                }
+            }
+        }
+
         currentStep = 'Speichern';
         updateImportProgress(total, total);
         targetWorkbook.Save();
@@ -549,6 +604,10 @@ function doImport() {
         var successMsg = '<strong>' + newCount + '</strong> neue Vorgange importiert<br>' +
             '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
             '<strong>' + skipCount + '</strong> Duplikate/Sent-Only ubersprungen';
+
+        if (erledigtCount > 0) {
+            successMsg += '<br><strong>' + erledigtCount + '</strong> Vorgange auf Erledigt gesetzt (nicht mehr in Inbox)';
+        }
 
         // Show debug summary as alert if there were skips
         if (skipCount > 0) {

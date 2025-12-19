@@ -267,6 +267,21 @@ function advanceConvExportPhase() {
  */
 function saveConversationExport() {
     try {
+        // Collect ALL ConversationIDs that are still in inbox (for Auto-Erledigt feature)
+        // This includes duplicates/already-in-Excel conversations
+        var stillInInbox = [];
+        for (var allConvId in convExportState.conversations) {
+            var allConv = convExportState.conversations[allConvId];
+            var allMessages = allConv.messages || [];
+            // Check if this conversation has at least one inbox message
+            for (var ami = 0; ami < allMessages.length; ami++) {
+                if (allMessages[ami].folder === 'inbox') {
+                    stillInInbox.push(allConvId);
+                    break;
+                }
+            }
+        }
+
         // Filter conversations: keep only those with at least one NEW email
         var filteredConversations = {};
         var skippedConvCount = 0;
@@ -344,7 +359,8 @@ function saveConversationExport() {
 
         var exportData = createExportStructure(
             filteredConversations,
-            convExportState.mailboxName
+            convExportState.mailboxName,
+            stillInInbox
         );
 
         // Get final counts after sent-only/online-abschluss filtering
