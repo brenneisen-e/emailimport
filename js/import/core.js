@@ -190,6 +190,10 @@ function convertConversationsToEmailArray(conversations) {
         var messages = conv.messages || [];
         if (messages.length === 0) continue;
 
+        // Skip "Online-Abschluss Vermittlerzuordnung" conversations (not needed)
+        var convSubject = (conv.subject || '').toLowerCase();
+        if (convSubject.indexOf('online-abschluss vermittlerzuordnung') !== -1) continue;
+
         // Sort by timestamp
         messages.sort(function(a, b) {
             var timeA = a.receivedTime || a.sentOn || '';
@@ -306,6 +310,11 @@ function doImport() {
         currentStep = 'Bestehende Daten lesen';
         document.getElementById('importProgressText').innerText = 'Lese bestehende Daten...';
         var existingData = readExistingData(worksheet);
+
+        // Count existing entries for debugging
+        var existingCount = Object.keys(existingData.byConvId).length;
+        var existingKeyCount = Object.keys(existingData.byKey).length;
+        console.log('Existing data: ' + existingCount + ' by ConvID, ' + existingKeyCount + ' by Key');
 
         currentStep = 'Letzte Zeile finden';
         var lastRow;
@@ -497,7 +506,10 @@ function doImport() {
         document.getElementById('importSuccess').style.display = 'block';
         var successMsg = '<strong>' + newCount + '</strong> neue Vorgange importiert<br>' +
             '<strong>' + updateCount + '</strong> Antworten aktualisiert<br>' +
-            '<strong>' + skipCount + '</strong> Duplikate ubersprungen';
+            '<strong>' + skipCount + '</strong> Duplikate/Sent-Only ubersprungen';
+        if (existingCount > 0) {
+            successMsg += '<br><em style="color:#666">(Excel hatte bereits ' + existingCount + ' Vorgange)</em>';
+        }
         if (erledigtCount > 0) {
             successMsg += '<br><strong>' + erledigtCount + '</strong> Vorgange auf Erledigt gesetzt';
         }
