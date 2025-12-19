@@ -102,6 +102,29 @@ function startFolderExtraction(folder, folderType) {
     try {
         convExportState.currentFolder = folder;
 
+        // Force refresh of folder items (helps with Outlook caching issues)
+        try {
+            // Access GetTable to trigger internal refresh
+            var table = folder.GetTable();
+            table = null;
+        } catch (e) {}
+
+        // Small delay to let Outlook sync
+        setTimeout(function() {
+            continueExtraction(folder, folderType);
+        }, 100);
+
+    } catch (e) {
+        // Skip to next phase if folder fails
+        advanceConvExportPhase();
+    }
+}
+
+/**
+ * Continue extraction after sync delay
+ */
+function continueExtraction(folder, folderType) {
+    try {
         // Filter by date
         var dateField = folderType === 'sent' ? '[SentOn]' : '[ReceivedTime]';
         var dateFilter = dateField + " >= '" + formatDateForRestrict(convExportState.cutoffDate) + "'";
@@ -116,13 +139,12 @@ function startFolderExtraction(folder, folderType) {
             convExportState.currentItems.Sort(dateField, true);
         } catch (e) {}
 
-        convExportState.maxItems = Math.min(convExportState.currentItems.Count, 1000);
+        convExportState.maxItems = Math.min(convExportState.currentItems.Count, 2000);
         convExportState.currentIdx = 1;
 
         setTimeout(function() { processConvExportBatch(folderType); }, 10);
 
     } catch (e) {
-        // Skip to next phase if folder fails
         advanceConvExportPhase();
     }
 }
