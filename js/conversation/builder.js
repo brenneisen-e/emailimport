@@ -85,12 +85,29 @@ function startConversationExport(folderId, days) {
 
     // Show progress
     document.getElementById('exportProgress').style.display = 'block';
-    document.getElementById('exportProgressText').innerText = 'Phase 1/4: Lade Inbox...';
-    document.getElementById('exportProgressFill').style.width = '5%';
+    document.getElementById('exportProgressText').innerText = 'Synchronisiere Outlook...';
+    document.getElementById('exportProgressFill').style.width = '2%';
 
-    // Start with inbox
-    convExportState.phase = 1;
-    startFolderExtraction(convExportState.inboxFolder, 'inbox');
+    // Force Outlook sync before starting export
+    try {
+        // Try to trigger send/receive for all accounts
+        var syncObjects = outlookNS.SyncObjects;
+        if (syncObjects && syncObjects.Count > 0) {
+            for (var i = 1; i <= syncObjects.Count; i++) {
+                try {
+                    syncObjects.Item(i).Start();
+                } catch (e) {}
+            }
+        }
+    } catch (e) {}
+
+    // Wait for sync to complete, then start export
+    setTimeout(function() {
+        document.getElementById('exportProgressText').innerText = 'Phase 1/4: Lade Inbox...';
+        document.getElementById('exportProgressFill').style.width = '5%';
+        convExportState.phase = 1;
+        startFolderExtraction(convExportState.inboxFolder, 'inbox');
+    }, 1500);  // 1.5 seconds to let sync start
 }
 
 /**
@@ -104,15 +121,19 @@ function startFolderExtraction(folder, folderType) {
 
         // Force refresh of folder items (helps with Outlook caching issues)
         try {
-            // Access GetTable to trigger internal refresh
+            // Access GetTable to trigger internal refresh - this forces Outlook to update
             var table = folder.GetTable();
+            // Read first row to force actual data access
+            if (table && !table.EndOfTable) {
+                try { table.GetNextRow(); } catch (e) {}
+            }
             table = null;
         } catch (e) {}
 
-        // Small delay to let Outlook sync
+        // Delay to let Outlook fully sync folder data
         setTimeout(function() {
             continueExtraction(folder, folderType);
-        }, 100);
+        }, 500);
 
     } catch (e) {
         // Skip to next phase if folder fails
