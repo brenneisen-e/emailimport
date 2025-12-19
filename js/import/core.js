@@ -346,12 +346,20 @@ function doImport() {
             currentStep = 'Email ' + (i+1) + ' Key erstellen';
             var emailKey = createEmailKey(email.datum, email.betreff);
 
-            // Find existing row: first by ConversationID, then by date+subject
+            // Find existing row: by ConversationID if available, otherwise by date+subject
+            // IMPORTANT: If email has conversationId, ONLY check by convId (most reliable)
+            // The emailKey check is only for legacy emails without conversationId
             var existingRow = null;
-            if (email.conversationId && existingData.byConvId[email.conversationId]) {
-                existingRow = existingData.byConvId[email.conversationId];
-            } else if (existingData.byKey[emailKey]) {
-                existingRow = existingData.byKey[emailKey];
+            if (email.conversationId) {
+                // Has conversationId - only check by conversationId
+                if (existingData.byConvId[email.conversationId]) {
+                    existingRow = existingData.byConvId[email.conversationId];
+                }
+            } else {
+                // No conversationId - fallback to date+subject key
+                if (existingData.byKey[emailKey]) {
+                    existingRow = existingData.byKey[emailKey];
+                }
             }
 
             if (existingRow) {
