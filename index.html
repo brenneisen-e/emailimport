@@ -1274,7 +1274,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 24px; color: #666; font-size: 12px;">
-                Version 1.5.0
+                Version 1.6.0
             </div>
         </div>
     </div>
@@ -1717,7 +1717,9 @@
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Nothing to auto-load - user can drag & drop or click button
+            // Clear read status on page load - each session starts fresh
+            // Previously read emails are already in Excel, new JSON has new emails
+            clearReadStatus();
         });
 
         function getBearbeiterName() {
@@ -2765,9 +2767,6 @@
 
             // Select all emails for export by default
             selectedForExport = new Set(emails.map(e => e.id));
-
-            // Restore read status from localStorage
-            loadReadStatusFromStorage();
 
             renderEmailList();
             updateStats();
