@@ -44,6 +44,51 @@ var convExportState = {
 };
 
 /**
+ * Collect all ConversationIDs from inbox for last 30 days (lightweight scan for Auto-Erledigt)
+ * @returns {Array} Array of ConversationIDs still in inbox
+ */
+function collectInboxConversationIds30Days() {
+    var convIds = [];
+    var seenIds = {};
+
+    try {
+        // Get inbox folder
+        var inboxFolder = convExportState.inboxFolder;
+        if (!inboxFolder) return convIds;
+
+        // Calculate 30-day cutoff
+        var cutoff30 = new Date();
+        cutoff30.setDate(cutoff30.getDate() - 30);
+
+        // Filter by date
+        var dateFilter = "[ReceivedTime] >= '" + formatDateForRestrict(cutoff30) + "'";
+        var items;
+        try {
+            items = inboxFolder.Items.Restrict(dateFilter);
+        } catch (e) {
+            items = inboxFolder.Items;
+        }
+
+        // Collect ConversationIDs (just IDs, no content)
+        var maxItems = Math.min(items.Count, 5000);
+        for (var i = 1; i <= maxItems; i++) {
+            try {
+                var item = items.Item(i);
+                if (item.Class !== 43) continue;  // Only mail items
+
+                var convId = item.ConversationID || '';
+                if (convId && !seenIds[convId]) {
+                    convIds.push(convId);
+                    seenIds[convId] = true;
+                }
+            } catch (e) {}
+        }
+    } catch (e) {}
+
+    return convIds;
+}
+
+/**
  * Start conversation-based export
  * @param {string} folderId - Selected folder ID or 'inbox'
  * @param {number} days - Number of days to export
@@ -267,20 +312,9 @@ function advanceConvExportPhase() {
  */
 function saveConversationExport() {
     try {
-        // Collect ALL ConversationIDs that are still in inbox (for Auto-Erledigt feature)
-        // This includes duplicates/already-in-Excel conversations
-        var stillInInbox = [];
-        for (var allConvId in convExportState.conversations) {
-            var allConv = convExportState.conversations[allConvId];
-            var allMessages = allConv.messages || [];
-            // Check if this conversation has at least one inbox message
-            for (var ami = 0; ami < allMessages.length; ami++) {
-                if (allMessages[ami].folder === 'inbox') {
-                    stillInInbox.push(allConvId);
-                    break;
-                }
-            }
-        }
+        // Collect ALL ConversationIDs from inbox (last 30 days) for Auto-Erledigt feature
+        // This is a separate scan - independent of export period
+        var stillInInbox = collectInboxConversationIds30Days();
 
         // Filter conversations: keep only those with at least one NEW email
         var filteredConversations = {};
