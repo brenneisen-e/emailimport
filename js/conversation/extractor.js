@@ -462,13 +462,40 @@ function createExportStructure(conversations, mailboxName) {
     var totalEmails = 0;
     var byEntryID = {};
     var byConversationIndex = {};
+    var filteredConversations = {};
+    var skippedSentOnly = 0;
+    var skippedOnlineAbschluss = 0;
 
     for (var convId in conversations) {
         var conv = conversations[convId];
+        var messages = conv.messages || [];
+
+        // Filter 1: Skip sent-only conversations (no inbox messages)
+        var hasInboxMessage = false;
+        for (var m = 0; m < messages.length; m++) {
+            if (messages[m].folder === 'inbox') {
+                hasInboxMessage = true;
+                break;
+            }
+        }
+        if (!hasInboxMessage) {
+            skippedSentOnly++;
+            continue;
+        }
+
+        // Filter 2: Skip "Online-Abschluss Vermittlerzuordnung" (not needed)
+        var subject = (conv.subject || '').toLowerCase();
+        if (subject.indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+            skippedOnlineAbschluss++;
+            continue;
+        }
+
+        // Include this conversation
+        filteredConversations[convId] = conv;
         totalEmails += conv.messageCount;
 
-        for (var i = 0; i < conv.messages.length; i++) {
-            var msg = conv.messages[i];
+        for (var i = 0; i < messages.length; i++) {
+            var msg = messages[i];
             byEntryID[msg.entryID] = convId;
             if (msg.conversationIndexHex) {
                 byConversationIndex[msg.conversationIndexHex] = msg.entryID;
@@ -476,15 +503,26 @@ function createExportStructure(conversations, mailboxName) {
         }
     }
 
+    // Log filtering info
+    if (skippedSentOnly > 0 || skippedOnlineAbschluss > 0) {
+        try {
+            console.log('Export filter: ' + skippedSentOnly + ' sent-only, ' + skippedOnlineAbschluss + ' online-abschluss skipped');
+        } catch(e) {}
+    }
+
     return {
         exportDate: new Date().toISOString(),
         mailboxName: mailboxName || '',
         totalEmails: totalEmails,
-        conversationCount: Object.keys(conversations).length,
-        conversations: conversations,
+        conversationCount: Object.keys(filteredConversations).length,
+        conversations: filteredConversations,
         index: {
             byEntryID: byEntryID,
             byConversationIndex: byConversationIndex
+        },
+        _filterInfo: {
+            skippedSentOnly: skippedSentOnly,
+            skippedOnlineAbschluss: skippedOnlineAbschluss
         }
     };
 }

@@ -312,6 +312,23 @@ function saveConversationExport() {
             convExportState.mailboxName
         );
 
+        // Get final counts after sent-only/online-abschluss filtering
+        var finalConvCount = exportData.conversationCount;
+        var filterInfo = exportData._filterInfo || {};
+
+        // Check if all conversations were filtered out
+        if (finalConvCount === 0) {
+            var skippedTotal = (filterInfo.skippedSentOnly || 0) + (filterInfo.skippedOnlineAbschluss || 0);
+            var noNewMsg = 'Keine relevanten Vorgänge gefunden.';
+            if (skippedTotal > 0) {
+                noNewMsg += '<br><em style="color:#666">(' + skippedTotal + ' irrelevante Konversationen gefiltert)</em>';
+            }
+            showExportSuccess(noNewMsg);
+            document.getElementById('exportProgressFill').style.width = '100%';
+            document.getElementById('exportProgressText').innerText = 'Keine relevanten Vorgänge';
+            return;
+        }
+
         var fso = new ActiveXObject("Scripting.FileSystemObject");
         var shell = new ActiveXObject("WScript.Shell");
         var shellApp = new ActiveXObject("Shell.Application");
@@ -334,8 +351,12 @@ function saveConversationExport() {
         file.Write(JSON.stringify(exportData, null, 2));
         file.Close();
 
-        // Show success
-        var successMsg = '<strong>' + newEmailCount + '</strong> neue Emails in <strong>' + filteredCount + '</strong> Konversationen';
+        // Show success with final filtered count
+        var successMsg = '<strong>' + exportData.totalEmails + '</strong> Emails in <strong>' + finalConvCount + '</strong> Vorgängen';
+        if (filterInfo.skippedSentOnly > 0 || filterInfo.skippedOnlineAbschluss > 0) {
+            var skippedTotal = (filterInfo.skippedSentOnly || 0) + (filterInfo.skippedOnlineAbschluss || 0);
+            successMsg += '<br><em style="color:#666">(' + skippedTotal + ' irrelevante Konversationen gefiltert)</em>';
+        }
         if (skippedConvCount > 0) {
             successMsg += '<br><strong>' + skippedConvCount + '</strong> Konversationen bereits vollstaendig in Excel';
         }
