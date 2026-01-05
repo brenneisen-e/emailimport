@@ -20,10 +20,13 @@ function pad(n) {
 
 /**
  * Format date for Outlook Restrict() filter
+ * Uses German locale format (DD.MM.YYYY HH:MM) for German Windows systems
  */
 function formatDateForRestrict(date) {
     var d = new Date(date);
-    return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear() + ' ' + d.getHours() + ':' + d.getMinutes();
+    // German format: DD.MM.YYYY HH:MM (with leading zeros)
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' +
+           pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
 /**
