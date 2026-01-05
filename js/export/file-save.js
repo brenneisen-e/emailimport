@@ -127,7 +127,7 @@ function openWebApp() {
         // Step 4 completed - Web-App opened
         completeStep(4);
     } catch (e) {
-        showExportError("Fehler beim \u00D6ffnen der Web-App: " + e.message);
+        showExportError("Fehler beim Oeffnen der Web-App: " + e.message);
     }
 }
 
@@ -146,7 +146,7 @@ function openDownloads() {
         }
         shell.Run('explorer "' + downloads + '"');
     } catch (e) {
-        showExportError("Fehler beim \u00D6ffnen des Ordners: " + e.message);
+        showExportError("Fehler beim Oeffnen des Ordners: " + e.message);
     }
 }
 

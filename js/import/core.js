@@ -36,7 +36,7 @@ var stillInInbox = [];
 function selectJsonFile() {
     try {
         var shell = new ActiveXObject("Shell.Application");
-        var folder = shell.BrowseForFolder(0, "JSON-Datei ausw\u00E4hlen", 0x4000, "shell:Downloads");
+        var folder = shell.BrowseForFolder(0, "JSON-Datei auswaehlen", 0x4000, "shell:Downloads");
         if (folder && folder.Self) {
             // This returns a folder - need to use different approach
             // Use InputBox as fallback
@@ -102,7 +102,7 @@ function loadJsonFile(path) {
         if (parsed && parsed.conversations) {
             // New conversation format - convert to array
             jsonData = convertConversationsToEmailArray(parsed.conversations);
-            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Vorg\u00E4nge aus Konversations-Export geladen';
+            document.getElementById('jsonStatus').innerHTML = jsonData.length + ' Vorgaenge aus Konversations-Export geladen';
         } else if (parsed && parsed._exportInfo && parsed.emails) {
             // Debug format with export info
             jsonData = parsed.emails;
@@ -400,7 +400,7 @@ function doImport() {
             if (i % 3 === 0) {
                 updateImportProgress(i, total);
                 document.getElementById('importProgressText').innerText =
-                    'Verarbeite ' + (i+1) + '/' + total + ' (Neu: ' + newCount + ', Aktualisiert: ' + updateCount + ', \u00DCbersprungen: ' + skipCount + ')';
+                    'Verarbeite ' + (i+1) + '/' + total + ' (Neu: ' + newCount + ', Aktualisiert: ' + updateCount + ', Uebersprungen: ' + skipCount + ')';
             }
 
             currentStep = 'Email ' + (i+1) + ' Key erstellen';
@@ -435,7 +435,7 @@ function doImport() {
 
             if (existingRow) {
                 // Email exists - check for new replies using ReplyIDs
-                currentStep = 'Email ' + (i+1) + ' Antworten pr\u00FCfen';
+                currentStep = 'Email ' + (i+1) + ' Antworten pruefen';
                 // For sentOnly conversations, mark that we found a match
                 var matchedSentOnly = email.sentOnly ? true : false;
                 if (email.antworten && email.antworten.length > 0) {
@@ -565,8 +565,8 @@ function doImport() {
         // Auto-Erledigt: Mark Excel rows as "Erledigt" if their ConversationID is no longer in inbox
         var erledigtCount = 0;
         if (stillInInbox && stillInInbox.length > 0) {
-            currentStep = 'Auto-Erledigt pr\u00FCfen';
-            debugLog('=== Auto-Erledigt: Pr\u00FCfe ' + Object.keys(existingData.byConvId).length + ' Excel-Zeilen gegen ' + stillInInbox.length + ' Inbox-IDs ===');
+            currentStep = 'Auto-Erledigt pruefen';
+            debugLog('=== Auto-Erledigt: Pruefe ' + Object.keys(existingData.byConvId).length + ' Excel-Zeilen gegen ' + stillInInbox.length + ' Inbox-IDs ===');
 
             // Build lookup for faster checking
             var inboxLookup = {};
