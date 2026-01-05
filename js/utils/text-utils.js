@@ -100,7 +100,7 @@ function truncateForExcel(text, maxLength) {
     if (!text) return '';
     maxLength = maxLength || 30000;
     if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '\n[... Text gekürzt ...]';
+    return text.substring(0, maxLength) + '\n[... Text gekuerzt ...]';
 }
 
 /**

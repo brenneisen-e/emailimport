@@ -35,7 +35,7 @@ function writeEmailRow(worksheet, row, email) {
         repliesText = sanitizeForExcel(repliesText);
         // Excel cell limit is 32767 chars, keep it safe at 30000
         if (repliesText.length > 30000) {
-            repliesText = repliesText.substring(0, 30000) + '\n\n[... weitere Antworten gekürzt ...]';
+            repliesText = repliesText.substring(0, 30000) + '\n\n[... weitere Antworten gekuerzt ...]';
         }
     } catch (repliesErr) {
         repliesText = '[Fehler: ' + repliesErr.message + ']';

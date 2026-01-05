@@ -259,7 +259,7 @@ function advanceConvExportPhase() {
 
     } else if (convExportState.phase === 4) {
         // Phase 4: Scan inbox for stillInInbox IDs, then save
-        document.getElementById('exportProgressText').innerText = 'Phase 4/4: Scanne Inbox für Auto-Erledigt...';
+        document.getElementById('exportProgressText').innerText = 'Phase 4/4: Scanne Inbox fuer Auto-Erledigt...';
         document.getElementById('exportProgressFill').style.width = '95%';
 
         // Start async scan of inbox
