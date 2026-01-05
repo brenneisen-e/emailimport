@@ -43,50 +43,9 @@ var convExportState = {
     mailboxName: ''
 };
 
-/**
- * Collect all ConversationIDs from inbox for last 30 days (lightweight scan for Auto-Erledigt)
- * @returns {Array} Array of ConversationIDs still in inbox
- */
-function collectInboxConversationIds30Days() {
-    var convIds = [];
-    var seenIds = {};
-
-    try {
-        // Get inbox folder
-        var inboxFolder = convExportState.inboxFolder;
-        if (!inboxFolder) return convIds;
-
-        // Calculate 30-day cutoff
-        var cutoff30 = new Date();
-        cutoff30.setDate(cutoff30.getDate() - 30);
-
-        // Filter by date
-        var dateFilter = "[ReceivedTime] >= '" + formatDateForRestrict(cutoff30) + "'";
-        var items;
-        try {
-            items = inboxFolder.Items.Restrict(dateFilter);
-        } catch (e) {
-            items = inboxFolder.Items;
-        }
-
-        // Collect ConversationIDs (just IDs, no content)
-        var maxItems = Math.min(items.Count, 5000);
-        for (var i = 1; i <= maxItems; i++) {
-            try {
-                var item = items.Item(i);
-                if (item.Class !== 43) continue;  // Only mail items
-
-                var convId = item.ConversationID || '';
-                if (convId && !seenIds[convId]) {
-                    convIds.push(convId);
-                    seenIds[convId] = true;
-                }
-            } catch (e) {}
-        }
-    } catch (e) {}
-
-    return convIds;
-}
+// Note: collectInboxConversationIds30Days() was replaced by async
+// startInboxScan() / processInboxScanBatch() / finishInboxScan() functions
+// (see advanceConvExportPhase phase 4) for better progress indication
 
 /**
  * Start conversation-based export
@@ -299,22 +258,125 @@ function advanceConvExportPhase() {
         }, 50);
 
     } else if (convExportState.phase === 4) {
-        // Phase 4: Save export
-        document.getElementById('exportProgressText').innerText = 'Phase 4/4: Speichere...';
+        // Phase 4: Scan inbox for stillInInbox IDs, then save
+        document.getElementById('exportProgressText').innerText = 'Phase 4/4: Scanne Inbox für Auto-Erledigt...';
         document.getElementById('exportProgressFill').style.width = '95%';
 
-        setTimeout(saveConversationExport, 50);
+        // Start async scan of inbox
+        startInboxScan();
     }
 }
 
 /**
- * Save the conversation export to JSON file
+ * Async state for inbox scan (Phase 4)
  */
-function saveConversationExport() {
+var inboxScanState = {
+    items: null,
+    maxItems: 0,
+    currentIdx: 1,
+    convIds: [],
+    seenIds: {}
+};
+
+/**
+ * Start async inbox scan for stillInInbox ConversationIDs
+ */
+function startInboxScan() {
     try {
-        // Collect ALL ConversationIDs from inbox (last 30 days) for Auto-Erledigt feature
-        // This is a separate scan - independent of export period
-        var stillInInbox = collectInboxConversationIds30Days();
+        var inboxFolder = convExportState.inboxFolder;
+        if (!inboxFolder) {
+            // No inbox folder, skip scan
+            finishInboxScan();
+            return;
+        }
+
+        // Calculate 30-day cutoff
+        var cutoff30 = new Date();
+        cutoff30.setDate(cutoff30.getDate() - 30);
+
+        // Filter by date
+        var dateFilter = "[ReceivedTime] >= '" + formatDateForRestrict(cutoff30) + "'";
+        var items;
+        try {
+            items = inboxFolder.Items.Restrict(dateFilter);
+        } catch (e) {
+            items = inboxFolder.Items;
+        }
+
+        inboxScanState.items = items;
+        inboxScanState.maxItems = Math.min(items.Count, 5000);
+        inboxScanState.currentIdx = 1;
+        inboxScanState.convIds = [];
+        inboxScanState.seenIds = {};
+
+        // Start batch processing
+        setTimeout(processInboxScanBatch, 10);
+
+    } catch (e) {
+        // On error, just finish with empty list
+        finishInboxScan();
+    }
+}
+
+/**
+ * Process a batch of inbox items for ConversationID collection
+ */
+function processInboxScanBatch() {
+    var batchSize = 100;  // Larger batches since we only read ConversationID
+    var processed = 0;
+
+    while (processed < batchSize && inboxScanState.currentIdx <= inboxScanState.maxItems) {
+        var i = inboxScanState.currentIdx;
+        inboxScanState.currentIdx++;
+        processed++;
+
+        try {
+            var item = inboxScanState.items.Item(i);
+            if (item.Class !== 43) continue;  // Only mail items
+
+            var convId = item.ConversationID || '';
+            if (convId && !inboxScanState.seenIds[convId]) {
+                inboxScanState.convIds.push(convId);
+                inboxScanState.seenIds[convId] = true;
+            }
+        } catch (e) {}
+    }
+
+    // Update progress (95% to 99%)
+    var scanPct = Math.round((inboxScanState.currentIdx / inboxScanState.maxItems) * 4);
+    document.getElementById('exportProgressFill').style.width = (95 + scanPct) + '%';
+    document.getElementById('exportProgressText').innerText =
+        'Phase 4/4: Inbox-Scan ' + inboxScanState.currentIdx + '/' + inboxScanState.maxItems;
+
+    // Continue or finish
+    if (inboxScanState.currentIdx <= inboxScanState.maxItems) {
+        setTimeout(processInboxScanBatch, 10);
+    } else {
+        finishInboxScan();
+    }
+}
+
+/**
+ * Finish inbox scan and proceed to save
+ */
+function finishInboxScan() {
+    var stillInInbox = inboxScanState.convIds;
+
+    // Clean up scan state
+    inboxScanState.items = null;
+    inboxScanState.seenIds = {};
+
+    // Now save with the collected IDs
+    saveConversationExportWithData(stillInInbox);
+}
+
+/**
+ * Save the conversation export to JSON file
+ * @param {Array} stillInInbox - Array of ConversationIDs currently in inbox (from async scan)
+ */
+function saveConversationExportWithData(stillInInbox) {
+    try {
+        stillInInbox = stillInInbox || [];
 
         // Filter conversations: keep only those with at least one NEW email
         var filteredConversations = {};
@@ -378,13 +440,58 @@ function saveConversationExport() {
             }
         }
 
+        // Count total conversations before filtering
+        var totalConvCount = 0;
+        var sentOnlyCount = 0;
+        var onlineAbschlussCount = 0;
+        for (var countKey in convExportState.conversations) {
+            totalConvCount++;
+        }
+
         // Check if there are any new conversations
         var filteredCount = Object.keys(filteredConversations).length;
         if (filteredCount === 0) {
+            // Build detailed diagnostic message
             var noNewMsg = 'Keine neuen Emails gefunden.';
-            if (skippedConvCount > 0) {
-                noNewMsg += '<br><strong>' + totalEmailCount + '</strong> Emails in <strong>' + skippedConvCount + '</strong> Konversationen bereits in Excel.';
+
+            // Count filtered reasons
+            for (var diagConvId in convExportState.conversations) {
+                var diagConv = convExportState.conversations[diagConvId];
+                var diagMessages = diagConv.messages || [];
+                var hasInbox = false;
+                for (var di = 0; di < diagMessages.length; di++) {
+                    if (diagMessages[di].folder === 'inbox') {
+                        hasInbox = true;
+                        break;
+                    }
+                }
+                if (!hasInbox) {
+                    sentOnlyCount++;
+                } else {
+                    var diagSubject = diagMessages[0] ? diagMessages[0].subject : '';
+                    if ((diagSubject || '').toLowerCase().indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+                        onlineAbschlussCount++;
+                    }
+                }
             }
+
+            // Show diagnostic info
+            noNewMsg += '<br><br><strong>Diagnose:</strong>';
+            noNewMsg += '<br>• Emails im Export-Zeitraum: <strong>' + convExportState.allEmails.length + '</strong>';
+            noNewMsg += '<br>• Gefundene Konversationen: <strong>' + totalConvCount + '</strong>';
+            if (skippedConvCount > 0) {
+                noNewMsg += '<br>• Bereits in Excel: <strong>' + skippedConvCount + '</strong> (' + totalEmailCount + ' Emails)';
+            }
+            if (sentOnlyCount > 0) {
+                noNewMsg += '<br>• Nur Sent (keine Inbox): <strong>' + sentOnlyCount + '</strong>';
+            }
+            if (onlineAbschlussCount > 0) {
+                noNewMsg += '<br>• Online-Abschluss gefiltert: <strong>' + onlineAbschlussCount + '</strong>';
+            }
+            if (convExportState.allEmails.length === 0) {
+                noNewMsg += '<br><br><em>Hinweis: Keine Emails im gewählten Zeitraum gefunden. Prüfen Sie den Export-Zeitraum.</em>';
+            }
+
             showExportSuccess(noNewMsg);
             document.getElementById('exportProgressFill').style.width = '100%';
             document.getElementById('exportProgressText').innerText = 'Keine neuen Emails';
