@@ -533,9 +533,15 @@ function convertToLegacyFormat(conversations) {
             var replyTime = reply.sentOn || reply.receivedTime || '';
             var isSent = reply.folder === 'sent';
 
+            // Safe array access: check if recipients exists and has items
+            var recipientEmail = '';
+            if (isSent && reply.recipients && reply.recipients.length > 0 && reply.recipients[0]) {
+                recipientEmail = cleanX500Address(reply.recipients[0].email || '');
+            }
+
             legacyEmail.antworten.push({
                 datum: replyTime,
-                an: isSent ? cleanX500Address(reply.recipients[0] ? reply.recipients[0].email : '') : '',
+                an: recipientEmail,
                 von: isSent ? '' : reply.senderName,
                 text: removeEmailQuotes(reply.body || reply.bodyPreview || ''),
                 replyId: reply.entryID,

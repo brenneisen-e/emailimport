@@ -326,8 +326,9 @@ function htmlToPlainText(html) {
     text = text.replace(/<[^>]+>/g, '');
 
     // Decode HTML entities
+    // IMPORTANT: &amp; must be decoded LAST to prevent double-decoding
+    // (e.g., &amp;nbsp; should become &nbsp;, not a space)
     text = text.replace(/&nbsp;/gi, ' ');
-    text = text.replace(/&amp;/gi, '&');
     text = text.replace(/&lt;/gi, '<');
     text = text.replace(/&gt;/gi, '>');
     text = text.replace(/&quot;/gi, '"');
@@ -339,6 +340,7 @@ function htmlToPlainText(html) {
     text = text.replace(/&Ouml;/gi, 'Ö');
     text = text.replace(/&Uuml;/gi, 'Ü');
     text = text.replace(/&szlig;/gi, 'ß');
+    text = text.replace(/&amp;/gi, '&');  // LAST - prevents double-decoding
 
     // Clean up whitespace
     text = text.replace(/[ \t]+/g, ' ');
