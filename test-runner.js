@@ -638,16 +638,16 @@ console.log('\n=== DATE FORMATTING TESTS ===\n');
 function formatDateForRestrict(date) {
     if (!date) return '';
     var d = new Date(date);
-    var month = d.getMonth() + 1;
-    var day = d.getDate();
-    var year = d.getFullYear();
-    return month + '/' + day + '/' + year + ' 00:00';
+    // German format: DD.MM.YYYY HH:MM
+    function pad(n) { return n < 10 ? '0' + n : n; }
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' +
+           pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
-test('formatDateForRestrict: formats date correctly', () => {
-    const date = new Date('2025-06-15');
+test('formatDateForRestrict: formats date correctly for German locale', () => {
+    const date = new Date('2025-06-15T10:30:00');
     const result = formatDateForRestrict(date);
-    assertTrue(result.includes('6/15/2025'), 'Should format as M/D/YYYY');
+    assertTrue(result.includes('15.06.2025'), 'Should format as DD.MM.YYYY for German Outlook');
 });
 
 // ============================================================================

@@ -179,7 +179,7 @@ function continueExtraction(folder, folderType) {
  * @param {string} folderType - 'inbox' or 'sent'
  */
 function processConvExportBatch(folderType) {
-    var batchSize = 30;
+    var batchSize = 5;  // Small batches for visible progress
     var processed = 0;
 
     while (processed < batchSize && convExportState.currentIdx <= convExportState.maxItems) {
@@ -322,7 +322,7 @@ function startInboxScan() {
  * Process a batch of inbox items for ConversationID collection
  */
 function processInboxScanBatch() {
-    var batchSize = 100;  // Larger batches since we only read ConversationID
+    var batchSize = 10;  // Smaller batches for visible progress
     var processed = 0;
 
     while (processed < batchSize && inboxScanState.currentIdx <= inboxScanState.maxItems) {
@@ -477,19 +477,19 @@ function saveConversationExportWithData(stillInInbox) {
 
             // Show diagnostic info
             noNewMsg += '<br><br><strong>Diagnose:</strong>';
-            noNewMsg += '<br>• Emails im Export-Zeitraum: <strong>' + convExportState.allEmails.length + '</strong>';
-            noNewMsg += '<br>• Gefundene Konversationen: <strong>' + totalConvCount + '</strong>';
+            noNewMsg += '<br>&bull; Emails im Export-Zeitraum: <strong>' + convExportState.allEmails.length + '</strong>';
+            noNewMsg += '<br>&bull; Gefundene Konversationen: <strong>' + totalConvCount + '</strong>';
             if (skippedConvCount > 0) {
-                noNewMsg += '<br>• Bereits in Excel: <strong>' + skippedConvCount + '</strong> (' + totalEmailCount + ' Emails)';
+                noNewMsg += '<br>&bull; Bereits in Excel: <strong>' + skippedConvCount + '</strong> (' + totalEmailCount + ' Emails)';
             }
             if (sentOnlyCount > 0) {
-                noNewMsg += '<br>• Nur Sent (keine Inbox): <strong>' + sentOnlyCount + '</strong>';
+                noNewMsg += '<br>&bull; Nur Sent (keine Inbox): <strong>' + sentOnlyCount + '</strong>';
             }
             if (onlineAbschlussCount > 0) {
-                noNewMsg += '<br>• Online-Abschluss gefiltert: <strong>' + onlineAbschlussCount + '</strong>';
+                noNewMsg += '<br>&bull; Online-Abschluss gefiltert: <strong>' + onlineAbschlussCount + '</strong>';
             }
             if (convExportState.allEmails.length === 0) {
-                noNewMsg += '<br><br><em>Hinweis: Keine Emails im gewählten Zeitraum gefunden. Prüfen Sie den Export-Zeitraum.</em>';
+                noNewMsg += '<br><br><em>Hinweis: Keine Emails im gew&auml;hlten Zeitraum gefunden. Pr&uuml;fen Sie den Export-Zeitraum.</em>';
             }
 
             showExportSuccess(noNewMsg);

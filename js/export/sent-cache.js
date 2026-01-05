@@ -136,7 +136,7 @@ function startNextSentFolder() {
  * Process a batch of sent items
  */
 function processSentBatch() {
-    var batchSize = 50;
+    var batchSize = 5;  // Small batches for visible progress
     var processed = 0;
 
     while (processed < batchSize && sentCacheState.itemIdx <= sentCacheState.maxItems) {
