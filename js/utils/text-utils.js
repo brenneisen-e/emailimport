@@ -52,6 +52,8 @@ function fixEncoding(text) {
     result = result.replace(/\u00C3\u00B4/g, '\u00F4');  // Ã´ -> ô
     result = result.replace(/\u00C3\u00BB/g, '\u00FB');  // Ã» -> û
     result = result.replace(/\u00C3\u00A7/g, '\u00E7');  // Ã§ -> ç
+    result = result.replace(/\u00C3\u00B1/g, '\u00F1');  // Ã± -> ñ (Spanish)
+    result = result.replace(/\u00C3\u0091/g, '\u00D1');  // Ã' -> Ñ (Spanish uppercase)
 
     // Triple-byte UTF-8 sequences double-encoded (arrows, quotes, etc.)
     // → (U+2192) = E2 86 92 in UTF-8 -> â†' when double-encoded
@@ -122,6 +124,12 @@ function sanitizeForExcel(text) {
     // Remove emojis and other 4-byte UTF-8 characters (surrogate pairs)
     // This prevents issues in HTA/JScript and Excel
     result = result.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
+
+    // Remove double-encoded emojis (4-byte UTF-8 misread as Windows-1252)
+    // Example: 😊 becomes ðŸ˜Š when UTF-8 bytes F0 9F 98 8A are read as Win-1252
+    result = result.replace(/\u00F0\u0178[\u0080-\u02FF][\u0080-\u017F]/g, '');  // ðŸ... patterns
+    result = result.replace(/\u00F0\u0152[\u0080-\u02FF][\u0080-\u017F]/g, '');  // ðœ... patterns
+    result = result.replace(/\u00F0\u0153[\u0080-\u02FF][\u0080-\u017F]/g, '');  // ð... patterns
 
     // Remove other problematic Unicode symbols
     result = result.replace(/[\u2600-\u26FF]/g, '');   // Misc symbols (sun, stars, etc.)
@@ -348,3 +356,28 @@ function htmlToPlainText(html) {
 
     return text.trim();
 }
+
+/**
+ * Extract BD-Nummer (Vermittlernummer) from email text
+ * Looks for patterns like "(0067/0813)" or "0067/0813"
+ * @param {string} text - Email text to search
+ * @returns {string} Extracted BD-Nummer or empty string
+ */
+function extractBDNummerFromText(text) {
+    if (!text) return '';
+
+    // Pattern 1: (XXXX/XXXX) - in parentheses
+    var match = text.match(/\((\d{4}\/\d{4})\)/);
+    if (match) {
+        return match[1];
+    }
+
+    // Pattern 2: XXXX/XXXX - standalone
+    match = text.match(/\b(\d{4}\/\d{4})\b/);
+    if (match) {
+        return match[1];
+    }
+
+    return '';
+}
+

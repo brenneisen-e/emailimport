@@ -242,9 +242,10 @@ function convertConversationsToEmailArray(conversations) {
         var messages = conv.messages || [];
         if (messages.length === 0) continue;
 
-        // Skip "Online-Abschluss Vermittlerzuordnung" conversations (not needed)
+        // Skip "Online-Abschluss/Online-Antrag Vermittlerzuordnung" conversations (not needed)
         var convSubject = (conv.subject || '').toLowerCase();
-        if (convSubject.indexOf('online-abschluss vermittlerzuordnung') !== -1) continue;
+        if ((convSubject.indexOf('online-abschluss') !== -1 || convSubject.indexOf('online-antrag') !== -1)
+            && convSubject.indexOf('vermittlerzuordnung') !== -1) continue;
 
         // Sort by timestamp
         messages.sort(function(a, b) {
@@ -442,7 +443,7 @@ function doImport() {
                     // Get existing ReplyIDs from Excel
                     var currentReplyIdsStr = '';
                     try {
-                        currentReplyIdsStr = worksheet.Cells(existingRow, 24).Value || '';
+                        currentReplyIdsStr = worksheet.Cells(existingRow, 27).Value || '';  // Column 27 = ReplyIDs (shifted +3)
                     } catch (e) {}
 
                     // Build set of existing IDs for fast lookup
@@ -466,7 +467,7 @@ function doImport() {
                             var replyTimestamp = reply.datum || '';
                             var currentRepliesText = '';
                             try {
-                                currentRepliesText = worksheet.Cells(existingRow, 14).Value || '';
+                                currentRepliesText = worksheet.Cells(existingRow, 17).Value || '';  // Column 17 = Antwort (shifted +3)
                             } catch (e) {}
                             if (replyTimestamp && currentRepliesText.indexOf(replyTimestamp) === -1) {
                                 newReplies.push(reply);
@@ -481,15 +482,15 @@ function doImport() {
                         currentStep = 'Email ' + (i+1) + ' Antworten schreiben';
                         var currentReplies = '';
                         try {
-                            currentReplies = worksheet.Cells(existingRow, 14).Value || '';
+                            currentReplies = worksheet.Cells(existingRow, 17).Value || '';  // Column 17 = Antwort (shifted +3)
                         } catch (e) {}
                         var combinedReplies = currentReplies ? currentReplies + '\n\n' + newRepliesText : newRepliesText;
                         // Use sanitizeForExcel to remove \r chars that cause _x000D_
                         combinedReplies = sanitizeForExcel(combinedReplies);
-                        worksheet.Cells(existingRow, 14).Value = combinedReplies;
+                        worksheet.Cells(existingRow, 17).Value = combinedReplies;  // Column 17 = Antwort (shifted +3)
 
                         currentStep = 'Email ' + (i+1) + ' Timestamps fetten';
-                        boldTimestamps(worksheet.Cells(existingRow, 14));
+                        boldTimestamps(worksheet.Cells(existingRow, 17));  // Column 17 = Antwort (shifted +3)
 
                         // Update ReplyIDs
                         currentStep = 'Email ' + (i+1) + ' ReplyIDs aktualisieren';
@@ -502,7 +503,7 @@ function doImport() {
                             }
                             if (newReplyIds.length > 0) {
                                 var combinedIds = currentReplyIdsStr ? currentReplyIdsStr + ',' + newReplyIds.join(',') : newReplyIds.join(',');
-                                worksheet.Cells(existingRow, 24).Value = combinedIds;
+                                worksheet.Cells(existingRow, 27).Value = combinedIds;  // Column 27 = ReplyIDs (shifted +3)
                             }
                         } catch (replyIdErr) {}
 
@@ -550,8 +551,8 @@ function doImport() {
                         }
                         worksheet.Cells(errorRow, 1).Value = 'HC-' + (errorRow - 1);
                         worksheet.Cells(errorRow, 2).Value = email.datum || '';
-                        worksheet.Cells(errorRow, 12).Value = email.betreff || '';
-                        worksheet.Cells(errorRow, 13).Value = '[FEHLER beim Import: ' + writeErr.message + ']';
+                        worksheet.Cells(errorRow, 15).Value = email.betreff || '';  // Column 15 = Betreff (shifted +3)
+                        worksheet.Cells(errorRow, 16).Value = '[FEHLER beim Import: ' + writeErr.message + ']';  // Column 16 = Anfrage (shifted +3)
                         existingData.byKey[emailKey] = errorRow;
                         nextRow = errorRow + 1;
                         skipCount++;
@@ -580,12 +581,12 @@ function doImport() {
                     var exRow = existingData.byConvId[exConvId];
                     // Check current status - only update if not already Erledigt
                     try {
-                        var currentStatus = worksheet.Cells(exRow, 9).Value || '';
+                        var currentStatus = worksheet.Cells(exRow, 12).Value || '';  // Column 12 = Status (shifted +3)
                         if (currentStatus.toLowerCase() !== 'erledigt') {
                             // Not already erledigt - check if still in inbox
                             if (!inboxLookup[exConvId]) {
                                 // NOT in inbox anymore -> set to Erledigt
-                                worksheet.Cells(exRow, 9).Value = 'Erledigt';
+                                worksheet.Cells(exRow, 12).Value = 'Erledigt';  // Column 12 = Status (shifted +3)
                                 erledigtCount++;
                                 debugLog('  Erledigt: Zeile ' + exRow + ' (nicht mehr in Inbox)');
                             }

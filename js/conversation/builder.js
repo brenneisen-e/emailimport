@@ -403,9 +403,11 @@ function saveConversationExportWithData(stillInInbox) {
                 continue;
             }
 
-            // Pre-filter 2: Skip "Online-Abschluss Vermittlerzuordnung"
+            // Pre-filter 2: Skip "Online-Abschluss/Online-Antrag Vermittlerzuordnung" emails
             var convSubject = messages[0] ? messages[0].subject : '';
-            if ((convSubject || '').toLowerCase().indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+            var convSubjectLower = (convSubject || '').toLowerCase();
+            if ((convSubjectLower.indexOf('online-abschluss') !== -1 || convSubjectLower.indexOf('online-antrag') !== -1)
+                && convSubjectLower.indexOf('vermittlerzuordnung') !== -1) {
                 continue;
             }
 
@@ -469,7 +471,9 @@ function saveConversationExportWithData(stillInInbox) {
                     sentOnlyCount++;
                 } else {
                     var diagSubject = diagMessages[0] ? diagMessages[0].subject : '';
-                    if ((diagSubject || '').toLowerCase().indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+                    var diagSubjectLower = (diagSubject || '').toLowerCase();
+                    if ((diagSubjectLower.indexOf('online-abschluss') !== -1 || diagSubjectLower.indexOf('online-antrag') !== -1)
+                        && diagSubjectLower.indexOf('vermittlerzuordnung') !== -1) {
                         onlineAbschlussCount++;
                     }
                 }
@@ -618,6 +622,7 @@ function convertToLegacyFormat(conversations) {
         var sentOnlyConversation = !hasInboxRoot;
 
         // Normal processing: Build legacy email object
+        // WICHTIG: Bei der Anfrage (erste Mail) KEINE Zitate entfernen - der volle Kontext ist wichtig!
         var legacyEmail = {
             emailId: rootMsg.entryID,
             conversationId: convId,
@@ -625,7 +630,7 @@ function convertToLegacyFormat(conversations) {
             von_email: rootMsg.senderEmail,
             von_name: rootMsg.senderName,
             betreff: rootMsg.subject,
-            text: removeEmailQuotes(rootMsg.body || ''),
+            text: rootMsg.body || '',  // Voller Text OHNE Quote-Entfernung fuer Anfrage
             anhaenge: rootMsg.anhaenge || [],
             kategorie: rootMsg.kategorie || '',
             sentOnly: sentOnlyConversation,  // Flag for import to handle

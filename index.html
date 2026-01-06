@@ -1274,7 +1274,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 24px; color: #666; font-size: 12px;">
-                Version 3.0
+                Version 4.0
             </div>
         </div>
     </div>
@@ -1439,7 +1439,17 @@
 
                             <div class="form-group">
                                 <label class="form-label">Versicherungsnummer</label>
-                                <input type="text" class="form-input" id="formVsnr" onchange="updateField('vsnr')">
+                                <input type="text" class="form-input" id="formVsnr" onchange="updateField('vsnr')" placeholder="Mehrere mit , oder ; trennen">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Name Versicherungsnehmer</label>
+                                <input type="text" class="form-input" id="formVsnName" onchange="updateField('vsnName')" placeholder="Mehrere mit , oder ; trennen">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Antragsdatum</label>
+                                <input type="text" class="form-input" id="formAntragsdatum" onchange="updateField('antragsdatum')" placeholder="z.B. 01.01.2025">
                             </div>
                         </div>
 
@@ -1846,9 +1856,10 @@
                 const hasInboxMessage = messages.some(m => m.folder === 'inbox');
                 if (!hasInboxMessage) continue;
 
-                // Skip "Online-Abschluss Vermittlerzuordnung" emails - these are not needed
+                // Skip "Online-Abschluss/Online-Antrag Vermittlerzuordnung" emails - these are not needed
                 const convSubject = (conv.subject || '').toLowerCase();
-                if (convSubject.includes('online-abschluss vermittlerzuordnung')) continue;
+                if ((convSubject.includes('online-abschluss') || convSubject.includes('online-antrag'))
+                    && convSubject.includes('vermittlerzuordnung')) continue;
 
                 totalMessages += messages.length;
 
@@ -2670,10 +2681,14 @@
         }
 
         function processEmails(rawEmails) {
-            // Filter out emails with subject containing "Online-Abschluss Vermittlerzuordnung ändern"
+            // Filter out emails with subject containing "Online-Abschluss/Online-Antrag Vermittlerzuordnung"
             rawEmails = rawEmails.filter(email => {
                 const subject = (email.betreff || email.subject || '').toLowerCase();
-                return !subject.includes('online-abschluss vermittlerzuordnung ändern');
+                if ((subject.includes('online-abschluss') || subject.includes('online-antrag'))
+                    && subject.includes('vermittlerzuordnung')) {
+                    return false;
+                }
+                return true;
             });
 
             emails = rawEmails.map(email => {
@@ -2707,6 +2722,8 @@
                 const agentur = vermittlerName || extractAgentur(fromName, subject);
                 const vermittlernr = provisionData?.vermittlernummer_vermittler || extractVermittlernr(text);
                 const vsnr = provisionData?.versicherungsnummer_kunde || extractVsnr(text);
+                const vsnName = provisionData ?
+                    ((provisionData.vorname_kunde || '') + ' ' + (provisionData.nachname_kunde || '')).trim() : '';
 
                 return {
                     id: nextId++,
@@ -2739,8 +2756,11 @@
                     agentur: agentur,
                     vermittlernr: vermittlernr,
                     vsnr: vsnr,
-                    // anfrage: stored for text fallback (actual display uses HTML parsing)
-                    anfrage: email.anfrage || (provisionData?.nachricht) || removeEmailQuotes(text),
+                    vsnName: email.vsnName || vsnName,
+                    antragsdatum: email.antragsdatum || '',
+                    // anfrage: Bei Standardmails nur "nachricht", sonst voller Text
+                    // Standardmail-Felder werden nicht angezeigt, nur die eigentliche Nachricht
+                    anfrage: (provisionData?.nachricht) || email.anfrage || text,
                     antwort: email.antwort || '',
                     kommentar: email.kommentar || '',
                     bearbeiter: email.bearbeiter || email.outlookKategorie || '',  // From saved or Outlook category
@@ -2883,8 +2903,19 @@
         }
 
         function extractVermittlernr(text) {
-            const match = text.match(/vermittler(?:nummer|nr)?[:\s]*(\d{5,10})/i);
-            return match ? match[1] : '';
+            // Pattern 1: "vermittlernummer: 12345" or similar
+            let match = text.match(/vermittler(?:nummer|nr)?[:\s]*(\d{5,10})/i);
+            if (match) return match[1];
+
+            // Pattern 2: "(0067/0813)" - BD-Nummer in parentheses
+            match = text.match(/\((\d{4}\/\d{4})\)/);
+            if (match) return match[1];
+
+            // Pattern 3: "0067/0813" - BD-Nummer standalone
+            match = text.match(/\b(\d{4}\/\d{4})\b/);
+            if (match) return match[1];
+
+            return '';
         }
 
         function extractVsnr(text) {
@@ -3201,6 +3232,8 @@
             document.getElementById('formAgentur').value = email.agentur;
             document.getElementById('formVermittlernr').value = email.vermittlernr;
             document.getElementById('formVsnr').value = email.vsnr;
+            document.getElementById('formVsnName').value = email.vsnName || '';
+            document.getElementById('formAntragsdatum').value = email.antragsdatum || '';
             document.getElementById('formBearbeiter').value = email.bearbeiter || '';
             document.getElementById('formAntwort').value = email.antwort;
             document.getElementById('formKommentar').value = email.kommentar;
