@@ -67,9 +67,14 @@ function writeEmailRow(worksheet, row, email) {
         anfrage = sanitizeForExcel(fixEncoding(email.text || ''));
     }
 
-    // BD-Nummer
+    // BD-Nummer - with fallback extraction from email text
     _writeRowCurrentField = 'BD-Nummer erstellen';
-    var bdNummer = sanitizeForExcel(pd.vermittlernummer_vermittler || email.vermittlernr || '');
+    var bdNummer = pd.vermittlernummer_vermittler || email.vermittlernr || '';
+    if (!bdNummer) {
+        // Fallback: try to extract from email text (pattern like "(0067/0813)")
+        bdNummer = extractBDNummerFromText(email.anfrage || email.text || '');
+    }
+    bdNummer = sanitizeForExcel(bdNummer);
 
     // Betreff
     _writeRowCurrentField = 'Betreff erstellen';

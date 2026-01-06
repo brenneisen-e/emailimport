@@ -2903,8 +2903,19 @@
         }
 
         function extractVermittlernr(text) {
-            const match = text.match(/vermittler(?:nummer|nr)?[:\s]*(\d{5,10})/i);
-            return match ? match[1] : '';
+            // Pattern 1: "vermittlernummer: 12345" or similar
+            let match = text.match(/vermittler(?:nummer|nr)?[:\s]*(\d{5,10})/i);
+            if (match) return match[1];
+
+            // Pattern 2: "(0067/0813)" - BD-Nummer in parentheses
+            match = text.match(/\((\d{4}\/\d{4})\)/);
+            if (match) return match[1];
+
+            // Pattern 3: "0067/0813" - BD-Nummer standalone
+            match = text.match(/\b(\d{4}\/\d{4})\b/);
+            if (match) return match[1];
+
+            return '';
         }
 
         function extractVsnr(text) {

@@ -356,3 +356,27 @@ function htmlToPlainText(html) {
 
     return text.trim();
 }
+
+/**
+ * Extract BD-Nummer (Vermittlernummer) from email text
+ * Looks for patterns like "(0067/0813)" or "0067/0813"
+ * @param {string} text - Email text to search
+ * @returns {string} Extracted BD-Nummer or empty string
+ */
+function extractBDNummerFromText(text) {
+    if (!text) return '';
+
+    // Pattern 1: (XXXX/XXXX) - in parentheses
+    var match = text.match(/\((\d{4}\/\d{4})\)/);
+    if (match) {
+        return match[1];
+    }
+
+    // Pattern 2: XXXX/XXXX - standalone
+    match = text.match(/\b(\d{4}\/\d{4})\b/);
+    if (match) {
+        return match[1];
+    }
+
+    return '';
+}
