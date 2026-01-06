@@ -190,7 +190,7 @@ function writeEmailRow(worksheet, row, email) {
 
     // NEW COLUMNS: Versicherungsnummer, Name VN, Antragsdatum
     _writeRowCurrentField = 'Spalte 7 (Versicherungsnummer)';
-    var versicherungsnr = sanitizeForExcel(email.vsnr || '');
+    var versicherungsnr = sanitizeForExcel(fixEncoding(email.vsnr || ''));
     worksheet.Cells(row, 7).Value = versicherungsnr;
 
     _writeRowCurrentField = 'Spalte 8 (Name Versicherungsnehmer)';
