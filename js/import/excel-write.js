@@ -56,24 +56,17 @@ function writeEmailRow(worksheet, row, email) {
     _writeRowCurrentField = 'Agentur erstellen';
     var agentur = sanitizeForExcel(fixEncoding(email.agentur || ''));
 
-    // Anfrage - Bei weitergeleiteten Standardmails den neuen Text extrahieren
+    // Anfrage - Bei Standardmails nur "nachricht", sonst voller Text
     _writeRowCurrentField = 'Anfrage erstellen';
     var anfrage = '';
-    var fullText = email.anfrage || email.text || '';
-
-    // Pruefen ob es eine weitergeleitete Mail mit neuem Text ist
-    var forwardedNewText = extractTextBeforeForward(fullText);
-    if (forwardedNewText && forwardedNewText.trim().length > 10) {
-        // Es gibt neuen Text VOR der Weiterleitung - diesen verwenden
-        anfrage = sanitizeForExcel(fixEncoding(forwardedNewText));
-    } else if (pd.nachricht) {
+    if (pd.nachricht) {
         // Standardmail: nur die eigentliche Nachricht anzeigen (nicht die strukturierten Felder)
         anfrage = sanitizeForExcel(fixEncoding(pd.nachricht));
     } else if (email.anfrage && email.anfrage.trim()) {
-        // Normale E-Mail: voller Text ohne Quote-Entfernung
+        // Normale/weitergeleitete E-Mail: voller Text
         anfrage = sanitizeForExcel(fixEncoding(email.anfrage));
     } else {
-        anfrage = sanitizeForExcel(fixEncoding(fullText));
+        anfrage = sanitizeForExcel(fixEncoding(email.text || ''));
     }
 
     // BD-Nummer - with fallback extraction from email text
