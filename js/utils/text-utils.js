@@ -380,3 +380,43 @@ function extractBDNummerFromText(text) {
 
     return '';
 }
+
+/**
+ * Extract text before forwarded content or provision data
+ * Used to get the "new" message when someone forwards an email
+ * @param {string} text - Full email text
+ * @returns {string} Text before forward marker, or empty string
+ */
+function extractTextBeforeForward(text) {
+    if (!text) return '';
+
+    // Patterns that indicate forwarded content or provision email structure
+    var forwardPatterns = [
+        /-{5,}\s*Weitergeleitete\s+Nachricht/i,
+        /-{5,}\s*Forwarded\s+Message/i,
+        /-{5,}\s*Original\s*Message/i,
+        /-{5,}\s*Urspr[uü]ngliche\s+Nachricht/i,
+        /_{5,}\s*\r?\n\s*Von:/i,
+        /\r?\n\s*Von:\s+[^\r\n]+\r?\n\s*Gesendet:/i,
+        /\r?\n\s*From:\s+[^\r\n]+\r?\n\s*Sent:/i,
+        // Provision email structure markers
+        /reklamation_provision\s*:/i,
+        /vorname_vermittler\s*:/i,
+        /vermittlernummer_vermittler\s*:/i
+    ];
+
+    var earliestMatch = text.length;
+
+    for (var i = 0; i < forwardPatterns.length; i++) {
+        var match = text.search(forwardPatterns[i]);
+        if (match > 0 && match < earliestMatch) {
+            earliestMatch = match;
+        }
+    }
+
+    if (earliestMatch < text.length && earliestMatch > 10) {
+        return text.substring(0, earliestMatch).trim();
+    }
+
+    return '';
+}
