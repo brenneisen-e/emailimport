@@ -2758,9 +2758,9 @@
                     vsnr: vsnr,
                     vsnName: email.vsnName || vsnName,
                     antragsdatum: email.antragsdatum || '',
-                    // anfrage: stored for text fallback (actual display uses HTML parsing)
-                    // WICHTIG: Anfrage behaelt vollen Text OHNE Quote-Entfernung - Kontext ist wichtig!
-                    anfrage: email.anfrage || (provisionData?.nachricht) || text,
+                    // anfrage: Bei Standardmails nur "nachricht", sonst voller Text
+                    // Standardmail-Felder werden nicht angezeigt, nur die eigentliche Nachricht
+                    anfrage: (provisionData?.nachricht) || email.anfrage || text,
                     antwort: email.antwort || '',
                     kommentar: email.kommentar || '',
                     bearbeiter: email.bearbeiter || email.outlookKategorie || '',  // From saved or Outlook category

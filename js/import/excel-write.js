@@ -56,13 +56,15 @@ function writeEmailRow(worksheet, row, email) {
     _writeRowCurrentField = 'Agentur erstellen';
     var agentur = sanitizeForExcel(fixEncoding(email.agentur || ''));
 
-    // Anfrage - VOLLER TEXT ohne Quote-Entfernung (erste Mail wird nie beschnitten!)
+    // Anfrage - Bei Standardmails nur die "nachricht", sonst voller Text
     _writeRowCurrentField = 'Anfrage erstellen';
     var anfrage = '';
-    if (email.anfrage && email.anfrage.trim()) {
-        anfrage = sanitizeForExcel(fixEncoding(email.anfrage));
-    } else if (pd.nachricht) {
+    if (pd.nachricht) {
+        // Standardmail: nur die eigentliche Nachricht anzeigen (nicht die strukturierten Felder)
         anfrage = sanitizeForExcel(fixEncoding(pd.nachricht));
+    } else if (email.anfrage && email.anfrage.trim()) {
+        // Normale E-Mail: voller Text ohne Quote-Entfernung
+        anfrage = sanitizeForExcel(fixEncoding(email.anfrage));
     } else {
         anfrage = sanitizeForExcel(fixEncoding(email.text || ''));
     }
