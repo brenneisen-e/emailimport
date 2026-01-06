@@ -52,6 +52,8 @@ function fixEncoding(text) {
     result = result.replace(/\u00C3\u00B4/g, '\u00F4');  // Ã´ -> ô
     result = result.replace(/\u00C3\u00BB/g, '\u00FB');  // Ã» -> û
     result = result.replace(/\u00C3\u00A7/g, '\u00E7');  // Ã§ -> ç
+    result = result.replace(/\u00C3\u00B1/g, '\u00F1');  // Ã± -> ñ (Spanish)
+    result = result.replace(/\u00C3\u0091/g, '\u00D1');  // Ã' -> Ñ (Spanish uppercase)
 
     // Triple-byte UTF-8 sequences double-encoded (arrows, quotes, etc.)
     // → (U+2192) = E2 86 92 in UTF-8 -> â†' when double-encoded
