@@ -403,9 +403,11 @@ function saveConversationExportWithData(stillInInbox) {
                 continue;
             }
 
-            // Pre-filter 2: Skip "Online-Abschluss Vermittlerzuordnung"
+            // Pre-filter 2: Skip "Online-Abschluss/Online-Antrag Vermittlerzuordnung" emails
             var convSubject = messages[0] ? messages[0].subject : '';
-            if ((convSubject || '').toLowerCase().indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+            var convSubjectLower = (convSubject || '').toLowerCase();
+            if ((convSubjectLower.indexOf('online-abschluss') !== -1 || convSubjectLower.indexOf('online-antrag') !== -1)
+                && convSubjectLower.indexOf('vermittlerzuordnung') !== -1) {
                 continue;
             }
 
@@ -469,7 +471,9 @@ function saveConversationExportWithData(stillInInbox) {
                     sentOnlyCount++;
                 } else {
                     var diagSubject = diagMessages[0] ? diagMessages[0].subject : '';
-                    if ((diagSubject || '').toLowerCase().indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+                    var diagSubjectLower = (diagSubject || '').toLowerCase();
+                    if ((diagSubjectLower.indexOf('online-abschluss') !== -1 || diagSubjectLower.indexOf('online-antrag') !== -1)
+                        && diagSubjectLower.indexOf('vermittlerzuordnung') !== -1) {
                         onlineAbschlussCount++;
                     }
                 }

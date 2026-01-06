@@ -1274,7 +1274,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 24px; color: #666; font-size: 12px;">
-                Version 3.0
+                Version 4.0
             </div>
         </div>
     </div>
@@ -1856,9 +1856,10 @@
                 const hasInboxMessage = messages.some(m => m.folder === 'inbox');
                 if (!hasInboxMessage) continue;
 
-                // Skip "Online-Abschluss Vermittlerzuordnung" emails - these are not needed
+                // Skip "Online-Abschluss/Online-Antrag Vermittlerzuordnung" emails - these are not needed
                 const convSubject = (conv.subject || '').toLowerCase();
-                if (convSubject.includes('online-abschluss vermittlerzuordnung')) continue;
+                if ((convSubject.includes('online-abschluss') || convSubject.includes('online-antrag'))
+                    && convSubject.includes('vermittlerzuordnung')) continue;
 
                 totalMessages += messages.length;
 
@@ -2680,10 +2681,14 @@
         }
 
         function processEmails(rawEmails) {
-            // Filter out emails with subject containing "Online-Abschluss Vermittlerzuordnung ändern"
+            // Filter out emails with subject containing "Online-Abschluss/Online-Antrag Vermittlerzuordnung"
             rawEmails = rawEmails.filter(email => {
                 const subject = (email.betreff || email.subject || '').toLowerCase();
-                return !subject.includes('online-abschluss vermittlerzuordnung ändern');
+                if ((subject.includes('online-abschluss') || subject.includes('online-antrag'))
+                    && subject.includes('vermittlerzuordnung')) {
+                    return false;
+                }
+                return true;
             });
 
             emails = rawEmails.map(email => {

@@ -125,6 +125,12 @@ function sanitizeForExcel(text) {
     // This prevents issues in HTA/JScript and Excel
     result = result.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
 
+    // Remove double-encoded emojis (4-byte UTF-8 misread as Windows-1252)
+    // Example: 😊 becomes ðŸ˜Š when UTF-8 bytes F0 9F 98 8A are read as Win-1252
+    result = result.replace(/\u00F0\u0178[\u0080-\u02FF][\u0080-\u017F]/g, '');  // ðŸ... patterns
+    result = result.replace(/\u00F0\u0152[\u0080-\u02FF][\u0080-\u017F]/g, '');  // ðœ... patterns
+    result = result.replace(/\u00F0\u0153[\u0080-\u02FF][\u0080-\u017F]/g, '');  // ð... patterns
+
     // Remove other problematic Unicode symbols
     result = result.replace(/[\u2600-\u26FF]/g, '');   // Misc symbols (sun, stars, etc.)
     result = result.replace(/[\u2700-\u27BF]/g, '');   // Dingbats

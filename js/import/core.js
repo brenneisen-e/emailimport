@@ -242,9 +242,10 @@ function convertConversationsToEmailArray(conversations) {
         var messages = conv.messages || [];
         if (messages.length === 0) continue;
 
-        // Skip "Online-Abschluss Vermittlerzuordnung" conversations (not needed)
+        // Skip "Online-Abschluss/Online-Antrag Vermittlerzuordnung" conversations (not needed)
         var convSubject = (conv.subject || '').toLowerCase();
-        if (convSubject.indexOf('online-abschluss vermittlerzuordnung') !== -1) continue;
+        if ((convSubject.indexOf('online-abschluss') !== -1 || convSubject.indexOf('online-antrag') !== -1)
+            && convSubject.indexOf('vermittlerzuordnung') !== -1) continue;
 
         // Sort by timestamp
         messages.sort(function(a, b) {

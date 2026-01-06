@@ -484,9 +484,10 @@ function createExportStructure(conversations, mailboxName, stillInInbox) {
             continue;
         }
 
-        // Filter 2: Skip "Online-Abschluss Vermittlerzuordnung" (not needed)
+        // Filter 2: Skip "Online-Abschluss/Online-Antrag Vermittlerzuordnung" (not needed)
         var subject = (conv.subject || '').toLowerCase();
-        if (subject.indexOf('online-abschluss vermittlerzuordnung') !== -1) {
+        if ((subject.indexOf('online-abschluss') !== -1 || subject.indexOf('online-antrag') !== -1)
+            && subject.indexOf('vermittlerzuordnung') !== -1) {
             skippedOnlineAbschluss++;
             continue;
         }

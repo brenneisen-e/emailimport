@@ -143,7 +143,10 @@ function processEmailBatch() {
 
             // Filter out specific subjects
             var subjectLower = (emailData.betreff || '').toLowerCase();
-            if (subjectLower.indexOf('online-abschluss vermittlerzuordnung ändern') !== -1) {
+            if (subjectLower.indexOf('online-abschluss') !== -1 && subjectLower.indexOf('vermittlerzuordnung') !== -1) {
+                continue;
+            }
+            if (subjectLower.indexOf('online-antrag') !== -1 && subjectLower.indexOf('vermittlerzuordnung') !== -1) {
                 continue;
             }
 
