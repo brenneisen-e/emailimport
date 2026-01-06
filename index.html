@@ -2754,7 +2754,8 @@
                     vsnName: email.vsnName || vsnName,
                     antragsdatum: email.antragsdatum || '',
                     // anfrage: stored for text fallback (actual display uses HTML parsing)
-                    anfrage: email.anfrage || (provisionData?.nachricht) || removeEmailQuotes(text),
+                    // WICHTIG: Anfrage behaelt vollen Text OHNE Quote-Entfernung - Kontext ist wichtig!
+                    anfrage: email.anfrage || (provisionData?.nachricht) || text,
                     antwort: email.antwort || '',
                     kommentar: email.kommentar || '',
                     bearbeiter: email.bearbeiter || email.outlookKategorie || '',  // From saved or Outlook category

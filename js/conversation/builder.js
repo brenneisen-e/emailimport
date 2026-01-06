@@ -618,6 +618,7 @@ function convertToLegacyFormat(conversations) {
         var sentOnlyConversation = !hasInboxRoot;
 
         // Normal processing: Build legacy email object
+        // WICHTIG: Bei der Anfrage (erste Mail) KEINE Zitate entfernen - der volle Kontext ist wichtig!
         var legacyEmail = {
             emailId: rootMsg.entryID,
             conversationId: convId,
@@ -625,7 +626,7 @@ function convertToLegacyFormat(conversations) {
             von_email: rootMsg.senderEmail,
             von_name: rootMsg.senderName,
             betreff: rootMsg.subject,
-            text: removeEmailQuotes(rootMsg.body || ''),
+            text: rootMsg.body || '',  // Voller Text OHNE Quote-Entfernung fuer Anfrage
             anhaenge: rootMsg.anhaenge || [],
             kategorie: rootMsg.kategorie || '',
             sentOnly: sentOnlyConversation,  // Flag for import to handle
