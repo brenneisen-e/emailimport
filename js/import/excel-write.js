@@ -19,8 +19,8 @@ function writeEmailRow(worksheet, row, email) {
     if (row > 2) {
         try {
             _writeRowCurrentField = 'Format kopieren';
-            var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 24));
-            var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 24));
+            var sourceRange = worksheet.Range(worksheet.Cells(row - 1, 1), worksheet.Cells(row - 1, 27));
+            var targetRange = worksheet.Range(worksheet.Cells(row, 1), worksheet.Cells(row, 27));
             sourceRange.Copy();
             targetRange.PasteSpecial(-4122); // xlPasteFormats
             try { worksheet.Application.CutCopyMode = false; } catch(e) {}
@@ -188,51 +188,64 @@ function writeEmailRow(worksheet, row, email) {
     _writeRowCurrentField = 'Spalte 6 (Agentur)';
     worksheet.Cells(row, 6).Value = agentur;
 
-    _writeRowCurrentField = 'Spalte 7 (Absender)';
-    worksheet.Cells(row, 7).Value = absender;
+    // NEW COLUMNS: Versicherungsnummer, Name VN, Antragsdatum
+    _writeRowCurrentField = 'Spalte 7 (Versicherungsnummer)';
+    var versicherungsnr = sanitizeForExcel(email.vsnr || '');
+    worksheet.Cells(row, 7).Value = versicherungsnr;
 
-    _writeRowCurrentField = 'Spalte 8 (Kategorie)';
-    worksheet.Cells(row, 8).Value = kategorie;
+    _writeRowCurrentField = 'Spalte 8 (Name Versicherungsnehmer)';
+    var vsnName = sanitizeForExcel(fixEncoding(email.vsnName || ''));
+    worksheet.Cells(row, 8).Value = vsnName;
 
-    _writeRowCurrentField = 'Spalte 9 (Status)';
-    worksheet.Cells(row, 9).Value = status;
+    _writeRowCurrentField = 'Spalte 9 (Antragsdatum)';
+    var antragsdatum = sanitizeForExcel(email.antragsdatum || '');
+    worksheet.Cells(row, 9).Value = antragsdatum;
 
-    _writeRowCurrentField = 'Spalte 10 (In Bearbeitung von)';
-    worksheet.Cells(row, 10).Value = bearbeiter;
+    _writeRowCurrentField = 'Spalte 10 (Absender)';
+    worksheet.Cells(row, 10).Value = absender;
 
-    _writeRowCurrentField = 'Spalte 11 (Cluster)';
-    worksheet.Cells(row, 11).Value = clusters;
+    _writeRowCurrentField = 'Spalte 11 (Kategorie)';
+    worksheet.Cells(row, 11).Value = kategorie;
 
-    _writeRowCurrentField = 'Spalte 12 (Betreff)';
-    worksheet.Cells(row, 12).Value = betreff;
+    _writeRowCurrentField = 'Spalte 12 (Status)';
+    worksheet.Cells(row, 12).Value = status;
 
-    _writeRowCurrentField = 'Spalte 13 (Anfrage)';
+    _writeRowCurrentField = 'Spalte 13 (In Bearbeitung von)';
+    worksheet.Cells(row, 13).Value = bearbeiter;
+
+    _writeRowCurrentField = 'Spalte 14 (Cluster)';
+    worksheet.Cells(row, 14).Value = clusters;
+
+    _writeRowCurrentField = 'Spalte 15 (Betreff)';
+    worksheet.Cells(row, 15).Value = betreff;
+
+    _writeRowCurrentField = 'Spalte 16 (Anfrage)';
     // Truncate and sanitize for Excel (max 30000 chars for safety)
     var safeAnfrage = truncateForExcel(sanitizeForExcel(fixEncoding(anfrage)), 30000);
-    worksheet.Cells(row, 13).Value = safeAnfrage;
+    worksheet.Cells(row, 16).Value = safeAnfrage;
 
-    _writeRowCurrentField = 'Spalte 14 (Antwort)';
+    _writeRowCurrentField = 'Spalte 17 (Antwort)';
     // Truncate and sanitize for Excel (max 30000 chars for safety)
     var safeAntwort = truncateForExcel(sanitizeForExcel(fixEncoding(antwortText)), 30000);
-    worksheet.Cells(row, 14).Value = safeAntwort;
+    worksheet.Cells(row, 17).Value = safeAntwort;
 
     // Bold timestamps in reply cell
     _writeRowCurrentField = 'Timestamps fetten';
-    boldTimestamps(worksheet.Cells(row, 14));
+    boldTimestamps(worksheet.Cells(row, 17));
 
-    _writeRowCurrentField = 'Spalte 15-20 (leer)';
-    // Columns 15-20 reserved
+    _writeRowCurrentField = 'Spalte 18-23 (leer)';
+    // Columns 18-23 reserved
 
-    _writeRowCurrentField = 'Spalte 21 (Kommentar)';
-    worksheet.Cells(row, 21).Value = kommentar;
+    _writeRowCurrentField = 'Spalte 24 (Kommentar)';
+    worksheet.Cells(row, 24).Value = kommentar;
 
-    _writeRowCurrentField = 'Spalte 22 (ConversationID)';
-    worksheet.Cells(row, 22).Value = email.conversationId || '';
+    _writeRowCurrentField = 'Spalte 25 (ConversationID)';
+    worksheet.Cells(row, 25).Value = email.conversationId || '';
 
-    _writeRowCurrentField = 'Spalte 23 (EmailID)';
-    worksheet.Cells(row, 23).Value = email.emailId || '';
+    _writeRowCurrentField = 'Spalte 26 (EmailID)';
+    worksheet.Cells(row, 26).Value = email.emailId || '';
 
-    _writeRowCurrentField = 'Spalte 24 (ReplyIDs)';
+    _writeRowCurrentField = 'Spalte 27 (ReplyIDs)';
     var replyIdList = [];
     if (email.antworten) {
         for (var ri = 0; ri < email.antworten.length; ri++) {
@@ -241,7 +254,7 @@ function writeEmailRow(worksheet, row, email) {
             }
         }
     }
-    worksheet.Cells(row, 24).Value = replyIdList.join(',');
+    worksheet.Cells(row, 27).Value = replyIdList.join(',');
 
     _writeRowCurrentField = 'Fertig';
 }
@@ -350,8 +363,8 @@ function readExistingData(worksheet) {
 
         for (var row = 2; row <= lastRow; row++) {
             var datum = worksheet.Cells(row, 2).Value || '';
-            var betreff = worksheet.Cells(row, 12).Value || '';  // Column 12 = Betreff
-            var conversationId = worksheet.Cells(row, 22).Value || '';  // Column 22 = ConversationID
+            var betreff = worksheet.Cells(row, 15).Value || '';  // Column 15 = Betreff (shifted +3)
+            var conversationId = worksheet.Cells(row, 25).Value || '';  // Column 25 = ConversationID (shifted +3)
 
             // Track by date+subject
             if (datum || betreff) {
