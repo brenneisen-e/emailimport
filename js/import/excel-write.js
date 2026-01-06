@@ -61,7 +61,9 @@ function writeEmailRow(worksheet, row, email) {
     var anfrage = '';
     if (pd.nachricht) {
         // Standardmail: nur die eigentliche Nachricht anzeigen (nicht die strukturierten Felder)
-        anfrage = sanitizeForExcel(fixEncoding(pd.nachricht));
+        // Zitate entfernen falls jemand weitergeleitete Inhalte eingefuegt hat
+        anfrage = removeQuotedContent(pd.nachricht);
+        anfrage = sanitizeForExcel(fixEncoding(anfrage));
     } else if (email.anfrage && email.anfrage.trim()) {
         // Normale E-Mail: voller Text ohne Quote-Entfernung
         anfrage = sanitizeForExcel(fixEncoding(email.anfrage));
