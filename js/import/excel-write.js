@@ -56,14 +56,17 @@ function writeEmailRow(worksheet, row, email) {
     _writeRowCurrentField = 'Agentur erstellen';
     var agentur = sanitizeForExcel(fixEncoding(email.agentur || ''));
 
-    // Anfrage - Bei Standardmails nur "nachricht", sonst voller Text
+    // Anfrage - Bei echten Standardmails nur "nachricht", bei WG/AW voller Text
     _writeRowCurrentField = 'Anfrage erstellen';
     var anfrage = '';
-    if (pd.nachricht) {
-        // Standardmail: nur die eigentliche Nachricht anzeigen (nicht die strukturierten Felder)
+    var betreffLower = (email.betreff || '').toLowerCase().trim();
+    var isForwardedOrReply = /^(wg|fw|fwd|aw|re|antwort|antw):/i.test(betreffLower);
+
+    if (pd.nachricht && !isForwardedOrReply) {
+        // Echte Standardmail (kein WG/AW): nur die eigentliche Nachricht
         anfrage = sanitizeForExcel(fixEncoding(pd.nachricht));
     } else if (email.anfrage && email.anfrage.trim()) {
-        // Normale/weitergeleitete E-Mail: voller Text
+        // Weitergeleitete/beantwortete E-Mail oder normale E-Mail: voller Text
         anfrage = sanitizeForExcel(fixEncoding(email.anfrage));
     } else {
         anfrage = sanitizeForExcel(fixEncoding(email.text || ''));
