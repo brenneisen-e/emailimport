@@ -359,20 +359,32 @@ function htmlToPlainText(html) {
 
 /**
  * Extract BD-Nummer (Vermittlernummer) from email text
- * Looks for patterns like "(0067/0813)" or "0067/0813"
+ * Looks for patterns like "(0067/0813)" or "0067/0813" or "Vermittler:0062/0654"
  * @param {string} text - Email text to search
  * @returns {string} Extracted BD-Nummer or empty string
  */
 function extractBDNummerFromText(text) {
     if (!text) return '';
 
-    // Pattern 1: (XXXX/XXXX) - in parentheses
-    var match = text.match(/\((\d{4}\/\d{4})\)/);
+    // Pattern 1: "Vermittler:XXXX/XXXX" or "Vermittler: XXXX/XXXX" (from subject lines)
+    var match = text.match(/vermittler\s*:?\s*(\d{4}\/\d{4})/i);
     if (match) {
         return match[1];
     }
 
-    // Pattern 2: XXXX/XXXX - standalone
+    // Pattern 2: (XXXX/XXXX) - in parentheses
+    match = text.match(/\((\d{4}\/\d{4})\)/);
+    if (match) {
+        return match[1];
+    }
+
+    // Pattern 3: "der XXXX/XXXX" or "für XXXX/XXXX" - with article
+    match = text.match(/(?:der|für|fuer|die)\s+(\d{4}\/\d{4})/i);
+    if (match) {
+        return match[1];
+    }
+
+    // Pattern 4: XXXX/XXXX - standalone
     match = text.match(/\b(\d{4}\/\d{4})\b/);
     if (match) {
         return match[1];
@@ -389,6 +401,8 @@ function extractBDNummerFromText(text) {
  * - "Vers.Nr.: 12345678"
  * - "Wohngebäudeversicherung 116996046"
  * - "Vertrag 123456789"
+ * - URL parameter "versno=06962902Z00"
+ * - Standalone "06 962 902 Z 00" format
  * @param {string} text - Email text to search
  * @returns {string} Extracted Versicherungsnummer or empty string
  */
@@ -413,21 +427,64 @@ function extractVsnrFromText(text) {
         return match[1].trim();
     }
 
-    // Pattern 4: Insurance type followed by number (e.g., "Wohngebäudeversicherung 116996046")
+    // Pattern 4: URL parameter "versno=XXXXXXXX" (from Barmenia links)
+    match = text.match(/versno=(\d{8,12}[A-Z]?\d{0,2})/i);
+    if (match) {
+        // Format nicely: 06962902Z00 -> 06 962 902 Z 00
+        var raw = match[1];
+        if (raw.length >= 8) {
+            var formatted = raw.replace(/(\d{2})(\d{3})(\d{3})([A-Z]?)(\d{0,2})/, '$1 $2 $3 $4 $5').trim();
+            return formatted;
+        }
+        return raw;
+    }
+
+    // Pattern 5: Standalone VSNR format "XX XXX XXX X XX" or "XX XXX XXX XX" (with letter)
+    match = text.match(/\b(\d{2}\s+\d{3}\s+\d{3}\s+[A-Z]?\s*\d{0,2})\b/);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 6: Insurance type followed by number (e.g., "Wohngebäudeversicherung 116996046")
     // Matches: Wohngebäude-, Hausrat-, Haftpflicht-, KFZ-, Kranken-, Leben(s)-, Unfall-, Rechtsschutz-versicherung
     match = text.match(/(?:wohngebäude|wohngebaude|hausrat|haftpflicht|kfz|kranken|lebens?|unfall|rechtsschutz|gebäude|gebaude)(?:versicherung)?\s+(\d{6,12})/i);
     if (match) {
         return match[1].trim();
     }
 
-    // Pattern 5: "Vertrag" or "Vertragsnummer" followed by number
+    // Pattern 7: "Vertrag" or "Vertragsnummer" followed by number
     match = text.match(/vertrags?(?:nummer|nr)?\.?\s*:?\s*(\d{6,12})/i);
     if (match) {
         return match[1].trim();
     }
 
-    // Pattern 6: "o.a. Vertrag" (oben angeführter Vertrag) - number before it
+    // Pattern 8: Number before verbs like "musste/wurde/ist/hat"
     match = text.match(/(\d{6,12})\s+(?:musste|wurde|ist|hat)/i);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 9: Standalone 9-digit numbers (typical VSNR format)
+    // Look for numbers on their own line or after "abgeschlossen:" context
+    match = text.match(/(?:abgeschlossen|verträge?|vertrag)[\s\S]{0,50}?(\d{9})/i);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 10: 9-digit number at start of line or after newline
+    match = text.match(/(?:^|\n)\s*(\d{9})\s*(?:\n|$|und)/m);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 11: VSNR format in subject like "02575202X00" (8 digits + X + 2 digits)
+    match = text.match(/\b(\d{8}[A-Z]\d{2})\b/);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 12: VSNR at start of subject/text (before "//")
+    match = text.match(/^(\d{8,11}[A-Z]?\d{0,2})(?:\s|\/\/)/);
     if (match) {
         return match[1].trim();
     }
@@ -506,6 +563,22 @@ function extractVsnNameFromText(text) {
     if (!fullName) {
         // Pattern 6: "für XXX" (e.g., "Provision für Max Mustermann")
         var match = text.match(/(?:provision|vertrag|antrag)\s+(?:für|fuer)\s+([A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ][a-zäöüß]+)/i);
+        if (match) {
+            fullName = match[1].trim();
+        }
+    }
+
+    if (!fullName) {
+        // Pattern 7: "Frau/Herr XXX" (e.g., "Frau Berns kam heute")
+        var match = text.match(/(?:frau|herr)\s+([A-ZÄÖÜ][a-zäöüß]+)(?:\s+(?:kam|hat|ist|wurde|möchte))?/i);
+        if (match) {
+            fullName = match[1].trim();
+        }
+    }
+
+    if (!fullName) {
+        // Pattern 8: "unsere Kundin/unser Kunde XXX" or "die Kundin/der Kunde XXX"
+        var match = text.match(/(?:unsere?|die|der)\s+(?:kundin|kunde)\s+(?:frau|herr)?\s*([A-ZÄÖÜ][a-zäöüß]+)/i);
         if (match) {
             fullName = match[1].trim();
         }

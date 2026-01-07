@@ -83,9 +83,13 @@ function writeEmailRow(worksheet, row, email) {
         anfrage = sanitizeForExcel(fixEncoding(email.text || ''));
     }
 
-    // BD-Nummer - with fallback extraction from email text
+    // BD-Nummer - with fallback extraction from email text and subject
     _writeRowCurrentField = 'BD-Nummer erstellen';
     var bdNummer = pd.vermittlernummer_vermittler || email.vermittlernr || '';
+    if (!bdNummer) {
+        // Fallback: try to extract from subject first (often contains "Vermittler:XXXX/XXXX")
+        bdNummer = extractBDNummerFromText(email.betreff || '');
+    }
     if (!bdNummer) {
         // Fallback: try to extract from email text (pattern like "(0067/0813)")
         bdNummer = extractBDNummerFromText(email.anfrage || email.text || '');
@@ -218,6 +222,10 @@ function writeEmailRow(worksheet, row, email) {
     // Fallback: Try to extract from provisionData
     if (!versicherungsnr && pd.versicherungsnummer_kunde) {
         versicherungsnr = pd.versicherungsnummer_kunde;
+    }
+    // Fallback: Try to extract from subject first (often contains VSNR like "02575202X00 // AE")
+    if (!versicherungsnr) {
+        versicherungsnr = extractVsnrFromText(email.betreff || '');
     }
     // Fallback: Try to extract from email text (handles Frage_BAP format etc.)
     if (!versicherungsnr) {
