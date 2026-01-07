@@ -54,7 +54,17 @@ function writeEmailRow(worksheet, row, email) {
 
     // Agentur
     _writeRowCurrentField = 'Agentur erstellen';
-    var agentur = sanitizeForExcel(fixEncoding(email.agentur || ''));
+    var agentur = email.agentur || '';
+    // Wenn Agentur "Aussendienst" oder "Sarina Ebert" ist, nutze den Absendernamen der ersten Mail
+    var agenturLower = agentur.toLowerCase().trim();
+    if (agenturLower === 'aussendienst' || agenturLower === 'sarina ebert' || !agentur) {
+        // Fallback: Absendername der ersten E-Mail (wahrscheinlich die eigentliche Agentur)
+        var senderName = email.von_name || '';
+        if (senderName && senderName.toLowerCase() !== 'aussendienst' && senderName.toLowerCase() !== 'sarina ebert') {
+            agentur = senderName;
+        }
+    }
+    agentur = sanitizeForExcel(fixEncoding(agentur));
 
     // Anfrage - Bei echten Standardmails nur "nachricht", sonst voller Text
     _writeRowCurrentField = 'Anfrage erstellen';
@@ -73,9 +83,13 @@ function writeEmailRow(worksheet, row, email) {
         anfrage = sanitizeForExcel(fixEncoding(email.text || ''));
     }
 
-    // BD-Nummer - with fallback extraction from email text
+    // BD-Nummer - with fallback extraction from email text and subject
     _writeRowCurrentField = 'BD-Nummer erstellen';
     var bdNummer = pd.vermittlernummer_vermittler || email.vermittlernr || '';
+    if (!bdNummer) {
+        // Fallback: try to extract from subject first (often contains "Vermittler:XXXX/XXXX")
+        bdNummer = extractBDNummerFromText(email.betreff || '');
+    }
     if (!bdNummer) {
         // Fallback: try to extract from email text (pattern like "(0067/0813)")
         bdNummer = extractBDNummerFromText(email.anfrage || email.text || '');
@@ -200,12 +214,37 @@ function writeEmailRow(worksheet, row, email) {
     worksheet.Cells(row, 6).Value = agentur;
 
     // NEW COLUMNS: Versicherungsnummer, Name VN, Antragsdatum
+    // Source text for extraction (anfrage text or email text)
+    var sourceText = email.anfrage || email.text || '';
+
     _writeRowCurrentField = 'Spalte 7 (Versicherungsnummer)';
-    var versicherungsnr = sanitizeForExcel(fixEncoding(email.vsnr || ''));
+    var versicherungsnr = email.vsnr || '';
+    // Fallback: Try to extract from provisionData
+    if (!versicherungsnr && pd.versicherungsnummer_kunde) {
+        versicherungsnr = pd.versicherungsnummer_kunde;
+    }
+    // Fallback: Try to extract from subject first (often contains VSNR like "02575202X00 // AE")
+    if (!versicherungsnr) {
+        versicherungsnr = extractVsnrFromText(email.betreff || '');
+    }
+    // Fallback: Try to extract from email text (handles Frage_BAP format etc.)
+    if (!versicherungsnr) {
+        versicherungsnr = extractVsnrFromText(sourceText);
+    }
+    versicherungsnr = sanitizeForExcel(fixEncoding(versicherungsnr));
     worksheet.Cells(row, 7).Value = versicherungsnr;
 
     _writeRowCurrentField = 'Spalte 8 (Name Versicherungsnehmer)';
-    var vsnName = sanitizeForExcel(fixEncoding(email.vsnName || ''));
+    var vsnName = email.vsnName || '';
+    // Fallback: Try to extract from provisionData
+    if (!vsnName && (pd.vorname_kunde || pd.nachname_kunde)) {
+        vsnName = ((pd.vorname_kunde || '') + ' ' + (pd.nachname_kunde || '')).trim();
+    }
+    // Fallback: Try to extract from email text (handles Frage_BAP format etc.)
+    if (!vsnName) {
+        vsnName = extractVsnNameFromText(sourceText);
+    }
+    vsnName = sanitizeForExcel(fixEncoding(vsnName));
     worksheet.Cells(row, 8).Value = vsnName;
 
     _writeRowCurrentField = 'Spalte 9 (Antragsdatum)';
