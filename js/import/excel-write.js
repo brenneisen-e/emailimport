@@ -54,7 +54,17 @@ function writeEmailRow(worksheet, row, email) {
 
     // Agentur
     _writeRowCurrentField = 'Agentur erstellen';
-    var agentur = sanitizeForExcel(fixEncoding(email.agentur || ''));
+    var agentur = email.agentur || '';
+    // Wenn Agentur "Aussendienst" oder "Sarina Ebert" ist, nutze den Absendernamen der ersten Mail
+    var agenturLower = agentur.toLowerCase().trim();
+    if (agenturLower === 'aussendienst' || agenturLower === 'sarina ebert' || !agentur) {
+        // Fallback: Absendername der ersten E-Mail (wahrscheinlich die eigentliche Agentur)
+        var senderName = email.von_name || '';
+        if (senderName && senderName.toLowerCase() !== 'aussendienst' && senderName.toLowerCase() !== 'sarina ebert') {
+            agentur = senderName;
+        }
+    }
+    agentur = sanitizeForExcel(fixEncoding(agentur));
 
     // Anfrage - Bei echten Standardmails nur "nachricht", sonst voller Text
     _writeRowCurrentField = 'Anfrage erstellen';
