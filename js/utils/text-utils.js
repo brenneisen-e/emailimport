@@ -381,3 +381,78 @@ function extractBDNummerFromText(text) {
     return '';
 }
 
+/**
+ * Extract Versicherungsnummer from email text
+ * Handles multiple formats:
+ * - "versicherungsnummer : 08 728 482 A 01"
+ * - "versicherungsnummer_kunde : 123456"
+ * - "Vers.Nr.: 12345678"
+ * @param {string} text - Email text to search
+ * @returns {string} Extracted Versicherungsnummer or empty string
+ */
+function extractVsnrFromText(text) {
+    if (!text) return '';
+
+    // Pattern 1: "versicherungsnummer : XX XXX XXX X XX" (with spaces)
+    var match = text.match(/versicherungsnummer\s*:\s*([0-9A-Za-z\s\/\-]+?)(?:\n|$|(?=\s+[a-z\-_]+\s*:))/i);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 2: "versicherungsnummer_kunde : XXXXX"
+    match = text.match(/versicherungsnummer_kunde\s*:\s*([^\n]+?)(?:\n|$|(?=\s+[a-z\-_]+\s*:))/i);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 3: "Vers.Nr." or "Versicherungsnr" followed by number
+    match = text.match(/vers(?:icherungs)?\.?\s*(?:nr|nummer)\.?\s*:?\s*([0-9A-Za-z\s\/\-]{5,20})/i);
+    if (match) {
+        return match[1].trim();
+    }
+
+    return '';
+}
+
+/**
+ * Extract Versicherungsnehmer name from email text
+ * Handles multiple formats:
+ * - "vorname : Bernd" + "nachname : Scheel"
+ * - "vorname_kunde : Bernd" + "nachname_kunde : Scheel"
+ * @param {string} text - Email text to search
+ * @returns {string} Extracted name (Vorname Nachname) or empty string
+ */
+function extractVsnNameFromText(text) {
+    if (!text) return '';
+
+    var vorname = '';
+    var nachname = '';
+
+    // Pattern 1: "vorname : XXX" (without _kunde suffix)
+    var matchVorname = text.match(/(?:^|\n)\s*vorname\s*:\s*([^\n]+?)(?:\n|$|(?=\s+[a-z\-_]+\s*:))/i);
+    if (matchVorname) {
+        vorname = matchVorname[1].trim();
+    }
+
+    // Pattern 2: "nachname : XXX" (without _kunde suffix)
+    var matchNachname = text.match(/(?:^|\n)\s*nachname\s*:\s*([^\n]+?)(?:\n|$|(?=\s+[a-z\-_]+\s*:))/i);
+    if (matchNachname) {
+        nachname = matchNachname[1].trim();
+    }
+
+    // Fallback: Pattern with _kunde suffix
+    if (!vorname) {
+        matchVorname = text.match(/vorname_kunde\s*:\s*([^\n]+?)(?:\n|$|(?=\s+[a-z\-_]+\s*:))/i);
+        if (matchVorname) vorname = matchVorname[1].trim();
+    }
+
+    if (!nachname) {
+        matchNachname = text.match(/nachname_kunde\s*:\s*([^\n]+?)(?:\n|$|(?=\s+[a-z\-_]+\s*:))/i);
+        if (matchNachname) nachname = matchNachname[1].trim();
+    }
+
+    // Combine name
+    var fullName = ((vorname || '') + ' ' + (nachname || '')).trim();
+    return fullName;
+}
+

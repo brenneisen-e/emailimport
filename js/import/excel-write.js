@@ -200,12 +200,33 @@ function writeEmailRow(worksheet, row, email) {
     worksheet.Cells(row, 6).Value = agentur;
 
     // NEW COLUMNS: Versicherungsnummer, Name VN, Antragsdatum
+    // Source text for extraction (anfrage text or email text)
+    var sourceText = email.anfrage || email.text || '';
+
     _writeRowCurrentField = 'Spalte 7 (Versicherungsnummer)';
-    var versicherungsnr = sanitizeForExcel(fixEncoding(email.vsnr || ''));
+    var versicherungsnr = email.vsnr || '';
+    // Fallback: Try to extract from provisionData
+    if (!versicherungsnr && pd.versicherungsnummer_kunde) {
+        versicherungsnr = pd.versicherungsnummer_kunde;
+    }
+    // Fallback: Try to extract from email text (handles Frage_BAP format etc.)
+    if (!versicherungsnr) {
+        versicherungsnr = extractVsnrFromText(sourceText);
+    }
+    versicherungsnr = sanitizeForExcel(fixEncoding(versicherungsnr));
     worksheet.Cells(row, 7).Value = versicherungsnr;
 
     _writeRowCurrentField = 'Spalte 8 (Name Versicherungsnehmer)';
-    var vsnName = sanitizeForExcel(fixEncoding(email.vsnName || ''));
+    var vsnName = email.vsnName || '';
+    // Fallback: Try to extract from provisionData
+    if (!vsnName && (pd.vorname_kunde || pd.nachname_kunde)) {
+        vsnName = ((pd.vorname_kunde || '') + ' ' + (pd.nachname_kunde || '')).trim();
+    }
+    // Fallback: Try to extract from email text (handles Frage_BAP format etc.)
+    if (!vsnName) {
+        vsnName = extractVsnNameFromText(sourceText);
+    }
+    vsnName = sanitizeForExcel(fixEncoding(vsnName));
     worksheet.Cells(row, 8).Value = vsnName;
 
     _writeRowCurrentField = 'Spalte 9 (Antragsdatum)';
