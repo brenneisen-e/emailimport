@@ -387,6 +387,8 @@ function extractBDNummerFromText(text) {
  * - "versicherungsnummer : 08 728 482 A 01"
  * - "versicherungsnummer_kunde : 123456"
  * - "Vers.Nr.: 12345678"
+ * - "Wohngebäudeversicherung 116996046"
+ * - "Vertrag 123456789"
  * @param {string} text - Email text to search
  * @returns {string} Extracted Versicherungsnummer or empty string
  */
@@ -411,6 +413,25 @@ function extractVsnrFromText(text) {
         return match[1].trim();
     }
 
+    // Pattern 4: Insurance type followed by number (e.g., "Wohngebäudeversicherung 116996046")
+    // Matches: Wohngebäude-, Hausrat-, Haftpflicht-, KFZ-, Kranken-, Leben(s)-, Unfall-, Rechtsschutz-versicherung
+    match = text.match(/(?:wohngebäude|wohngebaude|hausrat|haftpflicht|kfz|kranken|lebens?|unfall|rechtsschutz|gebäude|gebaude)(?:versicherung)?\s+(\d{6,12})/i);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 5: "Vertrag" or "Vertragsnummer" followed by number
+    match = text.match(/vertrags?(?:nummer|nr)?\.?\s*:?\s*(\d{6,12})/i);
+    if (match) {
+        return match[1].trim();
+    }
+
+    // Pattern 6: "o.a. Vertrag" (oben angeführter Vertrag) - number before it
+    match = text.match(/(\d{6,12})\s+(?:musste|wurde|ist|hat)/i);
+    if (match) {
+        return match[1].trim();
+    }
+
     return '';
 }
 
@@ -419,6 +440,9 @@ function extractVsnrFromText(text) {
  * Handles multiple formats:
  * - "vorname : Bernd" + "nachname : Scheel"
  * - "vorname_kunde : Bernd" + "nachname_kunde : Scheel"
+ * - "Markus Stöber ist Bestandskunde"
+ * - "Kunde: Max Mustermann"
+ * - "von Max Mustermann"
  * @param {string} text - Email text to search
  * @returns {string} Extracted name (Vorname Nachname) or empty string
  */
@@ -451,8 +475,42 @@ function extractVsnNameFromText(text) {
         if (matchNachname) nachname = matchNachname[1].trim();
     }
 
-    // Combine name
+    // Combine name from vorname/nachname fields
     var fullName = ((vorname || '') + ' ' + (nachname || '')).trim();
+
+    // If no name found yet, try other patterns
+    if (!fullName) {
+        // Pattern 3: "XXX ist Bestandskunde" or "XXX ist Kunde" or "XXX ist Neukunde"
+        var match = text.match(/([A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ][a-zäöüß]+)\s+ist\s+(?:Bestands?|Neu)?kunde/i);
+        if (match) {
+            fullName = match[1].trim();
+        }
+    }
+
+    if (!fullName) {
+        // Pattern 4: "Kunde: XXX" or "Kundenname: XXX" or "VN: XXX"
+        var match = text.match(/(?:kunde|kundenname|versicherungsnehmer|vn)\s*:\s*([A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ][a-zäöüß]+)/i);
+        if (match) {
+            fullName = match[1].trim();
+        }
+    }
+
+    if (!fullName) {
+        // Pattern 5: "von XXX" at start of sentence (e.g., "Gebäudeversicherung von Max Mustermann")
+        var match = text.match(/versicherung\s+von\s+([A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ][a-zäöüß]+)/i);
+        if (match) {
+            fullName = match[1].trim();
+        }
+    }
+
+    if (!fullName) {
+        // Pattern 6: "für XXX" (e.g., "Provision für Max Mustermann")
+        var match = text.match(/(?:provision|vertrag|antrag)\s+(?:für|fuer)\s+([A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ][a-zäöüß]+)/i);
+        if (match) {
+            fullName = match[1].trim();
+        }
+    }
+
     return fullName;
 }
 
