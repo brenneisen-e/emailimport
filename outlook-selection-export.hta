@@ -859,13 +859,12 @@
                     emails: emails
                 };
 
-                var stream = new ActiveXObject("ADODB.Stream");
-                stream.Type = 2;
-                stream.Charset = "UTF-8";
-                stream.Open();
-                stream.WriteText(JSON.stringify(exportData, null, 2));
-                stream.SaveToFile(filename, 2);
-                stream.Close();
+                var jsonContent = JSON.stringify(exportData, null, 2);
+
+                // Use FileSystemObject with Unicode (same as main tool)
+                var file = fso.CreateTextFile(filename, true, true);
+                file.Write(jsonContent);
+                file.Close();
 
                 document.getElementById('progressContainer').style.display = 'none';
                 document.getElementById('successStatus').style.display = 'block';
