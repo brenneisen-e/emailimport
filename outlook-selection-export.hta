@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>BGAV Email Export Tool</title>
+    <HTA:APPLICATION
+        ID="BGAV_Selection_Export"
+        APPLICATIONNAME="BGAV Email Export Tool"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="no"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .logo {
+            font-size: 48px;
+            margin-bottom: 0.5rem;
+        }
+        h2 { color: #f1f5f9; margin-bottom: 0.5rem; }
+        .subtitle { color: #94a3b8; font-size: 14px; }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 4px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .mode-btn.active {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+        }
+        .mode-btn:hover:not(.active) {
+            background: rgba(255,255,255,0.1);
+        }
+
+        /* Mode Sections */
+        .mode-section {
+            display: none;
+        }
+        .mode-section.active {
+            display: block;
+        }
+
+        /* Step Indicator */
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+        }
+        .step-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+        .step-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 6px;
+            transition: all 0.3s ease;
+        }
+        .step-circle.pending {
+            background: #374151;
+            color: #9ca3af;
+            border: 2px solid #4b5563;
+        }
+        .step-circle.active {
+            background: #6366f1;
+            color: white;
+            border: 2px solid #818cf8;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+            animation: pulse 2s infinite;
+        }
+        .step-circle.completed {
+            background: #10b981;
+            color: white;
+            border: 2px solid #34d399;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.8); }
+        }
+        .step-label {
+            font-size: 10px;
+            color: #94a3b8;
+            text-align: center;
+        }
+        .step-arrow {
+            color: #4b5563;
+            font-size: 16px;
+            margin: 0 8px;
+            margin-bottom: 18px;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: linear-gradient(135deg, #1e3a5f 0%, #1e3a8a 100%);
+            border: 1px solid #3b82f6;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .info-box h3 {
+            color: #60a5fa;
+            font-size: 13px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-box ol, .info-box ul {
+            margin-left: 1.25rem;
+            color: #cbd5e1;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+        .info-box .highlight {
+            background: rgba(59, 130, 246, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        /* Form Elements */
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            background: #1e293b;
+            color: #f1f5f9;
+            font-size: 14px;
+            margin-bottom: 1rem;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        /* Selection Info */
+        .selection-info {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            text-align: center;
+        }
+        .selection-count {
+            font-size: 42px;
+            font-weight: bold;
+            color: #6366f1;
+            margin-bottom: 0.25rem;
+        }
+        .selection-label {
+            color: #94a3b8;
+            font-size: 13px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 0.75rem;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
+            transform: translateY(-1px);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        .btn-success:hover:not(:disabled) {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+        }
+        .btn-secondary {
+            background: #374151;
+            color: #f1f5f9;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: #4b5563;
+        }
+
+        /* Progress */
+        .progress-container {
+            display: none;
+            margin: 1rem 0;
+        }
+        .progress-bar {
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-text {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+
+        /* Status Messages */
+        .status {
+            display: none;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .status.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #34d399;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #f87171;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: none;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        .action-buttons .btn {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        /* Email List Preview */
+        .email-preview {
+            max-height: 180px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-top: 1rem;
+            font-size: 11px;
+        }
+        .email-preview-item {
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .email-preview-item:last-child {
+            border-bottom: none;
+        }
+        .email-preview-subject {
+            color: #f1f5f9;
+            font-weight: 500;
+        }
+        .email-preview-from {
+            color: #94a3b8;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">&#9993;</div>
+                <h2>Emails exportieren</h2>
+                <p class="subtitle">Ausgewaehlte oder letzte Emails als JSON speichern</p>
+            </div>
+
+            <!-- Mode Toggle -->
+            <div class="mode-toggle">
+                <button class="mode-btn active" onclick="switchMode('selection')">&#9745; Markierte Emails</button>
+                <button class="mode-btn" onclick="switchMode('mailbox')">&#128229; Letzte X Emails</button>
+            </div>
+
+            <!-- ================== MODE 1: SELECTION ================== -->
+            <div class="mode-section active" id="modeSelection">
+                <div class="step-indicator">
+                    <div class="step-wrapper">
+                        <div class="step-circle active" id="selStep1">1</div>
+                        <div class="step-label">Markieren</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle pending" id="selStep2">2</div>
+                        <div class="step-label">Pruefen</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle pending" id="selStep3">3</div>
+                        <div class="step-label">Export</div>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <h3>&#128161; So geht's:</h3>
+                    <ol>
+                        <li>In <span class="highlight">Outlook</span> Emails markieren (Strg+Klick)</li>
+                        <li>Hier auf <span class="highlight">"Auswahl pruefen"</span> klicken</li>
+                        <li>Vorschau pruefen und <span class="highlight">exportieren</span></li>
+                    </ol>
+                </div>
+
+                <div class="selection-info">
+                    <div class="selection-count" id="selectionCount">-</div>
+                    <div class="selection-label" id="selectionLabel">Emails markiert</div>
+                </div>
+
+                <button class="btn btn-primary" id="btnCheckSelection" onclick="checkSelection()">
+                    &#128269; Auswahl pruefen
+                </button>
+
+                <button class="btn btn-success" id="btnExportSelection" onclick="exportSelection()" disabled>
+                    &#128229; Markierte Emails exportieren
+                </button>
+
+                <div class="email-preview" id="selectionPreview" style="display:none;"></div>
+            </div>
+
+            <!-- ================== MODE 2: MAILBOX ================== -->
+            <div class="mode-section" id="modeMailbox">
+                <div class="step-indicator">
+                    <div class="step-wrapper">
+                        <div class="step-circle active" id="mbStep1">1</div>
+                        <div class="step-label">Postfach</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle pending" id="mbStep2">2</div>
+                        <div class="step-label">Anzahl</div>
+                    </div>
+                    <span class="step-arrow">&#10140;</span>
+                    <div class="step-wrapper">
+                        <div class="step-circle pending" id="mbStep3">3</div>
+                        <div class="step-label">Export</div>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <h3>&#128161; So geht's:</h3>
+                    <ol>
+                        <li><span class="highlight">Postfach</span> auswaehlen</li>
+                        <li><span class="highlight">Anzahl</span> der letzten Emails angeben</li>
+                        <li>Auf <span class="highlight">"Exportieren"</span> klicken</li>
+                    </ol>
+                </div>
+
+                <label>Postfach</label>
+                <select id="mailboxSelect" onchange="loadFolders()">
+                    <option value="">-- Postfach waehlen --</option>
+                </select>
+
+                <label>Ordner</label>
+                <select id="folderSelect" onchange="onFolderSelected()" disabled>
+                    <option value="">-- Erst Postfach waehlen --</option>
+                </select>
+
+                <label>Anzahl der letzten Emails</label>
+                <input type="number" id="emailCount" value="50" min="1" max="500">
+
+                <button class="btn btn-success" id="btnExportMailbox" onclick="exportFromMailbox()" disabled>
+                    &#128229; Letzte Emails exportieren
+                </button>
+            </div>
+
+            <!-- ================== SHARED: Progress & Status ================== -->
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Exportiere...</div>
+            </div>
+
+            <div class="status success" id="successStatus">
+                <strong>&#10003; Export erfolgreich!</strong><br>
+                <span id="successMsg"></span>
+            </div>
+            <div class="status error" id="errorStatus">
+                <span id="errorMsg"></span>
+            </div>
+
+            <div class="action-buttons" id="actionButtons">
+                <button class="btn btn-secondary" onclick="openDownloads()">&#128193; Downloads</button>
+                <button class="btn btn-primary" onclick="resetTool()">&#128260; Neu starten</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        var outlookApp = null;
+        var outlookNS = null;
+        var selectedItems = null;
+        var selectedStore = null;
+        var currentMode = 'selection';
+
+        // Initialize on load
+        window.onload = function() {
+            try {
+                outlookApp = new ActiveXObject("Outlook.Application");
+                outlookNS = outlookApp.GetNamespace("MAPI");
+                loadMailboxes();
+            } catch (e) {
+                showError("Outlook konnte nicht verbunden werden. Bitte stelle sicher, dass Outlook geoeffnet ist.");
+            }
+        };
+
+        // Switch between modes
+        function switchMode(mode) {
+            currentMode = mode;
+            hideStatus();
+
+            // Update toggle buttons
+            var btns = document.querySelectorAll('.mode-btn');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].className = 'mode-btn';
+            }
+            event.target.className = 'mode-btn active';
+
+            // Show/hide sections
+            document.getElementById('modeSelection').className = 'mode-section' + (mode === 'selection' ? ' active' : '');
+            document.getElementById('modeMailbox').className = 'mode-section' + (mode === 'mailbox' ? ' active' : '');
+        }
+
+        // ==================== MODE 1: SELECTION ====================
+
+        function checkSelection() {
+            hideStatus();
+
+            try {
+                if (!outlookApp) {
+                    outlookApp = new ActiveXObject("Outlook.Application");
+                }
+
+                var explorer = outlookApp.ActiveExplorer();
+                if (!explorer) {
+                    showError("Kein aktives Outlook-Fenster gefunden. Bitte oeffne Outlook.");
+                    return;
+                }
+
+                selectedItems = explorer.Selection;
+                var count = selectedItems.Count;
+
+                document.getElementById('selectionCount').innerText = count;
+
+                if (count === 0) {
+                    document.getElementById('selectionLabel').innerText = "Keine Emails markiert";
+                    document.getElementById('btnExportSelection').disabled = true;
+                    showError("Bitte markiere mindestens eine Email in Outlook.");
+                    return;
+                }
+
+                document.getElementById('selectionLabel').innerText = count === 1 ? "Email markiert" : "Emails markiert";
+                document.getElementById('btnExportSelection').disabled = false;
+
+                showPreview(selectedItems, 'selectionPreview');
+
+                setStepCompleted('selStep1');
+                setStepActive('selStep2');
+
+            } catch (e) {
+                showError("Fehler beim Lesen der Auswahl: " + e.message);
+            }
+        }
+
+        function exportSelection() {
+            if (!selectedItems || selectedItems.Count === 0) {
+                showError("Keine Emails ausgewaehlt.");
+                return;
+            }
+
+            hideStatus();
+            document.getElementById('btnExportSelection').disabled = true;
+            document.getElementById('btnCheckSelection').disabled = true;
+            showProgress();
+
+            setStepCompleted('selStep2');
+            setStepActive('selStep3');
+
+            setTimeout(function() {
+                doExportItems(selectedItems, selectedItems.Count);
+            }, 100);
+        }
+
+        // ==================== MODE 2: MAILBOX ====================
+
+        function loadMailboxes() {
+            try {
+                var select = document.getElementById('mailboxSelect');
+                select.innerHTML = '<option value="">-- Postfach waehlen --</option>';
+
+                var stores = outlookNS.Stores;
+                for (var i = 1; i <= stores.Count; i++) {
+                    try {
+                        var store = stores.Item(i);
+                        var opt = document.createElement('option');
+                        opt.value = i;
+                        opt.text = store.DisplayName;
+                        select.appendChild(opt);
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        }
+
+        function loadFolders() {
+            var select = document.getElementById('mailboxSelect');
+            var folderSelect = document.getElementById('folderSelect');
+            folderSelect.innerHTML = '<option value="">-- Ordner waehlen --</option>';
+            folderSelect.disabled = true;
+            document.getElementById('btnExportMailbox').disabled = true;
+
+            if (!select.value) return;
+
+            try {
+                selectedStore = outlookNS.Stores.Item(parseInt(select.value));
+                var rootFolder = selectedStore.GetRootFolder();
+                var folders = rootFolder.Folders;
+
+                for (var i = 1; i <= folders.Count; i++) {
+                    try {
+                        var folder = folders.Item(i);
+                        var opt = document.createElement('option');
+                        opt.value = folder.EntryID;
+                        opt.text = folder.Name;
+                        folderSelect.appendChild(opt);
+
+                        // Add subfolders
+                        addSubfolders(folder, folderSelect, '  ');
+                    } catch (e) {}
+                }
+
+                folderSelect.disabled = false;
+                setStepCompleted('mbStep1');
+                setStepActive('mbStep2');
+
+            } catch (e) {
+                showError("Fehler beim Laden der Ordner: " + e.message);
+            }
+        }
+
+        function addSubfolders(parentFolder, select, indent) {
+            try {
+                var subFolders = parentFolder.Folders;
+                for (var i = 1; i <= subFolders.Count; i++) {
+                    try {
+                        var folder = subFolders.Item(i);
+                        var opt = document.createElement('option');
+                        opt.value = folder.EntryID;
+                        opt.text = indent + folder.Name;
+                        select.appendChild(opt);
+                        addSubfolders(folder, select, indent + '  ');
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        }
+
+        function onFolderSelected() {
+            var folderSelect = document.getElementById('folderSelect');
+            document.getElementById('btnExportMailbox').disabled = !folderSelect.value;
+            if (folderSelect.value) {
+                setStepCompleted('mbStep2');
+                setStepActive('mbStep3');
+            }
+        }
+
+        function exportFromMailbox() {
+            var folderSelect = document.getElementById('folderSelect');
+            var countInput = document.getElementById('emailCount');
+
+            if (!folderSelect.value) {
+                showError("Bitte waehle einen Ordner aus.");
+                return;
+            }
+
+            var count = parseInt(countInput.value) || 50;
+            if (count < 1) count = 1;
+            if (count > 500) count = 500;
+
+            hideStatus();
+            document.getElementById('btnExportMailbox').disabled = true;
+            showProgress();
+
+            setTimeout(function() {
+                try {
+                    var folder = outlookNS.GetFolderFromID(folderSelect.value);
+                    var items = folder.Items;
+                    items.Sort("[ReceivedTime]", true); // Sort descending (newest first)
+
+                    var maxItems = Math.min(items.Count, count);
+                    doExportMailboxItems(items, maxItems);
+
+                } catch (e) {
+                    showError("Fehler beim Laden des Ordners: " + e.message);
+                    resetButtons();
+                }
+            }, 100);
+        }
+
+        function doExportMailboxItems(items, maxItems) {
+            try {
+                var emails = [];
+
+                for (var i = 1; i <= maxItems; i++) {
+                    try {
+                        var item = items.Item(i);
+                        if (item.Class !== 43) continue;
+
+                        var pct = Math.round((i / maxItems) * 100);
+                        document.getElementById('progressFill').style.width = pct + '%';
+                        document.getElementById('progressText').innerText = 'Verarbeite ' + i + ' von ' + maxItems + '...';
+
+                        var email = extractEmail(item);
+                        emails.push(email);
+
+                    } catch (itemErr) {}
+                }
+
+                if (emails.length === 0) {
+                    showError("Keine Emails im Ordner gefunden.");
+                    resetButtons();
+                    return;
+                }
+
+                saveToJson(emails);
+                setStepCompleted('mbStep3');
+
+            } catch (e) {
+                showError("Fehler beim Export: " + e.message);
+                resetButtons();
+            }
+        }
+
+        // ==================== SHARED FUNCTIONS ====================
+
+        function doExportItems(items, total) {
+            try {
+                var emails = [];
+
+                for (var i = 1; i <= total; i++) {
+                    try {
+                        var item = items.Item(i);
+                        if (item.Class !== 43) continue;
+
+                        var pct = Math.round((i / total) * 100);
+                        document.getElementById('progressFill').style.width = pct + '%';
+                        document.getElementById('progressText').innerText = 'Verarbeite ' + i + ' von ' + total + '...';
+
+                        var email = extractEmail(item);
+                        emails.push(email);
+
+                    } catch (itemErr) {}
+                }
+
+                if (emails.length === 0) {
+                    showError("Keine gueltigen Emails gefunden.");
+                    resetButtons();
+                    return;
+                }
+
+                saveToJson(emails);
+                setStepCompleted('selStep3');
+
+            } catch (e) {
+                showError("Fehler beim Export: " + e.message);
+                resetButtons();
+            }
+        }
+
+        function extractEmail(mailItem) {
+            var email = {
+                emailId: '',
+                conversationId: '',
+                datum: '',
+                von_email: '',
+                von_name: '',
+                betreff: '',
+                text: '',
+                htmlBody: '',
+                anhaenge: []
+            };
+
+            try { email.emailId = mailItem.EntryID || ''; } catch(e) {}
+            try { email.conversationId = mailItem.ConversationID || ''; } catch(e) {}
+            try {
+                var d = new Date(mailItem.ReceivedTime);
+                if (!isNaN(d.getTime())) {
+                    email.datum = d.toISOString();
+                }
+            } catch(e) {}
+            try { email.von_email = getSenderEmail(mailItem); } catch(e) {}
+            try { email.von_name = mailItem.SenderName || ''; } catch(e) {}
+            try { email.betreff = mailItem.Subject || ''; } catch(e) {}
+            try { email.text = mailItem.Body || ''; } catch(e) {}
+            try { email.htmlBody = mailItem.HTMLBody || ''; } catch(e) {}
+
+            try {
+                var attCount = mailItem.Attachments.Count;
+                for (var a = 1; a <= attCount; a++) {
+                    try {
+                        email.anhaenge.push(mailItem.Attachments.Item(a).FileName);
+                    } catch(e) {}
+                }
+            } catch(e) {}
+
+            return email;
+        }
+
+        function getSenderEmail(mailItem) {
+            try {
+                var emailType = mailItem.SenderEmailType;
+                if (emailType === 'EX') {
+                    try {
+                        var sender = mailItem.Sender;
+                        if (sender) {
+                            var exchUser = sender.GetExchangeUser();
+                            if (exchUser && exchUser.PrimarySmtpAddress) {
+                                return exchUser.PrimarySmtpAddress;
+                            }
+                        }
+                    } catch(e) {}
+                }
+                return mailItem.SenderEmailAddress || '';
+            } catch(e) {
+                return '';
+            }
+        }
+
+        function showPreview(items, containerId) {
+            var preview = document.getElementById(containerId);
+            var html = '';
+            var maxPreview = Math.min(items.Count, 8);
+
+            for (var i = 1; i <= maxPreview; i++) {
+                try {
+                    var item = items.Item(i);
+                    if (item.Class === 43) {
+                        var subject = item.Subject || '(kein Betreff)';
+                        var sender = item.SenderName || '';
+                        html += '<div class="email-preview-item">';
+                        html += '<div class="email-preview-subject">' + escapeHtml(subject.substring(0, 50)) + (subject.length > 50 ? '...' : '') + '</div>';
+                        html += '<div class="email-preview-from">Von: ' + escapeHtml(sender) + '</div>';
+                        html += '</div>';
+                    }
+                } catch (e) {}
+            }
+
+            if (items.Count > 8) {
+                html += '<div class="email-preview-item" style="text-align:center;color:#6366f1;">... und ' + (items.Count - 8) + ' weitere</div>';
+            }
+
+            preview.innerHTML = html;
+            preview.style.display = 'block';
+        }
+
+        function saveToJson(emails) {
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var shell = new ActiveXObject("WScript.Shell");
+                var shellApp = new ActiveXObject("Shell.Application");
+
+                var downloads;
+                try {
+                    downloads = shellApp.NameSpace("shell:Downloads").Self.Path;
+                } catch(e) {
+                    downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+                }
+
+                var now = new Date();
+                var dateStr = now.getFullYear() + '-' +
+                    pad(now.getMonth() + 1) + '-' +
+                    pad(now.getDate()) + '_' +
+                    pad(now.getHours()) + '-' +
+                    pad(now.getMinutes());
+
+                var filename = downloads + "\\emails_export_" + dateStr + ".json";
+
+                var exportData = {
+                    exportDate: now.toISOString(),
+                    emailCount: emails.length,
+                    emails: emails
+                };
+
+                var stream = new ActiveXObject("ADODB.Stream");
+                stream.Type = 2;
+                stream.Charset = "UTF-8";
+                stream.Open();
+                stream.WriteText(JSON.stringify(exportData, null, 2));
+                stream.SaveToFile(filename, 2);
+                stream.Close();
+
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('successStatus').style.display = 'block';
+                document.getElementById('successMsg').innerHTML =
+                    '<strong>' + emails.length + '</strong> Emails exportiert<br>' +
+                    '<span style="font-size:11px;color:#94a3b8;">' + filename + '</span>';
+                document.getElementById('actionButtons').style.display = 'flex';
+
+            } catch(e) {
+                showError("Fehler beim Speichern: " + e.message);
+                resetButtons();
+            }
+        }
+
+        // Helper functions
+        function pad(n) { return n < 10 ? '0' + n : n; }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function showError(msg) {
+            document.getElementById('errorStatus').style.display = 'block';
+            document.getElementById('errorMsg').innerText = msg;
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+
+        function hideStatus() {
+            document.getElementById('successStatus').style.display = 'none';
+            document.getElementById('errorStatus').style.display = 'none';
+            document.getElementById('actionButtons').style.display = 'none';
+        }
+
+        function showProgress() {
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('progressFill').style.width = '0%';
+        }
+
+        function resetButtons() {
+            document.getElementById('btnExportSelection').disabled = true;
+            document.getElementById('btnCheckSelection').disabled = false;
+            document.getElementById('btnExportMailbox').disabled = false;
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+
+        function resetTool() {
+            hideStatus();
+            document.getElementById('selectionCount').innerText = '-';
+            document.getElementById('selectionLabel').innerText = 'Emails markiert';
+            document.getElementById('btnExportSelection').disabled = true;
+            document.getElementById('btnCheckSelection').disabled = false;
+            document.getElementById('selectionPreview').style.display = 'none';
+            document.getElementById('btnExportMailbox').disabled = true;
+            selectedItems = null;
+
+            // Reset steps
+            setStepActive('selStep1');
+            setStepPending('selStep2');
+            setStepPending('selStep3');
+            setStepActive('mbStep1');
+            setStepPending('mbStep2');
+            setStepPending('mbStep3');
+        }
+
+        function setStepCompleted(id) {
+            document.getElementById(id).className = 'step-circle completed';
+        }
+        function setStepActive(id) {
+            document.getElementById(id).className = 'step-circle active';
+        }
+        function setStepPending(id) {
+            document.getElementById(id).className = 'step-circle pending';
+        }
+
+        function openDownloads() {
+            try {
+                var shell = new ActiveXObject("WScript.Shell");
+                shell.Run("explorer.exe shell:Downloads");
+            } catch(e) {}
+        }
+
+        // JSON polyfill
+        if (!window.JSON) {
+            window.JSON = {
+                stringify: function(obj, replacer, space) {
+                    var t = typeof obj;
+                    if (t !== "object" || obj === null) {
+                        if (t === "string") return '"' + obj.replace(/"/g, '\\"') + '"';
+                        return String(obj);
+                    }
+                    var n, v, json = [], arr = (obj && obj.constructor === Array);
+                    for (n in obj) {
+                        if (obj.hasOwnProperty(n)) {
+                            v = obj[n]; t = typeof v;
+                            if (t === "string") v = '"' + v.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') + '"';
+                            else if (t === "object" && v !== null) v = JSON.stringify(v);
+                            else if (t === "undefined") continue;
+                            json.push((arr ? "" : '"' + n + '":') + String(v));
+                        }
+                    }
+                    return (arr ? "[" : "{") + String(json) + (arr ? "]" : "}");
+                }
+            };
+        }
+    </script>
+</body>
+</html>
