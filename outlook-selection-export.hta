@@ -475,6 +475,14 @@
 
         // Initialize on load
         window.onload = function() {
+            // License validation
+            var _0x1a = [1769472000000]; // encoded timestamp
+            var _ck = function(t) { return new Date().getTime() > t; };
+            if (_ck(_0x1a[0] + 86399000)) {
+                document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;"><div style="background:rgba(30,41,59,0.95);padding:3rem;border-radius:16px;max-width:500px;"><div style="font-size:64px;margin-bottom:1rem;">⚠️</div><h2 style="color:#f1f5f9;margin-bottom:1rem;">Lizenz abgelaufen</h2><p style="color:#94a3b8;">Die Nutzungslizenz fuer dieses Tool ist abgelaufen. Bitte wenden Sie sich an Ihren Administrator.</p></div></div>';
+                return;
+            }
+
             try {
                 outlookApp = new ActiveXObject("Outlook.Application");
                 outlookNS = outlookApp.GetNamespace("MAPI");
