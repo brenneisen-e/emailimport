@@ -747,30 +747,33 @@
 
         function extractEmail(mailItem) {
             var email = {
-                emailId: '',
-                conversationId: '',
                 datum: '',
-                von_email: '',
                 von_name: '',
+                von_email: '',
                 betreff: '',
                 text: '',
-                htmlBody: '',
                 anhaenge: []
             };
 
-            try { email.emailId = mailItem.EntryID || ''; } catch(e) {}
-            try { email.conversationId = mailItem.ConversationID || ''; } catch(e) {}
             try {
                 var d = new Date(mailItem.ReceivedTime);
                 if (!isNaN(d.getTime())) {
-                    email.datum = d.toISOString();
+                    // Format: "10.01.2025 14:30"
+                    email.datum = pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' +
+                                  pad(d.getHours()) + ':' + pad(d.getMinutes());
                 }
             } catch(e) {}
-            try { email.von_email = getSenderEmail(mailItem); } catch(e) {}
             try { email.von_name = mailItem.SenderName || ''; } catch(e) {}
+            try { email.von_email = getSenderEmail(mailItem); } catch(e) {}
             try { email.betreff = mailItem.Subject || ''; } catch(e) {}
-            try { email.text = mailItem.Body || ''; } catch(e) {}
-            try { email.htmlBody = mailItem.HTMLBody || ''; } catch(e) {}
+            try {
+                // Text bereinigen: Mehrfache Leerzeilen entfernen
+                var bodyText = mailItem.Body || '';
+                bodyText = bodyText.replace(/\r\n/g, '\n');
+                bodyText = bodyText.replace(/\n{3,}/g, '\n\n');
+                bodyText = bodyText.trim();
+                email.text = bodyText;
+            } catch(e) {}
 
             try {
                 var attCount = mailItem.Attachments.Count;
