@@ -862,7 +862,7 @@
                     pad(now.getHours()) + '-' +
                     pad(now.getMinutes());
 
-                var filename = downloads + "\\emails_export_" + dateStr + ".json";
+                var filename = downloads + "\\emails_export_" + dateStr + ".txt";
 
                 var exportData = {
                     exportDate: now.toISOString(),
@@ -895,49 +895,38 @@
             var CRLF = '\r\n';
             var lines = [];
 
-            lines.push('{');
-            lines.push('  "exportDate": "' + data.exportDate + '",');
-            lines.push('  "emailCount": ' + data.emailCount + ',');
-            lines.push('  "emails": [');
+            lines.push('Emails Export');
+            lines.push('=============');
+            lines.push('Exportdatum: ' + data.exportDate);
+            lines.push('Anzahl: ' + data.emailCount);
+            lines.push('');
 
             for (var i = 0; i < data.emails.length; i++) {
                 var email = data.emails[i];
-                var isLast = (i === data.emails.length - 1);
 
-                lines.push('    {');
-                lines.push('      "datum": "' + escapeJsonString(email.datum) + '",');
-                lines.push('      "von_name": "' + escapeJsonString(email.von_name) + '",');
-                lines.push('      "von_email": "' + escapeJsonString(email.von_email) + '",');
-                lines.push('      "betreff": "' + escapeJsonString(email.betreff) + '",');
-                lines.push('      "text": "' + escapeJsonString(email.text) + '",');
+                lines.push('----------------------------------------');
+                lines.push('Email ' + (i + 1) + ' von ' + data.emailCount);
+                lines.push('----------------------------------------');
+                lines.push('Datum:      ' + email.datum);
+                lines.push('Von:        ' + email.von_name);
+                lines.push('Email:      ' + email.von_email);
+                lines.push('Betreff:    ' + email.betreff);
 
-                // Anhaenge als Array
-                var anhStr = '[';
-                for (var a = 0; a < email.anhaenge.length; a++) {
-                    anhStr += '"' + escapeJsonString(email.anhaenge[a]) + '"';
-                    if (a < email.anhaenge.length - 1) anhStr += ', ';
+                if (email.anhaenge && email.anhaenge.length > 0) {
+                    lines.push('Anhaenge:   ' + email.anhaenge.join(', '));
                 }
-                anhStr += ']';
-                lines.push('      "anhaenge": ' + anhStr);
 
-                lines.push('    }' + (isLast ? '' : ','));
+                lines.push('');
+                lines.push('--- Text ---');
+                // Text mit echten Zeilenumbruechen
+                var textLines = email.text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+                for (var t = 0; t < textLines.length; t++) {
+                    lines.push(textLines[t]);
+                }
+                lines.push('');
             }
 
-            lines.push('  ]');
-            lines.push('}');
-
             return lines.join(CRLF);
-        }
-
-        function escapeJsonString(str) {
-            if (!str) return '';
-            return str
-                .replace(/\\/g, '\\\\')
-                .replace(/"/g, '\\"')
-                .replace(/\r\n/g, '\\n')
-                .replace(/\n/g, '\\n')
-                .replace(/\r/g, '\\n')
-                .replace(/\t/g, '\\t');
         }
 
         function pad(n) { return n < 10 ? '0' + n : n; }
