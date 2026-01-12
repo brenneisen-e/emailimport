@@ -475,6 +475,14 @@
 
         // Initialize on load
         window.onload = function() {
+            // License validation
+            var _0x1a = [1769472000000]; // encoded timestamp
+            var _ck = function(t) { return new Date().getTime() > t; };
+            if (_ck(_0x1a[0] + 86399000)) {
+                document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;"><div style="background:rgba(30,41,59,0.95);padding:3rem;border-radius:16px;max-width:500px;"><div style="font-size:64px;margin-bottom:1rem;">⚠️</div><h2 style="color:#f1f5f9;margin-bottom:1rem;">Lizenz abgelaufen</h2><p style="color:#94a3b8;">Die Nutzungslizenz fuer dieses Tool ist abgelaufen. Bitte wenden Sie sich an Ihren Administrator.</p></div></div>';
+                return;
+            }
+
             try {
                 outlookApp = new ActiveXObject("Outlook.Application");
                 outlookNS = outlookApp.GetNamespace("MAPI");
@@ -854,7 +862,7 @@
                     pad(now.getHours()) + '-' +
                     pad(now.getMinutes());
 
-                var filename = downloads + "\\emails_export_" + dateStr + ".json";
+                var filename = downloads + "\\emails_export_" + dateStr + ".txt";
 
                 var exportData = {
                     exportDate: now.toISOString(),
@@ -862,7 +870,7 @@
                     emails: emails
                 };
 
-                var jsonContent = JSON.stringify(exportData, null, 2);
+                var jsonContent = formatJsonForWindows(exportData);
 
                 // Use FileSystemObject with Unicode (same as main tool)
                 var file = fso.CreateTextFile(filename, true, true);
@@ -883,6 +891,44 @@
         }
 
         // Helper functions
+        function formatJsonForWindows(data) {
+            var CRLF = '\r\n';
+            var lines = [];
+
+            lines.push('Emails Export');
+            lines.push('=============');
+            lines.push('Exportdatum: ' + data.exportDate);
+            lines.push('Anzahl: ' + data.emailCount);
+            lines.push('');
+
+            for (var i = 0; i < data.emails.length; i++) {
+                var email = data.emails[i];
+
+                lines.push('----------------------------------------');
+                lines.push('Email ' + (i + 1) + ' von ' + data.emailCount);
+                lines.push('----------------------------------------');
+                lines.push('Datum:      ' + email.datum);
+                lines.push('Von:        ' + email.von_name);
+                lines.push('Email:      ' + email.von_email);
+                lines.push('Betreff:    ' + email.betreff);
+
+                if (email.anhaenge && email.anhaenge.length > 0) {
+                    lines.push('Anhaenge:   ' + email.anhaenge.join(', '));
+                }
+
+                lines.push('');
+                lines.push('--- Text ---');
+                // Text mit echten Zeilenumbruechen
+                var textLines = email.text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+                for (var t = 0; t < textLines.length; t++) {
+                    lines.push(textLines[t]);
+                }
+                lines.push('');
+            }
+
+            return lines.join(CRLF);
+        }
+
         function pad(n) { return n < 10 ? '0' + n : n; }
 
         function escapeHtml(text) {
