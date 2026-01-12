@@ -862,7 +862,7 @@
                     emails: emails
                 };
 
-                var jsonContent = JSON.stringify(exportData, null, 2);
+                var jsonContent = formatJsonForWindows(exportData);
 
                 // Use FileSystemObject with Unicode (same as main tool)
                 var file = fso.CreateTextFile(filename, true, true);
@@ -883,6 +883,55 @@
         }
 
         // Helper functions
+        function formatJsonForWindows(data) {
+            var CRLF = '\r\n';
+            var lines = [];
+
+            lines.push('{');
+            lines.push('  "exportDate": "' + data.exportDate + '",');
+            lines.push('  "emailCount": ' + data.emailCount + ',');
+            lines.push('  "emails": [');
+
+            for (var i = 0; i < data.emails.length; i++) {
+                var email = data.emails[i];
+                var isLast = (i === data.emails.length - 1);
+
+                lines.push('    {');
+                lines.push('      "datum": "' + escapeJsonString(email.datum) + '",');
+                lines.push('      "von_name": "' + escapeJsonString(email.von_name) + '",');
+                lines.push('      "von_email": "' + escapeJsonString(email.von_email) + '",');
+                lines.push('      "betreff": "' + escapeJsonString(email.betreff) + '",');
+                lines.push('      "text": "' + escapeJsonString(email.text) + '",');
+
+                // Anhaenge als Array
+                var anhStr = '[';
+                for (var a = 0; a < email.anhaenge.length; a++) {
+                    anhStr += '"' + escapeJsonString(email.anhaenge[a]) + '"';
+                    if (a < email.anhaenge.length - 1) anhStr += ', ';
+                }
+                anhStr += ']';
+                lines.push('      "anhaenge": ' + anhStr);
+
+                lines.push('    }' + (isLast ? '' : ','));
+            }
+
+            lines.push('  ]');
+            lines.push('}');
+
+            return lines.join(CRLF);
+        }
+
+        function escapeJsonString(str) {
+            if (!str) return '';
+            return str
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, '\\"')
+                .replace(/\r\n/g, '\\n')
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\n')
+                .replace(/\t/g, '\\t');
+        }
+
         function pad(n) { return n < 10 ? '0' + n : n; }
 
         function escapeHtml(text) {
