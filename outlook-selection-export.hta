@@ -859,13 +859,34 @@
                     emails: emails
                 };
 
-                var stream = new ActiveXObject("ADODB.Stream");
-                stream.Type = 2;
-                stream.Charset = "UTF-8";
-                stream.Open();
-                stream.WriteText(JSON.stringify(exportData, null, 2));
-                stream.SaveToFile(filename, 2);
-                stream.Close();
+                var jsonContent = JSON.stringify(exportData, null, 2);
+
+                // Try ADODB.Stream first (UTF-8), fallback to FSO (Unicode)
+                var saved = false;
+                try {
+                    var stream = new ActiveXObject("ADODB.Stream");
+                    stream.Type = 2;
+                    stream.Charset = "UTF-8";
+                    stream.Open();
+                    stream.WriteText(jsonContent);
+                    stream.SaveToFile(filename, 2);
+                    stream.Close();
+                    saved = true;
+                } catch(streamErr) {
+                    // Fallback: Use FileSystemObject with Unicode
+                    try {
+                        var file = fso.CreateTextFile(filename, true, true); // true = Unicode
+                        file.Write(jsonContent);
+                        file.Close();
+                        saved = true;
+                    } catch(fsoErr) {
+                        // Last resort: ASCII mode
+                        var file2 = fso.CreateTextFile(filename, true, false);
+                        file2.Write(jsonContent);
+                        file2.Close();
+                        saved = true;
+                    }
+                }
 
                 document.getElementById('progressContainer').style.display = 'none';
                 document.getElementById('successStatus').style.display = 'block';
