@@ -1,2 +1,11 @@
 hypercare_emails_2025-12-11.json
 dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# Extrahierte Test-Mails (werden lokal erzeugt, nicht im Repo)
+output/eml/
+output/pdf/
+output/testfaelle_metadaten.csv
