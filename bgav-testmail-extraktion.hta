@@ -447,10 +447,36 @@
         try {
             var fso = new ActiveXObject("Scripting.FileSystemObject");
             var htaDir = getScriptDir();
-            var excelInHtaDir = htaDir + "Uebersicht_Titelaenderung.xlsx";
 
-            if (fso.FileExists(excelInHtaDir)) {
-                document.getElementById('excelPath').value = excelInHtaDir;
+            // Moegliche Dateinamen (mit und ohne Umlaute)
+            var excelNames = [
+                "\u00DCbersicht_Titel\u00E4nderung.xlsx",
+                "Uebersicht_Titelaenderung.xlsx",
+                "\u00DCbersicht_Titelaenderung.xlsx",
+                "Uebersicht_Titel\u00E4nderung.xlsx"
+            ];
+
+            var found = false;
+            for (var ei = 0; ei < excelNames.length; ei++) {
+                var excelCandidate = htaDir + excelNames[ei];
+                if (fso.FileExists(excelCandidate)) {
+                    document.getElementById('excelPath').value = excelCandidate;
+                    found = true;
+                    break;
+                }
+            }
+
+            // Fallback: Suche nach *Titel*.xlsx im HTA-Verzeichnis
+            if (!found && fso.FolderExists(htaDir)) {
+                var htaFolder = fso.GetFolder(htaDir);
+                var htaFiles = new Enumerator(htaFolder.Files);
+                for (; !htaFiles.atEnd(); htaFiles.moveNext()) {
+                    var htaFile = htaFiles.item();
+                    if (htaFile.Name.match(/titel/i) && htaFile.Name.match(/\.xlsx?$/i)) {
+                        document.getElementById('excelPath').value = htaFile.Path;
+                        break;
+                    }
+                }
             }
         } catch (e) {}
     }
