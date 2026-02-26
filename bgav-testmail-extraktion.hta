@@ -16,7 +16,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.0"
+        VERSION="1.1"
         WINDOWSTATE="normal"
     />
 
@@ -759,10 +759,10 @@
                     }
                 }
 
-                // Dateiname: BGAV_Titelbezeichnung_BD00010091_001  (oder ohne BD wenn nicht gefunden)
+                // Dateiname: 00010091_BGAV_Titelbezeichnung_001 (BD-Nr vorne)
                 var baseName;
                 if (bdNr) {
-                    baseName = "BGAV_Titelbezeichnung_BD" + bdNr + "_" + fnNr;
+                    baseName = bdNr + "_BGAV_Titelbezeichnung_" + fnNr;
                     logInfo("  " + fnNr + ": BD " + bdNr + " -> " + baseName);
                 } else {
                     baseName = "BGAV_Titelbezeichnung_" + fnNr;
@@ -1276,13 +1276,33 @@
     // Datei-Operationen
     // ══════════════════════════════════════════════════════════════
     function writeUtf8File(filepath, content) {
-        var stream = new ActiveXObject("ADODB.Stream");
-        stream.Type = 2; // adTypeText
-        stream.Charset = "UTF-8";
-        stream.Open();
-        stream.WriteText(content);
-        stream.SaveToFile(filepath, 2); // adSaveCreateOverWrite
-        stream.Close();
+        // ADODB.Stream hat in HTA Sicherheitsbeschraenkungen bei
+        // Dateizugriff ausserhalb der eigenen Domaene.
+        // Verwende daher FileSystemObject mit Unicode-Flag als primaere Methode,
+        // und ADODB.Stream nur als Fallback.
+        try {
+            var fso = new ActiveXObject("Scripting.FileSystemObject");
+            // CreateTextFile(path, overwrite, unicode)
+            // unicode=true schreibt UTF-16LE mit BOM - fuer CSV/HTML akzeptabel
+            var file = fso.CreateTextFile(filepath, true, true);
+            file.Write(content);
+            file.Close();
+            return;
+        } catch (fsoErr) {
+            // FSO fehlgeschlagen, versuche ADODB.Stream
+        }
+
+        try {
+            var stream = new ActiveXObject("ADODB.Stream");
+            stream.Type = 2; // adTypeText
+            stream.Charset = "UTF-8";
+            stream.Open();
+            stream.WriteText(content);
+            stream.SaveToFile(filepath, 2); // adSaveCreateOverWrite
+            stream.Close();
+        } catch (streamErr) {
+            throw new Error("Datei konnte nicht geschrieben werden: " + filepath + " - " + streamErr.message);
+        }
     }
 
     // ══════════════════════════════════════════════════════════════
