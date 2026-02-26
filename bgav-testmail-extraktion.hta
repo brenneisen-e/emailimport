@@ -16,7 +16,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.1"
+        VERSION="1.2"
         WINDOWSTATE="normal"
     />
 
@@ -436,13 +436,7 @@
     };
 
     function setDefaultPaths() {
-        try {
-            var shell = new ActiveXObject("WScript.Shell");
-            var desktop = shell.SpecialFolders("Desktop");
-            document.getElementById('outputPath').value = desktop + "\\BGAV_Testmails";
-        } catch (e) {
-            document.getElementById('outputPath').value = "C:\\BGAV_Testmails";
-        }
+        document.getElementById('outputPath').value = "\\\\cifs\\shellfolder\\243898\\Desktop_2016\\Neuer Ordner (5)";
 
         // Versuche Excel-Datei automatisch zu finden
         try {
