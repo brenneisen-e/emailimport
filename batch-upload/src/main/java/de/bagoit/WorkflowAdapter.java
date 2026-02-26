@@ -39,7 +39,7 @@ public class WorkflowAdapter {
     private static final long DOKUMENT_TYP = -1;  // TODO: richtigen Wert eintragen
 
     /** Hinweistext der am Dokument hinterlegt wird */
-    private static final String HINWEIS_TEXT = "";  // TODO: ggf. befuellen
+    private static final String HINWEIS_TEXT = "Serienbrief BGAV Kommunikation Titel Außendarstellung";
 
     /** Erstellender User (1 + 6-stellige PersNr) */
     private static final String ERSTELLER = "";  // TODO: z.B. "1234567"
