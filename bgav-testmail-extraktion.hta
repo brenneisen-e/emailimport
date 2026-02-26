@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="x-ua-compatible" content="ie=edge"/>
+    <meta charset="utf-8"/>
+    <title>BGAV Testmail-Extraktion</title>
+
+    <HTA:APPLICATION
+        ID="BGAV_Testmail_Extraktion"
+        APPLICATIONNAME="BGAV Testmail-Extraktion"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="no"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 20px;
+            color: #1e293b;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 760px;
+            padding: 32px;
+            margin-top: 10px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            font-size: 22px;
+            color: #1e293b;
+            font-weight: 700;
+        }
+        .header .subtitle {
+            color: #64748b;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+
+        /* Steps */
+        .steps {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+        }
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 8px 4px;
+            border-radius: 8px;
+            font-size: 11px;
+            color: #94a3b8;
+            background: white;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+        .step.active {
+            color: #f59e0b;
+            border-color: #f59e0b;
+            background: #fffbeb;
+            font-weight: 600;
+        }
+        .step.completed {
+            color: #10b981;
+            border-color: #10b981;
+            background: #ecfdf5;
+        }
+        .step-num {
+            font-weight: 700;
+            font-size: 14px;
+            display: block;
+        }
+
+        /* Form elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 13px;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+        select, input[type=text], input[type=number] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #f59e0b;
+        }
+        select:disabled, input:disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-secondary:hover { background: #e2e8f0; }
+
+        /* Progress */
+        .progress-container {
+            display: none;
+            margin: 16px 0;
+        }
+        .progress-bar {
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-text {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        /* Log */
+        .log-container {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            max-height: 220px;
+            overflow-y: auto;
+            display: none;
+        }
+        .log-entry {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #94a3b8;
+        }
+        .log-entry.info { color: #38bdf8; }
+        .log-entry.success { color: #4ade80; }
+        .log-entry.warn { color: #fbbf24; }
+        .log-entry.error { color: #f87171; }
+
+        /* Status messages */
+        .status-box {
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin: 12px 0;
+            font-size: 13px;
+            display: none;
+        }
+        .status-success {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
+        }
+        .status-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+        .status-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+
+        /* Results table */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+        .results-table th {
+            background: #f8fafc;
+            padding: 8px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .results-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #475569;
+        }
+        .results-table tr:hover td { background: #f8fafc; }
+
+        /* Settings row */
+        .settings-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .settings-row .form-group { flex: 1; }
+
+        .file-path {
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            color: #64748b;
+            word-break: break-all;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin: 20px 0 10px 0;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #f59e0b;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 8px 0;
+        }
+        .checkbox-row input[type=checkbox] { width: auto; }
+        .checkbox-row label { margin: 0; font-weight: normal; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>BGAV Testmail-Extraktion</h1>
+            <div class="subtitle">Gesendete BGAV-Titelbezeichnung-Mails extrahieren (EML + PDF + Metadaten-CSV)</div>
+            <div class="badge">SST-Workflow-API Vorbereitung</div>
+        </div>
+
+        <!-- Steps -->
+        <div class="steps">
+            <div class="step active" id="step1">
+                <span class="step-num">1</span>
+                Postfach
+            </div>
+            <div class="step" id="step2">
+                <span class="step-num">2</span>
+                Excel
+            </div>
+            <div class="step" id="step3">
+                <span class="step-num">3</span>
+                Extraktion
+            </div>
+            <div class="step" id="step4">
+                <span class="step-num">4</span>
+                Ergebnis
+            </div>
+        </div>
+
+        <!-- Step 1: Postfach + Settings -->
+        <div id="panelStep1">
+            <div class="section-title">1. Postfach und Einstellungen</div>
+
+            <div class="form-group">
+                <label>Postfach (Store)</label>
+                <select id="mailboxSelect" onchange="onMailboxChange()">
+                    <option value="">-- Bitte Outlook oeffnen und Postfach waehlen --</option>
+                </select>
+            </div>
+
+            <div class="settings-row">
+                <div class="form-group">
+                    <label>Betreff-Filter</label>
+                    <input type="text" id="subjectFilter" value="BGAV | Titelbezeichnung"/>
+                </div>
+                <div class="form-group" style="max-width: 120px;">
+                    <label>Anzahl Mails</label>
+                    <input type="number" id="maxMails" value="5" min="1" max="100"/>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Excel-Datei (Uebersicht_Titelaenderung.xlsx)</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="excelPath" placeholder="Pfad zur Excel-Datei..." style="flex:1;"/>
+                    <button class="btn btn-secondary" onclick="browseExcel()">Durchsuchen...</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Ausgabe-Ordner</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="outputPath" placeholder="Ausgabe-Ordner..." style="flex:1;"/>
+                    <button class="btn btn-secondary" onclick="browseOutput()">Durchsuchen...</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 16px; text-align: center;">
+                <button class="btn btn-primary" id="btnStart" onclick="startExtraction()" disabled>
+                    &#9654; Extraktion starten
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Initialisiere...</div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-container" id="logContainer"></div>
+
+        <!-- Status Messages -->
+        <div class="status-box status-error" id="errorStatus"></div>
+        <div class="status-box status-success" id="successStatus"></div>
+        <div class="status-box status-info" id="infoStatus"></div>
+
+        <!-- Results (Step 4) -->
+        <div id="panelResults" style="display:none;">
+            <div class="section-title">Ergebnis</div>
+            <div id="resultsSummary"></div>
+            <table class="results-table" id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>Nr</th>
+                        <th>Empfaenger</th>
+                        <th>BD-Nummer</th>
+                        <th>EML</th>
+                        <th>PDF</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+            <div style="margin-top: 16px; text-align: center;">
+                <button class="btn btn-secondary" onclick="openOutputFolder()">&#128193; Ausgabe-Ordner oeffnen</button>
+                <button class="btn btn-secondary" onclick="resetTool()">&#8635; Neuer Durchlauf</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    // ══════════════════════════════════════════════════════════════
+    // Globale Variablen
+    // ══════════════════════════════════════════════════════════════
+    var outlookApp = null;
+    var outlookNS = null;
+    var selectedStore = null;
+    var excelLookup = {};
+    var extractedMails = [];
+
+    var PR_SMTP_ADDRESS = "http://schemas.microsoft.com/mapi/proptag/0x39FE001F";
+
+    // Outlook SaveAs-Formate
+    var olTXT = 0;
+    var olMSG = 3;
+    var olHTML = 5;
+    var olMHTML = 10;
+
+    // Word PDF-Format
+    var wdFormatPDF = 17;
+
+    // ══════════════════════════════════════════════════════════════
+    // Initialisierung
+    // ══════════════════════════════════════════════════════════════
+    window.onload = function () {
+        // HTA-Fenstergroesse setzen
+        try {
+            window.resizeTo(800, 820);
+        } catch (e) {}
+
+        setDefaultPaths();
+        initOutlook();
+    };
+
+    function setDefaultPaths() {
+        try {
+            var shell = new ActiveXObject("WScript.Shell");
+            var desktop = shell.SpecialFolders("Desktop");
+            document.getElementById('outputPath').value = desktop + "\\BGAV_Testmails";
+        } catch (e) {
+            document.getElementById('outputPath').value = "C:\\BGAV_Testmails";
+        }
+
+        // Versuche Excel-Datei automatisch zu finden
+        try {
+            var fso = new ActiveXObject("Scripting.FileSystemObject");
+            var htaDir = getScriptDir();
+
+            // Moegliche Dateinamen (mit und ohne Umlaute)
+            var excelNames = [
+                "\u00DCbersicht_Titel\u00E4nderung.xlsx",
+                "Uebersicht_Titelaenderung.xlsx",
+                "\u00DCbersicht_Titelaenderung.xlsx",
+                "Uebersicht_Titel\u00E4nderung.xlsx"
+            ];
+
+            var found = false;
+            for (var ei = 0; ei < excelNames.length; ei++) {
+                var excelCandidate = htaDir + excelNames[ei];
+                if (fso.FileExists(excelCandidate)) {
+                    document.getElementById('excelPath').value = excelCandidate;
+                    found = true;
+                    break;
+                }
+            }
+
+            // Fallback: Suche nach *Titel*.xlsx im HTA-Verzeichnis
+            if (!found && fso.FolderExists(htaDir)) {
+                var htaFolder = fso.GetFolder(htaDir);
+                var htaFiles = new Enumerator(htaFolder.Files);
+                for (; !htaFiles.atEnd(); htaFiles.moveNext()) {
+                    var htaFile = htaFiles.item();
+                    if (htaFile.Name.match(/titel/i) && htaFile.Name.match(/\.xlsx?$/i)) {
+                        document.getElementById('excelPath').value = htaFile.Path;
+                        break;
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+
+    function getScriptDir() {
+        try {
+            var path = document.location.pathname;
+            // URL-Decode fuer Umlaute
+            path = unescape(path);
+            // Fuehrenden Slash entfernen
+            if (path.charAt(0) === '/') path = path.substring(1);
+            path = path.replace(/\//g, '\\');
+            var lastSlash = path.lastIndexOf('\\');
+            if (lastSlash > -1) return path.substring(0, lastSlash + 1);
+            return '';
+        } catch (e) { return ''; }
+    }
+
+    function initOutlook() {
+        try {
+            outlookApp = new ActiveXObject("Outlook.Application");
+            outlookNS = outlookApp.GetNamespace("MAPI");
+            loadMailboxes();
+            logInfo("Outlook verbunden");
+        } catch (e) {
+            showError("Outlook nicht gefunden. Bitte stelle sicher, dass Outlook geoeffnet ist.<br><small>" + e.message + "</small>");
+        }
+    }
+
+    function loadMailboxes() {
+        var select = document.getElementById('mailboxSelect');
+        select.innerHTML = '<option value="">-- Postfach waehlen --</option>';
+
+        try {
+            var stores = outlookNS.Stores;
+            for (var i = 1; i <= stores.Count; i++) {
+                try {
+                    var store = stores.Item(i);
+                    var opt = document.createElement('option');
+                    opt.value = i;
+                    opt.text = store.DisplayName;
+                    select.appendChild(opt);
+
+                    // Auto-select umstellung1ev
+                    if (store.DisplayName.toLowerCase().indexOf('umstellung1ev') > -1 ||
+                        store.DisplayName.toLowerCase().indexOf('umstellung1ev@barmenia') > -1) {
+                        opt.selected = true;
+                        selectedStore = store;
+                        logInfo("Postfach auto-gewaehlt: " + store.DisplayName);
+                    }
+                } catch (e) {}
+            }
+        } catch (e) {
+            showError("Fehler beim Laden der Postfaecher: " + e.message);
+        }
+
+        checkReady();
+    }
+
+    function onMailboxChange() {
+        var select = document.getElementById('mailboxSelect');
+        if (select.value) {
+            selectedStore = outlookNS.Stores.Item(parseInt(select.value));
+            logInfo("Postfach gewaehlt: " + selectedStore.DisplayName);
+        } else {
+            selectedStore = null;
+        }
+        checkReady();
+    }
+
+    function checkReady() {
+        var ready = selectedStore !== null;
+        document.getElementById('btnStart').disabled = !ready;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Datei-Dialoge
+    // ══════════════════════════════════════════════════════════════
+    function browseExcel() {
+        try {
+            var shellApp = new ActiveXObject("Shell.Application");
+            var file = shellApp.BrowseForFolder(0,
+                "Excel-Datei auswaehlen (Ordner der Datei waehlen)", 0x0040, 17);
+            if (file) {
+                // BrowseForFolder gibt nur Ordner zurueck
+                // Zeige den gewaehlten Ordner und pruefe auf die Datei
+                var folderPath = file.Self.Path;
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+                // Suche nach xlsx-Dateien im gewaehlten Ordner
+                var folder = fso.GetFolder(folderPath);
+                var files = folder.Files;
+                var enumFiles = new Enumerator(files);
+                for (; !enumFiles.atEnd(); enumFiles.moveNext()) {
+                    var f = enumFiles.item();
+                    if (f.Name.toLowerCase().indexOf('titelaenderung') > -1 ||
+                        f.Name.toLowerCase().indexOf('titel') > -1) {
+                        document.getElementById('excelPath').value = f.Path;
+                        logInfo("Excel-Datei gefunden: " + f.Name);
+                        return;
+                    }
+                }
+                // Fallback: erster xlsx
+                enumFiles = new Enumerator(files);
+                for (; !enumFiles.atEnd(); enumFiles.moveNext()) {
+                    var f2 = enumFiles.item();
+                    if (f2.Name.match(/\.xlsx?$/i)) {
+                        document.getElementById('excelPath').value = f2.Path;
+                        logInfo("Excel-Datei: " + f2.Name);
+                        return;
+                    }
+                }
+                document.getElementById('excelPath').value = folderPath;
+            }
+        } catch (e) {
+            logWarn("Dialog-Fehler: " + e.message);
+        }
+    }
+
+    function browseOutput() {
+        try {
+            var shellApp = new ActiveXObject("Shell.Application");
+            var folder = shellApp.BrowseForFolder(0,
+                "Ausgabe-Ordner waehlen", 0x0040, 17);
+            if (folder) {
+                document.getElementById('outputPath').value = folder.Self.Path;
+            }
+        } catch (e) {
+            logWarn("Dialog-Fehler: " + e.message);
+        }
+    }
+
+    function openOutputFolder() {
+        try {
+            var shell = new ActiveXObject("WScript.Shell");
+            shell.Run('explorer.exe "' + document.getElementById('outputPath').value + '"');
+        } catch (e) {}
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Haupt-Extraktion
+    // ══════════════════════════════════════════════════════════════
+    function startExtraction() {
+        hideAllStatus();
+        document.getElementById('panelResults').style.display = 'none';
+        document.getElementById('progressContainer').style.display = 'block';
+        document.getElementById('logContainer').style.display = 'block';
+        document.getElementById('btnStart').disabled = true;
+
+        setStepActive('step1');
+
+        // Leicht verzoegert starten, damit die UI sich aktualisiert
+        setTimeout(function() { doExtraction(); }, 100);
+    }
+
+    function doExtraction() {
+        try {
+            var subjectFilter = document.getElementById('subjectFilter').value;
+            var maxMails = parseInt(document.getElementById('maxMails').value) || 5;
+            var excelPath = document.getElementById('excelPath').value;
+            var outputBase = document.getElementById('outputPath').value;
+
+            var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+            // ── 1. Ausgabe-Ordner erstellen ──
+            setProgress(5, 'Erstelle Ausgabe-Ordner...');
+            var emlDir = outputBase + "\\eml";
+            var pdfDir = outputBase + "\\pdf";
+
+            if (!fso.FolderExists(outputBase)) fso.CreateFolder(outputBase);
+            if (!fso.FolderExists(emlDir)) fso.CreateFolder(emlDir);
+            if (!fso.FolderExists(pdfDir)) fso.CreateFolder(pdfDir);
+
+            logInfo("Ausgabe-Ordner: " + outputBase);
+            setStepCompleted('step1');
+
+            // ── 2. Excel laden ──
+            setStepActive('step2');
+            setProgress(10, 'Lade Excel-Metadaten...');
+            excelLookup = {};
+
+            if (excelPath && fso.FileExists(excelPath)) {
+                excelLookup = loadExcelMetadata(excelPath);
+                logSuccess(countKeys(excelLookup) + " Eintraege aus Excel geladen");
+            } else {
+                logWarn("Keine Excel-Datei angegeben oder nicht gefunden. Metadaten werden leer sein.");
+            }
+            setStepCompleted('step2');
+
+            // ── 3. Mails suchen und extrahieren ──
+            setStepActive('step3');
+            setProgress(20, 'Suche gesendete Mails...');
+
+            var sentFolder = findSentFolder(selectedStore);
+            if (!sentFolder) {
+                showError("Gesendete-Elemente-Ordner nicht gefunden!");
+                return;
+            }
+            logInfo("Gesendete-Ordner: " + sentFolder.Name + " (" + sentFolder.Items.Count + " Elemente)");
+
+            // Filter nach Betreff
+            var items = sentFolder.Items;
+            items.Sort("[SentOn]", true); // Neueste zuerst
+
+            // Restrict fuer bessere Performance
+            var filter = "@SQL=\"urn:schemas:httpmail:subject\" LIKE '%" + subjectFilter.replace(/'/g, "''") + "%'";
+            var filteredItems;
+            try {
+                filteredItems = items.Restrict(filter);
+                logInfo("Filter aktiv: " + subjectFilter + " (" + filteredItems.Count + " Treffer)");
+            } catch (filterErr) {
+                logWarn("Restrict fehlgeschlagen, durchsuche alle: " + filterErr.message);
+                filteredItems = items;
+            }
+
+            // Mails sammeln
+            extractedMails = [];
+            var checked = 0;
+            var totalItems = filteredItems.Count;
+
+            for (var i = 1; i <= totalItems; i++) {
+                try {
+                    var item = filteredItems.Item(i);
+                    if (item.Class !== 43) continue; // Nur MailItems
+
+                    checked++;
+                    var subject = item.Subject || '';
+
+                    // Betreff pruefen (falls Restrict nicht perfekt gefiltert hat)
+                    if (subject.indexOf(subjectFilter) === -1) continue;
+
+                    // Sender pruefen: nur tatsaechlich gesendete Mails
+                    var senderEmail = getSenderSMTPAddress(item);
+                    // Akzeptiere alle Mails aus dem Gesendete-Ordner
+
+                    extractedMails.push(item);
+
+                    var recipients = getRecipientList(item);
+                    logInfo("[" + extractedMails.length + "] " + subject +
+                        " | An: " + recipients.join(", ") +
+                        " | " + formatDateShort(item.SentOn));
+
+                    var pct = 20 + Math.round((extractedMails.length / maxMails) * 30);
+                    setProgress(pct, 'Mail ' + extractedMails.length + ' von ' + maxMails + ' gefunden...');
+
+                    if (extractedMails.length >= maxMails) break;
+
+                } catch (itemErr) {
+                    // Einzelne Items ueberspringen
+                }
+            }
+
+            if (extractedMails.length === 0) {
+                showError("Keine Mails mit Betreff '" + subjectFilter + "' im Gesendete-Ordner gefunden!");
+                resetButtons();
+                return;
+            }
+
+            if (extractedMails.length < maxMails) {
+                logWarn("Nur " + extractedMails.length + " von " + maxMails + " gewuenschten Mails gefunden");
+            }
+
+            // ── 4. EML + PDF speichern ──
+            setProgress(55, 'Speichere EML-Dateien...');
+            logInfo("--- EML Export ---");
+
+            for (var e = 0; e < extractedMails.length; e++) {
+                var nr = padNumber(e + 1, 3);
+                var emlPath = emlDir + "\\BGAV_Titelbezeichnung_" + nr + ".eml";
+
+                try {
+                    saveAsEml(extractedMails[e], emlPath);
+                    logSuccess("  EML: BGAV_Titelbezeichnung_" + nr + ".eml");
+                } catch (emlErr) {
+                    logError("  EML-Fehler Mail " + nr + ": " + emlErr.message);
+                }
+
+                setProgress(55 + Math.round(((e + 1) / extractedMails.length) * 15),
+                    'EML ' + (e + 1) + '/' + extractedMails.length);
+            }
+
+            setProgress(72, 'Erstelle PDF-Dateien...');
+            logInfo("--- PDF Export ---");
+
+            // Pruefen ob Word verfuegbar ist
+            var wordAvailable = isWordAvailable();
+            var wordApp = null;
+
+            if (wordAvailable) {
+                try {
+                    wordApp = new ActiveXObject("Word.Application");
+                    wordApp.Visible = false;
+                    logInfo("Word gefunden - erstelle PDF via Word");
+                } catch (wordErr) {
+                    wordAvailable = false;
+                    logWarn("Word nicht verfuegbar: " + wordErr.message);
+                }
+            }
+
+            for (var p = 0; p < extractedMails.length; p++) {
+                var pNr = padNumber(p + 1, 3);
+                var pdfPath = pdfDir + "\\BGAV_Titelbezeichnung_" + pNr + ".pdf";
+
+                try {
+                    if (wordAvailable && wordApp) {
+                        saveAsPdfViaWord(extractedMails[p], pdfPath, wordApp);
+                    } else {
+                        saveAsPdfViaHtml(extractedMails[p], pdfPath, pdfDir, pNr);
+                    }
+                    logSuccess("  PDF: BGAV_Titelbezeichnung_" + pNr + ".pdf");
+                } catch (pdfErr) {
+                    logError("  PDF-Fehler Mail " + pNr + ": " + pdfErr.message);
+                    // Fallback: Als HTML speichern
+                    try {
+                        var htmlFallback = pdfDir + "\\BGAV_Titelbezeichnung_" + pNr + ".html";
+                        saveAsHtmlFallback(extractedMails[p], htmlFallback);
+                        logWarn("  Fallback: HTML gespeichert statt PDF");
+                    } catch (htmlErr) {}
+                }
+
+                setProgress(72 + Math.round(((p + 1) / extractedMails.length) * 15),
+                    'PDF ' + (p + 1) + '/' + extractedMails.length);
+            }
+
+            // Word schliessen
+            if (wordApp) {
+                try { wordApp.Quit(0); } catch (qe) {}
+                wordApp = null;
+            }
+
+            // ── 5. CSV erzeugen ──
+            setProgress(90, 'Erzeuge Metadaten-CSV...');
+            logInfo("--- CSV Export ---");
+
+            var csvPath = outputBase + "\\testfaelle_metadaten.csv";
+            var csvRows = generateMetadataCsv(extractedMails, excelLookup, csvPath);
+
+            logSuccess("CSV gespeichert: testfaelle_metadaten.csv (" + csvRows + " Eintraege)");
+
+            // ── 6. Ergebnis ──
+            setStepCompleted('step3');
+            setStepCompleted('step4');
+            setProgress(100, 'Fertig!');
+
+            showResults(outputBase, csvRows);
+
+            showSuccess(
+                "<strong>Extraktion abgeschlossen!</strong><br>" +
+                extractedMails.length + " Mails als EML + PDF exportiert, " +
+                csvRows + " CSV-Eintraege erzeugt.<br>" +
+                "<span class='file-path'>" + outputBase + "</span>"
+            );
+
+        } catch (ex) {
+            showError("Unerwarteter Fehler: " + ex.message);
+            logError("FEHLER: " + ex.message);
+        }
+
+        resetButtons();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Gesendete-Elemente-Ordner finden
+    // ══════════════════════════════════════════════════════════════
+    function findSentFolder(store) {
+        // Methode 1: GetDefaultFolder(5) = olFolderSentMail
+        try {
+            var root = store.GetRootFolder();
+            // Versuche ueber den Store den Default Sent Folder zu bekommen
+            var sentFolder = store.GetDefaultFolder(5);
+            return sentFolder;
+        } catch (e) {}
+
+        // Methode 2: Suche nach Namen
+        try {
+            var rootFolder = store.GetRootFolder();
+            var folders = rootFolder.Folders;
+            var sentNames = ['Gesendete Elemente', 'Gesendete Objekte', 'Sent Items', 'Sent'];
+
+            for (var i = 1; i <= folders.Count; i++) {
+                try {
+                    var folder = folders.Item(i);
+                    for (var n = 0; n < sentNames.length; n++) {
+                        if (folder.Name.toLowerCase() === sentNames[n].toLowerCase()) {
+                            return folder;
+                        }
+                    }
+                } catch (e2) {}
+            }
+        } catch (e3) {}
+
+        return null;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Sender/Empfaenger-Aufloesung (Exchange X500 -> SMTP)
+    // ══════════════════════════════════════════════════════════════
+    function getSenderSMTPAddress(mailItem) {
+        try {
+            var emailType = mailItem.SenderEmailType;
+            if (emailType === 'EX') {
+                try {
+                    var sender = mailItem.Sender;
+                    if (sender) {
+                        try {
+                            var exchUser = sender.GetExchangeUser();
+                            if (exchUser && exchUser.PrimarySmtpAddress) {
+                                return exchUser.PrimarySmtpAddress.toLowerCase();
+                            }
+                        } catch (e1) {}
+                        try {
+                            var smtpAddr = sender.PropertyAccessor.GetProperty(PR_SMTP_ADDRESS);
+                            if (smtpAddr) return smtpAddr.toLowerCase();
+                        } catch (e2) {}
+                    }
+                } catch (e3) {}
+            }
+            return (mailItem.SenderEmailAddress || '').toLowerCase();
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function getRecipientSMTPAddress(recipient) {
+        try {
+            var addr = recipient.Address || '';
+            if (addr.indexOf('@') > -1) return addr.toLowerCase();
+
+            try {
+                var addrEntry = recipient.AddressEntry;
+                if (addrEntry) {
+                    try {
+                        var exchUser = addrEntry.GetExchangeUser();
+                        if (exchUser && exchUser.PrimarySmtpAddress) {
+                            return exchUser.PrimarySmtpAddress.toLowerCase();
+                        }
+                    } catch (e1) {}
+                    try {
+                        var smtpAddr = addrEntry.PropertyAccessor.GetProperty(PR_SMTP_ADDRESS);
+                        if (smtpAddr) return smtpAddr.toLowerCase();
+                    } catch (e2) {}
+                }
+            } catch (e3) {}
+
+            return (recipient.Name || addr).toLowerCase();
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function getRecipientList(mailItem) {
+        var result = [];
+        try {
+            var recipients = mailItem.Recipients;
+            for (var r = 1; r <= recipients.Count; r++) {
+                try {
+                    var rcpt = recipients.Item(r);
+                    // Nur TO-Empfaenger (Type 1), nicht CC (2) oder BCC (3)
+                    if (rcpt.Type === 1) {
+                        result.push(getRecipientSMTPAddress(rcpt));
+                    }
+                } catch (e) {}
+            }
+        } catch (e) {}
+        return result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // EML-Export (via Outlook SaveAs MHTML)
+    // ══════════════════════════════════════════════════════════════
+    function saveAsEml(mailItem, filepath) {
+        // Outlook SaveAs mit olMHTML (10) erzeugt MIME-Format
+        mailItem.SaveAs(filepath, olMHTML);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // PDF-Export via Word COM
+    // ══════════════════════════════════════════════════════════════
+    function isWordAvailable() {
+        try {
+            var w = new ActiveXObject("Word.Application");
+            w.Quit(0);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function saveAsPdfViaWord(mailItem, pdfPath, wordApp) {
+        var htmlContent = buildEmailHtml(mailItem);
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+        // Temporaere HTML-Datei erstellen
+        var tempDir = fso.GetSpecialFolder(2).Path; // %TEMP%
+        var tempHtml = tempDir + "\\bgav_temp_" + (new Date()).getTime() + ".html";
+
+        // HTML-Datei schreiben (UTF-8 via ADODB.Stream)
+        writeUtf8File(tempHtml, htmlContent);
+
+        try {
+            // In Word oeffnen und als PDF speichern
+            var doc = wordApp.Documents.Open(tempHtml, false, true);
+            doc.SaveAs2(pdfPath, wdFormatPDF);
+            doc.Close(0); // wdDoNotSaveChanges
+        } catch (wordErr) {
+            throw wordErr;
+        } finally {
+            // Temp-Datei loeschen
+            try { fso.DeleteFile(tempHtml, true); } catch (de) {}
+        }
+    }
+
+    function saveAsPdfViaHtml(mailItem, pdfPath, outputDir, nr) {
+        // Fallback wenn Word nicht verfuegbar: Speichere als HTML
+        // (Benutzer kann HTML manuell zu PDF drucken)
+        var htmlPath = pdfPath.replace(/\.pdf$/i, '.html');
+        var htmlContent = buildEmailHtml(mailItem);
+        writeUtf8File(htmlPath, htmlContent);
+        logWarn("  Kein Word - HTML gespeichert (bitte manuell als PDF drucken): " + nr + ".html");
+    }
+
+    function saveAsHtmlFallback(mailItem, htmlPath) {
+        var htmlContent = buildEmailHtml(mailItem);
+        writeUtf8File(htmlPath, htmlContent);
+    }
+
+    function buildEmailHtml(mailItem) {
+        var subject = '';
+        try { subject = mailItem.Subject || ''; } catch (e) {}
+
+        var senderEmail = getSenderSMTPAddress(mailItem);
+        var senderName = '';
+        try { senderName = mailItem.SenderName || ''; } catch (e) {}
+
+        var sentDate = '';
+        try { sentDate = formatDateLong(mailItem.SentOn); } catch (e) {}
+
+        // Empfaenger
+        var toList = [];
+        var ccList = [];
+        try {
+            var recipients = mailItem.Recipients;
+            for (var r = 1; r <= recipients.Count; r++) {
+                try {
+                    var rcpt = recipients.Item(r);
+                    var rcptEmail = getRecipientSMTPAddress(rcpt);
+                    var rcptName = rcpt.Name || '';
+                    var display = rcptName ? rcptName + ' &lt;' + rcptEmail + '&gt;' : rcptEmail;
+                    if (rcpt.Type === 1) toList.push(display);
+                    else if (rcpt.Type === 2) ccList.push(display);
+                } catch (re) {}
+            }
+        } catch (e) {}
+
+        // Body
+        var body = '';
+        try {
+            var htmlBody = mailItem.HTMLBody || '';
+            if (htmlBody) {
+                // HTML-Body bereinigen
+                body = cleanHtmlBody(htmlBody);
+            } else {
+                var textBody = mailItem.Body || '';
+                body = '<pre style="white-space:pre-wrap;font-family:Segoe UI,Arial,sans-serif;font-size:10pt;">' +
+                    escapeHtml(textBody) + '</pre>';
+            }
+        } catch (e) {}
+
+        var senderDisplay = senderName ? senderName + ' &lt;' + senderEmail + '&gt;' : senderEmail;
+        var now = new Date();
+
+        return '<!DOCTYPE html>\n' +
+            '<html>\n<head>\n<meta charset="utf-8"/>\n' +
+            '<style>\n' +
+            '@page { size: A4; margin: 2cm; }\n' +
+            'body { font-family: Segoe UI, Arial, sans-serif; font-size: 10pt; color: #333; margin: 20px; }\n' +
+            '.email-header { border-bottom: 2px solid #0078d4; padding-bottom: 10px; margin-bottom: 15px; }\n' +
+            '.subject { font-size: 14pt; font-weight: bold; color: #0078d4; margin: 10px 0 5px 0; }\n' +
+            '.hf { margin: 3px 0; font-size: 9pt; }\n' +
+            '.hl { font-weight: bold; color: #555; display: inline-block; width: 55px; }\n' +
+            '.email-body { margin-top: 10px; line-height: 1.4; }\n' +
+            '.footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 8pt; color: #999; }\n' +
+            '</style>\n</head>\n<body>\n' +
+            '<div class="email-header">\n' +
+            '  <div class="subject">' + escapeHtml(subject) + '</div>\n' +
+            '  <div class="hf"><span class="hl">Von:</span> ' + senderDisplay + '</div>\n' +
+            '  <div class="hf"><span class="hl">An:</span> ' + toList.join('; ') + '</div>\n' +
+            (ccList.length > 0 ? '  <div class="hf"><span class="hl">CC:</span> ' + ccList.join('; ') + '</div>\n' : '') +
+            '  <div class="hf"><span class="hl">Datum:</span> ' + sentDate + '</div>\n' +
+            '  <div class="hf"><span class="hl">Betreff:</span> ' + escapeHtml(subject) + '</div>\n' +
+            '</div>\n' +
+            '<div class="email-body">\n' + body + '\n</div>\n' +
+            '<div class="footer">Exportiert am ' + formatDateLong(now) +
+            ' | Quelle: ' + senderEmail + ' (Gesendete Elemente)</div>\n' +
+            '</body>\n</html>';
+    }
+
+    function cleanHtmlBody(html) {
+        // Entferne style, script, link, meta, img Tags
+        html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        html = html.replace(/<link[^>]*\/?>/gi, '');
+        html = html.replace(/<meta[^>]*\/?>/gi, '');
+        html = html.replace(/<\/?html[^>]*>/gi, '');
+        html = html.replace(/<\/?head[^>]*>/gi, '');
+        html = html.replace(/<\/?body[^>]*>/gi, '');
+        html = html.replace(/<!DOCTYPE[^>]*>/gi, '');
+        html = html.replace(/<img[^>]*>/gi, '');
+        return html;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Excel-Metadaten laden (COM)
+    // ══════════════════════════════════════════════════════════════
+    function loadExcelMetadata(excelPath) {
+        var lookup = {};
+        var excelApp = null;
+        var workbook = null;
+
+        try {
+            excelApp = new ActiveXObject("Excel.Application");
+            excelApp.Visible = false;
+            excelApp.DisplayAlerts = false;
+
+            workbook = excelApp.Workbooks.Open(excelPath, 0, true); // ReadOnly
+            var ws = workbook.Sheets.Item(1);
+
+            var maxRow = ws.UsedRange.Rows.Count;
+            logInfo("Excel geladen: " + maxRow + " Zeilen");
+
+            // Spalte A=1 (BD-Nummer), I=9 (Vorname), J=10 (Nachname), K=11 (Email)
+            for (var row = 2; row <= maxRow + 1; row++) {
+                try {
+                    var emailVal = ws.Cells(row, 11).Value;
+                    if (!emailVal) continue;
+
+                    var emailKey = String(emailVal).replace(/^\s+|\s+$/g, '').toLowerCase();
+                    if (!emailKey || emailKey.indexOf('@') === -1) continue;
+
+                    var bdNummer = ws.Cells(row, 1).Value;
+                    var vorname = ws.Cells(row, 9).Value;
+                    var nachname = ws.Cells(row, 10).Value;
+
+                    lookup[emailKey] = {
+                        bd_nummer: bdNummer ? String(bdNummer).replace(/^\s+|\s+$/g, '') : '',
+                        vorname: vorname ? String(vorname).replace(/^\s+|\s+$/g, '') : '',
+                        nachname: nachname ? String(nachname).replace(/^\s+|\s+$/g, '') : '',
+                        email: String(emailVal).replace(/^\s+|\s+$/g, '')
+                    };
+                } catch (rowErr) {}
+            }
+
+        } catch (excelErr) {
+            logError("Excel-Fehler: " + excelErr.message);
+        } finally {
+            try { if (workbook) workbook.Close(false); } catch (e) {}
+            try { if (excelApp) excelApp.Quit(); } catch (e) {}
+        }
+
+        return lookup;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // CSV-Erzeugung
+    // ══════════════════════════════════════════════════════════════
+    function generateMetadataCsv(mails, lookup, csvPath) {
+        var lines = [];
+        var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff";
+        lines.push(header);
+
+        var nr = 0;
+        var klammerbegriff = "BGAV Titelbezeichnung";
+
+        for (var i = 0; i < mails.length; i++) {
+            var fileNr = padNumber(i + 1, 3);
+            var emlName = "BGAV_Titelbezeichnung_" + fileNr + ".eml";
+            var pdfName = "BGAV_Titelbezeichnung_" + fileNr + ".pdf";
+
+            var toRecipients = getRecipientList(mails[i]);
+
+            if (toRecipients.length === 0) {
+                nr++;
+                lines.push(csvLine(nr, emlName, pdfName, '', '', '', '', klammerbegriff));
+                logWarn("  Mail " + fileNr + ": Kein Empfaenger gefunden");
+                continue;
+            }
+
+            for (var r = 0; r < toRecipients.length; r++) {
+                nr++;
+                var rcptEmail = toRecipients[r];
+                var meta = lookup[rcptEmail];
+
+                if (meta) {
+                    lines.push(csvLine(nr, emlName, pdfName, meta.email, meta.vorname, meta.nachname, meta.bd_nummer, klammerbegriff));
+                    logInfo("  " + fileNr + " -> " + meta.email + " | BD: " + meta.bd_nummer + " | " + meta.vorname + " " + meta.nachname);
+                } else {
+                    // Empfaenger nicht in Excel
+                    lines.push(csvLine(nr, emlName, pdfName, rcptEmail, '', '', '', klammerbegriff));
+                    logWarn("  " + fileNr + " -> " + rcptEmail + ": NICHT in Excel gefunden! BD-Nummer leer.");
+                }
+            }
+        }
+
+        // CSV schreiben (UTF-8 mit BOM)
+        var csvContent = lines.join('\r\n') + '\r\n';
+        writeUtf8File(csvPath, csvContent);
+
+        return nr;
+    }
+
+    function csvLine(nr, eml, pdf, email, vorname, nachname, bd, klammer) {
+        return nr + ';' +
+            csvEscape(eml) + ';' +
+            csvEscape(pdf) + ';' +
+            csvEscape(email) + ';' +
+            csvEscape(vorname) + ';' +
+            csvEscape(nachname) + ';' +
+            csvEscape(bd) + ';' +
+            csvEscape(klammer);
+    }
+
+    function csvEscape(val) {
+        if (!val) return '';
+        var s = String(val);
+        if (s.indexOf(';') > -1 || s.indexOf('"') > -1 || s.indexOf('\n') > -1) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Datei-Operationen
+    // ══════════════════════════════════════════════════════════════
+    function writeUtf8File(filepath, content) {
+        var stream = new ActiveXObject("ADODB.Stream");
+        stream.Type = 2; // adTypeText
+        stream.Charset = "UTF-8";
+        stream.Open();
+        stream.WriteText(content);
+        stream.SaveToFile(filepath, 2); // adSaveCreateOverWrite
+        stream.Close();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Ergebnis-Anzeige
+    // ══════════════════════════════════════════════════════════════
+    function showResults(outputBase, csvRows) {
+        document.getElementById('panelResults').style.display = 'block';
+
+        document.getElementById('resultsSummary').innerHTML =
+            '<p style="margin-bottom:8px;">' +
+            '<strong>' + extractedMails.length + '</strong> Mails exportiert | ' +
+            '<strong>' + csvRows + '</strong> CSV-Eintraege | ' +
+            'Ordner: <span class="file-path">' + outputBase + '</span></p>';
+
+        var tbody = document.getElementById('resultsBody');
+        tbody.innerHTML = '';
+
+        for (var i = 0; i < extractedMails.length; i++) {
+            var fileNr = padNumber(i + 1, 3);
+            var toRecipients = getRecipientList(extractedMails[i]);
+
+            for (var r = 0; r < toRecipients.length; r++) {
+                var rcptEmail = toRecipients[r];
+                var meta = excelLookup[rcptEmail];
+                var bd = meta ? meta.bd_nummer : '-';
+                var name = meta ? meta.vorname + ' ' + meta.nachname : rcptEmail;
+
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td>' + fileNr + '</td>' +
+                    '<td>' + escapeHtml(name) + '<br><small style="color:#94a3b8;">' + escapeHtml(rcptEmail) + '</small></td>' +
+                    '<td>' + escapeHtml(bd) + '</td>' +
+                    '<td style="color:#10b981;">&#10003;</td>' +
+                    '<td style="color:#10b981;">&#10003;</td>';
+                tbody.appendChild(tr);
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // UI-Hilfsfunktionen
+    // ══════════════════════════════════════════════════════════════
+    function setProgress(pct, text) {
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressText').innerText = text;
+    }
+
+    function setStepActive(stepId) {
+        document.getElementById(stepId).className = 'step active';
+    }
+
+    function setStepCompleted(stepId) {
+        document.getElementById(stepId).className = 'step completed';
+    }
+
+    function showError(msg) {
+        var el = document.getElementById('errorStatus');
+        el.innerHTML = msg;
+        el.style.display = 'block';
+    }
+
+    function showSuccess(msg) {
+        var el = document.getElementById('successStatus');
+        el.innerHTML = msg;
+        el.style.display = 'block';
+    }
+
+    function showInfo(msg) {
+        var el = document.getElementById('infoStatus');
+        el.innerHTML = msg;
+        el.style.display = 'block';
+    }
+
+    function hideAllStatus() {
+        document.getElementById('errorStatus').style.display = 'none';
+        document.getElementById('successStatus').style.display = 'none';
+        document.getElementById('infoStatus').style.display = 'none';
+    }
+
+    function logEntry(msg, cls) {
+        var container = document.getElementById('logContainer');
+        container.style.display = 'block';
+        var div = document.createElement('div');
+        div.className = 'log-entry ' + (cls || '');
+        div.innerText = msg;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function logInfo(msg)    { logEntry(msg, 'info'); }
+    function logSuccess(msg) { logEntry(msg, 'success'); }
+    function logWarn(msg)    { logEntry(msg, 'warn'); }
+    function logError(msg)   { logEntry(msg, 'error'); }
+
+    function resetButtons() {
+        document.getElementById('btnStart').disabled = false;
+    }
+
+    function resetTool() {
+        document.getElementById('panelResults').style.display = 'none';
+        document.getElementById('progressContainer').style.display = 'none';
+        document.getElementById('logContainer').innerHTML = '';
+        document.getElementById('logContainer').style.display = 'none';
+        hideAllStatus();
+        extractedMails = [];
+
+        document.getElementById('step1').className = 'step active';
+        document.getElementById('step2').className = 'step';
+        document.getElementById('step3').className = 'step';
+        document.getElementById('step4').className = 'step';
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Hilfsfunktionen
+    // ══════════════════════════════════════════════════════════════
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function padNumber(num, len) {
+        var s = String(num);
+        while (s.length < len) s = '0' + s;
+        return s;
+    }
+
+    function countKeys(obj) {
+        var count = 0;
+        for (var k in obj) {
+            if (obj.hasOwnProperty(k)) count++;
+        }
+        return count;
+    }
+
+    function formatDateShort(d) {
+        try {
+            var dt = new Date(d);
+            return padNumber(dt.getDate(), 2) + '.' +
+                padNumber(dt.getMonth() + 1, 2) + '.' +
+                dt.getFullYear() + ' ' +
+                padNumber(dt.getHours(), 2) + ':' +
+                padNumber(dt.getMinutes(), 2);
+        } catch (e) { return ''; }
+    }
+
+    function formatDateLong(d) {
+        try {
+            var dt = new Date(d);
+            return padNumber(dt.getDate(), 2) + '.' +
+                padNumber(dt.getMonth() + 1, 2) + '.' +
+                dt.getFullYear() + ' ' +
+                padNumber(dt.getHours(), 2) + ':' +
+                padNumber(dt.getMinutes(), 2) + ':' +
+                padNumber(dt.getSeconds(), 2);
+        } catch (e) { return ''; }
+    }
+    </script>
+</body>
+</html>
