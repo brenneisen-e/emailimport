@@ -292,7 +292,7 @@
         <!-- Header -->
         <div class="header">
             <h1>BGAV Testmail-Extraktion</h1>
-            <div class="subtitle">Gesendete BGAV-Titelbezeichnung-Mails extrahieren (EML + PDF + Metadaten-CSV)</div>
+            <div class="subtitle">Gesendete BGAV-Titelaenderung-Mails extrahieren (EML + PDF + Metadaten-CSV)</div>
             <div class="badge">SST-Workflow-API Vorbereitung</div>
         </div>
 
@@ -767,13 +767,13 @@
                     }
                 }
 
-                // Dateiname: 00010091_BGAV_Titelbezeichnung_001 (BD-Nr vorne)
+                // Dateiname: 00010091_BGAV_Titelaenderung_001 (BD-Nr vorne)
                 var baseName;
                 if (bdNr) {
-                    baseName = bdNr + "_BGAV_Titelbezeichnung_" + fnNr;
+                    baseName = bdNr + "_BGAV_Titelaenderung_" + fnNr;
                     logInfo("  " + fnNr + ": BD " + bdNr + " -> " + baseName);
                 } else {
-                    baseName = "BGAV_Titelbezeichnung_" + fnNr;
+                    baseName = "BGAV_Titelaenderung_" + fnNr;
                     logWarn("  " + fnNr + ": Keine BD-Nummer gefunden -> " + baseName);
                 }
 
@@ -1227,7 +1227,7 @@
         lines.push(header);
 
         var nr = 0;
-        var klammerbegriff = "BGAV Titelbezeichnung";
+        var klammerbegriff = "BGAV Titelaenderung";
 
         for (var i = 0; i < mails.length; i++) {
             var emlName = fileNames[i].baseName + ".eml";
