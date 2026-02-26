@@ -409,6 +409,7 @@
     var selectedStore = null;
     var excelLookup = {};
     var extractedMails = [];
+    var extractedFileNames = []; // {nr, baseName, bdNummer, emlPath, pdfPath}
 
     var PR_SMTP_ADDRESS = "http://schemas.microsoft.com/mapi/proptag/0x39FE001F";
 
@@ -739,65 +740,101 @@
                 logWarn("Nur " + extractedMails.length + " von " + maxMails + " gewuenschten Mails gefunden");
             }
 
-            // ── 4. EML + PDF speichern ──
+            // ── 4. Dateinamen mit BD-Nummer aufbauen ──
+            setProgress(50, 'Ermittle BD-Nummern fuer Dateinamen...');
+            logInfo("--- Dateinamen-Zuordnung ---");
+
+            var fileNames = []; // Array mit {nr, baseName, bdNummer, emlPath, pdfPath}
+            for (var fn = 0; fn < extractedMails.length; fn++) {
+                var fnNr = padNumber(fn + 1, 3);
+                var toRcpts = getRecipientList(extractedMails[fn]);
+                var bdNr = '';
+
+                // Erste TO-Adresse gegen Excel matchen
+                for (var tr = 0; tr < toRcpts.length; tr++) {
+                    var rcptMeta = excelLookup[toRcpts[tr]];
+                    if (rcptMeta && rcptMeta.bd_nummer) {
+                        bdNr = rcptMeta.bd_nummer;
+                        break;
+                    }
+                }
+
+                // Dateiname: BGAV_Titelbezeichnung_BD00010091_001  (oder ohne BD wenn nicht gefunden)
+                var baseName;
+                if (bdNr) {
+                    baseName = "BGAV_Titelbezeichnung_BD" + bdNr + "_" + fnNr;
+                    logInfo("  " + fnNr + ": BD " + bdNr + " -> " + baseName);
+                } else {
+                    baseName = "BGAV_Titelbezeichnung_" + fnNr;
+                    logWarn("  " + fnNr + ": Keine BD-Nummer gefunden -> " + baseName);
+                }
+
+                fileNames.push({
+                    nr: fnNr,
+                    baseName: baseName,
+                    bdNummer: bdNr,
+                    emlPath: emlDir + "\\" + baseName + ".eml",
+                    pdfPath: pdfDir + "\\" + baseName + ".pdf"
+                });
+            }
+            extractedFileNames = fileNames; // global speichern fuer Ergebnis-Anzeige
+
+            // ── 5. EML speichern ──
             setProgress(55, 'Speichere EML-Dateien...');
             logInfo("--- EML Export ---");
 
             for (var e = 0; e < extractedMails.length; e++) {
-                var nr = padNumber(e + 1, 3);
-                var emlPath = emlDir + "\\BGAV_Titelbezeichnung_" + nr + ".eml";
-
                 try {
-                    saveAsEml(extractedMails[e], emlPath);
-                    logSuccess("  EML: BGAV_Titelbezeichnung_" + nr + ".eml");
+                    saveAsEml(extractedMails[e], fileNames[e].emlPath);
+                    logSuccess("  EML: " + fileNames[e].baseName + ".eml");
                 } catch (emlErr) {
-                    logError("  EML-Fehler Mail " + nr + ": " + emlErr.message);
+                    logError("  EML-Fehler " + fileNames[e].nr + ": " + emlErr.message);
                 }
 
-                setProgress(55 + Math.round(((e + 1) / extractedMails.length) * 15),
+                setProgress(55 + Math.round(((e + 1) / extractedMails.length) * 10),
                     'EML ' + (e + 1) + '/' + extractedMails.length);
             }
 
-            setProgress(72, 'Erstelle PDF-Dateien...');
+            // ── 6. PDF erstellen ──
+            setProgress(68, 'Erstelle PDF-Dateien...');
             logInfo("--- PDF Export ---");
 
-            // Pruefen ob Word verfuegbar ist
-            var wordAvailable = isWordAvailable();
             var wordApp = null;
-
-            if (wordAvailable) {
-                try {
-                    wordApp = new ActiveXObject("Word.Application");
-                    wordApp.Visible = false;
-                    logInfo("Word gefunden - erstelle PDF via Word");
-                } catch (wordErr) {
-                    wordAvailable = false;
-                    logWarn("Word nicht verfuegbar: " + wordErr.message);
-                }
+            var wordAvailable = false;
+            try {
+                wordApp = new ActiveXObject("Word.Application");
+                wordApp.Visible = false;
+                wordAvailable = true;
+                logInfo("Word gefunden - erstelle PDF via Word");
+            } catch (wordInitErr) {
+                logWarn("Word nicht verfuegbar (" + wordInitErr.message + "). Speichere HTML als Fallback.");
             }
 
             for (var p = 0; p < extractedMails.length; p++) {
-                var pNr = padNumber(p + 1, 3);
-                var pdfPath = pdfDir + "\\BGAV_Titelbezeichnung_" + pNr + ".pdf";
+                var pdfOk = false;
 
-                try {
-                    if (wordAvailable && wordApp) {
-                        saveAsPdfViaWord(extractedMails[p], pdfPath, wordApp);
-                    } else {
-                        saveAsPdfViaHtml(extractedMails[p], pdfPath, pdfDir, pNr);
-                    }
-                    logSuccess("  PDF: BGAV_Titelbezeichnung_" + pNr + ".pdf");
-                } catch (pdfErr) {
-                    logError("  PDF-Fehler Mail " + pNr + ": " + pdfErr.message);
-                    // Fallback: Als HTML speichern
+                if (wordAvailable && wordApp) {
                     try {
-                        var htmlFallback = pdfDir + "\\BGAV_Titelbezeichnung_" + pNr + ".html";
-                        saveAsHtmlFallback(extractedMails[p], htmlFallback);
-                        logWarn("  Fallback: HTML gespeichert statt PDF");
-                    } catch (htmlErr) {}
+                        saveAsPdfViaWord(extractedMails[p], fileNames[p].pdfPath, wordApp);
+                        logSuccess("  PDF: " + fileNames[p].baseName + ".pdf");
+                        pdfOk = true;
+                    } catch (pdfErr) {
+                        logError("  PDF-Fehler " + fileNames[p].nr + ": " + pdfErr.message);
+                    }
                 }
 
-                setProgress(72 + Math.round(((p + 1) / extractedMails.length) * 15),
+                if (!pdfOk) {
+                    // Fallback: HTML speichern (gleicher Name aber .html)
+                    try {
+                        var htmlFallbackPath = pdfDir + "\\" + fileNames[p].baseName + ".html";
+                        saveAsHtmlFallback(extractedMails[p], htmlFallbackPath);
+                        logWarn("  HTML-Fallback: " + fileNames[p].baseName + ".html (bitte manuell als PDF drucken)");
+                    } catch (htmlErr) {
+                        logError("  Auch HTML-Fallback fehlgeschlagen: " + htmlErr.message);
+                    }
+                }
+
+                setProgress(68 + Math.round(((p + 1) / extractedMails.length) * 17),
                     'PDF ' + (p + 1) + '/' + extractedMails.length);
             }
 
@@ -807,12 +844,12 @@
                 wordApp = null;
             }
 
-            // ── 5. CSV erzeugen ──
+            // ── 7. CSV erzeugen ──
             setProgress(90, 'Erzeuge Metadaten-CSV...');
             logInfo("--- CSV Export ---");
 
             var csvPath = outputBase + "\\testfaelle_metadaten.csv";
-            var csvRows = generateMetadataCsv(extractedMails, excelLookup, csvPath);
+            var csvRows = generateMetadataCsv(extractedMails, excelLookup, csvPath, fileNames);
 
             logSuccess("CSV gespeichert: testfaelle_metadaten.csv (" + csvRows + " Eintraege)");
 
@@ -966,39 +1003,68 @@
     }
 
     function saveAsPdfViaWord(mailItem, pdfPath, wordApp) {
-        var htmlContent = buildEmailHtml(mailItem);
         var fso = new ActiveXObject("Scripting.FileSystemObject");
-
-        // Temporaere HTML-Datei erstellen
         var tempDir = fso.GetSpecialFolder(2).Path; // %TEMP%
-        var tempHtml = tempDir + "\\bgav_temp_" + (new Date()).getTime() + ".html";
+        var tempBase = tempDir + "\\bgav_temp_" + (new Date()).getTime();
 
-        // HTML-Datei schreiben (UTF-8 via ADODB.Stream)
-        writeUtf8File(tempHtml, htmlContent);
+        // Methode 1: Outlook-eigene HTML-Speicherung + Word-Konvertierung
+        // (zuverlaessiger als selbst gebautes HTML)
+        var tempHtml = tempBase + ".html";
+        var tempMht = tempBase + ".mht";
+        var doc = null;
 
         try {
-            // In Word oeffnen und als PDF speichern
-            var doc = wordApp.Documents.Open(tempHtml, false, true);
-            doc.SaveAs2(pdfPath, wdFormatPDF);
-            doc.Close(0); // wdDoNotSaveChanges
-        } catch (wordErr) {
-            throw wordErr;
-        } finally {
-            // Temp-Datei loeschen
-            try { fso.DeleteFile(tempHtml, true); } catch (de) {}
+            // Versuche zuerst MHT (enthaelt eingebettete Bilder/Formatierung)
+            mailItem.SaveAs(tempMht, olMHTML);
+            doc = wordApp.Documents.Open(tempMht, false, true, false);
+        } catch (mhtErr) {
+            // Fallback: Outlook HTML-Export
+            try {
+                mailItem.SaveAs(tempHtml, olHTML);
+                doc = wordApp.Documents.Open(tempHtml, false, true, false);
+            } catch (htmlErr) {
+                // Letzter Versuch: selbst gebautes HTML
+                var htmlContent = buildEmailHtml(mailItem);
+                writeUtf8File(tempHtml, htmlContent);
+                doc = wordApp.Documents.Open(tempHtml, false, true, false);
+            }
         }
-    }
 
-    function saveAsPdfViaHtml(mailItem, pdfPath, outputDir, nr) {
-        // Fallback wenn Word nicht verfuegbar: Speichere als HTML
-        // (Benutzer kann HTML manuell zu PDF drucken)
-        var htmlPath = pdfPath.replace(/\.pdf$/i, '.html');
-        var htmlContent = buildEmailHtml(mailItem);
-        writeUtf8File(htmlPath, htmlContent);
-        logWarn("  Kein Word - HTML gespeichert (bitte manuell als PDF drucken): " + nr + ".html");
+        try {
+            // ExportAsFixedFormat ist zuverlaessiger als SaveAs2 fuer PDF
+            // wdExportFormatPDF = 17, wdExportOptimizeForPrint = 0
+            doc.ExportAsFixedFormat(
+                pdfPath,            // OutputFileName
+                17,                 // ExportFormat: wdExportFormatPDF
+                false,              // OpenAfterExport
+                0,                  // OptimizeFor: wdExportOptimizeForPrint
+                0                   // Range: wdExportAllDocument
+            );
+        } catch (exportErr) {
+            // Fallback auf SaveAs2
+            doc.SaveAs2(pdfPath, wdFormatPDF);
+        }
+
+        doc.Close(0); // wdDoNotSaveChanges
+
+        // Temp-Dateien aufraumen
+        try { if (fso.FileExists(tempHtml)) fso.DeleteFile(tempHtml, true); } catch (de) {}
+        try { if (fso.FileExists(tempMht)) fso.DeleteFile(tempMht, true); } catch (de2) {}
+        // MHT erzeugt manchmal einen _files-Ordner
+        try {
+            var filesDir = tempBase + "_files";
+            if (fso.FolderExists(filesDir)) fso.DeleteFolder(filesDir, true);
+        } catch (de3) {}
     }
 
     function saveAsHtmlFallback(mailItem, htmlPath) {
+        // Versuche zuerst Outlook-eigenen HTML-Export
+        try {
+            mailItem.SaveAs(htmlPath, olHTML);
+            return;
+        } catch (e) {}
+
+        // Fallback: selbst gebautes HTML
         var htmlContent = buildEmailHtml(mailItem);
         writeUtf8File(htmlPath, htmlContent);
     }
@@ -1142,7 +1208,7 @@
     // ══════════════════════════════════════════════════════════════
     // CSV-Erzeugung
     // ══════════════════════════════════════════════════════════════
-    function generateMetadataCsv(mails, lookup, csvPath) {
+    function generateMetadataCsv(mails, lookup, csvPath, fileNames) {
         var lines = [];
         var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff";
         lines.push(header);
@@ -1151,16 +1217,15 @@
         var klammerbegriff = "BGAV Titelbezeichnung";
 
         for (var i = 0; i < mails.length; i++) {
-            var fileNr = padNumber(i + 1, 3);
-            var emlName = "BGAV_Titelbezeichnung_" + fileNr + ".eml";
-            var pdfName = "BGAV_Titelbezeichnung_" + fileNr + ".pdf";
+            var emlName = fileNames[i].baseName + ".eml";
+            var pdfName = fileNames[i].baseName + ".pdf";
 
             var toRecipients = getRecipientList(mails[i]);
 
             if (toRecipients.length === 0) {
                 nr++;
                 lines.push(csvLine(nr, emlName, pdfName, '', '', '', '', klammerbegriff));
-                logWarn("  Mail " + fileNr + ": Kein Empfaenger gefunden");
+                logWarn("  Mail " + fileNames[i].nr + ": Kein Empfaenger gefunden");
                 continue;
             }
 
@@ -1171,11 +1236,11 @@
 
                 if (meta) {
                     lines.push(csvLine(nr, emlName, pdfName, meta.email, meta.vorname, meta.nachname, meta.bd_nummer, klammerbegriff));
-                    logInfo("  " + fileNr + " -> " + meta.email + " | BD: " + meta.bd_nummer + " | " + meta.vorname + " " + meta.nachname);
+                    logInfo("  " + fileNames[i].nr + " -> " + meta.email + " | BD: " + meta.bd_nummer + " | " + meta.vorname + " " + meta.nachname);
                 } else {
                     // Empfaenger nicht in Excel
                     lines.push(csvLine(nr, emlName, pdfName, rcptEmail, '', '', '', klammerbegriff));
-                    logWarn("  " + fileNr + " -> " + rcptEmail + ": NICHT in Excel gefunden! BD-Nummer leer.");
+                    logWarn("  " + fileNames[i].nr + " -> " + rcptEmail + ": NICHT in Excel gefunden! BD-Nummer leer.");
                 }
             }
         }
@@ -1236,7 +1301,7 @@
         tbody.innerHTML = '';
 
         for (var i = 0; i < extractedMails.length; i++) {
-            var fileNr = padNumber(i + 1, 3);
+            var fInfo = extractedFileNames[i];
             var toRecipients = getRecipientList(extractedMails[i]);
 
             for (var r = 0; r < toRecipients.length; r++) {
@@ -1247,11 +1312,11 @@
 
                 var tr = document.createElement('tr');
                 tr.innerHTML =
-                    '<td>' + fileNr + '</td>' +
+                    '<td>' + fInfo.nr + '</td>' +
                     '<td>' + escapeHtml(name) + '<br><small style="color:#94a3b8;">' + escapeHtml(rcptEmail) + '</small></td>' +
                     '<td>' + escapeHtml(bd) + '</td>' +
-                    '<td style="color:#10b981;">&#10003;</td>' +
-                    '<td style="color:#10b981;">&#10003;</td>';
+                    '<td style="color:#10b981;">&#10003; ' + escapeHtml(fInfo.baseName) + '.eml</td>' +
+                    '<td style="color:#10b981;">&#10003; ' + escapeHtml(fInfo.baseName) + '.pdf</td>';
                 tbody.appendChild(tr);
             }
         }
