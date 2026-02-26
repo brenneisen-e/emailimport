@@ -16,7 +16,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.1"
+        VERSION="1.2"
         WINDOWSTATE="normal"
     />
 
@@ -436,13 +436,7 @@
     };
 
     function setDefaultPaths() {
-        try {
-            var shell = new ActiveXObject("WScript.Shell");
-            var desktop = shell.SpecialFolders("Desktop");
-            document.getElementById('outputPath').value = desktop + "\\BGAV_Testmails";
-        } catch (e) {
-            document.getElementById('outputPath').value = "C:\\BGAV_Testmails";
-        }
+        document.getElementById('outputPath').value = "\\\\cifs\\shellfolder\\243898\\Desktop_2016\\Neuer Ordner (5)";
 
         // Versuche Excel-Datei automatisch zu finden
         try {
@@ -693,9 +687,11 @@
                 filteredItems = items;
             }
 
-            // Mails sammeln
+            // Mails sammeln (mit Duplikat-Erkennung ueber ConversationID)
             extractedMails = [];
+            var seenConversations = {}; // ConversationID -> true
             var checked = 0;
+            var duplicatesSkipped = 0;
             var totalItems = filteredItems.Count;
 
             for (var i = 1; i <= totalItems; i++) {
@@ -709,16 +705,24 @@
                     // Betreff pruefen (falls Restrict nicht perfekt gefiltert hat)
                     if (subject.indexOf(subjectFilter) === -1) continue;
 
-                    // Sender pruefen: nur tatsaechlich gesendete Mails
-                    var senderEmail = getSenderSMTPAddress(item);
-                    // Akzeptiere alle Mails aus dem Gesendete-Ordner
+                    // Duplikat-Erkennung: Pro Konversation nur eine Mail
+                    var convId = '';
+                    try { convId = item.ConversationID || ''; } catch (ce) {}
+
+                    if (convId && seenConversations[convId]) {
+                        duplicatesSkipped++;
+                        logWarn("  Duplikat uebersprungen (gleiche Konversation): " + subject);
+                        continue;
+                    }
+                    if (convId) seenConversations[convId] = true;
 
                     extractedMails.push(item);
 
                     var recipients = getRecipientList(item);
                     logInfo("[" + extractedMails.length + "] " + subject +
                         " | An: " + recipients.join(", ") +
-                        " | " + formatDateShort(item.SentOn));
+                        " | " + formatDateShort(item.SentOn) +
+                        (convId ? " | Conv: " + convId.substring(0, 8) + "..." : ""));
 
                     var pct = 20 + Math.round((extractedMails.length / maxMails) * 30);
                     setProgress(pct, 'Mail ' + extractedMails.length + ' von ' + maxMails + ' gefunden...');
@@ -728,6 +732,10 @@
                 } catch (itemErr) {
                     // Einzelne Items ueberspringen
                 }
+            }
+
+            if (duplicatesSkipped > 0) {
+                logInfo(duplicatesSkipped + " Duplikate (gleiche Konversation) uebersprungen");
             }
 
             if (extractedMails.length === 0) {
@@ -769,10 +777,15 @@
                     logWarn("  " + fnNr + ": Keine BD-Nummer gefunden -> " + baseName);
                 }
 
+                // ConversationID auslesen
+                var convId = '';
+                try { convId = extractedMails[fn].ConversationID || ''; } catch (ce) {}
+
                 fileNames.push({
                     nr: fnNr,
                     baseName: baseName,
                     bdNummer: bdNr,
+                    conversationId: convId,
                     emlPath: emlDir + "\\" + baseName + ".eml",
                     pdfPath: pdfDir + "\\" + baseName + ".pdf"
                 });
@@ -1210,7 +1223,7 @@
     // ══════════════════════════════════════════════════════════════
     function generateMetadataCsv(mails, lookup, csvPath, fileNames) {
         var lines = [];
-        var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff";
+        var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff;Konversations_ID";
         lines.push(header);
 
         var nr = 0;
@@ -1219,12 +1232,13 @@
         for (var i = 0; i < mails.length; i++) {
             var emlName = fileNames[i].baseName + ".eml";
             var pdfName = fileNames[i].baseName + ".pdf";
+            var convId = fileNames[i].conversationId || '';
 
             var toRecipients = getRecipientList(mails[i]);
 
             if (toRecipients.length === 0) {
                 nr++;
-                lines.push(csvLine(nr, emlName, pdfName, '', '', '', '', klammerbegriff));
+                lines.push(csvLine(nr, emlName, pdfName, '', '', '', '', klammerbegriff, convId));
                 logWarn("  Mail " + fileNames[i].nr + ": Kein Empfaenger gefunden");
                 continue;
             }
@@ -1235,11 +1249,11 @@
                 var meta = lookup[rcptEmail];
 
                 if (meta) {
-                    lines.push(csvLine(nr, emlName, pdfName, meta.email, meta.vorname, meta.nachname, meta.bd_nummer, klammerbegriff));
+                    lines.push(csvLine(nr, emlName, pdfName, meta.email, meta.vorname, meta.nachname, meta.bd_nummer, klammerbegriff, convId));
                     logInfo("  " + fileNames[i].nr + " -> " + meta.email + " | BD: " + meta.bd_nummer + " | " + meta.vorname + " " + meta.nachname);
                 } else {
                     // Empfaenger nicht in Excel
-                    lines.push(csvLine(nr, emlName, pdfName, rcptEmail, '', '', '', klammerbegriff));
+                    lines.push(csvLine(nr, emlName, pdfName, rcptEmail, '', '', '', klammerbegriff, convId));
                     logWarn("  " + fileNames[i].nr + " -> " + rcptEmail + ": NICHT in Excel gefunden! BD-Nummer leer.");
                 }
             }
@@ -1252,7 +1266,7 @@
         return nr;
     }
 
-    function csvLine(nr, eml, pdf, email, vorname, nachname, bd, klammer) {
+    function csvLine(nr, eml, pdf, email, vorname, nachname, bd, klammer, convId) {
         return nr + ';' +
             csvEscape(eml) + ';' +
             csvEscape(pdf) + ';' +
@@ -1260,7 +1274,8 @@
             csvEscape(vorname) + ';' +
             csvEscape(nachname) + ';' +
             csvEscape(bd) + ';' +
-            csvEscape(klammer);
+            csvEscape(klammer) + ';' +
+            csvEscape(convId || '');
     }
 
     function csvEscape(val) {
