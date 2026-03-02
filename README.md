@@ -449,6 +449,115 @@ emailimport/
 
 ---
 
+---
+
+## Teil 4: BGAV Testmail-Extraktion + SST-Workflow-Upload
+
+Neben dem Hypercare-Review-Workflow gibt es einen separaten Prozess fuer die **automatisierte Ablage von BGAV-Titelbezeichnung-Mails** in der SST-Workflow-API.
+
+### Gesamtablauf
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              BGAV TESTMAIL-EXTRAKTION + UPLOAD WORKFLOW                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────┐         ┌──────────────────┐         ┌──────────────────┐
+  │   OUTLOOK    │         │  HTA-Tool        │         │  Batch-Upload    │
+  │   Postfach   │         │  (Extraktion)    │         │  (Java)          │
+  └──────┬───────┘         └──────┬───────────┘         └──────┬───────────┘
+         │                        │                             │
+         │  1. Mails lesen        │                             │
+         │  ──────────────►       │                             │
+         │                        │                             │
+         │                        │  2. EML + PDF + CSV         │
+         │                        │  ──────────────────►        │
+         │                        │     Dateien erzeugen        │
+         │                        │                             │
+         │                        │                             │  3. SST-API
+         │                        │                             │  ──────────►
+         │                        │                             │  Upload
+         └────────────────────────┴─────────────────────────────┘
+```
+
+### Schritt 1: HTA-Tool (bgav-testmail-extraktion.hta)
+
+Das HTA-Tool macht folgendes:
+
+1. **Outlook-Postfach verbinden** - Waehlt das Postfach (z.B. umstellung1ev)
+2. **Excel-Metadaten laden** - Liest BD-Nummern, Namen, E-Mails aus `Uebersicht_Titelaenderung.xlsx`
+3. **Gesendete Mails filtern** - Sucht nach Betreff "BGAV | Titelbezeichnung" in Gesendete Elemente
+4. **Duplikate erkennen** - Pro ConversationID wird nur eine Mail exportiert
+5. **BD-Nummer zuordnen** - Empfaenger-E-Mail wird gegen Excel gematcht
+6. **EML exportieren** - Original-Mail im MHTML-Format
+7. **PDF erstellen** - Mail als PDF via Word-Konvertierung
+8. **CSV erzeugen** - Metadaten-Datei fuer den Batch-Upload
+
+**Ausgabe-Struktur:**
+```
+output/
+├── eml/
+│   ├── 00010091_BGAV_Titelbezeichnung_001.eml
+│   ├── 00550179_BGAV_Titelbezeichnung_002.eml
+│   └── ...
+├── pdf/
+│   ├── 00010091_BGAV_Titelbezeichnung_001.pdf
+│   ├── 00550179_BGAV_Titelbezeichnung_002.pdf
+│   └── ...
+└── testfaelle_metadaten.csv
+```
+
+**CSV-Format:**
+```
+Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff;Konversations_ID
+1;00010091_BGAV_Titelbezeichnung_001.eml;00010091_BGAV_Titelbezeichnung_001.pdf;name@firma.de;Max;Muster;00010091;ADM Vertrag;AAA-BBB...
+```
+
+### Schritt 2: Batch-Upload (Java)
+
+Das Java-Tool `BgavBatchUpload` liest die CSV und laedt die Dateien ueber die SST-Workflow-API hoch.
+
+**Verwendung:**
+```bash
+java -jar bgav-batch-upload.jar <pfad-zum-output-ordner>
+
+# Dry-Run (nur pruefen, kein Upload):
+java -jar bgav-batch-upload.jar <pfad> --dry-run
+```
+
+**Was passiert pro Testfall:**
+```
+1. Originaldokument archivieren    → EML wird ins SST-Archiv gespeichert
+2. Arbeitsdokument erzeugen        → PDF wird als Arbeitskopie angelegt + Vorgang erstellt
+3. Vorgang abschliessen            → Vorgang wird geschlossen
+4. Dokument klammern               → Klammerbegriff "ADM Vertrag" wird gesetzt
+```
+
+### Aktuelle Konfiguration (WorkflowAdapter)
+
+| Parameter | Wert | Beschreibung |
+|-----------|------|-------------|
+| **Klammer** | `ADM Vertrag` | Klammerbegriff am Dokument |
+| **Dokumentenart** | VSW (Schriftwechsel) | TODO: numerische ID noetig |
+| **Vorgangsart** | Sonstige | TODO: numerische ID noetig |
+| **Hinweis** | `Titel ab 01.01.26` | Hinweistext am Dokument |
+| **Fremdschluesselsystem** | `EV_Technischer_Vertragsnachtrag` | Externe System-Kennung |
+| **Technischer User** | `TBD` | Erstellender User (PersNr) |
+| **Geschnotyp** | `BD_VERMITTLER_VERTRAG` | Aktentyp |
+
+### Offene TODOs
+
+- [ ] Numerische ID fuer Vorgangsart "Sonstige" (`VORGANGS_TYP`)
+- [ ] Numerische ID fuer Dokumentenart "VSW" (`DOKUMENT_TYP`)
+- [ ] Echte PersNr fuer den technischen User (`ERSTELLER`)
+
+### Weitere Dokumentation
+
+- **[SST-WORKFLOW-API.md](SST-WORKFLOW-API.md)** - Referenz-Code und API-Details der SST-Workflow-Schnittstelle
+- **[HTA-ANLEITUNG.md](HTA-ANLEITUNG.md)** - Allgemeine HTA-Anleitung
+
+---
+
 ## Lizenz
 
-Internes Tool für Barmenia/Gothaer BGAV Hypercare Projekt.
+Internes Tool fuer Barmenia/Gothaer BGAV Hypercare Projekt.

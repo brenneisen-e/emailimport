@@ -1,3 +1,54 @@
+# SST-Workflow-API - Schnittstellen-Referenz
+
+Referenz-Code fuer die SST-Workflow-API (`de.barmenia.sst.workflow2.api.userintent`), bereitgestellt vom SST-Team.
+
+## Verwendete API-Klassen
+
+| Klasse | Paket | Beschreibung |
+|--------|-------|-------------|
+| `UserIntentService` | `api.userintent` | Haupt-Service fuer alle Workflow-Operationen |
+| `UserIntentServiceFactory` | `api.userintent` | Factory zum Erzeugen einer `UserIntentService`-Instanz |
+| `MDCWrapper` | `api.userintent` | Wrapper fuer Logging-Kontext (correlationId) |
+| `AkteDescriptor` | `descriptors` | Beschreibt die Ziel-Akte (Geschnotyp + Geschno) |
+| `ArbeitsdokumentDescriptor` | `descriptors` | Beschreibt ein Arbeitsdokument (PDF mit Referenz auf Original) |
+| `DokumentBytesDescriptor` | `descriptors` | Beschreibt ein Dokument ohne Original-Referenz (z.B. Dashboard) |
+| `VorgangDescriptor` | `descriptors` | Beschreibt einen Vorgang (Typ, Ersteller, Fremdschluessel) |
+
+## Verwendete Entities
+
+| Entity | Beschreibung |
+|--------|-------------|
+| `Originaldokument` | EML-Original das archiviert wird |
+| `DokumentFormat` | Enum: `EML`, `PDF`, etc. |
+| `Quelle` | Enum: `API`, etc. |
+| `Fremdschluessel` | Eindeutiger externer Schluessel (System + ID) |
+| `FremdschluesselSystem` | Enum: `WORKFLOW`, etc. |
+| `Postverteilart` | Enum: `OHNE`, etc. |
+| `Geschnotyp` | Enum: `BD_VERMITTLER_VERTRAG`, etc. |
+| `Vorgang` | Repraesentiert einen SST-Vorgang |
+
+## Ablauf: Mail ablegen (`legeMailAb`)
+
+```
+1. archiviereOriginaldokument()    -> docnumber (EML ins Archiv)
+2. erzeugeDokument()               -> Arbeitsdokument (PDF) + Vorgang anlegen
+3. gibVorgangZuFremdschluessel()   -> Vorgang-Objekt abrufen
+4. schliesseVorgangAb()            -> Vorgang abschliessen
+5. gibDokumenteZuVorgang()         -> Dokument-Liste abrufen
+6. klammerDokument()               -> Dokument mit Klammerbegriff versehen
+```
+
+## Ablauf: Dashboard ablegen (`legeDashboardAb`)
+
+```
+1. erzeugeDokument()               -> Dokument (PDF) + Vorgang anlegen (kein EML-Original)
+2. gibVorgangZuFremdschluessel()   -> Vorgang-Objekt abrufen
+3. schliesseVorgangAb()            -> Vorgang abschliessen
+```
+
+## Referenz-Code (vom SST-Team)
+
+```java
 package de.bagoit;
 
 import de.barmenia.sst.workflow2.api.userintent.MDCWrapper;
@@ -15,24 +66,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Referenz-Code vom SST-Team.
- * Adapter fuer die SST-Workflow-API - wird von BgavBatchUpload aufgerufen.
- *
- * Konfigurationswerte (BGAV-Projekt):
- *   Klammer:              ADM Vertrag (wird als Parameter uebergeben)
- *   Dokumentenart:         VSW = Schriftwechsel (DOKUMENT_TYP - ID noch offen)
- *   Vorgangsart:           Sonstige (VORGANGS_TYP - ID noch offen)
- *   Hinweis:               Titel ab 01.01.26
- *   Fremdschluesselsystem: EV_Technischer_Vertragsnachtrag
- *   Technischer User:      TBD (ERSTELLER - echte PersNr noch offen)
- */
 public class WorkflowAdapter {
-    private static final long VORGANGS_TYP = -1;   // TODO: ID fuer "Sonstige"
-    private static final long DOKUMENT_TYP = -1;   // TODO: ID fuer "VSW" (Schriftwechsel)
-    private static final String HINWEIS_TEXT = "Titel ab 01.01.26";
-    private static final String FREMDSCHLUESSEL_SYSTEM = "EV_Technischer_Vertragsnachtrag";
-    private static final String ERSTELLER = "TBD";  // TODO: echte PersNr
+    private static final long VORGANGS_TYP = -1;
+    private static final long DOKUMENT_TYP = -1;
+    private static final String HINWEIS_TEXT = "";
 
     public void legeMailAb(
             final byte[] emailEml,
@@ -57,7 +94,8 @@ public class WorkflowAdapter {
                         .withFremdschluessel(
                                 Fremdschluessel.Builder.create()
                                         .withFremdschluesselId(correlationId + "_original")
-                                        //Hier wird idealerweise noch ein eigener Eintrag bei uns in der DB gemacht und das "richtige" system eingetragen
+                                        //Hier wird idealerweise noch ein eigener Eintrag bei uns in der DB gemacht
+                                        //und das "richtige" system eingetragen
                                         .withFremdschluesselSystem(FremdschluesselSystem.WORKFLOW)
                                         .build()
                         )
@@ -70,8 +108,9 @@ public class WorkflowAdapter {
                 .withIdDoktyp(DOKUMENT_TYP)
                 .withDokumentFormat(DokumentFormat.PDF)
                 .withQuelle(Quelle.API)
-                //Hier wird idealerweise noch ein eigener Eintrag bei uns in der DB gemacht und das "richtige" system eingetragen
-                .withExterneSystemId(FREMDSCHLUESSEL_SYSTEM)
+                //Hier wird idealerweise noch ein eigener Eintrag bei uns in der DB gemacht
+                //und das "richtige" system eingetragen
+                .withExterneSystemId("WORKFLOW")
                 .withExterneId(correlationId + "_arbeit")
                 .build();
 
@@ -87,8 +126,10 @@ public class WorkflowAdapter {
                         .withIdVorgtyp(VORGANGS_TYP)
                         .withPostverteilart(Postverteilart.OHNE)
                         .withFremdschluesselId(correlationId)
-                        .withFremdschluesselSystem(FREMDSCHLUESSEL_SYSTEM)
-                        .withErsteller(ERSTELLER)
+                        //Hier z.B. Anwendungskuerzel
+                        .withFremdschluesselSystem("")
+                        //Erstellender User (1 + 6 stellige PersNr)
+                        .withErsteller("")
                         .build(),
                 AkteDescriptor.Builder.create()
                         .withGeschnotyp(Geschnotyp.BD_VERMITTLER_VERTRAG)
@@ -96,16 +137,18 @@ public class WorkflowAdapter {
                         .build()
         );
 
-        final Vorgang vorgang = userIntentService.gibVorgangZuFremdschluessel(mdcWrapper, Fremdschluessel.Builder.create()
-                .withFremdschluesselSystem(FremdschluesselSystem.valueOf(FREMDSCHLUESSEL_SYSTEM))
-                .withFremdschluesselId(correlationId)
-                .build());
+        final Vorgang vorgang = userIntentService.gibVorgangZuFremdschluessel(mdcWrapper,
+                Fremdschluessel.Builder.create()
+                        .withFremdschluesselSystem(FremdschluesselSystem.valueOf(""))
+                        .withFremdschluesselId(correlationId)
+                        .build());
 
         userIntentService.schliesseVorgangAb(mdcWrapper, VorgangDescriptor.Builder.create()
                 .withIdVorgang(Long.parseLong(vorgang.getId()))
                 .build());
 
-        final List<ArbeitsdokumentDescriptor> dokumente = userIntentService.gibDokumenteZuVorgang(mdcWrapper, Long.parseLong(vorgang.getId()));
+        final List<ArbeitsdokumentDescriptor> dokumente =
+                userIntentService.gibDokumenteZuVorgang(mdcWrapper, Long.parseLong(vorgang.getId()));
 
         userIntentService.klammerDokument(mdcWrapper, dokumente.getFirst().getIdDokument(), klammerBegriff);
     }
@@ -114,7 +157,8 @@ public class WorkflowAdapter {
             final byte[] emailPdf,
             final String bdVermittlerNummer
     ) throws UserIntentServiceException {
-        //Wird als eindeutiger Identifier verwendet! Entweder eindeutig oder wenn mail und dashboard abgelegt werden mit suffix arbeiten
+        //Wird als eindeutiger Identifier verwendet!
+        //Entweder eindeutig oder wenn mail und dashboard abgelegt werden mit suffix arbeiten
         final String correlationId = Optional.ofNullable(MDC.get("correlationId")).orElse(UUID.randomUUID().toString());
 
         final MDCWrapper mdcWrapper = MDCWrapper.Builder.create()
@@ -128,8 +172,9 @@ public class WorkflowAdapter {
                 .withIdDoktyp(DOKUMENT_TYP)
                 .withDokumentFormat(DokumentFormat.PDF)
                 .withQuelle(Quelle.API)
-                //Hier wird idealerweise noch ein eigener Eintrag bei uns in der DB gemacht und das "richtige" system eingetragen
-                .withExterneSystemId(FREMDSCHLUESSEL_SYSTEM)
+                //Hier wird idealerweise noch ein eigener Eintrag bei uns in der DB gemacht
+                //und das "richtige" system eingetragen
+                .withExterneSystemId("WORKFLOW")
                 .withExterneId(correlationId + "_arbeit")
                 .withSeitenzahl(-1)
                 .withHinweis(HINWEIS_TEXT)
@@ -143,8 +188,10 @@ public class WorkflowAdapter {
                         .withIdVorgtyp(VORGANGS_TYP)
                         .withPostverteilart(Postverteilart.OHNE)
                         .withFremdschluesselId(correlationId)
-                        .withFremdschluesselSystem(FREMDSCHLUESSEL_SYSTEM)
-                        .withErsteller(ERSTELLER)
+                        //Hier z.B. Anwendungskuerzel
+                        .withFremdschluesselSystem("")
+                        //Erstellender User (1 + 6 stellige PersNr)
+                        .withErsteller("")
                         .build(),
                 AkteDescriptor.Builder.create()
                         .withGeschnotyp(Geschnotyp.BD_VERMITTLER_VERTRAG)
@@ -152,13 +199,27 @@ public class WorkflowAdapter {
                         .build()
         );
 
-        final Vorgang vorgang = userIntentService.gibVorgangZuFremdschluessel(mdcWrapper, Fremdschluessel.Builder.create()
-                .withFremdschluesselSystem(FremdschluesselSystem.valueOf(FREMDSCHLUESSEL_SYSTEM))
-                .withFremdschluesselId(correlationId)
-                .build());
+        final Vorgang vorgang = userIntentService.gibVorgangZuFremdschluessel(mdcWrapper,
+                Fremdschluessel.Builder.create()
+                        .withFremdschluesselSystem(FremdschluesselSystem.valueOf(""))
+                        .withFremdschluesselId(correlationId)
+                        .build());
 
         userIntentService.schliesseVorgangAb(mdcWrapper, VorgangDescriptor.Builder.create()
                 .withIdVorgang(Long.parseLong(vorgang.getId()))
                 .build());
     }
 }
+```
+
+## Aktuelle Konfiguration (BGAV-Projekt)
+
+| Parameter | Wert | Status |
+|-----------|------|--------|
+| Klammer | `ADM Vertrag` | gesetzt |
+| Dokumentenart | VSW (Schriftwechsel) | TODO: numerische ID fehlt |
+| Vorgangsart | Sonstige | TODO: numerische ID fehlt |
+| Hinweis | `Titel ab 01.01.26` | gesetzt |
+| Fremdschluesselsystem | `EV_Technischer_Vertragsnachtrag` | gesetzt |
+| Technischer User | `TBD` | TODO: echte PersNr eintragen |
+| Geschnotyp | `BD_VERMITTLER_VERTRAG` | gesetzt |
