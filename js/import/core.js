@@ -449,7 +449,7 @@ function doImport() {
                     // Build set of existing IDs for fast lookup
                     var existingIds = {};
                     if (currentReplyIdsStr) {
-                        var idList = currentReplyIdsStr.split(',');
+                        var idList = String(currentReplyIdsStr).split(',');
                         for (var ei = 0; ei < idList.length; ei++) {
                             var trimmedId = idList[ei].trim();
                             if (trimmedId) existingIds[trimmedId] = true;

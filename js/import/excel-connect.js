@@ -100,7 +100,7 @@ function detectExcelForExport() {
                 if (anfrage) existingAnfragen[convKey] = anfrage;
                 if (datum) existingDates[convKey] = datum;
                 if (betreff) existingSubjects[convKey] = betreff;
-                if (status.toLowerCase() !== 'erledigt') {
+                if (String(status).toLowerCase() !== 'erledigt') {
                     existingExcelRows[conversationId] = row;
                 }
             }
@@ -120,7 +120,7 @@ function detectExcelForExport() {
             }
             // Track all replyIds individually for duplicate detection
             if (replyIds) {
-                var replyIdList = replyIds.split(',');
+                var replyIdList = String(replyIds).split(',');
                 for (var ri = 0; ri < replyIdList.length; ri++) {
                     var rid = replyIdList[ri].trim();
                     if (rid) {
