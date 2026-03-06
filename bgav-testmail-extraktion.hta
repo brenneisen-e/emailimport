@@ -860,8 +860,11 @@
             logInfo("--- Dateinamen-Zuordnung ---");
 
             var fileNames = []; // Array mit {nr, baseName, bdNummer, emlPath, pdfPath}
+            var filteredMails = []; // Nur Mails mit BD-Nummer
+            var skippedNoBd = 0;
+            var mailNr = 0;
+
             for (var fn = 0; fn < extractedMails.length; fn++) {
-                var fnNr = padNumber(fn + 1, 3);
                 var toRcpts = getRecipientList(extractedMails[fn]);
                 var bdNr = '';
 
@@ -874,20 +877,24 @@
                     }
                 }
 
-                // Dateiname: 00010091_BGAV_Titelbezeichnung_001 (BD-Nr vorne)
-                var baseName;
-                if (bdNr) {
-                    baseName = bdNr + "_BGAV_Titelbezeichnung_" + fnNr;
-                    logInfo("  " + fnNr + ": BD " + bdNr + " -> " + baseName);
-                } else {
-                    baseName = "BGAV_Titelbezeichnung_" + fnNr;
-                    logWarn("  " + fnNr + ": Keine BD-Nummer gefunden -> " + baseName);
+                // Ohne BD-Nummer -> ueberspringen
+                if (!bdNr) {
+                    skippedNoBd++;
+                    logWarn("  Uebersprungen (keine BD-Nummer): " + (extractedMails[fn].Subject || '') +
+                        " | An: " + toRcpts.join(", "));
+                    continue;
                 }
+
+                mailNr++;
+                var fnNr = padNumber(mailNr, 3);
+                var baseName = bdNr + "_BGAV_Titelbezeichnung_" + fnNr;
+                logInfo("  " + fnNr + ": BD " + bdNr + " -> " + baseName);
 
                 // ConversationID auslesen
                 var convId = '';
                 try { convId = extractedMails[fn].ConversationID || ''; } catch (ce) {}
 
+                filteredMails.push(extractedMails[fn]);
                 fileNames.push({
                     nr: fnNr,
                     baseName: baseName,
@@ -897,7 +904,22 @@
                     pdfPath: pdfDir + "\\" + baseName + ".pdf"
                 });
             }
-            extractedFileNames = fileNames; // global speichern fuer Ergebnis-Anzeige
+
+            if (skippedNoBd > 0) {
+                logInfo(skippedNoBd + " Mails ohne BD-Nummer uebersprungen");
+            }
+
+            // Ab hier nur noch Mails mit BD-Nummer verwenden
+            extractedMails = filteredMails;
+            extractedFileNames = fileNames;
+
+            if (extractedMails.length === 0) {
+                showError("Keine Mails mit BD-Nummer-Zuordnung gefunden! Bitte Excel-Datei pruefen.");
+                resetButtons();
+                return;
+            }
+
+            logSuccess(extractedMails.length + " Mails mit BD-Nummer verbleiben");
 
             // ── 5. EML speichern ──
             setProgress(55, 'Speichere EML-Dateien...');
