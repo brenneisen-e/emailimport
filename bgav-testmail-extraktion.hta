@@ -3,11 +3,11 @@
 <head>
     <meta http-equiv="x-ua-compatible" content="ie=edge"/>
     <meta charset="utf-8"/>
-    <title>BGAV Testmail-Extraktion</title>
+    <title>BGAV Extraktion</title>
 
     <HTA:APPLICATION
-        ID="BGAV_Testmail_Extraktion"
-        APPLICATIONNAME="BGAV Testmail-Extraktion"
+        ID="BGAV_Extraktion"
+        APPLICATIONNAME="BGAV Extraktion"
         BORDER="dialog"
         BORDERSTYLE="normal"
         CAPTION="yes"
@@ -16,7 +16,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="4.5"
+        VERSION="5.0"
         WINDOWSTATE="normal"
     />
 
@@ -291,9 +291,9 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>BGAV Testmail-Extraktion</h1>
+            <h1>BGAV Extraktion</h1>
             <div class="subtitle">Gesendete BGAV-Titelbezeichnung-Mails extrahieren (EML + PDF + Metadaten-CSV)</div>
-            <div class="badge">SST-Workflow-API Vorbereitung</div>
+            <div class="badge">SST-Workflow-API | Letzte Mail pro Konversation</div>
         </div>
 
         <!-- Steps -->
@@ -332,9 +332,9 @@
                     <label>Betreff-Filter</label>
                     <input type="text" id="subjectFilter" value="BGAV | Titelbezeichnung"/>
                 </div>
-                <div class="form-group" style="max-width: 120px;">
-                    <label>Anzahl Mails</label>
-                    <input type="number" id="maxMails" value="5" min="1" max="100"/>
+                <div class="form-group" style="max-width: 160px;">
+                    <label>Max. Mails (0 = alle)</label>
+                    <input type="number" id="maxMails" value="0" min="0" max="10000"/>
                 </div>
             </div>
 
@@ -630,7 +630,8 @@
     function doExtraction() {
         try {
             var subjectFilter = document.getElementById('subjectFilter').value;
-            var maxMails = parseInt(document.getElementById('maxMails').value) || 5;
+            var maxMails = parseInt(document.getElementById('maxMails').value) || 0;
+            var unlimitedMode = (maxMails === 0);
             var excelPath = document.getElementById('excelPath').value;
             var outputBase = document.getElementById('outputPath').value;
 
@@ -688,11 +689,15 @@
             }
 
             // Mails sammeln (mit Duplikat-Erkennung ueber ConversationID)
+            // Sortierung: Neueste zuerst -> erste Mail pro Konversation = letzte gesendete
             extractedMails = [];
             var seenConversations = {}; // ConversationID -> true
             var checked = 0;
             var duplicatesSkipped = 0;
             var totalItems = filteredItems.Count;
+
+            logInfo("Durchsuche " + totalItems + " Mails (letzte pro Konversation)" +
+                (unlimitedMode ? " - ALLE verarbeiten" : " - max. " + maxMails));
 
             for (var i = 1; i <= totalItems; i++) {
                 try {
@@ -705,13 +710,13 @@
                     // Betreff pruefen (falls Restrict nicht perfekt gefiltert hat)
                     if (subject.indexOf(subjectFilter) === -1) continue;
 
-                    // Duplikat-Erkennung: Pro Konversation nur eine Mail
+                    // Duplikat-Erkennung: Pro Konversation nur die letzte (neueste) Mail
+                    // Da nach SentOn DESC sortiert, ist die erste gefundene = die letzte gesendete
                     var convId = '';
                     try { convId = item.ConversationID || ''; } catch (ce) {}
 
                     if (convId && seenConversations[convId]) {
                         duplicatesSkipped++;
-                        logWarn("  Duplikat uebersprungen (gleiche Konversation): " + subject);
                         continue;
                     }
                     if (convId) seenConversations[convId] = true;
@@ -724,10 +729,12 @@
                         " | " + formatDateShort(item.SentOn) +
                         (convId ? " | Conv: " + convId.substring(0, 8) + "..." : ""));
 
-                    var pct = 20 + Math.round((extractedMails.length / maxMails) * 30);
-                    setProgress(pct, 'Mail ' + extractedMails.length + ' von ' + maxMails + ' gefunden...');
+                    // Progress berechnen
+                    var pctTarget = unlimitedMode ? totalItems : maxMails;
+                    var pct = 20 + Math.round((i / totalItems) * 30);
+                    setProgress(pct, 'Mail ' + extractedMails.length + ' gefunden (' + i + '/' + totalItems + ' durchsucht)...');
 
-                    if (extractedMails.length >= maxMails) break;
+                    if (!unlimitedMode && extractedMails.length >= maxMails) break;
 
                 } catch (itemErr) {
                     // Einzelne Items ueberspringen
@@ -735,7 +742,7 @@
             }
 
             if (duplicatesSkipped > 0) {
-                logInfo(duplicatesSkipped + " Duplikate (gleiche Konversation) uebersprungen");
+                logInfo(duplicatesSkipped + " aeltere Duplikate (gleiche Konversation) uebersprungen - jeweils letzte Mail behalten");
             }
 
             if (extractedMails.length === 0) {
@@ -744,9 +751,7 @@
                 return;
             }
 
-            if (extractedMails.length < maxMails) {
-                logWarn("Nur " + extractedMails.length + " von " + maxMails + " gewuenschten Mails gefunden");
-            }
+            logSuccess(extractedMails.length + " eindeutige Konversationen gefunden (von " + checked + " geprüften Mails)");
 
             // ── 4. Dateinamen mit BD-Nummer aufbauen ──
             setProgress(50, 'Ermittle BD-Nummern fuer Dateinamen...');
@@ -861,10 +866,10 @@
             setProgress(90, 'Erzeuge Metadaten-CSV...');
             logInfo("--- CSV Export ---");
 
-            var csvPath = outputBase + "\\testfaelle_metadaten.csv";
+            var csvPath = outputBase + "\\bgav_metadaten.csv";
             var csvRows = generateMetadataCsv(extractedMails, excelLookup, csvPath, fileNames);
 
-            logSuccess("CSV gespeichert: testfaelle_metadaten.csv (" + csvRows + " Eintraege)");
+            logSuccess("CSV gespeichert: bgav_metadaten.csv (" + csvRows + " Eintraege)");
 
             // ── 6. Ergebnis ──
             setStepCompleted('step3');
