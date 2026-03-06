@@ -36,7 +36,7 @@
             background: white;
             border-radius: 16px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            width: 760px;
+            width: 840px;
             padding: 32px;
             margin-top: 10px;
         }
@@ -192,7 +192,7 @@
             border-radius: 10px;
             padding: 12px 16px;
             margin: 16px 0;
-            max-height: 220px;
+            max-height: 350px;
             overflow-y: auto;
             display: none;
         }
@@ -428,7 +428,7 @@
     window.onload = function () {
         // HTA-Fenstergroesse setzen
         try {
-            window.resizeTo(800, 820);
+            window.resizeTo(900, 900);
         } catch (e) {}
 
         setDefaultPaths();
@@ -614,17 +614,28 @@
     // ══════════════════════════════════════════════════════════════
     // Haupt-Extraktion
     // ══════════════════════════════════════════════════════════════
+    // Fehlerzaehler fuer Zusammenfassung
+    var errorStats = { eml: 0, pdf: 0, total: 0 };
+    var abortRequested = false;
+
     function startExtraction() {
         hideAllStatus();
         document.getElementById('panelResults').style.display = 'none';
         document.getElementById('progressContainer').style.display = 'block';
         document.getElementById('logContainer').style.display = 'block';
         document.getElementById('btnStart').disabled = true;
+        abortRequested = false;
+        errorStats = { eml: 0, pdf: 0, total: 0 };
 
         setStepActive('step1');
 
         // Leicht verzoegert starten, damit die UI sich aktualisiert
         setTimeout(function() { doExtraction(); }, 100);
+    }
+
+    function requestAbort() {
+        abortRequested = true;
+        logWarn("Abbruch angefordert - wird nach aktuellem Schritt gestoppt...");
     }
 
     function doExtraction() {
@@ -763,15 +774,21 @@
             }
 
             // Phase 2: Pro Konversation die richtige Mail auswaehlen
+            // BD-Nummer wird immer von der ERSTEN (aeltesten) Mail der Konversation genommen,
+            // da diese den Original-Empfaenger enthaelt
             setProgress(42, 'Waehle beste Mail pro Konversation...');
             extractedMails = [];
+            var firstMailPerConv = []; // Aelteste Mail pro Konversation (fuer BD-Nummer-Lookup)
             var kreitzFallbacks = 0;
 
             for (var cid in conversationMails) {
                 if (!conversationMails.hasOwnProperty(cid)) continue;
 
                 var convItems = conversationMails[cid];
-                // convItems ist bereits nach SentOn DESC sortiert (neueste zuerst)
+                // convItems ist nach SentOn DESC sortiert (neueste zuerst)
+                // -> letztes Element = aelteste/erste Mail der Konversation
+
+                var oldestItem = convItems[convItems.length - 1]; // Erste/originale Mail
 
                 // Pruefe ob die neueste Mail nur an Kreitz geht
                 var newestItem = convItems[0];
@@ -809,11 +826,14 @@
                 }
 
                 extractedMails.push(selectedItem);
+                firstMailPerConv.push(oldestItem); // Aelteste Mail fuer BD-Nummer
 
                 var selRecipients = getRecipientList(selectedItem);
+                var origRecipients = getRecipientList(oldestItem);
                 logInfo("[" + extractedMails.length + "] " + (selectedItem.Subject || '') +
                     " | An: " + selRecipients.join(", ") +
                     " | " + formatDateShort(selectedItem.SentOn) +
+                    " | BD-Lookup via Orig-Mail an: " + origRecipients.join(", ") +
                     " | Conv: " + cid.substring(0, 8) + "...");
 
                 if (!unlimitedMode && extractedMails.length >= maxMails) break;
@@ -822,15 +842,8 @@
             // Mails ohne ConversationID hinzufuegen
             for (var nc = 0; nc < noConvMails.length; nc++) {
                 var ncRecipients = getRecipientList(noConvMails[nc]);
-                var ncOnlyKreitz = (ncRecipients.length > 0);
-                for (var nck = 0; nck < ncRecipients.length; nck++) {
-                    if (ncRecipients[nck] !== KREITZ_EMAIL) {
-                        ncOnlyKreitz = false;
-                        break;
-                    }
-                }
-                // Mails ohne ConvID die nur an Kreitz gehen: trotzdem aufnehmen (keine Alternative)
                 extractedMails.push(noConvMails[nc]);
+                firstMailPerConv.push(noConvMails[nc]); // Ist gleichzeitig die erste
 
                 logInfo("[" + extractedMails.length + "] " + (noConvMails[nc].Subject || '') +
                     " | An: " + ncRecipients.join(", ") +
@@ -864,16 +877,36 @@
             var skippedNoBd = 0;
             var mailNr = 0;
 
+            logInfo("BD-Nummer-Lookup: Verwende Empfaenger der ERSTEN (aeltesten) Mail pro Konversation");
+
             for (var fn = 0; fn < extractedMails.length; fn++) {
-                var toRcpts = getRecipientList(extractedMails[fn]);
+                // BD-Nummer ueber die ERSTE (aelteste) Mail der Konversation ermitteln
+                // Die erste Mail enthaelt den Original-Empfaenger (z.B. frank-roland.scheide@...)
+                // Spaetere Mails koennen weitergeleitet sein (z.B. an Ulrike Arnold)
+                var origMail = firstMailPerConv[fn];
+                var origRcpts = getRecipientList(origMail);
                 var bdNr = '';
 
-                // Erste TO-Adresse gegen Excel matchen
-                for (var tr = 0; tr < toRcpts.length; tr++) {
-                    var rcptMeta = excelLookup[toRcpts[tr]];
+                // Original-Empfaenger gegen Excel matchen
+                for (var tr = 0; tr < origRcpts.length; tr++) {
+                    if (origRcpts[tr] === IGNORE_EMAIL || origRcpts[tr] === KREITZ_EMAIL) continue;
+                    var rcptMeta = excelLookup[origRcpts[tr]];
                     if (rcptMeta && rcptMeta.bd_nummer) {
                         bdNr = rcptMeta.bd_nummer;
                         break;
+                    }
+                }
+
+                // Fallback: auch ausgewaehlte Mail pruefen falls Orig keinen Treffer hat
+                if (!bdNr) {
+                    var selRcpts = getRecipientList(extractedMails[fn]);
+                    for (var tr2 = 0; tr2 < selRcpts.length; tr2++) {
+                        if (selRcpts[tr2] === IGNORE_EMAIL || selRcpts[tr2] === KREITZ_EMAIL) continue;
+                        var rcptMeta2 = excelLookup[selRcpts[tr2]];
+                        if (rcptMeta2 && rcptMeta2.bd_nummer) {
+                            bdNr = rcptMeta2.bd_nummer;
+                            break;
+                        }
                     }
                 }
 
@@ -881,14 +914,14 @@
                 if (!bdNr) {
                     skippedNoBd++;
                     logWarn("  Uebersprungen (keine BD-Nummer): " + (extractedMails[fn].Subject || '') +
-                        " | An: " + toRcpts.join(", "));
+                        " | Orig-An: " + origRcpts.join(", "));
                     continue;
                 }
 
                 mailNr++;
                 var fnNr = padNumber(mailNr, 3);
                 var baseName = bdNr + "_BGAV_Titelbezeichnung_" + fnNr;
-                logInfo("  " + fnNr + ": BD " + bdNr + " -> " + baseName);
+                logInfo("  " + fnNr + ": BD " + bdNr + " (via Orig-Mail an " + origRcpts.join(", ") + ") -> " + baseName);
 
                 // ConversationID auslesen
                 var convId = '';
@@ -921,100 +954,231 @@
 
             logSuccess(extractedMails.length + " Mails mit BD-Nummer verbleiben");
 
-            // ── 5. EML speichern ──
+            // ── 5. Export starten (async in Batches) ──
+            // Speichere Kontext fuer async Verarbeitung
+            window._exportCtx = {
+                mails: extractedMails,
+                fileNames: fileNames,
+                emlDir: emlDir,
+                pdfDir: pdfDir,
+                outputBase: outputBase,
+                emlIndex: 0,
+                pdfIndex: 0,
+                wordApp: null,
+                wordAvailable: false,
+                wordErrors: 0,
+                WORD_MAX_ERRORS: 5 // Nach 5 Fehlern Word neu starten
+            };
+
+            // Abbruch-Button anzeigen
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStart').innerText = '⏹ Abbrechen';
+            document.getElementById('btnStart').onclick = function() { requestAbort(); };
+
+            // EML-Export starten (async)
             setProgress(55, 'Speichere EML-Dateien...');
-            logInfo("--- EML Export ---");
-
-            for (var e = 0; e < extractedMails.length; e++) {
-                try {
-                    saveAsEml(extractedMails[e], fileNames[e].emlPath);
-                    logSuccess("  EML: " + fileNames[e].baseName + ".eml");
-                } catch (emlErr) {
-                    logError("  EML-Fehler " + fileNames[e].nr + ": " + emlErr.message);
-                }
-
-                setProgress(55 + Math.round(((e + 1) / extractedMails.length) * 10),
-                    'EML ' + (e + 1) + '/' + extractedMails.length);
-            }
-
-            // ── 6. PDF erstellen ──
-            setProgress(68, 'Erstelle PDF-Dateien...');
-            logInfo("--- PDF Export ---");
-
-            var wordApp = null;
-            var wordAvailable = false;
-            try {
-                wordApp = new ActiveXObject("Word.Application");
-                wordApp.Visible = false;
-                wordAvailable = true;
-                logInfo("Word gefunden - erstelle PDF via Word");
-            } catch (wordInitErr) {
-                logWarn("Word nicht verfuegbar (" + wordInitErr.message + "). Speichere HTML als Fallback.");
-            }
-
-            for (var p = 0; p < extractedMails.length; p++) {
-                var pdfOk = false;
-
-                if (wordAvailable && wordApp) {
-                    try {
-                        saveAsPdfViaWord(extractedMails[p], fileNames[p].pdfPath, wordApp);
-                        logSuccess("  PDF: " + fileNames[p].baseName + ".pdf");
-                        pdfOk = true;
-                    } catch (pdfErr) {
-                        logError("  PDF-Fehler " + fileNames[p].nr + ": " + pdfErr.message);
-                    }
-                }
-
-                if (!pdfOk) {
-                    // Fallback: HTML speichern (gleicher Name aber .html)
-                    try {
-                        var htmlFallbackPath = pdfDir + "\\" + fileNames[p].baseName + ".html";
-                        saveAsHtmlFallback(extractedMails[p], htmlFallbackPath);
-                        logWarn("  HTML-Fallback: " + fileNames[p].baseName + ".html (bitte manuell als PDF drucken)");
-                    } catch (htmlErr) {
-                        logError("  Auch HTML-Fallback fehlgeschlagen: " + htmlErr.message);
-                    }
-                }
-
-                setProgress(68 + Math.round(((p + 1) / extractedMails.length) * 17),
-                    'PDF ' + (p + 1) + '/' + extractedMails.length);
-            }
-
-            // Word schliessen
-            if (wordApp) {
-                try { wordApp.Quit(0); } catch (qe) {}
-                wordApp = null;
-            }
-
-            // ── 7. CSV erzeugen ──
-            setProgress(90, 'Erzeuge Metadaten-CSV...');
-            logInfo("--- CSV Export ---");
-
-            var csvPath = outputBase + "\\bgav_metadaten.csv";
-            var csvRows = generateMetadataCsv(extractedMails, excelLookup, csvPath, fileNames);
-
-            logSuccess("CSV gespeichert: bgav_metadaten.csv (" + csvRows + " Eintraege)");
-
-            // ── 6. Ergebnis ──
-            setStepCompleted('step3');
-            setStepCompleted('step4');
-            setProgress(100, 'Fertig!');
-
-            showResults(outputBase, csvRows);
-
-            showSuccess(
-                "<strong>Extraktion abgeschlossen!</strong><br>" +
-                extractedMails.length + " Mails als EML + PDF exportiert, " +
-                csvRows + " CSV-Eintraege erzeugt.<br>" +
-                "<span class='file-path'>" + outputBase + "</span>"
-            );
+            logInfo("--- EML Export (" + extractedMails.length + " Dateien) ---");
+            setTimeout(function() { exportEmlBatch(); }, 50);
 
         } catch (ex) {
             showError("Unerwarteter Fehler: " + ex.message);
             logError("FEHLER: " + ex.message);
+            resetButtons();
+        }
+    }
+
+    // ── Async EML-Export in Batches ──
+    var EML_BATCH_SIZE = 20;
+
+    function exportEmlBatch() {
+        var ctx = window._exportCtx;
+        var end = Math.min(ctx.emlIndex + EML_BATCH_SIZE, ctx.mails.length);
+
+        for (var e = ctx.emlIndex; e < end; e++) {
+            if (abortRequested) {
+                logWarn("EML-Export abgebrochen bei " + (e + 1) + "/" + ctx.mails.length);
+                finishExport(true);
+                return;
+            }
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                // Ueberspringe bereits existierende (Wiederaufnahme-Schutz)
+                if (!fso.FileExists(ctx.fileNames[e].emlPath)) {
+                    saveAsEml(ctx.mails[e], ctx.fileNames[e].emlPath);
+                }
+            } catch (emlErr) {
+                errorStats.eml++;
+                errorStats.total++;
+                logError("  EML-Fehler " + ctx.fileNames[e].nr + ": " + emlErr.message);
+            }
+        }
+
+        ctx.emlIndex = end;
+        var pct = 55 + Math.round((ctx.emlIndex / ctx.mails.length) * 10);
+        setProgress(pct, 'EML ' + ctx.emlIndex + '/' + ctx.mails.length +
+            (errorStats.eml > 0 ? ' (' + errorStats.eml + ' Fehler)' : ''));
+
+        if (ctx.emlIndex < ctx.mails.length) {
+            // Naechster Batch (setTimeout gibt UI Zeit zum Aktualisieren)
+            setTimeout(function() { exportEmlBatch(); }, 10);
+        } else {
+            logSuccess("EML-Export abgeschlossen: " + (ctx.mails.length - errorStats.eml) + " OK, " + errorStats.eml + " Fehler");
+            // PDF-Export starten
+            setProgress(68, 'Starte PDF-Export...');
+            logInfo("--- PDF Export (" + ctx.mails.length + " Dateien) ---");
+            initWordAndStartPdf();
+        }
+    }
+
+    // ── Word initialisieren und PDF-Export starten ──
+    function initWordAndStartPdf() {
+        var ctx = window._exportCtx;
+        try {
+            ctx.wordApp = new ActiveXObject("Word.Application");
+            ctx.wordApp.Visible = false;
+            ctx.wordApp.DisplayAlerts = 0; // wdAlertsNone
+            ctx.wordAvailable = true;
+            logInfo("Word gestartet - erstelle PDFs");
+        } catch (wordInitErr) {
+            logWarn("Word nicht verfuegbar (" + wordInitErr.message + "). Speichere HTML als Fallback.");
+            ctx.wordAvailable = false;
+        }
+        setTimeout(function() { exportPdfBatch(); }, 50);
+    }
+
+    // ── Async PDF-Export in Batches ──
+    var PDF_BATCH_SIZE = 10; // Kleiner als EML, da Word langsamer ist
+
+    function exportPdfBatch() {
+        var ctx = window._exportCtx;
+        var end = Math.min(ctx.pdfIndex + PDF_BATCH_SIZE, ctx.mails.length);
+
+        for (var p = ctx.pdfIndex; p < end; p++) {
+            if (abortRequested) {
+                logWarn("PDF-Export abgebrochen bei " + (p + 1) + "/" + ctx.mails.length);
+                cleanupWord();
+                finishExport(true);
+                return;
+            }
+
+            var pdfOk = false;
+            var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+            // Ueberspringe bereits existierende (Wiederaufnahme-Schutz)
+            if (fso.FileExists(ctx.fileNames[p].pdfPath)) {
+                pdfOk = true;
+            } else if (ctx.wordAvailable && ctx.wordApp) {
+                try {
+                    saveAsPdfViaWord(ctx.mails[p], ctx.fileNames[p].pdfPath, ctx.wordApp);
+                    pdfOk = true;
+                    ctx.wordErrors = 0; // Reset bei Erfolg
+                } catch (pdfErr) {
+                    errorStats.pdf++;
+                    errorStats.total++;
+                    ctx.wordErrors++;
+                    logError("  PDF-Fehler " + ctx.fileNames[p].nr + ": " + pdfErr.message);
+
+                    // Word neu starten nach zu vielen Fehlern
+                    if (ctx.wordErrors >= ctx.WORD_MAX_ERRORS) {
+                        logWarn("  Word wird neu gestartet nach " + ctx.wordErrors + " Fehlern...");
+                        try { ctx.wordApp.Quit(0); } catch (qe) {}
+                        ctx.wordApp = null;
+                        try {
+                            ctx.wordApp = new ActiveXObject("Word.Application");
+                            ctx.wordApp.Visible = false;
+                            ctx.wordApp.DisplayAlerts = 0;
+                            ctx.wordErrors = 0;
+                            logInfo("  Word erfolgreich neu gestartet");
+                        } catch (restartErr) {
+                            logError("  Word-Neustart fehlgeschlagen: " + restartErr.message);
+                            ctx.wordAvailable = false;
+                        }
+                    }
+                }
+            }
+
+            if (!pdfOk) {
+                // Fallback: HTML
+                try {
+                    var htmlFallbackPath = ctx.pdfDir + "\\" + ctx.fileNames[p].baseName + ".html";
+                    saveAsHtmlFallback(ctx.mails[p], htmlFallbackPath);
+                } catch (htmlErr) {
+                    logError("  Auch HTML-Fallback fehlgeschlagen " + ctx.fileNames[p].nr + ": " + htmlErr.message);
+                }
+            }
+        }
+
+        ctx.pdfIndex = end;
+        var pct = 68 + Math.round((ctx.pdfIndex / ctx.mails.length) * 17);
+        setProgress(pct, 'PDF ' + ctx.pdfIndex + '/' + ctx.mails.length +
+            (errorStats.pdf > 0 ? ' (' + errorStats.pdf + ' Fehler)' : ''));
+
+        if (ctx.pdfIndex < ctx.mails.length) {
+            // Naechster Batch - etwas mehr Pause fuer Word
+            setTimeout(function() { exportPdfBatch(); }, 30);
+        } else {
+            logSuccess("PDF-Export abgeschlossen: " + (ctx.mails.length - errorStats.pdf) + " OK, " + errorStats.pdf + " Fehler");
+            cleanupWord();
+            finishCsvAndResults();
+        }
+    }
+
+    function cleanupWord() {
+        var ctx = window._exportCtx;
+        if (ctx && ctx.wordApp) {
+            try { ctx.wordApp.Quit(0); } catch (qe) {}
+            ctx.wordApp = null;
+        }
+    }
+
+    function finishCsvAndResults() {
+        var ctx = window._exportCtx;
+
+        try {
+            // ── CSV erzeugen ──
+            setProgress(90, 'Erzeuge Metadaten-CSV...');
+            logInfo("--- CSV Export ---");
+
+            var csvPath = ctx.outputBase + "\\bgav_metadaten.csv";
+            var csvRows = generateMetadataCsv(ctx.mails, excelLookup, csvPath, ctx.fileNames);
+            logSuccess("CSV gespeichert: bgav_metadaten.csv (" + csvRows + " Eintraege)");
+
+            // Ergebnis
+            setStepCompleted('step3');
+            setStepCompleted('step4');
+            setProgress(100, 'Fertig!');
+
+            showResults(ctx.outputBase, csvRows);
+
+            var statusMsg = "<strong>Extraktion abgeschlossen!</strong><br>" +
+                ctx.mails.length + " Mails verarbeitet, " +
+                csvRows + " CSV-Eintraege erzeugt.";
+
+            if (errorStats.total > 0) {
+                statusMsg += "<br><span style='color:#dc2626;'>Fehler: " +
+                    errorStats.eml + " EML, " + errorStats.pdf + " PDF</span>";
+            }
+
+            statusMsg += "<br><span class='file-path'>" + ctx.outputBase + "</span>";
+            showSuccess(statusMsg);
+
+        } catch (ex) {
+            showError("Fehler beim Abschluss: " + ex.message);
+            logError("FEHLER: " + ex.message);
         }
 
         resetButtons();
+    }
+
+    function finishExport(aborted) {
+        var ctx = window._exportCtx;
+
+        if (aborted) {
+            // Trotzdem CSV erzeugen fuer das was schon da ist
+            logWarn("Export abgebrochen - erzeuge CSV fuer bereits exportierte Dateien...");
+        }
+
+        finishCsvAndResults();
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1542,7 +1706,10 @@
     function logError(msg)   { logEntry(msg, 'error'); }
 
     function resetButtons() {
-        document.getElementById('btnStart').disabled = false;
+        var btn = document.getElementById('btnStart');
+        btn.disabled = false;
+        btn.innerText = '\u25B6 Extraktion starten';
+        btn.onclick = function() { startExtraction(); };
     }
 
     function resetTool() {
