@@ -688,16 +688,29 @@
                 filteredItems = items;
             }
 
-            // Mails sammeln (mit Duplikat-Erkennung ueber ConversationID)
-            // Sortierung: Neueste zuerst -> erste Mail pro Konversation = letzte gesendete
-            extractedMails = [];
-            var seenConversations = {}; // ConversationID -> true
+            // Mails sammeln - zwei Phasen:
+            // Phase 1: Alle relevanten Mails pro Konversation sammeln
+            // Phase 2: Pro Konversation die richtige Mail auswaehlen
+            //
+            // Regeln:
+            // - Mails an umstellung1ev@barmenia.de komplett ignorieren
+            // - Letzte gesendete Mail pro Konversation nehmen
+            // - ABER: Wenn letzte Mail nur an Erik.Kreitz@barmenia.de ging,
+            //   schauen ob es in der Konversation eine aeltere Mail an einen
+            //   anderen Empfaenger gibt -> diese nehmen
+            var conversationMails = {}; // ConversationID -> [items] (neueste zuerst)
+            var noConvMails = []; // Mails ohne ConversationID
             var checked = 0;
-            var duplicatesSkipped = 0;
+            var ignoredUmstellung = 0;
             var totalItems = filteredItems.Count;
 
-            logInfo("Durchsuche " + totalItems + " Mails (letzte pro Konversation)" +
+            var IGNORE_EMAIL = 'umstellung1ev@barmenia.de';
+            var KREITZ_EMAIL = 'erik.kreitz@barmenia.de';
+
+            logInfo("Durchsuche " + totalItems + " Mails" +
                 (unlimitedMode ? " - ALLE verarbeiten" : " - max. " + maxMails));
+            logInfo("Ignoriere Mails an: " + IGNORE_EMAIL);
+            logInfo("Kreitz-Pruefung: Mails nur an " + KREITZ_EMAIL + " -> aeltere Mail bevorzugen");
 
             for (var i = 1; i <= totalItems; i++) {
                 try {
@@ -710,39 +723,128 @@
                     // Betreff pruefen (falls Restrict nicht perfekt gefiltert hat)
                     if (subject.indexOf(subjectFilter) === -1) continue;
 
-                    // Duplikat-Erkennung: Pro Konversation nur die letzte (neueste) Mail
-                    // Da nach SentOn DESC sortiert, ist die erste gefundene = die letzte gesendete
+                    // Empfaenger pruefen - Mails an umstellung1ev ignorieren
+                    var recipients = getRecipientList(item);
+                    var hasOnlyIgnored = true;
+                    for (var ri = 0; ri < recipients.length; ri++) {
+                        if (recipients[ri] !== IGNORE_EMAIL) {
+                            hasOnlyIgnored = false;
+                            break;
+                        }
+                    }
+                    if (recipients.length > 0 && hasOnlyIgnored) {
+                        ignoredUmstellung++;
+                        continue;
+                    }
+
+                    // ConversationID auslesen
                     var convId = '';
                     try { convId = item.ConversationID || ''; } catch (ce) {}
 
-                    if (convId && seenConversations[convId]) {
-                        duplicatesSkipped++;
-                        continue;
+                    if (convId) {
+                        if (!conversationMails[convId]) {
+                            conversationMails[convId] = [];
+                        }
+                        conversationMails[convId].push(item);
+                    } else {
+                        noConvMails.push(item);
                     }
-                    if (convId) seenConversations[convId] = true;
 
-                    extractedMails.push(item);
-
-                    var recipients = getRecipientList(item);
-                    logInfo("[" + extractedMails.length + "] " + subject +
-                        " | An: " + recipients.join(", ") +
-                        " | " + formatDateShort(item.SentOn) +
-                        (convId ? " | Conv: " + convId.substring(0, 8) + "..." : ""));
-
-                    // Progress berechnen
-                    var pctTarget = unlimitedMode ? totalItems : maxMails;
-                    var pct = 20 + Math.round((i / totalItems) * 30);
-                    setProgress(pct, 'Mail ' + extractedMails.length + ' gefunden (' + i + '/' + totalItems + ' durchsucht)...');
-
-                    if (!unlimitedMode && extractedMails.length >= maxMails) break;
+                    var pct = 20 + Math.round((i / totalItems) * 20);
+                    setProgress(pct, 'Sammle Mails... (' + i + '/' + totalItems + ')');
 
                 } catch (itemErr) {
                     // Einzelne Items ueberspringen
                 }
             }
 
-            if (duplicatesSkipped > 0) {
-                logInfo(duplicatesSkipped + " aeltere Duplikate (gleiche Konversation) uebersprungen - jeweils letzte Mail behalten");
+            if (ignoredUmstellung > 0) {
+                logInfo(ignoredUmstellung + " Mails an " + IGNORE_EMAIL + " ignoriert");
+            }
+
+            // Phase 2: Pro Konversation die richtige Mail auswaehlen
+            setProgress(42, 'Waehle beste Mail pro Konversation...');
+            extractedMails = [];
+            var kreitzFallbacks = 0;
+
+            for (var cid in conversationMails) {
+                if (!conversationMails.hasOwnProperty(cid)) continue;
+
+                var convItems = conversationMails[cid];
+                // convItems ist bereits nach SentOn DESC sortiert (neueste zuerst)
+
+                // Pruefe ob die neueste Mail nur an Kreitz geht
+                var newestItem = convItems[0];
+                var newestRecipients = getRecipientList(newestItem);
+
+                var newestOnlyKreitz = (newestRecipients.length > 0);
+                for (var nk = 0; nk < newestRecipients.length; nk++) {
+                    if (newestRecipients[nk] !== KREITZ_EMAIL) {
+                        newestOnlyKreitz = false;
+                        break;
+                    }
+                }
+
+                var selectedItem = newestItem;
+
+                if (newestOnlyKreitz && convItems.length > 1) {
+                    // Suche eine aeltere Mail in der Konversation die an jemand anderen ging
+                    for (var ci = 1; ci < convItems.length; ci++) {
+                        var olderRecipients = getRecipientList(convItems[ci]);
+                        var hasOtherRecipient = false;
+                        for (var or2 = 0; or2 < olderRecipients.length; or2++) {
+                            if (olderRecipients[or2] !== KREITZ_EMAIL && olderRecipients[or2] !== IGNORE_EMAIL) {
+                                hasOtherRecipient = true;
+                                break;
+                            }
+                        }
+                        if (hasOtherRecipient) {
+                            selectedItem = convItems[ci];
+                            kreitzFallbacks++;
+                            logWarn("  Conv " + cid.substring(0, 8) + "...: Letzte Mail nur an Kreitz -> nehme aeltere Mail an " +
+                                olderRecipients.join(", ") + " (" + formatDateShort(convItems[ci].SentOn) + ")");
+                            break;
+                        }
+                    }
+                }
+
+                extractedMails.push(selectedItem);
+
+                var selRecipients = getRecipientList(selectedItem);
+                logInfo("[" + extractedMails.length + "] " + (selectedItem.Subject || '') +
+                    " | An: " + selRecipients.join(", ") +
+                    " | " + formatDateShort(selectedItem.SentOn) +
+                    " | Conv: " + cid.substring(0, 8) + "...");
+
+                if (!unlimitedMode && extractedMails.length >= maxMails) break;
+            }
+
+            // Mails ohne ConversationID hinzufuegen
+            for (var nc = 0; nc < noConvMails.length; nc++) {
+                var ncRecipients = getRecipientList(noConvMails[nc]);
+                var ncOnlyKreitz = (ncRecipients.length > 0);
+                for (var nck = 0; nck < ncRecipients.length; nck++) {
+                    if (ncRecipients[nck] !== KREITZ_EMAIL) {
+                        ncOnlyKreitz = false;
+                        break;
+                    }
+                }
+                // Mails ohne ConvID die nur an Kreitz gehen: trotzdem aufnehmen (keine Alternative)
+                extractedMails.push(noConvMails[nc]);
+
+                logInfo("[" + extractedMails.length + "] " + (noConvMails[nc].Subject || '') +
+                    " | An: " + ncRecipients.join(", ") +
+                    " | " + formatDateShort(noConvMails[nc].SentOn) +
+                    " | (ohne Conv-ID)");
+
+                if (!unlimitedMode && extractedMails.length >= maxMails) break;
+            }
+
+            var convCount = 0;
+            for (var ck in conversationMails) { if (conversationMails.hasOwnProperty(ck)) convCount++; }
+
+            if (kreitzFallbacks > 0) {
+                logInfo(kreitzFallbacks + " Konversationen: Letzte Mail nur an Kreitz -> aeltere Mail mit anderem Empfaenger gewaehlt");
             }
 
             if (extractedMails.length === 0) {
@@ -751,7 +853,7 @@
                 return;
             }
 
-            logSuccess(extractedMails.length + " eindeutige Konversationen gefunden (von " + checked + " geprüften Mails)");
+            logSuccess(extractedMails.length + " Mails ausgewaehlt (aus " + convCount + " Konversationen, " + checked + " geprueft)");
 
             // ── 4. Dateinamen mit BD-Nummer aufbauen ──
             setProgress(50, 'Ermittle BD-Nummern fuer Dateinamen...');
