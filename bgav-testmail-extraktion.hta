@@ -674,6 +674,70 @@
             }
             logInfo("Gesendete-Ordner: " + sentFolder.Name + " (" + sentFolder.Items.Count + " Elemente)");
 
+            // ── 3a. Interne Mails (an umstellung1ev) in Unterordner verschieben ──
+            setProgress(15, 'Verschiebe interne Mails (an umstellung1ev)...');
+            logInfo("--- Interne Mails aussortieren ---");
+
+            var moveTargetName = "BGAV_intern_umstellung1ev";
+            var moveTarget = null;
+            try {
+                moveTarget = sentFolder.Folders(moveTargetName);
+            } catch (noFolder) {
+                moveTarget = sentFolder.Folders.Add(moveTargetName);
+                logInfo("Unterordner '" + moveTargetName + "' erstellt");
+            }
+
+            // Alle Mails mit dem Betreff-Filter durchgehen
+            var moveItems = sentFolder.Items;
+            var moveFilter = "@SQL=\"urn:schemas:httpmail:subject\" LIKE '%" + subjectFilter.replace(/'/g, "''") + "%'";
+            var moveFiltered;
+            try {
+                moveFiltered = moveItems.Restrict(moveFilter);
+            } catch (mfErr) {
+                moveFiltered = moveItems;
+            }
+
+            // Rueckwaerts iterieren weil Move die Collection veraendert
+            var moveCount = 0;
+            var moveTotal = moveFiltered.Count;
+            for (var mi = moveTotal; mi >= 1; mi--) {
+                try {
+                    var moveItem = moveFiltered.Item(mi);
+                    if (moveItem.Class !== 43) continue;
+
+                    var moveSubject = moveItem.Subject || '';
+                    if (moveSubject.indexOf(subjectFilter) === -1) continue;
+
+                    // Empfaenger pruefen
+                    var moveRcpts = getRecipientList(moveItem);
+                    var moveAllInternal = moveRcpts.length > 0;
+                    for (var mr = 0; mr < moveRcpts.length; mr++) {
+                        if (moveRcpts[mr].toLowerCase().indexOf('umstellung1ev') === -1) {
+                            moveAllInternal = false;
+                            break;
+                        }
+                    }
+
+                    if (moveAllInternal) {
+                        moveItem.Move(moveTarget);
+                        moveCount++;
+
+                        if (moveCount % 20 === 0) {
+                            setProgress(15 + Math.round((moveCount / moveTotal) * 5),
+                                'Verschiebe interne Mails... ' + moveCount);
+                        }
+                    }
+                } catch (moveErr) {
+                    // Einzelne Items ueberspringen
+                }
+            }
+
+            if (moveCount > 0) {
+                logSuccess(moveCount + " interne Mails nach '" + moveTargetName + "' verschoben");
+            } else {
+                logInfo("Keine internen Mails (an umstellung1ev) gefunden");
+            }
+
             // Bereits exportierte Konversationen laden (fuer Wiederholungslauf)
             var csvPath = outputBase + "\\bgav_metadaten.csv";
             var alreadyExported = loadAlreadyExportedConversations(csvPath);
@@ -789,46 +853,6 @@
             }
 
             logSuccess(extractedMails.length + " eindeutige Konversationen gefunden (von " + checked + " geprüften Mails)");
-
-            // Mails herausfiltern, deren Original-Empfaenger nur umstellung1ev ist
-            // (interne Mails / Antworten an das eigene Postfach)
-            var filteredMails = [];
-            var internalSkipped = 0;
-            for (var fi = 0; fi < extractedMails.length; fi++) {
-                var fiConvId = '';
-                try { fiConvId = extractedMails[fi].ConversationID || ''; } catch(ce) {}
-
-                var fiRcpts = (fiConvId && originalMailRecipients[fiConvId]) ?
-                    originalMailRecipients[fiConvId] : getRecipientList(extractedMails[fi]);
-
-                // Pruefen ob ALLE Empfaenger umstellung1ev sind
-                var allInternal = fiRcpts.length > 0;
-                for (var fi2 = 0; fi2 < fiRcpts.length; fi2++) {
-                    if (fiRcpts[fi2].indexOf('umstellung1ev') === -1) {
-                        allInternal = false;
-                        break;
-                    }
-                }
-
-                if (allInternal) {
-                    internalSkipped++;
-                    logInfo("  Uebersprungen (Empfaenger = umstellung1ev): " +
-                        (extractedMails[fi].Subject || '').substring(0, 60));
-                } else {
-                    filteredMails.push(extractedMails[fi]);
-                }
-            }
-            extractedMails = filteredMails;
-
-            if (internalSkipped > 0) {
-                logInfo(internalSkipped + " Mails uebersprungen (Original an umstellung1ev@barmenia.de)");
-            }
-
-            if (extractedMails.length === 0) {
-                showError("Keine exportierbaren Mails uebrig nach Filterung.");
-                resetButtons();
-                return;
-            }
 
             // ── 4. Dateinamen mit BD-Nummer aufbauen ──
             setProgress(50, 'Ermittle BD-Nummern fuer Dateinamen...');
