@@ -354,12 +354,65 @@
     // Ordner auswaehlen
     // ══════════════════════════════════════════════════════════════
 
+    // Shell-Namespace-Pfade (z.B. \shellfolder\...) in echte Dateisystem-Pfade aufloesen
+    // Noetig fuer Citrix/Terminal-Server-Umgebungen
+    function resolveShellFolder(folderObj) {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var path = folderObj.Self.Path;
+
+        // Wenn der Pfad direkt existiert, ist alles ok
+        if (fso.FolderExists(path)) return path;
+
+        // Methode 1: Ueber ein Kind-Element den echten Elternpfad ermitteln
+        try {
+            var items = folderObj.Items();
+            if (items && items.Count > 0) {
+                var childPath = items.Item(0).Path;
+                if (childPath && fso.FileExists(childPath)) {
+                    var resolved = fso.GetParentFolderName(childPath);
+                    if (fso.FolderExists(resolved)) {
+                        logInfo("Shell-Pfad aufgeloest: " + path + " -> " + resolved);
+                        return resolved;
+                    }
+                }
+                // Kind-Element ist selbst ein Ordner
+                if (childPath && fso.FolderExists(childPath)) {
+                    var resolved = fso.GetParentFolderName(childPath);
+                    if (fso.FolderExists(resolved)) {
+                        logInfo("Shell-Pfad aufgeloest: " + path + " -> " + resolved);
+                        return resolved;
+                    }
+                }
+            }
+        } catch(e) {
+            logError("Resolve Methode 1 fehlgeschlagen: " + e.message);
+        }
+
+        // Methode 2: Ueber Shell NameSpace erneut aufloesen
+        try {
+            var shell = new ActiveXObject("Shell.Application");
+            var ns = shell.NameSpace(path);
+            if (ns && ns.Self) {
+                var nsPath = ns.Self.Path;
+                if (nsPath !== path && fso.FolderExists(nsPath)) {
+                    logInfo("Shell-Pfad aufgeloest via NameSpace: " + path + " -> " + nsPath);
+                    return nsPath;
+                }
+            }
+        } catch(e) {
+            logError("Resolve Methode 2 fehlgeschlagen: " + e.message);
+        }
+
+        // Nicht aufloesbar - Original zurueckgeben
+        return path;
+    }
+
     function browseFolder() {
         try {
             var shell = new ActiveXObject("Shell.Application");
             var folder = shell.BrowseForFolder(0, "Ordner mit PDF-Dateien auswaehlen:", 0x0051, "");
             if (folder && folder.Self) {
-                selectedFolder = folder.Self.Path;
+                selectedFolder = resolveShellFolder(folder);
                 document.getElementById('folderPath').value = selectedFolder;
                 logInfo("Ordner ausgewaehlt: " + selectedFolder);
             }
@@ -397,8 +450,14 @@
         try {
             var fso = new ActiveXObject("Scripting.FileSystemObject");
             if (!fso.FolderExists(folder)) {
-                showMsg('error', 'Ordner existiert nicht: ' + folder);
-                logError("Ordner nicht gefunden: " + folder);
+                // Bei Shell-Namespace-Pfaden (\shellfolder\...) bessere Fehlermeldung
+                if (folder.indexOf("\\shellfolder\\") >= 0 || folder.indexOf("::") >= 0) {
+                    showMsg('error', 'Shell-Namespace-Pfad kann nicht aufgeloest werden: ' + folder + '<br><br>Bitte den Ordnerpfad manuell eingeben (z.B. C:\\Users\\...\\Desktop\\Ordner) oder ueber ein zugeordnetes Laufwerk navigieren.');
+                    logError("Shell-Namespace-Pfad nicht aufloesbar: " + folder);
+                } else {
+                    showMsg('error', 'Ordner existiert nicht: ' + folder);
+                    logError("Ordner nicht gefunden: " + folder);
+                }
                 return;
             }
 
