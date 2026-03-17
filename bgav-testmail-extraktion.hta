@@ -889,16 +889,35 @@
             setProgress(55, 'Speichere EML-Dateien...');
             logInfo("--- EML Export ---");
 
+            var emlErrors = 0;
             for (var e = 0; e < extractedMails.length; e++) {
                 try {
                     saveAsEml(extractedMails[e], fileNames[e].emlPath);
                     logSuccess("  EML: " + fileNames[e].baseName + ".eml");
                 } catch (emlErr) {
-                    logError("  EML-Fehler " + fileNames[e].nr + ": " + emlErr.message);
+                    emlErrors++;
+                    logError("  EML-Fehler " + fileNames[e].nr + ": " + emlErr.message +
+                        " | Pfad: " + fileNames[e].emlPath);
+
+                    // Bei gehaeften Fehlern: Outlook kurz entlasten
+                    if (emlErrors > 3 && emlErrors % 5 === 0) {
+                        CollectGarbage();
+                        sleep(500);
+                    }
+                }
+
+                // Alle 50 Mails kurz pausieren damit Outlook nicht ueberlaeuft
+                if ((e + 1) % 50 === 0) {
+                    CollectGarbage();
+                    sleep(200);
                 }
 
                 setProgress(55 + Math.round(((e + 1) / extractedMails.length) * 10),
                     'EML ' + (e + 1) + '/' + extractedMails.length);
+            }
+
+            if (emlErrors > 0) {
+                logError(emlErrors + " EML-Dateien konnten nicht gespeichert werden");
             }
 
             // ── 6. PDF erstellen ──
@@ -1148,6 +1167,12 @@
     // ══════════════════════════════════════════════════════════════
     // EML-Export (via Outlook SaveAs MHTML)
     // ══════════════════════════════════════════════════════════════
+    // Synchrone Pause (HTA hat kein sleep)
+    function sleep(ms) {
+        var end = new Date().getTime() + ms;
+        while (new Date().getTime() < end) { /* busy wait */ }
+    }
+
     function saveAsEml(mailItem, filepath) {
         // Outlook SaveAs mit olMHTML (10) erzeugt MIME-Format
         mailItem.SaveAs(filepath, olMHTML);
