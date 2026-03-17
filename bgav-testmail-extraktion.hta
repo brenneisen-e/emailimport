@@ -790,6 +790,46 @@
 
             logSuccess(extractedMails.length + " eindeutige Konversationen gefunden (von " + checked + " geprüften Mails)");
 
+            // Mails herausfiltern, deren Original-Empfaenger nur umstellung1ev ist
+            // (interne Mails / Antworten an das eigene Postfach)
+            var filteredMails = [];
+            var internalSkipped = 0;
+            for (var fi = 0; fi < extractedMails.length; fi++) {
+                var fiConvId = '';
+                try { fiConvId = extractedMails[fi].ConversationID || ''; } catch(ce) {}
+
+                var fiRcpts = (fiConvId && originalMailRecipients[fiConvId]) ?
+                    originalMailRecipients[fiConvId] : getRecipientList(extractedMails[fi]);
+
+                // Pruefen ob ALLE Empfaenger umstellung1ev sind
+                var allInternal = fiRcpts.length > 0;
+                for (var fi2 = 0; fi2 < fiRcpts.length; fi2++) {
+                    if (fiRcpts[fi2].indexOf('umstellung1ev') === -1) {
+                        allInternal = false;
+                        break;
+                    }
+                }
+
+                if (allInternal) {
+                    internalSkipped++;
+                    logInfo("  Uebersprungen (Empfaenger = umstellung1ev): " +
+                        (extractedMails[fi].Subject || '').substring(0, 60));
+                } else {
+                    filteredMails.push(extractedMails[fi]);
+                }
+            }
+            extractedMails = filteredMails;
+
+            if (internalSkipped > 0) {
+                logInfo(internalSkipped + " Mails uebersprungen (Original an umstellung1ev@barmenia.de)");
+            }
+
+            if (extractedMails.length === 0) {
+                showError("Keine exportierbaren Mails uebrig nach Filterung.");
+                resetButtons();
+                return;
+            }
+
             // ── 4. Dateinamen mit BD-Nummer aufbauen ──
             setProgress(50, 'Ermittle BD-Nummern fuer Dateinamen...');
             logInfo("--- Dateinamen-Zuordnung ---");
