@@ -590,7 +590,7 @@
 
             mailItem.Close(0); // olDiscard
         } catch (e) {
-            // MSG konnte nicht geoeffnet werden
+            logWarn("MSG nicht lesbar: " + msgPath.replace(/.*\\/, '') + " (" + e.message + ")");
         }
         return result;
     }
@@ -844,6 +844,7 @@
             step: 1,
             chunkSize: 5,
             body: function(i) {
+              try {
                 var mailFile = ctx.mailFiles[i];
                 var mailInfo = readMailFile(mailFile.path);
                 var toEmails = mailInfo.toEmails;
@@ -871,13 +872,31 @@
 
                     // Datei verschieben (Endung beibehalten)
                     var destPath;
-                    if (mailFile.type === 'msg') {
-                        ctx.fso.MoveFile(mailFile.path, newMsgPath);
-                        destPath = newMsgPath;
-                    } else {
-                        ctx.fso.MoveFile(mailFile.path, newEmlPath);
-                        destPath = newEmlPath;
+                    var ext = mailFile.type === 'msg' ? '.msg' : '.eml';
+                    var targetPath = (mailFile.type === 'msg') ? newMsgPath : newEmlPath;
+
+                    try {
+                        ctx.fso.MoveFile(mailFile.path, targetPath);
+                    } catch (moveErr) {
+                        // Fallback: CopyFile + Delete (hilft bei Netzlaufwerken)
+                        try {
+                            ctx.fso.CopyFile(mailFile.path, targetPath, true);
+                            try { ctx.fso.DeleteFile(mailFile.path, true); } catch (delErr) {
+                                logWarn("[" + nr + "] Quelle konnte nicht geloescht werden: " + mailFile.name);
+                            }
+                        } catch (copyErr) {
+                            logError("[" + nr + "] Datei konnte nicht verschoben werden: " + mailFile.name + " (" + copyErr.message + ")");
+                            // Als unmapped behandeln
+                            unmappedFiles.push({
+                                name: mailFile.name,
+                                path: mailFile.path,
+                                toEmails: toEmails,
+                                reason: 'Dateizugriff verweigert: ' + copyErr.message
+                            });
+                            return; // naechste Datei
+                        }
                     }
+                    destPath = targetPath;
 
                     processedFiles.push({
                         fileNr: fileNr,
@@ -892,7 +911,6 @@
                         subject: subject
                     });
 
-                    var ext = mailFile.type === 'msg' ? '.msg' : '.eml';
                     logSuccess("[" + nr + "] " + mailFile.name + " -> " + newName + ext + " (BD: " + bdNr + ", An: " + matchedEmail + ")");
                 } else {
                     // Nicht zugeordnet: bleibt im Quell-Ordner
@@ -915,9 +933,18 @@
                     logWarn("[---] " + mailFile.name + " -> NICHT ZUGEORDNET (" + reason +
                         (toEmails.length > 0 ? ", An: " + toEmails.join(", ") : "") + ")");
                 }
+              } catch (fileErr) {
+                logError("Fehler bei " + (ctx.mailFiles[i] ? ctx.mailFiles[i].name : "Datei " + i) + ": " + fileErr.message);
+                unmappedFiles.push({
+                    name: ctx.mailFiles[i] ? ctx.mailFiles[i].name : "Datei " + i,
+                    path: ctx.mailFiles[i] ? ctx.mailFiles[i].path : '',
+                    toEmails: [],
+                    reason: 'Fehler: ' + fileErr.message
+                });
+              }
 
                 var pct = 20 + Math.round(((i + 1) / ctx.mailFiles.length) * 30);
-                setProgress(pct, 'Mail ' + (i + 1) + '/' + ctx.mailFiles.length + ' verarbeitet...');
+                setProgress(pct, 'Verarbeite ' + (i + 1) + ' von ' + ctx.mailFiles.length + ' Mail-Dateien...');
             },
             onDone: function() {
 
