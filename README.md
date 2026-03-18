@@ -463,39 +463,40 @@ Neben dem Hypercare-Review-Workflow gibt es einen separaten Prozess fuer die **a
 └─────────────────────────────────────────────────────────────────────────────┘
 
   ┌──────────────┐         ┌──────────────────┐         ┌──────────────────┐
-  │   OUTLOOK    │         │  HTA-Tool        │         │  Batch-Upload    │
-  │   Postfach   │         │  (Extraktion)    │         │  (Java)          │
+  │  EML-Ordner  │         │  HTA-Tool        │         │  Batch-Upload    │
+  │  (Dateien)   │         │  (Verarbeitung)  │         │  (Java)          │
   └──────┬───────┘         └──────┬───────────┘         └──────┬───────────┘
          │                        │                             │
-         │  1. Mails lesen        │                             │
+         │  1. EML-Dateien        │                             │
+         │     einlesen           │                             │
          │  ──────────────►       │                             │
          │                        │                             │
-         │                        │  2. EML + PDF + CSV         │
+         │                        │  2. Zuordnen + Umbenennen   │
+         │                        │     + PDF + CSV             │
          │                        │  ──────────────────►        │
-         │                        │     Dateien erzeugen        │
          │                        │                             │
          │                        │                             │  3. SST-API
-         │                        │                             │  ──────────►
-         │                        │                             │  Upload
+         │  (nicht zugeordnete    │                             │  ──────────►
+         │   bleiben im Ordner)   │                             │  Upload
          └────────────────────────┴─────────────────────────────┘
 ```
 
 ### Schritt 1: HTA-Tool (bgav-testmail-extraktion.hta)
 
-Das HTA-Tool macht folgendes:
+Das HTA-Tool verarbeitet EML-Dateien aus einem Ordner (kein Outlook noetig):
 
-1. **Outlook-Postfach verbinden** - Waehlt das Postfach (z.B. umstellung1ev)
+1. **EML-Ordner auswaehlen** - Ordner mit den .eml Dateien angeben
 2. **Excel-Metadaten laden** - Liest BD-Nummern, Namen, E-Mails aus `Uebersicht_Titelaenderung.xlsx`
-3. **Gesendete Mails filtern** - Sucht nach Betreff "BGAV | Titelbezeichnung" in Gesendete Elemente
-4. **Duplikate erkennen** - Pro ConversationID wird nur eine Mail exportiert
-5. **BD-Nummer zuordnen** - Empfaenger-E-Mail wird gegen Excel gematcht
-6. **EML exportieren** - Original-Mail im MHTML-Format
-7. **PDF erstellen** - Mail als PDF via Word-Konvertierung
-8. **CSV erzeugen** - Metadaten-Datei fuer den Batch-Upload
+3. **EML-Header parsen** - Liest Empfaenger (To) aus jeder EML-Datei
+4. **BD-Nummer zuordnen** - Empfaenger-E-Mail wird gegen Excel gematcht
+5. **Zugeordnete Dateien umbenennen** - EML wird nach `{BD}_BGAV_Titelbezeichnung_{nr}.eml` umbenannt und in den Ausgabe-Ordner verschoben
+6. **PDF erstellen** - Mail als PDF via Word-Konvertierung (optional)
+7. **CSV erzeugen** - Metadaten-Datei fuer den Batch-Upload
+8. **Nicht zugeordnete Dateien** bleiben im Quell-Ordner fuer manuelle Pruefung und koennen beim naechsten Durchlauf erneut verarbeitet werden
 
 **Ausgabe-Struktur:**
 ```
-output/
+ausgabe/
 ├── eml/
 │   ├── 00010091_BGAV_Titelbezeichnung_001.eml
 │   ├── 00550179_BGAV_Titelbezeichnung_002.eml
@@ -504,13 +505,17 @@ output/
 │   ├── 00010091_BGAV_Titelbezeichnung_001.pdf
 │   ├── 00550179_BGAV_Titelbezeichnung_002.pdf
 │   └── ...
-└── testfaelle_metadaten.csv
+└── bgav_metadaten.csv
+
+quell-ordner/
+├── nicht_zugeordnet_1.eml   (bleibt fuer naechsten Durchlauf)
+└── nicht_zugeordnet_2.eml
 ```
 
 **CSV-Format:**
 ```
-Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff;Konversations_ID
-1;00010091_BGAV_Titelbezeichnung_001.eml;00010091_BGAV_Titelbezeichnung_001.pdf;name@firma.de;Max;Muster;00010091;ADM Vertrag;AAA-BBB...
+Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff;Original_Dateiname
+1;00010091_BGAV_Titelbezeichnung_001.eml;00010091_BGAV_Titelbezeichnung_001.pdf;name@firma.de;Max;Muster;00010091;ADM Vertrag;original.eml
 ```
 
 ### Schritt 2: Batch-Upload (Java)
