@@ -334,7 +334,7 @@
                 </div>
                 <div class="form-group" style="max-width: 160px;">
                     <label>Max. Mails (0 = alle)</label>
-                    <input type="number" id="maxMails" value="0" min="0" max="10000"/>
+                    <input type="number" id="maxMails" value="50" min="0" max="10000"/>
                 </div>
             </div>
 
@@ -1002,7 +1002,56 @@
 
             logSuccess("CSV gespeichert: bgav_metadaten.csv (" + csvRows + " Eintraege)");
 
-            // ── 6. Ergebnis ──
+            // ── 7b. Verarbeitete Mails in Unterordner verschieben ──
+            setProgress(92, 'Verschiebe verarbeitete Mails...');
+            logInfo("--- Mails in Unterordner verschieben ---");
+
+            var moveGueltigName = "BGAV_Gueltig";
+            var moveUngueltigName = "BGAV_Ungueltig";
+            var moveGueltigFolder = null;
+            var moveUngueltigFolder = null;
+
+            try {
+                moveGueltigFolder = sentFolder.Folders(moveGueltigName);
+            } catch (noF1) {
+                moveGueltigFolder = sentFolder.Folders.Add(moveGueltigName);
+                logInfo("Unterordner '" + moveGueltigName + "' erstellt");
+            }
+            try {
+                moveUngueltigFolder = sentFolder.Folders(moveUngueltigName);
+            } catch (noF2) {
+                moveUngueltigFolder = sentFolder.Folders.Add(moveUngueltigName);
+                logInfo("Unterordner '" + moveUngueltigName + "' erstellt");
+            }
+
+            var movedGueltig = 0;
+            var movedUngueltig = 0;
+            for (var mv = 0; mv < extractedMails.length; mv++) {
+                try {
+                    var mvBd = fileNames[mv].bdNummer || '';
+                    if (mvBd) {
+                        extractedMails[mv].Move(moveGueltigFolder);
+                        movedGueltig++;
+                    } else {
+                        extractedMails[mv].Move(moveUngueltigFolder);
+                        movedUngueltig++;
+                    }
+                } catch (mvErr) {
+                    logWarn("Mail " + fileNames[mv].nr + " konnte nicht verschoben werden: " + mvErr.message);
+                }
+
+                if ((mv + 1) % 20 === 0) {
+                    setProgress(92 + Math.round(((mv + 1) / extractedMails.length) * 3),
+                        'Verschiebe Mail ' + (mv + 1) + '/' + extractedMails.length);
+                }
+            }
+
+            logSuccess(movedGueltig + " Mails nach '" + moveGueltigName + "' verschoben (BD-Nummer vorhanden)");
+            if (movedUngueltig > 0) {
+                logWarn(movedUngueltig + " Mails nach '" + moveUngueltigName + "' verschoben (keine BD-Nummer)");
+            }
+
+            // ── 8. Ergebnis ──
             setStepCompleted('step3');
             setStepCompleted('step4');
             setProgress(100, 'Fertig!');
@@ -1013,8 +1062,12 @@
                 "<strong>Extraktion abgeschlossen!</strong><br>" +
                 extractedMails.length + " Mails als EML + PDF exportiert, " +
                 csvRows + " CSV-Eintraege erzeugt.<br>" +
+                movedGueltig + " gueltig / " + movedUngueltig + " ungueltig verschoben.<br>" +
                 "<span class='file-path'>" + outputBase + "</span>"
             );
+
+            // ── 9. Log als TXT-Datei speichern ──
+            saveLogToFile(outputBase);
 
         } catch (ex) {
             showError("Unerwarteter Fehler: " + ex.message);
@@ -1656,6 +1709,42 @@
     function logSuccess(msg) { logEntry(msg, 'success'); }
     function logWarn(msg)    { logEntry(msg, 'warn'); }
     function logError(msg)   { logEntry(msg, 'error'); }
+
+    function saveLogToFile(outputBase) {
+        try {
+            var container = document.getElementById('logContainer');
+            var entries = container.getElementsByTagName('div');
+            var logLines = [];
+            var now = new Date();
+            logLines.push("BGAV Extraktion - Log vom " + formatDateLong(now));
+            logLines.push("============================================================");
+            logLines.push("");
+
+            for (var li = 0; li < entries.length; li++) {
+                var entry = entries[li];
+                var prefix = "";
+                if (entry.className.indexOf('error') > -1) prefix = "[FEHLER] ";
+                else if (entry.className.indexOf('warn') > -1) prefix = "[WARNUNG] ";
+                else if (entry.className.indexOf('success') > -1) prefix = "[OK] ";
+                else if (entry.className.indexOf('info') > -1) prefix = "[INFO] ";
+                logLines.push(prefix + (entry.innerText || ''));
+            }
+
+            var logContent = logLines.join('\r\n') + '\r\n';
+            var timestamp = padNumber(now.getFullYear(), 4) +
+                padNumber(now.getMonth() + 1, 2) +
+                padNumber(now.getDate(), 2) + "_" +
+                padNumber(now.getHours(), 2) +
+                padNumber(now.getMinutes(), 2) +
+                padNumber(now.getSeconds(), 2);
+            var logPath = outputBase + "\\bgav_log_" + timestamp + ".txt";
+
+            writeUtf8File(logPath, logContent);
+            logSuccess("Log gespeichert: bgav_log_" + timestamp + ".txt");
+        } catch (logErr) {
+            logWarn("Log-Datei konnte nicht gespeichert werden: " + logErr.message);
+        }
+    }
 
     function resetButtons() {
         document.getElementById('btnStart').disabled = false;
