@@ -16,7 +16,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="7.1"
+        VERSION="7.2"
         WINDOWSTATE="normal"
     />
 
@@ -557,16 +557,18 @@
                             try {
                                 addr = rcpt.Address || '';
                                 if (addr.indexOf('@') === -1) {
-                                    // Exchange-Adresse -> SMTP auflösen
+                                    // Exchange-Adresse -> SMTP ueber mehrere Wege auflösen
                                     try {
                                         var addrEntry = rcpt.AddressEntry;
                                         if (addrEntry) {
+                                            // Weg 1: GetExchangeUser (braucht aktive Exchange-Verbindung)
                                             try {
                                                 var exchUser = addrEntry.GetExchangeUser();
                                                 if (exchUser && exchUser.PrimarySmtpAddress) {
                                                     addr = exchUser.PrimarySmtpAddress;
                                                 }
                                             } catch (e1) {}
+                                            // Weg 2: PR_SMTP_ADDRESS auf AddressEntry
                                             if (addr.indexOf('@') === -1) {
                                                 try {
                                                     var PR_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E";
@@ -576,6 +578,38 @@
                                             }
                                         }
                                     } catch (e3) {}
+                                    // Weg 3: PR_SMTP_ADDRESS direkt auf Recipient
+                                    if (addr.indexOf('@') === -1) {
+                                        try {
+                                            var PR_SMTP_R = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E";
+                                            var smtpR = rcpt.PropertyAccessor.GetProperty(PR_SMTP_R);
+                                            if (smtpR && smtpR.indexOf('@') !== -1) addr = smtpR;
+                                        } catch (e5) {}
+                                    }
+                                    // Weg 4: Proxy-Adressen (enthaelt smtp:user@domain)
+                                    if (addr.indexOf('@') === -1) {
+                                        try {
+                                            var PR_EMS_PROXY = "http://schemas.microsoft.com/mapi/proptag/0x800F101E";
+                                            var proxies = rcpt.PropertyAccessor.GetProperty(PR_EMS_PROXY);
+                                            if (proxies) {
+                                                var pArr = (typeof proxies === 'string') ? [proxies] : proxies.toArray ? proxies.toArray() : proxies;
+                                                for (var pi = 0; pi < pArr.length; pi++) {
+                                                    var px = '' + pArr[pi];
+                                                    if (px.substring(0, 5).toLowerCase() === 'smtp:') {
+                                                        addr = px.substring(5);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        } catch (e6) {}
+                                    }
+                                    // Weg 5: Name pruefen ob es eine Email-Adresse ist
+                                    if (addr.indexOf('@') === -1) {
+                                        try {
+                                            var rName = rcpt.Name || '';
+                                            if (rName.indexOf('@') !== -1) addr = rName;
+                                        } catch (e7) {}
+                                    }
                                 }
                             } catch (e4) {
                                 addr = rcpt.Name || '';
