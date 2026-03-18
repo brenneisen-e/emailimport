@@ -2,14 +2,9 @@
 
 ## Wichtige Regeln bei Aenderungen
 
-### 1. Versionsnummer hochsetzen
-Bei jeder Aenderung an einer HTA-Datei MUSS die VERSION im `<HTA:APPLICATION>`-Tag hochgesetzt werden (z.B. von "7.0" auf "7.1").
-
-HTA-Dateien und ihre Versionen:
-- `bgav-testmail-extraktion.hta` → VERSION in Zeile ~19
-- `outlook-export-modular.hta` → VERSION in Zeile ~19
-- `outlook-selection-export.hta` → VERSION in Zeile ~19
-- `pdf-massenupload.hta` → VERSION in Zeile ~19
+### 1. Globale Versionsnummer hochsetzen
+Bei jeder Aenderung MUSS die Versionsnummer in `index.html` (Zeile ~1420) hochgesetzt werden (z.B. von "8.0" auf "8.1").
+Das ist die zentrale Versionsnummer fuer das gesamte Projekt, angezeigt unten auf der Homepage.
 
 ### 2. ZIP-Dateien aktualisieren
 Nach jeder Aenderung an einer HTA-Datei MUSS die zugehoerige ZIP-Datei neu erstellt werden:
@@ -22,7 +17,7 @@ Nach jeder Aenderung an einer HTA-Datei MUSS die zugehoerige ZIP-Datei neu erste
 | `pdf-massenupload.hta` | `PDF-Massenupload.zip` | `zip -j PDF-Massenupload.zip pdf-massenupload.hta` |
 
 ### 3. Reihenfolge
-1. Code-Aenderung in der HTA-Datei
-2. VERSION hochsetzen
-3. ZIP aktualisieren
-4. Alles zusammen committen (HTA + ZIP)
+1. Code-Aenderung in der HTA-Datei / index.html / js/ / css/
+2. Globale Versionsnummer in `index.html` hochsetzen
+3. ZIP aktualisieren (falls HTA betroffen)
+4. Alles zusammen committen (HTA + ZIP + index.html)
