@@ -312,7 +312,7 @@
             </div>
 
             <div class="form-group">
-                <label>Excel-Datei (Uebersicht_Titelaenderung.xlsx)</label>
+                <label>Excel-Datei (Mappe1.xlsx)</label>
                 <div style="display: flex; gap: 8px;">
                     <input type="text" id="excelPath" placeholder="Pfad zur Excel-Datei..." style="flex:1;"/>
                     <button class="btn btn-secondary" onclick="browseExcel()">Durchsuchen...</button>
@@ -423,10 +423,10 @@
             var htaDir = getScriptDir();
 
             var excelNames = [
+                "Mappe1.xlsx",
+                "Mappe1.xls",
                 "\u00DCbersicht_Titel\u00E4nderung.xlsx",
-                "Uebersicht_Titelaenderung.xlsx",
-                "\u00DCbersicht_Titelaenderung.xlsx",
-                "Uebersicht_Titel\u00E4nderung.xlsx"
+                "Uebersicht_Titelaenderung.xlsx"
             ];
 
             var found = false;
@@ -444,7 +444,7 @@
                 var htaFiles = new Enumerator(htaFolder.Files);
                 for (; !htaFiles.atEnd(); htaFiles.moveNext()) {
                     var htaFile = htaFiles.item();
-                    if (htaFile.Name.match(/titel/i) && htaFile.Name.match(/\.xlsx?$/i)) {
+                    if (htaFile.Name.match(/mappe/i) && htaFile.Name.match(/\.xlsx?$/i)) {
                         document.getElementById('excelPath').value = htaFile.Path;
                         break;
                     }
@@ -494,8 +494,8 @@
                 var enumFiles = new Enumerator(files);
                 for (; !enumFiles.atEnd(); enumFiles.moveNext()) {
                     var f = enumFiles.item();
-                    if (f.Name.toLowerCase().indexOf('titelaenderung') > -1 ||
-                        f.Name.toLowerCase().indexOf('titel') > -1) {
+                    if (f.Name.toLowerCase().indexOf('mappe') > -1 ||
+                        f.Name.toLowerCase().indexOf('mappe1') > -1) {
                         document.getElementById('excelPath').value = f.Path;
                         logInfo("Excel-Datei gefunden: " + f.Name);
                         return;
