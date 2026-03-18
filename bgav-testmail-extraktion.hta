@@ -538,7 +538,7 @@
 
     // MSG-Datei via Outlook oeffnen und Infos extrahieren
     function readMsgFile(msgPath) {
-        var result = { toEmails: [], subject: '', date: '' };
+        var result = { toEmails: [], subject: '', date: '', conversationId: '' };
         try {
             var app = ensureOutlook();
             var mailItem = app.Session.OpenSharedItem(msgPath);
@@ -588,6 +588,23 @@
 
             try { result.date = mailItem.SentOn || ''; } catch (de) {}
 
+            // ConversationIndex extrahieren (erste 44 Hex-Zeichen = Conversation Header)
+            try {
+                var convIdx = mailItem.ConversationIndex || '';
+                if (convIdx.length >= 44) {
+                    result.conversationId = convIdx.substring(0, 44);
+                } else if (convIdx.length > 0) {
+                    result.conversationId = convIdx;
+                }
+            } catch (convErr) {}
+            // Fallback: ConversationTopic + Empfaenger als ID
+            if (!result.conversationId) {
+                try {
+                    var topic = mailItem.ConversationTopic || mailItem.Subject || '';
+                    result.conversationId = 'topic:' + topic + '|' + (result.toEmails.length > 0 ? result.toEmails[0] : '');
+                } catch (topicErr) {}
+            }
+
             mailItem.Close(0); // olDiscard
         } catch (e) {
             logWarn("MSG nicht lesbar: " + msgPath.replace(/.*\\/, '') + " (" + e.message + ")");
@@ -597,7 +614,7 @@
 
     // EML-Datei: Header parsen (Textformat)
     function readEmlFile(emlPath) {
-        var result = { toEmails: [], subject: '', date: '' };
+        var result = { toEmails: [], subject: '', date: '', conversationId: '' };
         var headers = {};
         try {
             var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -630,6 +647,15 @@
         result.toEmails = extractEmailAddresses(headers['to'] || '');
         result.subject = headers['subject'] || '';
         result.date = headers['date'] || '';
+        // EML: Thread-Index Header oder Fallback
+        if (headers['thread-index']) {
+            var ti = headers['thread-index'].replace(/\s/g, '');
+            result.conversationId = ti.length >= 44 ? ti.substring(0, 44) : ti;
+        } else {
+            // Fallback: Subject ohne AW/WG/RE/FW + Empfaenger
+            var cleanSubj = (headers['subject'] || '').replace(/^(AW|WG|RE|FW|Fwd):\s*/gi, '');
+            result.conversationId = 'topic:' + cleanSubj + '|' + (result.toEmails.length > 0 ? result.toEmails[0] : '');
+        }
         return result;
     }
 
@@ -837,7 +863,11 @@
             setProgress(20, 'Verarbeite ' + ctx.mailFiles.length + ' Mail-Dateien...');
         }, function() {
 
-        // ── Schritt 3a: EML-Dateien verarbeiten (async loop) ──
+        // ── Schritt 3a: Mails scannen und BD-Zuordnung erstellen ──
+        var scanResults = [];   // {index, mailFile, bdNr, matchedEmail, subject, date, toEmails, conversationId}
+        var convGroups = {};    // conversationId -> [scanResult, ...]
+        var duplicateCount = 0;
+
         asyncLoop({
             start: 0,
             end: ctx.mailFiles.length - 1,
@@ -849,6 +879,7 @@
                 var mailInfo = readMailFile(mailFile.path);
                 var toEmails = mailInfo.toEmails;
                 var subject = mailInfo.subject;
+                var date = mailInfo.date || '';
 
                 // BD-Nummer suchen
                 var bdNr = '';
@@ -863,57 +894,24 @@
                 }
 
                 if (bdNr) {
-                    // Zugeordnet: verschieben + umbenennen
-                    var fileNr = ctx.startNr + processedFiles.length + 1;
-                    var nr = padNumber(fileNr, 3);
-                    var newName = bdNr + "_BGAV_Titelbezeichnung_" + nr;
-                    var newMsgPath = ctx.emlDir + "\\" + newName + ".msg";
-                    var newEmlPath = ctx.emlDir + "\\" + newName + ".eml";
+                    var convId = mailInfo.conversationId || ('noconv:' + mailFile.name);
+                    var entry = {
+                        index: i,
+                        mailFile: mailFile,
+                        bdNr: bdNr,
+                        matchedEmail: matchedEmail,
+                        subject: subject,
+                        date: date,
+                        toEmails: toEmails,
+                        conversationId: convId
+                    };
+                    scanResults.push(entry);
 
-                    // Datei verschieben (Endung beibehalten)
-                    var destPath;
-                    var ext = mailFile.type === 'msg' ? '.msg' : '.eml';
-                    var targetPath = (mailFile.type === 'msg') ? newMsgPath : newEmlPath;
-
-                    try {
-                        ctx.fso.MoveFile(mailFile.path, targetPath);
-                    } catch (moveErr) {
-                        // Fallback: CopyFile + Delete (hilft bei Netzlaufwerken)
-                        try {
-                            ctx.fso.CopyFile(mailFile.path, targetPath, true);
-                            try { ctx.fso.DeleteFile(mailFile.path, true); } catch (delErr) {
-                                logWarn("[" + nr + "] Quelle konnte nicht geloescht werden: " + mailFile.name);
-                            }
-                        } catch (copyErr) {
-                            logError("[" + nr + "] Datei konnte nicht verschoben werden: " + mailFile.name + " (" + copyErr.message + ")");
-                            // Als unmapped behandeln
-                            unmappedFiles.push({
-                                name: mailFile.name,
-                                path: mailFile.path,
-                                toEmails: toEmails,
-                                reason: 'Dateizugriff verweigert: ' + copyErr.message
-                            });
-                            return; // naechste Datei
-                        }
+                    if (!convGroups[convId]) {
+                        convGroups[convId] = [];
                     }
-                    destPath = targetPath;
-
-                    processedFiles.push({
-                        fileNr: fileNr,
-                        nr: nr,
-                        baseName: newName,
-                        bdNummer: bdNr,
-                        email: matchedEmail,
-                        filePath: destPath,
-                        fileType: mailFile.type,
-                        pdfPath: ctx.pdfDir + "\\" + newName + ".pdf",
-                        originalName: mailFile.name,
-                        subject: subject
-                    });
-
-                    logSuccess("[" + nr + "] " + mailFile.name + " -> " + newName + ext + " (BD: " + bdNr + ", An: " + matchedEmail + ")");
+                    convGroups[convId].push(entry);
                 } else {
-                    // Nicht zugeordnet: bleibt im Quell-Ordner
                     var reason = '';
                     if (toEmails.length === 0) {
                         reason = 'Kein Empfaenger in Mail gefunden';
@@ -934,7 +932,7 @@
                         (toEmails.length > 0 ? ", An: " + toEmails.join(", ") : "") + ")");
                 }
               } catch (fileErr) {
-                logError("Fehler bei " + (ctx.mailFiles[i] ? ctx.mailFiles[i].name : "Datei " + i) + ": " + fileErr.message);
+                logError("Scan-Fehler bei " + (ctx.mailFiles[i] ? ctx.mailFiles[i].name : "Datei " + i) + ": " + fileErr.message);
                 unmappedFiles.push({
                     name: ctx.mailFiles[i] ? ctx.mailFiles[i].name : "Datei " + i,
                     path: ctx.mailFiles[i] ? ctx.mailFiles[i].path : '',
@@ -943,12 +941,150 @@
                 });
               }
 
-                var pct = 20 + Math.round(((i + 1) / ctx.mailFiles.length) * 30);
-                setProgress(pct, 'Verarbeite ' + (i + 1) + ' von ' + ctx.mailFiles.length + ' Mail-Dateien...');
+                var pct = 20 + Math.round(((i + 1) / ctx.mailFiles.length) * 15);
+                setProgress(pct, 'Scanne ' + (i + 1) + ' von ' + ctx.mailFiles.length + ' Mail-Dateien...');
             },
             onDone: function() {
 
-            logInfo("--- Ergebnis: " + processedFiles.length + " zugeordnet, " + unmappedFiles.length + " nicht zugeordnet ---");
+            // ── Schritt 3b: Duplikate filtern - pro ConversationIndex nur neueste Mail behalten ──
+            var filesToProcess = [];
+            var convKeys = [];
+            for (var k in convGroups) {
+                if (convGroups.hasOwnProperty(k)) convKeys.push(k);
+            }
+
+            for (var c = 0; c < convKeys.length; c++) {
+                var group = convGroups[convKeys[c]];
+                if (group.length === 1) {
+                    filesToProcess.push(group[0]);
+                } else {
+                    // Mehrere Mails im selben Thread: neueste behalten, BD von erster nehmen
+                    // Sortiere nach Datum (aufsteigend) - aelteste zuerst
+                    group.sort(function(a, b) {
+                        var dateA = a.date ? new Date(a.date).getTime() : 0;
+                        var dateB = b.date ? new Date(b.date).getTime() : 0;
+                        if (isNaN(dateA)) dateA = 0;
+                        if (isNaN(dateB)) dateB = 0;
+                        return dateA - dateB;
+                    });
+
+                    // BD-Mapping von der aeltesten (ersten) Mail im Thread nehmen
+                    var firstEntry = group[0];
+                    var bdFromFirst = firstEntry.bdNr;
+                    var emailFromFirst = firstEntry.matchedEmail;
+
+                    // Neueste Mail (letzte im sortierten Array) behalten
+                    var newest = group[group.length - 1];
+                    // BD-Mapping von erster Mail uebernehmen
+                    newest.bdNr = bdFromFirst;
+                    newest.matchedEmail = emailFromFirst;
+                    filesToProcess.push(newest);
+
+                    // Rest als Duplikat loggen
+                    for (var d = 0; d < group.length; d++) {
+                        if (d === group.length - 1) continue; // neueste ueberspringen
+                        duplicateCount++;
+                        unmappedFiles.push({
+                            name: group[d].mailFile.name,
+                            path: group[d].mailFile.path,
+                            toEmails: group[d].toEmails,
+                            reason: 'Duplikat (Thread, BD ' + bdFromFirst + ', behalte neuere: ' + newest.mailFile.name + ')'
+                        });
+                        logWarn("[DUP] " + group[d].mailFile.name + " -> DUPLIKAT im Thread (BD " + bdFromFirst + ", behalte neuere: " + newest.mailFile.name + ")");
+                    }
+                }
+            }
+
+            logInfo("--- Scan abgeschlossen: " + scanResults.length + " zugeordnet, davon " + duplicateCount + " Duplikate entfernt -> " + filesToProcess.length + " eindeutige Threads ---");
+
+        // ── Schritt 3c: Eindeutige Dateien kopieren/verschieben ──
+        asyncLoop({
+            start: 0,
+            end: filesToProcess.length - 1,
+            step: 1,
+            chunkSize: 5,
+            body: function(i) {
+              try {
+                var entry = filesToProcess[i];
+                var mailFile = entry.mailFile;
+                var bdNr = entry.bdNr;
+                var matchedEmail = entry.matchedEmail;
+                var subject = entry.subject;
+
+                var fileNr = ctx.startNr + processedFiles.length + 1;
+                var nr = padNumber(fileNr, 3);
+                var newName = bdNr + "_BGAV_Titelbezeichnung_" + nr;
+                var newMsgPath = ctx.emlDir + "\\" + newName + ".msg";
+                var newEmlPath = ctx.emlDir + "\\" + newName + ".eml";
+
+                var destPath;
+                var ext = mailFile.type === 'msg' ? '.msg' : '.eml';
+                var targetPath = (mailFile.type === 'msg') ? newMsgPath : newEmlPath;
+
+                try {
+                    ctx.fso.MoveFile(mailFile.path, targetPath);
+                } catch (moveErr) {
+                    try {
+                        ctx.fso.CopyFile(mailFile.path, targetPath, true);
+                        try { ctx.fso.DeleteFile(mailFile.path, true); } catch (delErr) {
+                            logWarn("[" + nr + "] Quelle konnte nicht geloescht werden: " + mailFile.name);
+                        }
+                    } catch (copyErr) {
+                        logError("[" + nr + "] Datei konnte nicht verschoben werden: " + mailFile.name + " (" + copyErr.message + ")");
+                        unmappedFiles.push({
+                            name: mailFile.name,
+                            path: mailFile.path,
+                            toEmails: entry.toEmails,
+                            reason: 'Dateizugriff verweigert: ' + copyErr.message
+                        });
+                        return;
+                    }
+                }
+                destPath = targetPath;
+
+                processedFiles.push({
+                    fileNr: fileNr,
+                    nr: nr,
+                    baseName: newName,
+                    bdNummer: bdNr,
+                    email: matchedEmail,
+                    filePath: destPath,
+                    fileType: mailFile.type,
+                    pdfPath: ctx.pdfDir + "\\" + newName + ".pdf",
+                    originalName: mailFile.name,
+                    subject: subject
+                });
+
+                logSuccess("[" + nr + "] " + mailFile.name + " -> " + newName + ext + " (BD: " + bdNr + ", An: " + matchedEmail + ")");
+              } catch (fileErr) {
+                logError("Fehler bei " + (filesToProcess[i] ? filesToProcess[i].mailFile.name : "Datei " + i) + ": " + fileErr.message);
+              }
+
+                var pct = 35 + Math.round(((i + 1) / filesToProcess.length) * 15);
+                setProgress(pct, 'Kopiere ' + (i + 1) + ' von ' + filesToProcess.length + ' Dateien...');
+            },
+            onDone: function() {
+
+            logInfo("--- Ergebnis: " + processedFiles.length + " zugeordnet, " + unmappedFiles.length + " nicht zugeordnet (davon " + duplicateCount + " Duplikate) ---");
+
+            // Nicht zugeordnete Dateien in separaten Ordner kopieren
+            if (unmappedFiles.length > 0) {
+                var unmappedDir = ctx.outputBase + "\\nicht_zugeordnet";
+                if (!ctx.fso.FolderExists(unmappedDir)) ctx.fso.CreateFolder(unmappedDir);
+                var unmappedCopied = 0;
+                for (var u = 0; u < unmappedFiles.length; u++) {
+                    var uf = unmappedFiles[u];
+                    if (uf.path && ctx.fso.FileExists(uf.path)) {
+                        try {
+                            ctx.fso.CopyFile(uf.path, unmappedDir + "\\" + uf.name, false);
+                            unmappedCopied++;
+                        } catch (ucErr) {}
+                    }
+                }
+                if (unmappedCopied > 0) {
+                    logInfo(unmappedCopied + " nicht zugeordnete Dateien nach " + unmappedDir + " kopiert");
+                }
+            }
 
             if (processedFiles.length === 0) {
                 showError("Keine EML-Dateien konnten zugeordnet werden. " +
@@ -1021,7 +1157,8 @@
 
         }}); // Ende asyncLoop PDF
         }); // Ende asyncStep Word-Init
-        }}); // Ende asyncLoop EML-Verarbeitung
+        }}); // Ende asyncLoop Dateien-Kopieren (3c)
+        }}); // Ende asyncLoop Scan (3a)
         }); // Ende asyncStep EML-Scan
         }); // Ende asyncStep Excel
         }); // Ende asyncStep Ordner
