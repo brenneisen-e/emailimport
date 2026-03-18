@@ -1067,23 +1067,32 @@
 
             logInfo("--- Ergebnis: " + processedFiles.length + " zugeordnet, " + unmappedFiles.length + " nicht zugeordnet (davon " + duplicateCount + " Duplikate) ---");
 
-            // Nicht zugeordnete Dateien in separaten Ordner kopieren
-            if (unmappedFiles.length > 0) {
-                var unmappedDir = ctx.outputBase + "\\nicht_zugeordnet";
-                if (!ctx.fso.FolderExists(unmappedDir)) ctx.fso.CreateFolder(unmappedDir);
-                var unmappedCopied = 0;
-                for (var u = 0; u < unmappedFiles.length; u++) {
-                    var uf = unmappedFiles[u];
-                    if (uf.path && ctx.fso.FileExists(uf.path)) {
-                        try {
-                            ctx.fso.CopyFile(uf.path, unmappedDir + "\\" + uf.name, false);
-                            unmappedCopied++;
-                        } catch (ucErr) {}
-                    }
-                }
-                if (unmappedCopied > 0) {
-                    logInfo(unmappedCopied + " nicht zugeordnete Dateien nach " + unmappedDir + " kopiert");
-                }
+            // Nicht zugeordnete Dateien + Duplikate in separate Ordner kopieren
+            var unmappedDir = ctx.outputBase + "\\nicht_zugeordnet";
+            var duplicateDir = ctx.outputBase + "\\duplikate_old";
+            var unmappedCopied = 0;
+            var dupCopied = 0;
+
+            for (var u = 0; u < unmappedFiles.length; u++) {
+                var uf = unmappedFiles[u];
+                if (!uf.path || !ctx.fso.FileExists(uf.path)) continue;
+
+                var isDuplicate = (uf.reason && uf.reason.indexOf('Duplikat') === 0);
+                var targetDir = isDuplicate ? duplicateDir : unmappedDir;
+
+                if (!ctx.fso.FolderExists(targetDir)) ctx.fso.CreateFolder(targetDir);
+
+                try {
+                    ctx.fso.CopyFile(uf.path, targetDir + "\\" + uf.name, false);
+                    if (isDuplicate) { dupCopied++; } else { unmappedCopied++; }
+                } catch (ucErr) {}
+            }
+
+            if (unmappedCopied > 0) {
+                logInfo(unmappedCopied + " nicht zugeordnete Dateien -> " + unmappedDir);
+            }
+            if (dupCopied > 0) {
+                logInfo(dupCopied + " Duplikate (aeltere Thread-Mails) -> " + duplicateDir);
             }
 
             if (processedFiles.length === 0) {
