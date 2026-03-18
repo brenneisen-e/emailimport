@@ -628,194 +628,301 @@
         setTimeout(function() { doExtraction(); }, 100);
     }
 
-    function doExtraction() {
+    // Schnelle Empfaenger-Pruefung OHNE Exchange-Lookup (fuer interne Mail-Sortierung)
+    function getRecipientAddressesFast(mailItem) {
+        var result = [];
         try {
-            var subjectFilter = document.getElementById('subjectFilter').value;
-            var maxMails = parseInt(document.getElementById('maxMails').value) || 0;
-            var unlimitedMode = (maxMails === 0);
-            var excelPath = document.getElementById('excelPath').value;
-            var outputBase = document.getElementById('outputPath').value;
+            var recipients = mailItem.Recipients;
+            for (var r = 1; r <= recipients.Count; r++) {
+                try {
+                    var rcpt = recipients.Item(r);
+                    if (rcpt.Type === 1) {
+                        // Nur Name/Address ohne teure Exchange-Aufloesung
+                        var addr = '';
+                        try { addr = rcpt.Address || ''; } catch (e) {}
+                        if (!addr) {
+                            try { addr = rcpt.Name || ''; } catch (e) {}
+                        }
+                        result.push(addr.toLowerCase());
+                    }
+                } catch (e) {}
+            }
+        } catch (e) {}
+        return result;
+    }
 
-            var fso = new ActiveXObject("Scripting.FileSystemObject");
+    // Async-Helfer: fuehrt eine Funktion aus und ruft danach via setTimeout den naechsten Schritt auf
+    function asyncStep(fn, nextFn) {
+        try {
+            fn();
+        } catch (ex) {
+            showError("Unerwarteter Fehler: " + ex.message);
+            logError("FEHLER: " + ex.message);
+            resetButtons();
+            return;
+        }
+        if (nextFn) {
+            setTimeout(nextFn, 50);
+        }
+    }
 
-            // ── 1. Ausgabe-Ordner erstellen ──
+    // Async-Schleife: verarbeitet Items in Chunks damit die UI sich aktualisieren kann
+    function asyncLoop(params) {
+        // params: { start, end, step, chunkSize, body, onDone, reverse }
+        var i = params.start;
+        var step = params.step || 1;
+        var chunkSize = params.chunkSize || 20;
+
+        function doChunk() {
+            try {
+                var count = 0;
+                if (params.reverse) {
+                    while (i >= params.end && count < chunkSize) {
+                        params.body(i);
+                        i += step; // step ist negativ bei reverse
+                        count++;
+                    }
+                    if (i >= params.end) {
+                        setTimeout(doChunk, 30);
+                    } else {
+                        if (params.onDone) params.onDone();
+                    }
+                } else {
+                    while (i <= params.end && count < chunkSize) {
+                        params.body(i);
+                        i += step;
+                        count++;
+                    }
+                    if (i <= params.end) {
+                        setTimeout(doChunk, 30);
+                    } else {
+                        if (params.onDone) params.onDone();
+                    }
+                }
+            } catch (ex) {
+                showError("Unerwarteter Fehler: " + ex.message);
+                logError("FEHLER: " + ex.message);
+                resetButtons();
+            }
+        }
+
+        doChunk();
+    }
+
+    function doExtraction() {
+        // Alle Variablen die ueber die Steps hinweg geteilt werden
+        var ctx = {
+            subjectFilter: document.getElementById('subjectFilter').value,
+            maxMails: parseInt(document.getElementById('maxMails').value) || 0,
+            excelPath: document.getElementById('excelPath').value,
+            outputBase: document.getElementById('outputPath').value,
+            fso: null,
+            emlDir: '',
+            pdfDir: '',
+            sentFolder: null,
+            moveTarget: null,
+            moveCount: 0,
+            moveFiltered: null,
+            moveTotal: 0,
+            alreadyExported: {},
+            filteredItems: null,
+            totalItems: 0,
+            seenConversations: {},
+            originalMailRecipients: {},
+            checked: 0,
+            duplicatesSkipped: 0,
+            fileNames: [],
+            emlErrors: 0,
+            wordApp: null,
+            wordAvailable: false,
+            csvRows: 0,
+            movedGueltig: 0,
+            movedUngueltig: 0,
+            moveGueltigFolder: null,
+            moveUngueltigFolder: null
+        };
+        ctx.unlimitedMode = (ctx.maxMails === 0);
+
+        // ── Schritt 1: Ordner erstellen ──
+        asyncStep(function() {
             setProgress(5, 'Erstelle Ausgabe-Ordner...');
-            var emlDir = outputBase + "\\eml";
-            var pdfDir = outputBase + "\\pdf";
+            ctx.fso = new ActiveXObject("Scripting.FileSystemObject");
+            ctx.emlDir = ctx.outputBase + "\\eml";
+            ctx.pdfDir = ctx.outputBase + "\\pdf";
 
-            if (!fso.FolderExists(outputBase)) fso.CreateFolder(outputBase);
-            if (!fso.FolderExists(emlDir)) fso.CreateFolder(emlDir);
-            if (!fso.FolderExists(pdfDir)) fso.CreateFolder(pdfDir);
+            if (!ctx.fso.FolderExists(ctx.outputBase)) ctx.fso.CreateFolder(ctx.outputBase);
+            if (!ctx.fso.FolderExists(ctx.emlDir)) ctx.fso.CreateFolder(ctx.emlDir);
+            if (!ctx.fso.FolderExists(ctx.pdfDir)) ctx.fso.CreateFolder(ctx.pdfDir);
 
-            logInfo("Ausgabe-Ordner: " + outputBase);
+            logInfo("Ausgabe-Ordner: " + ctx.outputBase);
             setStepCompleted('step1');
+        }, function() {
 
-            // ── 2. Excel laden ──
+        // ── Schritt 2: Excel laden ──
+        asyncStep(function() {
             setStepActive('step2');
             setProgress(10, 'Lade Excel-Metadaten...');
             excelLookup = {};
 
-            if (excelPath && fso.FileExists(excelPath)) {
-                excelLookup = loadExcelMetadata(excelPath);
+            if (ctx.excelPath && ctx.fso.FileExists(ctx.excelPath)) {
+                excelLookup = loadExcelMetadata(ctx.excelPath);
                 logSuccess(countKeys(excelLookup) + " Eintraege aus Excel geladen");
             } else {
                 logWarn("Keine Excel-Datei angegeben oder nicht gefunden. Metadaten werden leer sein.");
             }
             setStepCompleted('step2');
+        }, function() {
 
-            // ── 3. Mails suchen und extrahieren ──
+        // ── Schritt 3: Gesendete-Ordner finden ──
+        asyncStep(function() {
             setStepActive('step3');
-            setProgress(20, 'Suche gesendete Mails...');
+            setProgress(15, 'Suche gesendete Mails...');
 
-            var sentFolder = findSentFolder(selectedStore);
-            if (!sentFolder) {
+            ctx.sentFolder = findSentFolder(selectedStore);
+            if (!ctx.sentFolder) {
                 showError("Gesendete-Elemente-Ordner nicht gefunden!");
+                resetButtons();
                 return;
             }
-            logInfo("Gesendete-Ordner: " + sentFolder.Name + " (" + sentFolder.Items.Count + " Elemente)");
+            logInfo("Gesendete-Ordner: " + ctx.sentFolder.Name + " (" + ctx.sentFolder.Items.Count + " Elemente)");
 
-            // ── 3a. Interne Mails (an umstellung1ev) in Unterordner verschieben ──
-            setProgress(15, 'Verschiebe interne Mails (an umstellung1ev)...');
+            // Interne-Mails Zielordner vorbereiten
             logInfo("--- Interne Mails aussortieren ---");
-
             var moveTargetName = "BGAV_intern_umstellung1ev";
-            var moveTarget = null;
             try {
-                moveTarget = sentFolder.Folders(moveTargetName);
+                ctx.moveTarget = ctx.sentFolder.Folders(moveTargetName);
             } catch (noFolder) {
-                moveTarget = sentFolder.Folders.Add(moveTargetName);
+                ctx.moveTarget = ctx.sentFolder.Folders.Add(moveTargetName);
                 logInfo("Unterordner '" + moveTargetName + "' erstellt");
             }
 
-            // Alle Mails mit dem Betreff-Filter durchgehen
-            var moveItems = sentFolder.Items;
-            var moveFilter = "@SQL=\"urn:schemas:httpmail:subject\" LIKE '%" + subjectFilter.replace(/'/g, "''") + "%'";
-            var moveFiltered;
+            var moveItems = ctx.sentFolder.Items;
+            var moveFilter = "@SQL=\"urn:schemas:httpmail:subject\" LIKE '%" + ctx.subjectFilter.replace(/'/g, "''") + "%'";
             try {
-                moveFiltered = moveItems.Restrict(moveFilter);
+                ctx.moveFiltered = moveItems.Restrict(moveFilter);
             } catch (mfErr) {
-                moveFiltered = moveItems;
+                ctx.moveFiltered = moveItems;
             }
+            ctx.moveTotal = ctx.moveFiltered.Count;
+            setProgress(16, 'Pruefe ' + ctx.moveTotal + ' Mails auf interne Empfaenger...');
+        }, function() {
 
-            // Rueckwaerts iterieren weil Move die Collection veraendert
-            var moveCount = 0;
-            var moveTotal = moveFiltered.Count;
-            for (var mi = moveTotal; mi >= 1; mi--) {
+        // ── Schritt 3a: Interne Mails verschieben (async loop) ──
+        asyncLoop({
+            start: ctx.moveTotal,
+            end: 1,
+            step: -1,
+            reverse: true,
+            chunkSize: 30,
+            body: function(mi) {
                 try {
-                    var moveItem = moveFiltered.Item(mi);
-                    if (moveItem.Class !== 43) continue;
+                    var moveItem = ctx.moveFiltered.Item(mi);
+                    if (moveItem.Class !== 43) return;
 
                     var moveSubject = moveItem.Subject || '';
-                    if (moveSubject.indexOf(subjectFilter) === -1) continue;
+                    if (moveSubject.indexOf(ctx.subjectFilter) === -1) return;
 
-                    // Empfaenger pruefen
-                    var moveRcpts = getRecipientList(moveItem);
+                    // Schnelle Empfaenger-Pruefung (ohne Exchange-Lookup)
+                    var moveRcpts = getRecipientAddressesFast(moveItem);
                     var moveAllInternal = moveRcpts.length > 0;
                     for (var mr = 0; mr < moveRcpts.length; mr++) {
-                        if (moveRcpts[mr].toLowerCase().indexOf('umstellung1ev') === -1) {
+                        if (moveRcpts[mr].indexOf('umstellung1ev') === -1) {
                             moveAllInternal = false;
                             break;
                         }
                     }
 
                     if (moveAllInternal) {
-                        moveItem.Move(moveTarget);
-                        moveCount++;
-
-                        if (moveCount % 20 === 0) {
-                            setProgress(15 + Math.round((moveCount / moveTotal) * 5),
-                                'Verschiebe interne Mails... ' + moveCount);
-                        }
+                        moveItem.Move(ctx.moveTarget);
+                        ctx.moveCount++;
                     }
-                } catch (moveErr) {
-                    // Einzelne Items ueberspringen
-                }
-            }
+                } catch (moveErr) {}
 
-            if (moveCount > 0) {
-                logSuccess(moveCount + " interne Mails nach '" + moveTargetName + "' verschoben");
+                if (ctx.moveCount > 0 && ctx.moveCount % 20 === 0) {
+                    setProgress(16 + Math.round((1 - mi / ctx.moveTotal) * 4),
+                        'Verschiebe interne Mails... ' + ctx.moveCount);
+                }
+            },
+            onDone: function() {
+
+            if (ctx.moveCount > 0) {
+                logSuccess(ctx.moveCount + " interne Mails nach 'BGAV_intern_umstellung1ev' verschoben");
             } else {
                 logInfo("Keine internen Mails (an umstellung1ev) gefunden");
             }
 
-            // Bereits exportierte Konversationen laden (fuer Wiederholungslauf)
-            var csvPath = outputBase + "\\bgav_metadaten.csv";
-            var alreadyExported = loadAlreadyExportedConversations(csvPath);
-            var alreadyExportedCount = countKeys(alreadyExported);
+        // ── Schritt 3b: Filter und Mail-Suche vorbereiten ──
+        asyncStep(function() {
+            // Bereits exportierte Konversationen laden
+            var csvPath = ctx.outputBase + "\\bgav_metadaten.csv";
+            ctx.alreadyExported = loadAlreadyExportedConversations(csvPath);
+            var alreadyExportedCount = countKeys(ctx.alreadyExported);
             if (alreadyExportedCount > 0) {
                 logInfo(alreadyExportedCount + " bereits exportierte Konversationen (mit BD-Nummer) werden uebersprungen");
             }
 
             // Filter nach Betreff
-            var items = sentFolder.Items;
-            items.Sort("[SentOn]", true); // Neueste zuerst
+            var items = ctx.sentFolder.Items;
+            items.Sort("[SentOn]", true);
 
-            // Restrict fuer bessere Performance
-            var filter = "@SQL=\"urn:schemas:httpmail:subject\" LIKE '%" + subjectFilter.replace(/'/g, "''") + "%'";
-            var filteredItems;
+            var filter = "@SQL=\"urn:schemas:httpmail:subject\" LIKE '%" + ctx.subjectFilter.replace(/'/g, "''") + "%'";
             try {
-                filteredItems = items.Restrict(filter);
-                logInfo("Filter aktiv: " + subjectFilter + " (" + filteredItems.Count + " Treffer)");
+                ctx.filteredItems = items.Restrict(filter);
+                ctx.totalItems = ctx.filteredItems.Count;
+                logInfo("Filter aktiv: " + ctx.subjectFilter + " (" + ctx.totalItems + " Treffer)");
             } catch (filterErr) {
                 logWarn("Restrict fehlgeschlagen, durchsuche alle: " + filterErr.message);
-                filteredItems = items;
+                ctx.filteredItems = items;
+                ctx.totalItems = ctx.filteredItems.Count;
             }
 
-            // Mails sammeln (mit Duplikat-Erkennung ueber ConversationID)
-            // Sortierung: Neueste zuerst -> erste Mail pro Konversation = letzte gesendete
-            // WICHTIG: Fuer BD-Zuordnung wird die ORIGINAL-Mail (ohne WG:/AW:) verwendet,
-            // gespeichert wird aber die LETZTE (neueste) Mail der Konversation
             extractedMails = [];
-            var seenConversations = {}; // ConversationID -> index in extractedMails
-            var originalMailRecipients = {}; // ConversationID -> Empfaenger der Original-Mail
-            var checked = 0;
-            var duplicatesSkipped = 0;
-            var totalItems = filteredItems.Count;
+            setProgress(20, 'Durchsuche ' + ctx.totalItems + ' Mails...');
+            logInfo("Durchsuche " + ctx.totalItems + " Mails (letzte pro Konversation, Original fuer BD-Zuordnung)" +
+                (ctx.unlimitedMode ? " - ALLE verarbeiten" : " - max. " + ctx.maxMails));
+        }, function() {
 
-            logInfo("Durchsuche " + totalItems + " Mails (letzte pro Konversation, Original fuer BD-Zuordnung)" +
-                (unlimitedMode ? " - ALLE verarbeiten" : " - max. " + maxMails));
-
-            for (var i = 1; i <= totalItems; i++) {
+        // ── Schritt 3c: Mails sammeln (async loop) ──
+        var searchDone = false;
+        asyncLoop({
+            start: 1,
+            end: ctx.totalItems,
+            step: 1,
+            chunkSize: 25,
+            body: function(i) {
+                if (searchDone) return;
                 try {
-                    var item = filteredItems.Item(i);
-                    if (item.Class !== 43) continue; // Nur MailItems
+                    var item = ctx.filteredItems.Item(i);
+                    if (item.Class !== 43) return;
 
-                    checked++;
+                    ctx.checked++;
                     var subject = item.Subject || '';
-
-                    // Betreff pruefen (falls Restrict nicht perfekt gefiltert hat)
-                    if (subject.indexOf(subjectFilter) === -1) continue;
+                    if (subject.indexOf(ctx.subjectFilter) === -1) return;
 
                     var convId = '';
                     try { convId = item.ConversationID || ''; } catch (ce) {}
 
-                    // Bereits erfolgreich exportierte Konversation ueberspringen
-                    if (convId && alreadyExported[convId]) {
-                        duplicatesSkipped++;
-                        continue;
+                    if (convId && ctx.alreadyExported[convId]) {
+                        ctx.duplicatesSkipped++;
+                        return;
                     }
 
-                    // Pruefen ob dies die Original-Mail ist (ohne WG:/AW:/RE: Prefix)
-                    var isOriginal = isOriginalSubject(subject, subjectFilter);
+                    var isOriginal = isOriginalSubject(subject, ctx.subjectFilter);
 
-                    if (convId && seenConversations[convId] !== undefined) {
-                        // Konversation bereits bekannt (neueste Mail schon gespeichert)
-                        // Aber: Pruefen ob diese aeltere Mail das Original ist
-                        if (isOriginal && !originalMailRecipients[convId]) {
-                            originalMailRecipients[convId] = getRecipientList(item);
-                            logInfo("  -> Original-Empfaenger gefunden: " + originalMailRecipients[convId].join(", "));
+                    if (convId && ctx.seenConversations[convId] !== undefined) {
+                        if (isOriginal && !ctx.originalMailRecipients[convId]) {
+                            ctx.originalMailRecipients[convId] = getRecipientList(item);
+                            logInfo("  -> Original-Empfaenger gefunden: " + ctx.originalMailRecipients[convId].join(", "));
                         }
-                        duplicatesSkipped++;
-                        continue;
+                        ctx.duplicatesSkipped++;
+                        return;
                     }
 
-                    if (convId) seenConversations[convId] = extractedMails.length;
-
+                    if (convId) ctx.seenConversations[convId] = extractedMails.length;
                     extractedMails.push(item);
 
-                    // Falls die neueste Mail auch das Original ist, Empfaenger direkt speichern
-                    if (isOriginal && convId && !originalMailRecipients[convId]) {
-                        originalMailRecipients[convId] = getRecipientList(item);
+                    if (isOriginal && convId && !ctx.originalMailRecipients[convId]) {
+                        ctx.originalMailRecipients[convId] = getRecipientList(item);
                     }
 
                     var recipients = getRecipientList(item);
@@ -825,56 +932,51 @@
                         " | " + formatDateShort(item.SentOn) +
                         (convId ? " | Conv: " + convId.substring(0, 8) + "..." : ""));
 
-                    // Progress berechnen
-                    var pctTarget = unlimitedMode ? totalItems : maxMails;
-                    var pct = 20 + Math.round((i / totalItems) * 30);
-                    setProgress(pct, 'Mail ' + extractedMails.length + ' gefunden (' + i + '/' + totalItems + ' durchsucht)...');
+                    var pct = 20 + Math.round((i / ctx.totalItems) * 30);
+                    setProgress(pct, 'Mail ' + extractedMails.length + ' gefunden (' + i + '/' + ctx.totalItems + ' durchsucht)...');
 
-                    if (!unlimitedMode && extractedMails.length >= maxMails) break;
+                    if (!ctx.unlimitedMode && extractedMails.length >= ctx.maxMails) {
+                        searchDone = true;
+                    }
+                } catch (itemErr) {}
+            },
+            onDone: function() {
 
-                } catch (itemErr) {
-                    // Einzelne Items ueberspringen
-                }
-            }
-
-            if (duplicatesSkipped > 0 || alreadyExportedCount > 0) {
-                var skipMsg = duplicatesSkipped + " uebersprungen (";
+            if (ctx.duplicatesSkipped > 0 || countKeys(ctx.alreadyExported) > 0) {
+                var skipMsg = ctx.duplicatesSkipped + " uebersprungen (";
                 var skipParts = [];
-                if (alreadyExportedCount > 0) skipParts.push(alreadyExportedCount + " bereits exportiert");
+                if (countKeys(ctx.alreadyExported) > 0) skipParts.push(countKeys(ctx.alreadyExported) + " bereits exportiert");
                 skipParts.push("Rest: aeltere Duplikate gleicher Konversation");
                 skipMsg += skipParts.join(", ") + ")";
                 logInfo(skipMsg);
             }
 
             if (extractedMails.length === 0) {
-                showError("Keine Mails mit Betreff '" + subjectFilter + "' im Gesendete-Ordner gefunden!");
+                showError("Keine Mails mit Betreff '" + ctx.subjectFilter + "' im Gesendete-Ordner gefunden!");
                 resetButtons();
                 return;
             }
 
-            logSuccess(extractedMails.length + " eindeutige Konversationen gefunden (von " + checked + " geprüften Mails)");
+            logSuccess(extractedMails.length + " eindeutige Konversationen gefunden (von " + ctx.checked + " geprüften Mails)");
 
-            // ── 4. Dateinamen mit BD-Nummer aufbauen ──
+        // ── Schritt 4: Dateinamen mit BD-Nummer aufbauen ──
+        asyncStep(function() {
             setProgress(50, 'Ermittle BD-Nummern fuer Dateinamen...');
             logInfo("--- Dateinamen-Zuordnung ---");
 
-            var fileNames = []; // Array mit {nr, baseName, bdNummer, emlPath, pdfPath}
             for (var fn = 0; fn < extractedMails.length; fn++) {
                 var fnNr = padNumber(fn + 1, 3);
 
-                // Verwende Original-Empfaenger (ohne WG:/AW:) fuer BD-Zuordnung,
-                // Fallback auf die Empfaenger der gespeicherten (neuesten) Mail
                 var fnConvId = '';
                 try { fnConvId = extractedMails[fn].ConversationID || ''; } catch(ce) {}
-                var toRcpts = (fnConvId && originalMailRecipients[fnConvId]) ?
-                    originalMailRecipients[fnConvId] : getRecipientList(extractedMails[fn]);
+                var toRcpts = (fnConvId && ctx.originalMailRecipients[fnConvId]) ?
+                    ctx.originalMailRecipients[fnConvId] : getRecipientList(extractedMails[fn]);
                 var bdNr = '';
 
-                if (fnConvId && originalMailRecipients[fnConvId]) {
+                if (fnConvId && ctx.originalMailRecipients[fnConvId]) {
                     logInfo("  " + fnNr + ": Verwende Original-Empfaenger: " + toRcpts.join(", "));
                 }
 
-                // Erste TO-Adresse gegen Excel matchen
                 for (var tr = 0; tr < toRcpts.length; tr++) {
                     var rcptMeta = excelLookup[toRcpts[tr]];
                     if (rcptMeta && rcptMeta.bd_nummer) {
@@ -883,7 +985,6 @@
                     }
                 }
 
-                // Dateiname: 00010091_BGAV_Titelbezeichnung_001 (BD-Nr vorne)
                 var baseName;
                 if (bdNr) {
                     baseName = bdNr + "_BGAV_Titelbezeichnung_" + fnNr;
@@ -893,91 +994,96 @@
                     logWarn("  " + fnNr + ": Keine BD-Nummer gefunden -> " + baseName);
                 }
 
-                // ConversationID auslesen
                 var convId = '';
                 try { convId = extractedMails[fn].ConversationID || ''; } catch (ce) {}
 
-                fileNames.push({
+                ctx.fileNames.push({
                     nr: fnNr,
                     baseName: baseName,
                     bdNummer: bdNr,
                     conversationId: convId,
-                    emlPath: emlDir + "\\" + baseName + ".eml",
-                    pdfPath: pdfDir + "\\" + baseName + ".pdf"
+                    emlPath: ctx.emlDir + "\\" + baseName + ".eml",
+                    pdfPath: ctx.pdfDir + "\\" + baseName + ".pdf"
                 });
             }
-            extractedFileNames = fileNames; // global speichern fuer Ergebnis-Anzeige
-            globalOriginalMailRecipients = originalMailRecipients; // global fuer showResults
+            extractedFileNames = ctx.fileNames;
+            globalOriginalMailRecipients = ctx.originalMailRecipients;
+        }, function() {
 
-            // ── 5. EML speichern ──
-            setProgress(55, 'Speichere EML-Dateien...');
-            logInfo("--- EML Export ---");
+        // ── Schritt 5: EML speichern (async loop) ──
+        setProgress(55, 'Speichere EML-Dateien...');
+        logInfo("--- EML Export ---");
 
-            var emlErrors = 0;
-            for (var e = 0; e < extractedMails.length; e++) {
+        asyncLoop({
+            start: 0,
+            end: extractedMails.length - 1,
+            step: 1,
+            chunkSize: 10,
+            body: function(e) {
                 try {
-                    saveAsEml(extractedMails[e], fileNames[e].emlPath);
-                    logSuccess("  EML: " + fileNames[e].baseName + ".eml");
+                    saveAsEml(extractedMails[e], ctx.fileNames[e].emlPath);
+                    logSuccess("  EML: " + ctx.fileNames[e].baseName + ".eml");
                 } catch (emlErr) {
-                    emlErrors++;
-                    logError("  EML-Fehler " + fileNames[e].nr + ": " + emlErr.message +
-                        " | Pfad: " + fileNames[e].emlPath);
+                    ctx.emlErrors++;
+                    logError("  EML-Fehler " + ctx.fileNames[e].nr + ": " + emlErr.message +
+                        " | Pfad: " + ctx.fileNames[e].emlPath);
 
-                    // Bei gehaeften Fehlern: Outlook kurz entlasten
-                    if (emlErrors > 3 && emlErrors % 5 === 0) {
+                    if (ctx.emlErrors > 3 && ctx.emlErrors % 5 === 0) {
                         CollectGarbage();
-                        sleep(500);
                     }
                 }
 
-                // Alle 50 Mails kurz pausieren damit Outlook nicht ueberlaeuft
                 if ((e + 1) % 50 === 0) {
                     CollectGarbage();
-                    sleep(200);
                 }
 
                 setProgress(55 + Math.round(((e + 1) / extractedMails.length) * 10),
                     'EML ' + (e + 1) + '/' + extractedMails.length);
+            },
+            onDone: function() {
+
+            if (ctx.emlErrors > 0) {
+                logError(ctx.emlErrors + " EML-Dateien konnten nicht gespeichert werden");
             }
 
-            if (emlErrors > 0) {
-                logError(emlErrors + " EML-Dateien konnten nicht gespeichert werden");
-            }
-
-            // ── 6. PDF erstellen ──
+        // ── Schritt 6: PDF erstellen ──
+        asyncStep(function() {
             setProgress(68, 'Erstelle PDF-Dateien...');
             logInfo("--- PDF Export ---");
 
-            var wordApp = null;
-            var wordAvailable = false;
             try {
-                wordApp = new ActiveXObject("Word.Application");
-                wordApp.Visible = false;
-                wordAvailable = true;
+                ctx.wordApp = new ActiveXObject("Word.Application");
+                ctx.wordApp.Visible = false;
+                ctx.wordAvailable = true;
                 logInfo("Word gefunden - erstelle PDF via Word");
             } catch (wordInitErr) {
                 logWarn("Word nicht verfuegbar (" + wordInitErr.message + "). Speichere HTML als Fallback.");
             }
+        }, function() {
 
-            for (var p = 0; p < extractedMails.length; p++) {
+        asyncLoop({
+            start: 0,
+            end: extractedMails.length - 1,
+            step: 1,
+            chunkSize: 5,
+            body: function(p) {
                 var pdfOk = false;
 
-                if (wordAvailable && wordApp) {
+                if (ctx.wordAvailable && ctx.wordApp) {
                     try {
-                        saveAsPdfViaWord(extractedMails[p], fileNames[p].pdfPath, wordApp);
-                        logSuccess("  PDF: " + fileNames[p].baseName + ".pdf");
+                        saveAsPdfViaWord(extractedMails[p], ctx.fileNames[p].pdfPath, ctx.wordApp);
+                        logSuccess("  PDF: " + ctx.fileNames[p].baseName + ".pdf");
                         pdfOk = true;
                     } catch (pdfErr) {
-                        logError("  PDF-Fehler " + fileNames[p].nr + ": " + pdfErr.message);
+                        logError("  PDF-Fehler " + ctx.fileNames[p].nr + ": " + pdfErr.message);
                     }
                 }
 
                 if (!pdfOk) {
-                    // Fallback: HTML speichern (gleicher Name aber .html)
                     try {
-                        var htmlFallbackPath = pdfDir + "\\" + fileNames[p].baseName + ".html";
+                        var htmlFallbackPath = ctx.pdfDir + "\\" + ctx.fileNames[p].baseName + ".html";
                         saveAsHtmlFallback(extractedMails[p], htmlFallbackPath);
-                        logWarn("  HTML-Fallback: " + fileNames[p].baseName + ".html (bitte manuell als PDF drucken)");
+                        logWarn("  HTML-Fallback: " + ctx.fileNames[p].baseName + ".html (bitte manuell als PDF drucken)");
                     } catch (htmlErr) {
                         logError("  Auch HTML-Fallback fehlgeschlagen: " + htmlErr.message);
                     }
@@ -985,96 +1091,110 @@
 
                 setProgress(68 + Math.round(((p + 1) / extractedMails.length) * 17),
                     'PDF ' + (p + 1) + '/' + extractedMails.length);
-            }
+            },
+            onDone: function() {
 
             // Word schliessen
-            if (wordApp) {
-                try { wordApp.Quit(0); } catch (qe) {}
-                wordApp = null;
+            if (ctx.wordApp) {
+                try { ctx.wordApp.Quit(0); } catch (qe) {}
+                ctx.wordApp = null;
             }
 
-            // ── 7. CSV erzeugen ──
+        // ── Schritt 7: CSV erzeugen ──
+        asyncStep(function() {
             setProgress(90, 'Erzeuge Metadaten-CSV...');
             logInfo("--- CSV Export ---");
 
-            var csvPath = outputBase + "\\bgav_metadaten.csv";
-            var csvRows = generateMetadataCsv(extractedMails, excelLookup, csvPath, fileNames, originalMailRecipients);
+            var csvPath = ctx.outputBase + "\\bgav_metadaten.csv";
+            ctx.csvRows = generateMetadataCsv(extractedMails, excelLookup, csvPath, ctx.fileNames, ctx.originalMailRecipients);
+            logSuccess("CSV gespeichert: bgav_metadaten.csv (" + ctx.csvRows + " Eintraege)");
+        }, function() {
 
-            logSuccess("CSV gespeichert: bgav_metadaten.csv (" + csvRows + " Eintraege)");
-
-            // ── 7b. Verarbeitete Mails in Unterordner verschieben ──
+        // ── Schritt 7b: Verarbeitete Mails verschieben ──
+        asyncStep(function() {
             setProgress(92, 'Verschiebe verarbeitete Mails...');
             logInfo("--- Mails in Unterordner verschieben ---");
 
             var moveGueltigName = "BGAV_Gueltig";
             var moveUngueltigName = "BGAV_Ungueltig";
-            var moveGueltigFolder = null;
-            var moveUngueltigFolder = null;
 
             try {
-                moveGueltigFolder = sentFolder.Folders(moveGueltigName);
+                ctx.moveGueltigFolder = ctx.sentFolder.Folders(moveGueltigName);
             } catch (noF1) {
-                moveGueltigFolder = sentFolder.Folders.Add(moveGueltigName);
+                ctx.moveGueltigFolder = ctx.sentFolder.Folders.Add(moveGueltigName);
                 logInfo("Unterordner '" + moveGueltigName + "' erstellt");
             }
             try {
-                moveUngueltigFolder = sentFolder.Folders(moveUngueltigName);
+                ctx.moveUngueltigFolder = ctx.sentFolder.Folders(moveUngueltigName);
             } catch (noF2) {
-                moveUngueltigFolder = sentFolder.Folders.Add(moveUngueltigName);
+                ctx.moveUngueltigFolder = ctx.sentFolder.Folders.Add(moveUngueltigName);
                 logInfo("Unterordner '" + moveUngueltigName + "' erstellt");
             }
+        }, function() {
 
-            var movedGueltig = 0;
-            var movedUngueltig = 0;
-            for (var mv = 0; mv < extractedMails.length; mv++) {
+        asyncLoop({
+            start: 0,
+            end: extractedMails.length - 1,
+            step: 1,
+            chunkSize: 20,
+            body: function(mv) {
                 try {
-                    var mvBd = fileNames[mv].bdNummer || '';
+                    var mvBd = ctx.fileNames[mv].bdNummer || '';
                     if (mvBd) {
-                        extractedMails[mv].Move(moveGueltigFolder);
-                        movedGueltig++;
+                        extractedMails[mv].Move(ctx.moveGueltigFolder);
+                        ctx.movedGueltig++;
                     } else {
-                        extractedMails[mv].Move(moveUngueltigFolder);
-                        movedUngueltig++;
+                        extractedMails[mv].Move(ctx.moveUngueltigFolder);
+                        ctx.movedUngueltig++;
                     }
                 } catch (mvErr) {
-                    logWarn("Mail " + fileNames[mv].nr + " konnte nicht verschoben werden: " + mvErr.message);
+                    logWarn("Mail " + ctx.fileNames[mv].nr + " konnte nicht verschoben werden: " + mvErr.message);
                 }
 
                 if ((mv + 1) % 20 === 0) {
                     setProgress(92 + Math.round(((mv + 1) / extractedMails.length) * 3),
                         'Verschiebe Mail ' + (mv + 1) + '/' + extractedMails.length);
                 }
+            },
+            onDone: function() {
+
+            logSuccess(ctx.movedGueltig + " Mails nach 'BGAV_Gueltig' verschoben (BD-Nummer vorhanden)");
+            if (ctx.movedUngueltig > 0) {
+                logWarn(ctx.movedUngueltig + " Mails nach 'BGAV_Ungueltig' verschoben (keine BD-Nummer)");
             }
 
-            logSuccess(movedGueltig + " Mails nach '" + moveGueltigName + "' verschoben (BD-Nummer vorhanden)");
-            if (movedUngueltig > 0) {
-                logWarn(movedUngueltig + " Mails nach '" + moveUngueltigName + "' verschoben (keine BD-Nummer)");
-            }
-
-            // ── 8. Ergebnis ──
+            // ── Schritt 8: Ergebnis ──
             setStepCompleted('step3');
             setStepCompleted('step4');
             setProgress(100, 'Fertig!');
 
-            showResults(outputBase, csvRows);
+            showResults(ctx.outputBase, ctx.csvRows);
 
             showSuccess(
                 "<strong>Extraktion abgeschlossen!</strong><br>" +
                 extractedMails.length + " Mails als EML + PDF exportiert, " +
-                csvRows + " CSV-Eintraege erzeugt.<br>" +
-                movedGueltig + " gueltig / " + movedUngueltig + " ungueltig verschoben.<br>" +
-                "<span class='file-path'>" + outputBase + "</span>"
+                ctx.csvRows + " CSV-Eintraege erzeugt.<br>" +
+                ctx.movedGueltig + " gueltig / " + ctx.movedUngueltig + " ungueltig verschoben.<br>" +
+                "<span class='file-path'>" + ctx.outputBase + "</span>"
             );
 
-            // ── 9. Log als TXT-Datei speichern ──
-            saveLogToFile(outputBase);
+            // ── Schritt 9: Log speichern ──
+            saveLogToFile(ctx.outputBase);
+            resetButtons();
 
-        } catch (ex) {
-            showError("Unerwarteter Fehler: " + ex.message);
-            logError("FEHLER: " + ex.message);
-        }
-
-        resetButtons();
+        }}); // Ende asyncLoop Mail-Verschiebung
+        }); // Ende asyncStep Ordner-Vorbereitung
+        }); // Ende asyncStep CSV
+        }}); // Ende asyncLoop PDF
+        }); // Ende asyncStep Word-Init
+        }}); // Ende asyncLoop EML
+        }); // Ende asyncStep Dateinamen
+        }}); // Ende asyncLoop Mail-Suche
+        }); // Ende asyncStep Filter-Vorbereitung
+        }}); // Ende asyncLoop interne Mails
+        }); // Ende asyncStep Gesendete-Ordner
+        }); // Ende asyncStep Excel
+        }); // Ende asyncStep Ordner-Erstellung
     }
 
     // ══════════════════════════════════════════════════════════════
