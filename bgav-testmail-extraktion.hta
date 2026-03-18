@@ -304,9 +304,9 @@
             <div class="section-title">1. Ordner und Dateien</div>
 
             <div class="form-group">
-                <label>EML-Ordner (Quell-Ordner mit .eml Dateien)</label>
+                <label>Mail-Ordner (Quell-Ordner mit .msg oder .eml Dateien)</label>
                 <div style="display: flex; gap: 8px;">
-                    <input type="text" id="emlFolderPath" placeholder="Ordner mit EML-Dateien..." style="flex:1;"/>
+                    <input type="text" id="emlFolderPath" placeholder="Ordner mit Mail-Dateien (.msg/.eml)..." style="flex:1;"/>
                     <button class="btn btn-secondary" onclick="browseFolder('emlFolderPath')">Durchsuchen...</button>
                 </div>
             </div>
@@ -372,7 +372,7 @@
                     <thead>
                         <tr>
                             <th>Dateiname</th>
-                            <th>Empfaenger (aus EML)</th>
+                            <th>Empfaenger (aus Mail)</th>
                             <th>Grund</th>
                         </tr>
                     </thead>
@@ -395,8 +395,9 @@
     var excelLookup = {};
     var processedFiles = [];  // erfolgreich zugeordnete Dateien
     var unmappedFiles = [];   // nicht zugeordnete Dateien
+    var outlookApp = null;    // Outlook-Instanz (fuer .msg Dateien)
 
-    // Word PDF-Format
+    // Word/Outlook-Konstanten
     var wdFormatPDF = 17;
     var olMHTML = 10;
     var olHTML = 5;
@@ -414,7 +415,7 @@
 
     function setDefaultPaths() {
         document.getElementById('outputPath').value = "\\\\cifs\\shellfolder\\243898\\Desktop_2016\\Neuer Ordner (5)";
-        document.getElementById('emlFolderPath').value = "\\\\cifs\\shellfolder\\243898\\Desktop_2016\\Neuer Ordner (5)\\eml";
+        document.getElementById('emlFolderPath').value = "\\\\cifs\\shellfolder\\243898\\Desktop_2016\\Neuer Ordner (5)\\Neuer Ordner";
 
         // Versuche Excel-Datei automatisch zu finden
         try {
@@ -524,13 +525,83 @@
     }
 
     // ══════════════════════════════════════════════════════════════
-    // EML-Header-Parsing
+    // Mail-Datei lesen (.msg via Outlook, .eml via Header-Parsing)
     // ══════════════════════════════════════════════════════════════
-    function parseEmlHeaders(emlPath) {
+
+    // Outlook-Instanz initialisieren (nur einmal, fuer .msg Dateien)
+    function ensureOutlook() {
+        if (!outlookApp) {
+            outlookApp = new ActiveXObject("Outlook.Application");
+        }
+        return outlookApp;
+    }
+
+    // MSG-Datei via Outlook oeffnen und Infos extrahieren
+    function readMsgFile(msgPath) {
+        var result = { toEmails: [], subject: '', date: '' };
+        try {
+            var app = ensureOutlook();
+            var mailItem = app.Session.OpenSharedItem(msgPath);
+
+            result.subject = mailItem.Subject || '';
+
+            // Empfaenger-Adressen extrahieren
+            try {
+                var recipients = mailItem.Recipients;
+                for (var r = 1; r <= recipients.Count; r++) {
+                    try {
+                        var rcpt = recipients.Item(r);
+                        if (rcpt.Type === 1) { // olTo
+                            var addr = '';
+                            // Versuche SMTP-Adresse zu bekommen
+                            try {
+                                addr = rcpt.Address || '';
+                                if (addr.indexOf('@') === -1) {
+                                    // Exchange-Adresse -> SMTP auflösen
+                                    try {
+                                        var addrEntry = rcpt.AddressEntry;
+                                        if (addrEntry) {
+                                            try {
+                                                var exchUser = addrEntry.GetExchangeUser();
+                                                if (exchUser && exchUser.PrimarySmtpAddress) {
+                                                    addr = exchUser.PrimarySmtpAddress;
+                                                }
+                                            } catch (e1) {}
+                                            if (addr.indexOf('@') === -1) {
+                                                try {
+                                                    var PR_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E";
+                                                    var smtpAddr = addrEntry.PropertyAccessor.GetProperty(PR_SMTP);
+                                                    if (smtpAddr) addr = smtpAddr;
+                                                } catch (e2) {}
+                                            }
+                                        }
+                                    } catch (e3) {}
+                                }
+                            } catch (e4) {
+                                addr = rcpt.Name || '';
+                            }
+                            if (addr) result.toEmails.push(addr.toLowerCase());
+                        }
+                    } catch (rcptErr) {}
+                }
+            } catch (rcptsErr) {}
+
+            try { result.date = mailItem.SentOn || ''; } catch (de) {}
+
+            mailItem.Close(0); // olDiscard
+        } catch (e) {
+            // MSG konnte nicht geoeffnet werden
+        }
+        return result;
+    }
+
+    // EML-Datei: Header parsen (Textformat)
+    function readEmlFile(emlPath) {
+        var result = { toEmails: [], subject: '', date: '' };
         var headers = {};
         try {
             var fso = new ActiveXObject("Scripting.FileSystemObject");
-            var file = fso.OpenTextFile(emlPath, 1, false, 0); // ASCII
+            var file = fso.OpenTextFile(emlPath, 1, false, 0);
             var currentKey = '';
             var currentVal = '';
             var lineCount = 0;
@@ -539,17 +610,12 @@
                 var line = file.ReadLine();
                 lineCount++;
 
-                // Leere Zeile = Ende der Header
                 if (line.replace(/\s/g, '') === '') break;
 
-                // Continuation-Zeile (beginnt mit Whitespace)
                 if (/^\s/.test(line)) {
                     currentVal += ' ' + line.replace(/^\s+/, '');
                 } else {
-                    // Vorherigen Header speichern
-                    if (currentKey) {
-                        headers[currentKey] = currentVal;
-                    }
+                    if (currentKey) headers[currentKey] = currentVal;
                     var colonPos = line.indexOf(':');
                     if (colonPos > 0) {
                         currentKey = line.substring(0, colonPos).toLowerCase();
@@ -557,15 +623,23 @@
                     }
                 }
             }
-            // Letzten Header speichern
-            if (currentKey) {
-                headers[currentKey] = currentVal;
-            }
+            if (currentKey) headers[currentKey] = currentVal;
             file.Close();
-        } catch (e) {
-            // Header konnten nicht gelesen werden
+        } catch (e) {}
+
+        result.toEmails = extractEmailAddresses(headers['to'] || '');
+        result.subject = headers['subject'] || '';
+        result.date = headers['date'] || '';
+        return result;
+    }
+
+    // Mail-Datei lesen (automatisch MSG oder EML)
+    function readMailFile(filePath) {
+        if (filePath.match(/\.msg$/i)) {
+            return readMsgFile(filePath);
+        } else {
+            return readEmlFile(filePath);
         }
-        return headers;
     }
 
     function extractEmailAddresses(headerValue) {
@@ -662,7 +736,7 @@
             fso: null,
             emlDir: '',
             pdfDir: '',
-            emlFiles: [],   // Array von {path, name}
+            mailFiles: [],  // Array von {path, name, type:'msg'|'eml'}
             startNr: 0,
             wordApp: null,
             wordAvailable: false,
@@ -708,29 +782,48 @@
         // ── Schritt 3: EML-Dateien scannen ──
         asyncStep(function() {
             setStepActive('step3');
-            setProgress(15, 'Scanne EML-Ordner...');
+            setProgress(15, 'Scanne Mail-Ordner...');
 
             var folder = ctx.fso.GetFolder(ctx.emlFolder);
             var files = new Enumerator(folder.Files);
+            var msgCount = 0;
+            var emlCount = 0;
             for (; !files.atEnd(); files.moveNext()) {
                 var f = files.item();
-                if (f.Name.match(/\.eml$/i)) {
-                    ctx.emlFiles.push({ path: f.Path, name: f.Name });
+                if (f.Name.match(/\.msg$/i)) {
+                    ctx.mailFiles.push({ path: f.Path, name: f.Name, type: 'msg' });
+                    msgCount++;
+                } else if (f.Name.match(/\.eml$/i)) {
+                    ctx.mailFiles.push({ path: f.Path, name: f.Name, type: 'eml' });
+                    emlCount++;
                 }
             }
 
-            if (ctx.emlFiles.length === 0) {
-                throw new Error("Keine .eml Dateien im Ordner gefunden: " + ctx.emlFolder);
+            if (ctx.mailFiles.length === 0) {
+                throw new Error("Keine .msg oder .eml Dateien im Ordner gefunden: " + ctx.emlFolder);
             }
 
-            logInfo(ctx.emlFiles.length + " EML-Dateien gefunden");
+            var typeInfo = [];
+            if (msgCount > 0) typeInfo.push(msgCount + " MSG");
+            if (emlCount > 0) typeInfo.push(emlCount + " EML");
+            logInfo(ctx.mailFiles.length + " Mail-Dateien gefunden (" + typeInfo.join(", ") + ")");
+
+            if (msgCount > 0) {
+                logInfo("MSG-Dateien erkannt - initialisiere Outlook zum Lesen...");
+                try {
+                    ensureOutlook();
+                    logSuccess("Outlook verbunden");
+                } catch (olErr) {
+                    throw new Error("Outlook wird zum Lesen von MSG-Dateien benoetigt, konnte aber nicht gestartet werden: " + olErr.message);
+                }
+            }
 
             // Hoechste bestehende Nummer in Ausgabe ermitteln (fuer Fortsetzung)
             if (ctx.fso.FolderExists(ctx.emlDir)) {
                 var existing = new Enumerator(ctx.fso.GetFolder(ctx.emlDir).Files);
                 for (; !existing.atEnd(); existing.moveNext()) {
                     var exName = existing.item().Name;
-                    var exMatch = exName.match(/_(\d+)\.eml$/i);
+                    var exMatch = exName.match(/_(\d+)\.(eml|msg)$/i);
                     if (exMatch) {
                         var n = parseInt(exMatch[1]);
                         if (n > ctx.startNr) ctx.startNr = n;
@@ -741,21 +834,20 @@
                 }
             }
 
-            setProgress(20, 'Verarbeite ' + ctx.emlFiles.length + ' EML-Dateien...');
+            setProgress(20, 'Verarbeite ' + ctx.mailFiles.length + ' Mail-Dateien...');
         }, function() {
 
         // ── Schritt 3a: EML-Dateien verarbeiten (async loop) ──
         asyncLoop({
             start: 0,
-            end: ctx.emlFiles.length - 1,
+            end: ctx.mailFiles.length - 1,
             step: 1,
             chunkSize: 5,
             body: function(i) {
-                var emlFile = ctx.emlFiles[i];
-                var headers = parseEmlHeaders(emlFile.path);
-                var toHeader = headers['to'] || '';
-                var subject = headers['subject'] || '';
-                var toEmails = extractEmailAddresses(toHeader);
+                var mailFile = ctx.mailFiles[i];
+                var mailInfo = readMailFile(mailFile.path);
+                var toEmails = mailInfo.toEmails;
+                var subject = mailInfo.subject;
 
                 // BD-Nummer suchen
                 var bdNr = '';
@@ -774,9 +866,18 @@
                     var fileNr = ctx.startNr + processedFiles.length + 1;
                     var nr = padNumber(fileNr, 3);
                     var newName = bdNr + "_BGAV_Titelbezeichnung_" + nr;
+                    var newMsgPath = ctx.emlDir + "\\" + newName + ".msg";
                     var newEmlPath = ctx.emlDir + "\\" + newName + ".eml";
 
-                    ctx.fso.MoveFile(emlFile.path, newEmlPath);
+                    // Datei verschieben (Endung beibehalten)
+                    var destPath;
+                    if (mailFile.type === 'msg') {
+                        ctx.fso.MoveFile(mailFile.path, newMsgPath);
+                        destPath = newMsgPath;
+                    } else {
+                        ctx.fso.MoveFile(mailFile.path, newEmlPath);
+                        destPath = newEmlPath;
+                    }
 
                     processedFiles.push({
                         fileNr: fileNr,
@@ -784,18 +885,20 @@
                         baseName: newName,
                         bdNummer: bdNr,
                         email: matchedEmail,
-                        emlPath: newEmlPath,
+                        filePath: destPath,
+                        fileType: mailFile.type,
                         pdfPath: ctx.pdfDir + "\\" + newName + ".pdf",
-                        originalName: emlFile.name,
+                        originalName: mailFile.name,
                         subject: subject
                     });
 
-                    logSuccess("[" + nr + "] " + emlFile.name + " -> " + newName + ".eml (BD: " + bdNr + ", An: " + matchedEmail + ")");
+                    var ext = mailFile.type === 'msg' ? '.msg' : '.eml';
+                    logSuccess("[" + nr + "] " + mailFile.name + " -> " + newName + ext + " (BD: " + bdNr + ", An: " + matchedEmail + ")");
                 } else {
                     // Nicht zugeordnet: bleibt im Quell-Ordner
                     var reason = '';
                     if (toEmails.length === 0) {
-                        reason = 'Kein Empfaenger in EML-Header gefunden';
+                        reason = 'Kein Empfaenger in Mail gefunden';
                     } else if (countKeys(excelLookup) === 0) {
                         reason = 'Keine Excel-Datei geladen';
                     } else {
@@ -803,18 +906,18 @@
                     }
 
                     unmappedFiles.push({
-                        name: emlFile.name,
-                        path: emlFile.path,
+                        name: mailFile.name,
+                        path: mailFile.path,
                         toEmails: toEmails,
                         reason: reason
                     });
 
-                    logWarn("[---] " + emlFile.name + " -> NICHT ZUGEORDNET (" + reason +
+                    logWarn("[---] " + mailFile.name + " -> NICHT ZUGEORDNET (" + reason +
                         (toEmails.length > 0 ? ", An: " + toEmails.join(", ") : "") + ")");
                 }
 
-                var pct = 20 + Math.round(((i + 1) / ctx.emlFiles.length) * 30);
-                setProgress(pct, 'EML ' + (i + 1) + '/' + ctx.emlFiles.length + ' verarbeitet...');
+                var pct = 20 + Math.round(((i + 1) / ctx.mailFiles.length) * 30);
+                setProgress(pct, 'Mail ' + (i + 1) + '/' + ctx.mailFiles.length + ' verarbeitet...');
             },
             onDone: function() {
 
@@ -862,8 +965,13 @@
             chunkSize: 3,
             body: function(p) {
                 try {
-                    createPdfFromEml(processedFiles[p].emlPath, processedFiles[p].pdfPath, ctx.wordApp);
-                    logSuccess("  PDF: " + processedFiles[p].baseName + ".pdf");
+                    var pf = processedFiles[p];
+                    if (pf.fileType === 'msg') {
+                        createPdfFromMsg(pf.filePath, pf.pdfPath, ctx.wordApp);
+                    } else {
+                        createPdfFromEml(pf.filePath, pf.pdfPath, ctx.wordApp);
+                    }
+                    logSuccess("  PDF: " + pf.baseName + ".pdf");
                 } catch (pdfErr) {
                     logError("  PDF-Fehler " + processedFiles[p].nr + ": " + pdfErr.message);
                 }
@@ -922,6 +1030,39 @@
     // ══════════════════════════════════════════════════════════════
     // PDF-Erstellung via Word
     // ══════════════════════════════════════════════════════════════
+
+    // MSG-Datei: via Outlook als MHTML speichern, dann Word->PDF
+    function createPdfFromMsg(msgPath, pdfPath, wordApp) {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var tempDir = fso.GetSpecialFolder(2).Path;
+        var tempBase = tempDir + "\\bgav_temp_" + (new Date()).getTime();
+        var tempMht = tempBase + ".mht";
+
+        // MSG via Outlook als MHTML speichern
+        var app = ensureOutlook();
+        var mailItem = app.Session.OpenSharedItem(msgPath);
+        mailItem.SaveAs(tempMht, olMHTML);
+        mailItem.Close(0);
+
+        var doc = wordApp.Documents.Open(tempMht, false, true, false);
+
+        try {
+            doc.ExportAsFixedFormat(pdfPath, 17, false, 0, 0);
+        } catch (exportErr) {
+            doc.SaveAs2(pdfPath, wdFormatPDF);
+        }
+
+        doc.Close(0);
+
+        // Temp aufraumen
+        try { if (fso.FileExists(tempMht)) fso.DeleteFile(tempMht, true); } catch (de) {}
+        try {
+            var filesDir = tempBase + "_files";
+            if (fso.FolderExists(filesDir)) fso.DeleteFolder(filesDir, true);
+        } catch (de2) {}
+    }
+
+    // EML-Datei: als MHTML-Copy oeffnen, dann Word->PDF
     function createPdfFromEml(emlPath, pdfPath, wordApp) {
         var fso = new ActiveXObject("Scripting.FileSystemObject");
         var tempDir = fso.GetSpecialFolder(2).Path;
@@ -1054,7 +1195,7 @@
 
             lines.push(
                 nr + ';' +
-                csvEscape(pf.baseName + ".eml") + ';' +
+                csvEscape(pf.baseName + (pf.fileType === 'msg' ? '.msg' : '.eml')) + ';' +
                 csvEscape(pf.baseName + ".pdf") + ';' +
                 csvEscape(pf.email) + ';' +
                 csvEscape(meta.vorname || '') + ';' +
