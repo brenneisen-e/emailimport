@@ -1324,7 +1324,7 @@
     // CSV-Erzeugung
     // ══════════════════════════════════════════════════════════════
     function generateMetadataCsv(csvPath) {
-        var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff;Original_Dateiname";
+        var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;BD_Nummer;Klammerbegriff;Original_Dateiname";
         var klammerbegriff = "ADM Vertrag";
 
         // Bestehende CSV einlesen (fuer Wiederholungslauf)
@@ -1369,8 +1369,6 @@
                 csvEscape(pf.baseName + (pf.fileType === 'msg' ? '.msg' : '.eml')) + ';' +
                 csvEscape(pf.baseName + ".pdf") + ';' +
                 csvEscape(pf.email) + ';' +
-                csvEscape(meta.vorname || '') + ';' +
-                csvEscape(meta.nachname || '') + ';' +
                 csvEscape(pf.bdNummer) + ';' +
                 csvEscape(klammerbegriff) + ';' +
                 csvEscape(pf.originalName)
@@ -1435,7 +1433,7 @@
         for (var i = 0; i < processedFiles.length; i++) {
             var pf = processedFiles[i];
             var meta = excelLookup[pf.email] || {};
-            var name = (meta.vorname && meta.nachname) ? meta.vorname + ' ' + meta.nachname : pf.email;
+            var name = pf.email;
 
             var tr = document.createElement('tr');
             tr.innerHTML =

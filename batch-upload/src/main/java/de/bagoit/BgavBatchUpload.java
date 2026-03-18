@@ -151,9 +151,6 @@ public class BgavBatchUpload {
                 log.info("  PDF: {} ({} bytes)", rec.datenamePdf, pdfBytes.length);
                 log.info("  BD:  {}", rec.bdNummer);
                 log.info("  Klammer: {}", rec.klammerbegriff);
-                if (rec.konversationsId != null && !rec.konversationsId.isEmpty()) {
-                    log.info("  ConversationID: {}", rec.konversationsId);
-                }
 
                 if (dryRun) {
                     log.info("  [DRY-RUN] Wuerde legeMailAb() aufrufen...");
@@ -211,11 +208,9 @@ public class BgavBatchUpload {
      * 1      Dateiname_EML       00010091_BGAV_Titelbezeichnung_001.eml
      * 2      Dateiname_PDF       00010091_BGAV_Titelbezeichnung_001.pdf
      * 3      Empfaenger_Email    name@firma.de
-     * 4      Vorname             Max
-     * 5      Nachname            Muster
-     * 6      BD_Nummer           00010091
-     * 7      Klammerbegriff      ADM Vertrag
-     * 8      Konversations_ID    AAA-BBB-CCC (optional)
+     * 4      BD_Nummer           00010091
+     * 5      Klammerbegriff      ADM Vertrag
+     * 6      Original_Dateiname  original.eml (optional)
      * </pre>
      *
      * @param csvPath Pfad zur CSV-Datei
@@ -254,9 +249,9 @@ public class BgavBatchUpload {
                 if (line.isEmpty()) continue;
 
                 final String[] parts = line.split(CSV_SEPARATOR, -1);
-                // Mindestens 8 Spalten erwartet (Nr bis Klammerbegriff)
-                if (parts.length < 8) {
-                    log.warn("Zeile {} hat nur {} Spalten (erwartet min. 8), ueberspringe", lineNr, parts.length);
+                // Mindestens 6 Spalten erwartet (Nr bis Klammerbegriff)
+                if (parts.length < 6) {
+                    log.warn("Zeile {} hat nur {} Spalten (erwartet min. 6), ueberspringe", lineNr, parts.length);
                     continue;
                 }
 
@@ -265,11 +260,8 @@ public class BgavBatchUpload {
                 rec.dateinameEml = parts[1].trim();
                 rec.datenamePdf = parts[2].trim();
                 rec.empfaengerEmail = parts[3].trim();
-                rec.vorname = parts[4].trim();
-                rec.nachname = parts[5].trim();
-                rec.bdNummer = parts[6].trim();
-                rec.klammerbegriff = parts[7].trim();
-                rec.konversationsId = parts.length > 8 ? parts[8].trim() : "";
+                rec.bdNummer = parts[4].trim();
+                rec.klammerbegriff = parts[5].trim();
 
                 records.add(rec);
             }
@@ -304,16 +296,10 @@ public class BgavBatchUpload {
         String datenamePdf;
         /** E-Mail-Adresse des Empfaengers */
         String empfaengerEmail;
-        /** Vorname des Empfaengers (aus Excel) */
-        String vorname;
-        /** Nachname des Empfaengers (aus Excel) */
-        String nachname;
         /** BD-Vermittlernummer (z.B. "00010091") - Pflichtfeld fuer den Upload */
         String bdNummer;
         /** Klammerbegriff fuer die SST-API (z.B. "ADM Vertrag") */
         String klammerbegriff;
-        /** Outlook ConversationID fuer Nachvollziehbarkeit (optional) */
-        String konversationsId;
 
         @Override
         public String toString() {
