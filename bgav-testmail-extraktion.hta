@@ -1290,23 +1290,21 @@
             var maxRow = ws.UsedRange.Rows.Count;
             logInfo("Excel geladen: " + maxRow + " Zeilen");
 
-            // Spalte A=1 (BD-Nummer), I=9 (Vorname), J=10 (Nachname), K=11 (Email)
+            // Spalte B=2 (Email), C=3 (BD-Nummer/Match)
             for (var row = 2; row <= maxRow + 1; row++) {
                 try {
-                    var emailVal = ws.Cells(row, 11).Value;
+                    var emailVal = ws.Cells(row, 2).Value;
                     if (!emailVal) continue;
 
                     var emailKey = String(emailVal).replace(/^\s+|\s+$/g, '').toLowerCase();
                     if (!emailKey || emailKey.indexOf('@') === -1) continue;
 
-                    var bdNummer = ws.Cells(row, 1).Value;
-                    var vorname = ws.Cells(row, 9).Value;
-                    var nachname = ws.Cells(row, 10).Value;
+                    var bdNummer = ws.Cells(row, 3).Value;
 
                     lookup[emailKey] = {
                         bd_nummer: bdNummer ? String(bdNummer).replace(/^\s+|\s+$/g, '') : '',
-                        vorname: vorname ? String(vorname).replace(/^\s+|\s+$/g, '') : '',
-                        nachname: nachname ? String(nachname).replace(/^\s+|\s+$/g, '') : '',
+                        vorname: '',
+                        nachname: '',
                         email: String(emailVal).replace(/^\s+|\s+$/g, '')
                     };
                 } catch (rowErr) {}
@@ -1326,7 +1324,7 @@
     // CSV-Erzeugung
     // ══════════════════════════════════════════════════════════════
     function generateMetadataCsv(csvPath) {
-        var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;Vorname;Nachname;BD_Nummer;Klammerbegriff;Original_Dateiname";
+        var header = "Nr;Dateiname_EML;Dateiname_PDF;Empfaenger_Email;BD_Nummer;Klammerbegriff;Original_Dateiname";
         var klammerbegriff = "ADM Vertrag";
 
         // Bestehende CSV einlesen (fuer Wiederholungslauf)
@@ -1371,8 +1369,6 @@
                 csvEscape(pf.baseName + (pf.fileType === 'msg' ? '.msg' : '.eml')) + ';' +
                 csvEscape(pf.baseName + ".pdf") + ';' +
                 csvEscape(pf.email) + ';' +
-                csvEscape(meta.vorname || '') + ';' +
-                csvEscape(meta.nachname || '') + ';' +
                 csvEscape(pf.bdNummer) + ';' +
                 csvEscape(klammerbegriff) + ';' +
                 csvEscape(pf.originalName)
@@ -1437,7 +1433,7 @@
         for (var i = 0; i < processedFiles.length; i++) {
             var pf = processedFiles[i];
             var meta = excelLookup[pf.email] || {};
-            var name = (meta.vorname && meta.nachname) ? meta.vorname + ' ' + meta.nachname : pf.email;
+            var name = pf.email;
 
             var tr = document.createElement('tr');
             tr.innerHTML =
