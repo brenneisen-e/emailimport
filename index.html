@@ -1501,12 +1501,12 @@
                     <div class="tool-category-header" onclick="toggleCategory('catErgo')">
                         <div class="tool-category-icon ergo">E</div>
                         <div class="tool-category-title">ERGO</div>
-                        <div class="tool-category-count">1 Tool</div>
+                        <div class="tool-category-count">2 Tools</div>
                         <div class="tool-category-arrow">&#9654;</div>
                     </div>
                     <div class="tool-category-body">
 
-                        <!-- ERGO Email Batch Export -->
+                        <!-- ERGO Email Batch Export (HTA) -->
                         <details open>
                             <summary>
                                 ERGO Email Batch Export
@@ -1521,6 +1521,24 @@
                                     </a>
                                 </div>
                                 <div class="tool-meta">ergo-email-batch.hta | Benoetigt: Outlook (MAPI), Excel (fuer Excel-Export)</div>
+                            </div>
+                        </details>
+
+                        <!-- ERGO Excel Tool (Citrix-tauglich) -->
+                        <details open>
+                            <summary>
+                                ERGO Email Batch (Excel-Makro)
+                                <span class="tool-tag">XLSM / VBA</span>
+                            </summary>
+                            <div class="tool-body">
+                                <p><strong>Citrix-tauglich.</strong> Excel-VBA-Makro mit zwei Modi: <em>(1)</em> Outlook live (Ordner + Tage zurueck) oder <em>(2)</em> Ordner-Scan fuer .msg / .eml Dateien vom Laufwerk. Output: Tabellenblatt "Emails" + JSON-Beladungsdatei fuer das Web-Tool.</p>
+                                <div class="tool-actions">
+                                    <a href="ERGO-Excel-Tool.zip" download class="btn-download">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        ERGO-Excel-Tool.zip
+                                    </a>
+                                </div>
+                                <div class="tool-meta">ergo-email-batch.bas + ANLEITUNG-ERGO-EXCEL.txt | Einmal-Setup: 3 Klicks (Excel oeffnen -> als .xlsm speichern -> Modul importieren)</div>
                             </div>
                         </details>
 

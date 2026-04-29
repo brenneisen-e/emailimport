@@ -1,0 +1,68 @@
+============================================================
+ERGO Email Batch - Excel-Tool (Citrix-tauglich)
+============================================================
+
+EINMALIGE INSTALLATION (3 Klicks):
+
+  1. Excel oeffnen -> leere Arbeitsmappe
+  2. Datei -> Speichern unter
+     Dateityp: "Excel-Arbeitsmappe mit Makros (*.xlsm)"
+     Name:     ergo-email-batch.xlsm
+  3. Alt+F11 (oeffnet VBA-Editor)
+     Datei -> Datei importieren...
+     -> ergo-email-batch.bas auswaehlen
+     VBA-Editor schliessen
+
+  Falls Sicherheitswarnung erscheint:
+     -> "Inhalt aktivieren" / "Makros aktivieren"
+
+============================================================
+
+NUTZUNG:
+
+  Alt+F8 -> "Hauptmenu" auswaehlen -> Ausfuehren
+  ODER direkt eines dieser Makros starten:
+
+  - Outlook_Live_Abrufen   = Outlook-Ordner waehlen + Tage zurueck
+  - Ordner_Scannen         = Ordner mit .msg / .eml waehlen
+  - JSON_Exportieren       = Tabelle als JSON-Beladungsdatei speichern
+                             (zum Hochladen ins Web-Tool)
+
+============================================================
+
+WORKFLOWS:
+
+  A) Outlook live (Postfach + Tage):
+     1. Hauptmenu -> JA (Outlook live)
+     2. Im Dialog Ordner waehlen (z.B. Postfach\Posteingang)
+     3. Tage eingeben (z.B. 7)
+     -> Tabellenblatt "Emails" wird mit allen Mails gefuellt
+     4. Optional: JSON_Exportieren -> Beladungsdatei fuer Web-Tool
+
+  B) Ordner mit Email-Dateien:
+     1. In Outlook: Mails markieren -> in Windows-Ordner ziehen
+        (Outlook erstellt automatisch .msg-Dateien)
+     2. Hauptmenu -> NEIN (Ordner-Scan)
+     3. Ordner waehlen
+     -> Alle .msg / .eml Dateien werden gelesen
+     4. Optional: JSON_Exportieren
+
+============================================================
+
+AUSGABE:
+
+  Tabellenblatt "Emails" mit Spalten:
+    Nr | Datum | Datum_ISO | Absender Name | Absender Email |
+    Betreff | Text | Anhaenge
+
+  JSON-Format (Beladungsdatei):
+    Array von Email-Objekten - kompatibel mit index.html
+    Web-Oberflaeche -> "Datei auswaehlen" -> diese JSON laden.
+
+============================================================
+
+HINWEIS - ALLES READ-ONLY:
+  Das Makro liest nur. Keine Mails werden geloescht, verschoben,
+  als gelesen markiert oder anderweitig veraendert.
+
+============================================================
