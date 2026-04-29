@@ -1334,10 +1334,88 @@
                     width: 14px;
                     height: 14px;
                 }
+                /* Kachel (Kategorie-Karte) */
+                .tool-category {
+                    margin-bottom: 14px;
+                    border: 1px solid #e1dfdd;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    background: #fff;
+                }
+                .tool-category-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 14px 16px;
+                    cursor: pointer;
+                    user-select: none;
+                    background: linear-gradient(135deg, #faf9f8 0%, #f3f2f1 100%);
+                    border-bottom: 1px solid transparent;
+                    transition: background 0.15s;
+                }
+                .tool-category.open .tool-category-header {
+                    border-bottom-color: #e1dfdd;
+                }
+                .tool-category-header:hover { background: #f3f2f1; }
+                .tool-category-icon {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #fff;
+                    font-weight: 700;
+                    font-size: 14px;
+                    flex-shrink: 0;
+                }
+                .tool-category-icon.barmenia { background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%); }
+                .tool-category-icon.ergo { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); }
+                .tool-category-title {
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #323130;
+                    flex: 1;
+                }
+                .tool-category-count {
+                    font-size: 11px;
+                    color: #605e5c;
+                    background: #fff;
+                    padding: 2px 8px;
+                    border-radius: 10px;
+                    border: 1px solid #e1dfdd;
+                }
+                .tool-category-arrow {
+                    color: #a19f9d;
+                    font-size: 10px;
+                    transition: transform 0.2s;
+                }
+                .tool-category.open .tool-category-arrow {
+                    transform: rotate(90deg);
+                }
+                .tool-category-body {
+                    display: none;
+                    padding: 12px;
+                    background: #faf9f8;
+                }
+                .tool-category.open .tool-category-body {
+                    display: block;
+                }
+                .tool-category-body details { background: #fff; }
             </style>
 
             <div class="tool-section" style="margin-top: 24px;">
                 <div style="font-size: 12px; font-weight: 600; color: #605e5c; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Tools &amp; Downloads</div>
+
+                <!-- ============ KACHEL: BARMENIA ============ -->
+                <div class="tool-category open" id="catBarmenia">
+                    <div class="tool-category-header" onclick="toggleCategory('catBarmenia')">
+                        <div class="tool-category-icon barmenia">B</div>
+                        <div class="tool-category-title">Barmenia</div>
+                        <div class="tool-category-count">4 Tools</div>
+                        <div class="tool-category-arrow">&#9654;</div>
+                    </div>
+                    <div class="tool-category-body">
 
                 <!-- Outlook Export Tool -->
                 <details>
@@ -1414,6 +1492,40 @@
                         <div class="tool-meta">pdf-massenupload.hta + Java Batch-Upload | Keine Abhaengigkeiten fuer HTA</div>
                     </div>
                 </details>
+
+                    </div><!-- /tool-category-body Barmenia -->
+                </div><!-- /tool-category Barmenia -->
+
+                <!-- ============ KACHEL: ERGO ============ -->
+                <div class="tool-category open" id="catErgo">
+                    <div class="tool-category-header" onclick="toggleCategory('catErgo')">
+                        <div class="tool-category-icon ergo">E</div>
+                        <div class="tool-category-title">ERGO</div>
+                        <div class="tool-category-count">1 Tool</div>
+                        <div class="tool-category-arrow">&#9654;</div>
+                    </div>
+                    <div class="tool-category-body">
+
+                        <!-- ERGO Email Batch Export -->
+                        <details open>
+                            <summary>
+                                ERGO Email Batch Export
+                                <span class="tool-tag">HTA</span>
+                            </summary>
+                            <div class="tool-body">
+                                <p>Postfach &amp; Ordner waehlen, Zeitraum (Von/Bis) festlegen, alle Emails abrufen und in einer Tabelle anzeigen. Splittet in Subject, Body, Absender und Anhang-Namen. Export als Excel oder JSON (JSON wieder hier in der Web-Oberflaeche ladbar).</p>
+                                <div class="tool-actions">
+                                    <a href="ERGO-Email-Batch.zip" download class="btn-download">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        ERGO-Email-Batch.zip
+                                    </a>
+                                </div>
+                                <div class="tool-meta">ergo-email-batch.hta | Benoetigt: Outlook (MAPI), Excel (fuer Excel-Export)</div>
+                            </div>
+                        </details>
+
+                    </div><!-- /tool-category-body ERGO -->
+                </div><!-- /tool-category ERGO -->
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px;">
@@ -2758,6 +2870,17 @@
     <\/script>
 </body>
 </html>`;
+
+        // Toggle Tool-Kategorie (Barmenia / ERGO Kacheln)
+        function toggleCategory(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            if (el.className.indexOf('open') !== -1) {
+                el.className = el.className.replace(/\s*open\s*/g, ' ').replace(/\s+$/, '');
+            } else {
+                el.className = el.className + ' open';
+            }
+        }
 
         // Function to copy HTA source code to clipboard
         async function copyHtaSource() {
