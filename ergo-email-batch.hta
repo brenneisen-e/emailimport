@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>ERGO Email Batch Export</title>
+    <HTA:APPLICATION
+        ID="ERGO_Email_Batch"
+        APPLICATIONNAME="ERGO Email Batch Export"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .header { text-align: center; margin-bottom: 1.5rem; }
+        .logo { font-size: 42px; margin-bottom: 0.25rem; }
+        h2 { color: #f1f5f9; margin-bottom: 0.25rem; }
+        .subtitle { color: #94a3b8; font-size: 13px; }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: flex; gap: 0; margin-bottom: 1.25rem;
+            background: rgba(0,0,0,0.3); border-radius: 12px; padding: 4px;
+        }
+        .mode-btn {
+            flex: 1; padding: 10px 16px; border: none; background: transparent;
+            color: #94a3b8; cursor: pointer; border-radius: 8px;
+            font-size: 13px; font-weight: 500; transition: all 0.2s;
+        }
+        .mode-btn.active {
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+            color: white; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+        }
+        .mode-btn:hover:not(.active) { background: rgba(255,255,255,0.08); }
+        .mode-section { display: none; }
+        .mode-section.active { display: block; }
+
+        /* Form Elements */
+        label {
+            display: block; margin-bottom: 0.4rem;
+            color: #cbd5e1; font-size: 12px; font-weight: 500;
+        }
+        select, input[type="number"], input[type="date"], input[type="text"] {
+            width: 100%; padding: 9px 12px;
+            border: 1px solid #475569; border-radius: 8px;
+            background: #1e293b; color: #f1f5f9; font-size: 13px;
+            margin-bottom: 0.85rem;
+        }
+        select:focus, input:focus { outline: none; border-color: #ef4444; }
+        .row { display: flex; gap: 0.75rem; }
+        .row > * { flex: 1; }
+
+        /* Buttons */
+        .btn {
+            padding: 11px 20px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 13px; font-weight: 500;
+            transition: all 0.2s; margin-right: 0.5rem; margin-bottom: 0.5rem;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn-success:hover:not(:disabled) { background: linear-gradient(135deg, #34d399 0%, #10b981 100%); }
+        .btn-secondary { background: #475569; color: #f1f5f9; }
+        .btn-secondary:hover:not(:disabled) { background: #64748b; }
+
+        /* Progress + Status */
+        .progress-container { display: none; margin: 1rem 0; }
+        .progress-bar { height: 8px; background: #374151; border-radius: 4px; overflow: hidden; }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, #ef4444, #f97316);
+            width: 0%; transition: width 0.3s;
+        }
+        .progress-text { font-size: 12px; color: #94a3b8; margin-top: 0.5rem; text-align: center; }
+        .status { display: none; padding: 0.85rem 1rem; border-radius: 8px; margin: 0.75rem 0; font-size: 13px; }
+        .status.success { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; }
+        .status.error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+        .status.info { background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #93c5fd; }
+
+        /* Results Table */
+        .results-toolbar {
+            display: none; align-items: center; gap: 0.5rem;
+            padding: 0.75rem; background: rgba(0,0,0,0.25);
+            border-radius: 8px; margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .results-toolbar input[type="text"] { margin: 0; flex: 1; min-width: 200px; }
+        .results-count { color: #ef4444; font-weight: 600; font-size: 13px; padding: 0 0.5rem; }
+        .results-table-wrap {
+            display: none; max-height: 480px; overflow: auto;
+            background: rgba(0,0,0,0.25); border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        table.results { width: 100%; border-collapse: collapse; font-size: 12px; }
+        table.results th {
+            position: sticky; top: 0; background: #0f172a; color: #cbd5e1;
+            text-align: left; padding: 8px 10px; border-bottom: 1px solid #334155;
+            font-weight: 600; font-size: 11px; text-transform: uppercase;
+        }
+        table.results td {
+            padding: 7px 10px; border-bottom: 1px solid #1e293b;
+            color: #e2e8f0; vertical-align: top;
+        }
+        table.results tr:hover td { background: rgba(239, 68, 68, 0.08); cursor: pointer; }
+        table.results td.col-date { white-space: nowrap; color: #94a3b8; }
+        table.results td.col-subject { font-weight: 500; }
+        table.results td.col-preview { color: #94a3b8; max-width: 320px; }
+        table.results td.col-att { color: #fbbf24; font-size: 11px; }
+
+        /* Detail Modal */
+        .modal-backdrop {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); z-index: 100;
+            align-items: center; justify-content: center; padding: 2rem;
+        }
+        .modal-backdrop.active { display: flex; }
+        .modal {
+            background: #1e293b; border-radius: 12px; padding: 1.5rem;
+            max-width: 800px; width: 100%; max-height: 90vh; overflow: auto;
+            border: 1px solid #475569;
+        }
+        .modal h3 { color: #f1f5f9; margin-bottom: 0.75rem; font-size: 16px; }
+        .modal .meta { color: #94a3b8; font-size: 12px; margin-bottom: 0.5rem; }
+        .modal .meta strong { color: #cbd5e1; }
+        .modal pre {
+            background: #0f172a; padding: 1rem; border-radius: 8px;
+            color: #e2e8f0; font-size: 12px; white-space: pre-wrap;
+            word-wrap: break-word; max-height: 50vh; overflow: auto;
+            margin-top: 0.75rem; font-family: 'Consolas', monospace;
+        }
+        .info-box {
+            background: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6;
+            border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem;
+            font-size: 12px; color: #cbd5e1;
+        }
+        .info-box strong { color: #93c5fd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">&#9993;</div>
+                <h2>ERGO Email Batch Export</h2>
+                <p class="subtitle">Postfach &rarr; Zeitraum &rarr; Tabelle &rarr; Excel / JSON</p>
+            </div>
+
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="btnModeRetrieve" onclick="switchMode('retrieve')">&#128229; Emails abrufen</button>
+                <button class="mode-btn" id="btnModeLoad" onclick="switchMode('load')">&#128194; Vorhandene JSON laden</button>
+            </div>
+
+            <div class="mode-section active" id="sectionRetrieve">
+                <div class="info-box">
+                    <strong>So geht's:</strong> Postfach &amp; Ordner waehlen &rarr; Zeitraum (Von/Bis) &rarr; "Emails abrufen" klicken &rarr; Tabelle erscheint &rarr; Excel oder JSON exportieren.
+                </div>
+
+                <label>Postfach</label>
+                <select id="mailboxSelect" onchange="loadFolders()">
+                    <option value="">-- Postfach waehlen --</option>
+                </select>
+
+                <label>Ordner</label>
+                <select id="folderSelect" disabled>
+                    <option value="">-- Erst Postfach waehlen --</option>
+                </select>
+
+                <div class="row">
+                    <div>
+                        <label>Datum von</label>
+                        <input type="date" id="dateFrom">
+                    </div>
+                    <div>
+                        <label>Datum bis</label>
+                        <input type="date" id="dateTo">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="btnRetrieve" onclick="retrieveEmails()" disabled>
+                    &#128269; Emails abrufen
+                </button>
+                <button class="btn btn-secondary" onclick="setQuickRange(7)">Letzte 7 Tage</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(30)">Letzte 30 Tage</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(0)">Heute</button>
+            </div>
+
+            <div class="mode-section" id="sectionLoad">
+                <div class="info-box">
+                    <strong>JSON laden:</strong> Frueher exportierte JSON-Datei oeffnen, um die Emails wieder im Tool anzuzeigen oder erneut nach Excel zu exportieren.
+                </div>
+                <button class="btn btn-primary" onclick="loadJsonFile()">
+                    &#128194; JSON-Datei oeffnen
+                </button>
+                <input type="text" id="loadedFilePath" readonly placeholder="Noch keine Datei geladen" style="margin-top: 0.5rem;">
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText">Verarbeite...</div>
+            </div>
+
+            <div class="results-toolbar" id="resultsToolbar">
+                <input type="text" id="searchInput" placeholder="Suchen (Betreff, Absender, Text)..." oninput="renderTable()">
+                <span class="results-count" id="resultsCount">0 Emails</span>
+                <button class="btn btn-success" onclick="exportToExcel()">&#128202; Excel-Export</button>
+                <button class="btn btn-secondary" onclick="exportToJson()">&#128190; JSON-Export</button>
+            </div>
+
+            <div class="results-table-wrap" id="resultsTableWrap">
+                <table class="results">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Datum</th>
+                            <th>Absender</th>
+                            <th>Betreff</th>
+                            <th>Text (Vorschau)</th>
+                            <th>Anhaenge</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="modal-backdrop" id="detailModal" onclick="closeDetail(event)">
+                <div class="modal" onclick="event.stopPropagation()">
+                    <h3 id="detailSubject"></h3>
+                    <div class="meta"><strong>Datum:</strong> <span id="detailDate"></span></div>
+                    <div class="meta"><strong>Absender:</strong> <span id="detailSender"></span></div>
+                    <div class="meta"><strong>Anhaenge:</strong> <span id="detailAttachments"></span></div>
+                    <pre id="detailBody"></pre>
+                    <div style="margin-top: 1rem; text-align: right;">
+                        <button class="btn btn-secondary" onclick="closeDetail()">Schliessen</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status success" id="successStatus"><span id="successMsg"></span></div>
+            <div class="status error" id="errorStatus"><span id="errorMsg"></span></div>
+            <div class="status info" id="infoStatus"><span id="infoMsg"></span></div>
+        </div>
+    </div>
+
+    <script>
+        var outlookApp = null;
+        var outlookNS = null;
+        var selectedStore = null;
+        var allEmails = [];
+        var currentMode = 'retrieve';
+
+        window.onload = function() {
+            try { window.resizeTo(1180, 880); } catch(e) {}
+
+            // Default Zeitraum: letzte 7 Tage
+            setQuickRange(7);
+
+            try {
+                outlookApp = new ActiveXObject("Outlook.Application");
+                outlookNS = outlookApp.GetNamespace("MAPI");
+                loadMailboxes();
+            } catch (e) {
+                showError("Outlook konnte nicht verbunden werden. Bitte stelle sicher, dass Outlook geoeffnet ist. (" + e.message + ")");
+            }
+        };
+
+        function switchMode(mode) {
+            currentMode = mode;
+            hideStatus();
+            document.getElementById('btnModeRetrieve').className = 'mode-btn' + (mode === 'retrieve' ? ' active' : '');
+            document.getElementById('btnModeLoad').className = 'mode-btn' + (mode === 'load' ? ' active' : '');
+            document.getElementById('sectionRetrieve').className = 'mode-section' + (mode === 'retrieve' ? ' active' : '');
+            document.getElementById('sectionLoad').className = 'mode-section' + (mode === 'load' ? ' active' : '');
+        }
+
+        function setQuickRange(days) {
+            var now = new Date();
+            var to = new Date(now);
+            var from = new Date(now);
+            from.setDate(from.getDate() - days);
+            document.getElementById('dateFrom').value = isoDate(from);
+            document.getElementById('dateTo').value = isoDate(to);
+        }
+
+        function isoDate(d) {
+            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+        }
+
+        function loadMailboxes() {
+            try {
+                var select = document.getElementById('mailboxSelect');
+                select.innerHTML = '<option value="">-- Postfach waehlen --</option>';
+                var stores = outlookNS.Stores;
+                for (var i = 1; i <= stores.Count; i++) {
+                    try {
+                        var store = stores.Item(i);
+                        var opt = document.createElement('option');
+                        opt.value = i;
+                        opt.text = store.DisplayName;
+                        select.appendChild(opt);
+                    } catch (e) {}
+                }
+            } catch (e) {
+                showError("Postfaecher konnten nicht geladen werden: " + e.message);
+            }
+        }
+
+        function loadFolders() {
+            var select = document.getElementById('mailboxSelect');
+            var folderSelect = document.getElementById('folderSelect');
+            folderSelect.innerHTML = '<option value="">-- Ordner waehlen --</option>';
+            folderSelect.disabled = true;
+            document.getElementById('btnRetrieve').disabled = true;
+
+            if (!select.value) return;
+
+            try {
+                selectedStore = outlookNS.Stores.Item(parseInt(select.value));
+                var rootFolder = selectedStore.GetRootFolder();
+                var folders = rootFolder.Folders;
+                for (var i = 1; i <= folders.Count; i++) {
+                    try {
+                        var folder = folders.Item(i);
+                        var opt = document.createElement('option');
+                        opt.value = folder.EntryID;
+                        opt.text = folder.Name;
+                        folderSelect.appendChild(opt);
+                        addSubfolders(folder, folderSelect, '  ');
+                    } catch (e) {}
+                }
+                folderSelect.disabled = false;
+                folderSelect.onchange = function() {
+                    document.getElementById('btnRetrieve').disabled = !folderSelect.value;
+                };
+            } catch (e) {
+                showError("Ordner konnten nicht geladen werden: " + e.message);
+            }
+        }
+
+        function addSubfolders(parentFolder, select, indent) {
+            try {
+                var subFolders = parentFolder.Folders;
+                for (var i = 1; i <= subFolders.Count; i++) {
+                    try {
+                        var folder = subFolders.Item(i);
+                        var opt = document.createElement('option');
+                        opt.value = folder.EntryID;
+                        opt.text = indent + folder.Name;
+                        select.appendChild(opt);
+                        addSubfolders(folder, select, indent + '  ');
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        }
+
+        function retrieveEmails() {
+            hideStatus();
+            var folderSelect = document.getElementById('folderSelect');
+            var fromStr = document.getElementById('dateFrom').value;
+            var toStr = document.getElementById('dateTo').value;
+
+            if (!folderSelect.value) { showError("Bitte Ordner auswaehlen."); return; }
+            if (!fromStr || !toStr) { showError("Bitte Datum von und bis ausfuellen."); return; }
+
+            var fromDate = new Date(fromStr + "T00:00:00");
+            var toDate = new Date(toStr + "T23:59:59");
+            if (fromDate > toDate) { showError("Datum 'Von' muss vor 'Bis' liegen."); return; }
+
+            document.getElementById('btnRetrieve').disabled = true;
+            showProgress("Lade Ordner...");
+
+            setTimeout(function() {
+                try {
+                    var folder = outlookNS.GetFolderFromID(folderSelect.value);
+                    var items = folder.Items;
+                    items.Sort("[ReceivedTime]", true); // descending: neueste zuerst
+
+                    allEmails = [];
+                    var total = items.Count;
+                    var processed = 0;
+                    var matched = 0;
+
+                    for (var i = 1; i <= total; i++) {
+                        try {
+                            var item = items.Item(i);
+                            processed++;
+
+                            // Nur Emails (Class 43 = olMail)
+                            if (item.Class !== 43) continue;
+
+                            var rt;
+                            try { rt = new Date(item.ReceivedTime); } catch(e) { continue; }
+                            if (isNaN(rt.getTime())) continue;
+
+                            // Sortierung ist desc - wenn aelter als fromDate -> abbrechen
+                            if (rt < fromDate) break;
+                            // Wenn neuer als toDate -> ueberspringen
+                            if (rt > toDate) continue;
+
+                            allEmails.push(extractEmail(item));
+                            matched++;
+
+                            if (matched % 10 === 0) {
+                                updateProgress(processed, total, "Gefunden: " + matched);
+                            }
+                        } catch (e) {}
+                    }
+
+                    hideProgress();
+                    document.getElementById('btnRetrieve').disabled = false;
+
+                    if (allEmails.length === 0) {
+                        showInfo("Keine Emails im gewaehlten Zeitraum gefunden.");
+                        document.getElementById('resultsToolbar').style.display = 'none';
+                        document.getElementById('resultsTableWrap').style.display = 'none';
+                        return;
+                    }
+
+                    showSuccess(allEmails.length + " Emails geladen.");
+                    renderTable();
+
+                } catch (e) {
+                    hideProgress();
+                    document.getElementById('btnRetrieve').disabled = false;
+                    showError("Fehler beim Abrufen: " + e.message);
+                }
+            }, 100);
+        }
+
+        function extractEmail(mailItem) {
+            var email = {
+                datum: '',
+                datum_iso: '',
+                von_name: '',
+                von_email: '',
+                betreff: '',
+                text: '',
+                anhaenge: []
+            };
+
+            try {
+                var d = new Date(mailItem.ReceivedTime);
+                if (!isNaN(d.getTime())) {
+                    email.datum = pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() +
+                                  ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+                    email.datum_iso = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                                  'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':00';
+                }
+            } catch(e) {}
+
+            try { email.von_name = mailItem.SenderName || ''; } catch(e) {}
+            try { email.von_email = getSenderEmail(mailItem); } catch(e) {}
+            try { email.betreff = mailItem.Subject || ''; } catch(e) {}
+
+            try {
+                var bodyText = mailItem.Body || '';
+                bodyText = bodyText.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+                email.text = trim(bodyText);
+            } catch(e) {}
+
+            try {
+                var attCount = mailItem.Attachments.Count;
+                for (var a = 1; a <= attCount; a++) {
+                    try { email.anhaenge.push(mailItem.Attachments.Item(a).FileName); } catch(e) {}
+                }
+            } catch(e) {}
+
+            return email;
+        }
+
+        function getSenderEmail(mailItem) {
+            try {
+                var emailType = mailItem.SenderEmailType;
+                if (emailType === 'EX') {
+                    try {
+                        var sender = mailItem.Sender;
+                        if (sender) {
+                            var exchUser = sender.GetExchangeUser();
+                            if (exchUser && exchUser.PrimarySmtpAddress) {
+                                return exchUser.PrimarySmtpAddress;
+                            }
+                        }
+                    } catch(e) {}
+                }
+                return mailItem.SenderEmailAddress || '';
+            } catch(e) { return ''; }
+        }
+
+        function renderTable() {
+            var tbody = document.getElementById('resultsBody');
+            var search = (document.getElementById('searchInput').value || '').toLowerCase();
+
+            var html = '';
+            var shown = 0;
+            for (var i = 0; i < allEmails.length; i++) {
+                var em = allEmails[i];
+                if (search) {
+                    var hay = (em.betreff + ' ' + em.von_name + ' ' + em.von_email + ' ' + em.text).toLowerCase();
+                    if (hay.indexOf(search) === -1) continue;
+                }
+
+                var preview = (em.text || '').substring(0, 90).replace(/\n/g, ' ');
+                if ((em.text || '').length > 90) preview += '...';
+                var sender = em.von_name || em.von_email || '';
+                var att = em.anhaenge && em.anhaenge.length > 0
+                    ? '&#128206; ' + em.anhaenge.length + (em.anhaenge.length === 1 ? ' Anhang' : ' Anhaenge')
+                    : '';
+
+                html += '<tr onclick="showDetail(' + i + ')">';
+                html += '<td>' + (i + 1) + '</td>';
+                html += '<td class="col-date">' + esc(em.datum) + '</td>';
+                html += '<td>' + esc(sender) + '</td>';
+                html += '<td class="col-subject">' + esc(em.betreff || '(kein Betreff)') + '</td>';
+                html += '<td class="col-preview">' + esc(preview) + '</td>';
+                html += '<td class="col-att">' + att + '</td>';
+                html += '</tr>';
+                shown++;
+            }
+            tbody.innerHTML = html;
+            document.getElementById('resultsCount').innerText =
+                (search ? shown + ' von ' + allEmails.length : allEmails.length) + ' Emails';
+            document.getElementById('resultsToolbar').style.display = 'flex';
+            document.getElementById('resultsTableWrap').style.display = 'block';
+        }
+
+        function showDetail(idx) {
+            var em = allEmails[idx];
+            if (!em) return;
+            document.getElementById('detailSubject').innerText = em.betreff || '(kein Betreff)';
+            document.getElementById('detailDate').innerText = em.datum || '';
+            var senderTxt = em.von_name || '';
+            if (em.von_email) senderTxt += (senderTxt ? ' <' : '') + em.von_email + (senderTxt ? '>' : '');
+            document.getElementById('detailSender').innerText = senderTxt;
+            document.getElementById('detailAttachments').innerText =
+                em.anhaenge && em.anhaenge.length > 0 ? em.anhaenge.join(', ') : '(keine)';
+            document.getElementById('detailBody').innerText = em.text || '';
+            document.getElementById('detailModal').className = 'modal-backdrop active';
+        }
+
+        function closeDetail(ev) {
+            if (ev && ev.target && ev.target.className && ev.target.className.indexOf('modal-backdrop') === -1) return;
+            document.getElementById('detailModal').className = 'modal-backdrop';
+        }
+
+        function exportToExcel() {
+            if (allEmails.length === 0) { showError("Keine Emails zum Exportieren."); return; }
+            hideStatus();
+
+            try {
+                var excel = new ActiveXObject("Excel.Application");
+                excel.Visible = true;
+                excel.DisplayAlerts = false;
+                var wb = excel.Workbooks.Add();
+                var sheet = wb.ActiveSheet;
+                try { sheet.Name = "ERGO Emails"; } catch(e) {}
+
+                // Header
+                var headers = ["#", "Datum", "Absender Name", "Absender Email", "Betreff", "Text", "Anhaenge"];
+                for (var c = 0; c < headers.length; c++) {
+                    sheet.Cells(1, c + 1).Value = headers[c];
+                }
+                // Header-Style
+                try {
+                    var headerRange = sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, headers.length));
+                    headerRange.Font.Bold = true;
+                    headerRange.Interior.Color = 0xB91C1C;
+                    headerRange.Font.Color = 0xFFFFFF;
+                } catch(e) {}
+
+                // Daten
+                for (var i = 0; i < allEmails.length; i++) {
+                    var em = allEmails[i];
+                    var row = i + 2;
+                    sheet.Cells(row, 1).Value = i + 1;
+                    sheet.Cells(row, 2).Value = em.datum || '';
+                    sheet.Cells(row, 3).Value = em.von_name || '';
+                    sheet.Cells(row, 4).Value = em.von_email || '';
+                    sheet.Cells(row, 5).Value = em.betreff || '';
+                    sheet.Cells(row, 6).Value = em.text || '';
+                    sheet.Cells(row, 7).Value = (em.anhaenge && em.anhaenge.length > 0) ? em.anhaenge.join('; ') : '';
+                }
+
+                // Spaltenbreiten + Wrap
+                try {
+                    sheet.Columns("A:A").ColumnWidth = 5;
+                    sheet.Columns("B:B").ColumnWidth = 18;
+                    sheet.Columns("C:C").ColumnWidth = 25;
+                    sheet.Columns("D:D").ColumnWidth = 30;
+                    sheet.Columns("E:E").ColumnWidth = 50;
+                    sheet.Columns("F:F").ColumnWidth = 80;
+                    sheet.Columns("G:G").ColumnWidth = 30;
+                    sheet.Columns("F:F").WrapText = true;
+                    sheet.Rows(1).Font.Bold = true;
+                    sheet.Range("A1").Select();
+                    excel.ActiveWindow.FreezePanes = false;
+                    sheet.Range("A2").Select();
+                    excel.ActiveWindow.FreezePanes = true;
+                } catch(e) {}
+
+                excel.DisplayAlerts = true;
+                showSuccess("Excel mit " + allEmails.length + " Emails geoeffnet. Bitte manuell speichern.");
+            } catch(e) {
+                showError("Excel-Export fehlgeschlagen: " + e.message);
+            }
+        }
+
+        function exportToJson() {
+            if (allEmails.length === 0) { showError("Keine Emails zum Exportieren."); return; }
+            hideStatus();
+
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var shell = new ActiveXObject("WScript.Shell");
+                var shellApp = new ActiveXObject("Shell.Application");
+
+                var downloads;
+                try { downloads = shellApp.NameSpace("shell:Downloads").Self.Path; }
+                catch(e) { downloads = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads"; }
+
+                var now = new Date();
+                var dateStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) +
+                              '_' + pad(now.getHours()) + '-' + pad(now.getMinutes());
+                var filename = downloads + "\\ergo_emails_" + dateStr + ".json";
+
+                // Format: Array (kompatibel mit index.html Format 3)
+                // Datum-Feld als ISO fuer index.html, plus deutsche Anzeige
+                var out = [];
+                for (var i = 0; i < allEmails.length; i++) {
+                    var em = allEmails[i];
+                    out.push({
+                        datum: em.datum_iso || em.datum,
+                        von_name: em.von_name,
+                        von_email: em.von_email,
+                        betreff: em.betreff,
+                        text: em.text,
+                        anhaenge: em.anhaenge
+                    });
+                }
+                var json = jsonStringify(out);
+
+                // Mit ADODB.Stream als UTF-8 schreiben
+                var stream = new ActiveXObject("ADODB.Stream");
+                stream.Type = 2; // Text
+                stream.Charset = "utf-8";
+                stream.Open();
+                stream.WriteText(json);
+                stream.SaveToFile(filename, 2);
+                stream.Close();
+
+                showSuccess("JSON gespeichert: " + filename);
+            } catch(e) {
+                showError("JSON-Export fehlgeschlagen: " + e.message);
+            }
+        }
+
+        function loadJsonFile() {
+            hideStatus();
+            try {
+                var dlg = new ActiveXObject("UserAccounts.CommonDialog");
+                dlg.Filter = "JSON Dateien|*.json|Alle Dateien|*.*";
+                if (!dlg.ShowOpen()) return;
+                var path = dlg.FileName;
+                doLoadJson(path);
+            } catch(e) {
+                // Fallback: Pfad eingeben lassen
+                var path = prompt("Pfad zur JSON-Datei eingeben:", "");
+                if (path) doLoadJson(path);
+            }
+        }
+
+        function doLoadJson(path) {
+            try {
+                var stream = new ActiveXObject("ADODB.Stream");
+                stream.Type = 2;
+                stream.Charset = "utf-8";
+                stream.Open();
+                stream.LoadFromFile(path);
+                var content = stream.ReadText();
+                stream.Close();
+
+                var data = eval('(' + content + ')');
+                var arr = Array.isArray(data) ? data
+                       : (data && data.emails) ? data.emails
+                       : (data && data.conversations) ? flattenConversations(data.conversations)
+                       : null;
+
+                if (!arr || arr.length === 0) { showError("Keine Emails in der Datei gefunden."); return; }
+
+                allEmails = [];
+                for (var i = 0; i < arr.length; i++) {
+                    var em = arr[i];
+                    allEmails.push({
+                        datum: em.datum || em.date || '',
+                        datum_iso: em.datum_iso || em.datum || '',
+                        von_name: em.von_name || em.from_name || em.von || '',
+                        von_email: em.von_email || em.from_email || '',
+                        betreff: em.betreff || em.subject || '',
+                        text: em.text || em.body || '',
+                        anhaenge: em.anhaenge || em.attachments || []
+                    });
+                }
+                document.getElementById('loadedFilePath').value = path;
+                showSuccess(allEmails.length + " Emails geladen aus " + path);
+                renderTable();
+            } catch(e) {
+                showError("JSON konnte nicht gelesen werden: " + e.message);
+            }
+        }
+
+        function flattenConversations(convs) {
+            var out = [];
+            for (var k in convs) {
+                if (convs.hasOwnProperty(k) && convs[k].emails) {
+                    for (var i = 0; i < convs[k].emails.length; i++) out.push(convs[k].emails[i]);
+                }
+            }
+            return out;
+        }
+
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+        function trim(s) { return (s || '').replace(/^\s+|\s+$/g, ''); }
+
+        function esc(s) {
+            if (s === null || s === undefined) return '';
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function showProgress(text) {
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').innerText = text || 'Verarbeite...';
+        }
+        function updateProgress(current, total, label) {
+            var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressText').innerText =
+                (label || '') + ' (' + current + ' / ' + total + ')';
+        }
+        function hideProgress() {
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+
+        function showSuccess(msg) {
+            document.getElementById('successStatus').style.display = 'block';
+            document.getElementById('successMsg').innerHTML = msg;
+            document.getElementById('errorStatus').style.display = 'none';
+            document.getElementById('infoStatus').style.display = 'none';
+        }
+        function showError(msg) {
+            document.getElementById('errorStatus').style.display = 'block';
+            document.getElementById('errorMsg').innerHTML = msg;
+            document.getElementById('successStatus').style.display = 'none';
+            document.getElementById('infoStatus').style.display = 'none';
+        }
+        function showInfo(msg) {
+            document.getElementById('infoStatus').style.display = 'block';
+            document.getElementById('infoMsg').innerHTML = msg;
+            document.getElementById('successStatus').style.display = 'none';
+            document.getElementById('errorStatus').style.display = 'none';
+        }
+        function hideStatus() {
+            document.getElementById('successStatus').style.display = 'none';
+            document.getElementById('errorStatus').style.display = 'none';
+            document.getElementById('infoStatus').style.display = 'none';
+        }
+
+        // JSON Stringify (IE11 hat das, aber sicherheitshalber Polyfill)
+        function jsonStringify(obj) {
+            if (typeof JSON !== 'undefined' && JSON.stringify) {
+                try { return JSON.stringify(obj, null, 2); } catch(e) {}
+            }
+            return jsonStringifyFallback(obj);
+        }
+        function jsonStringifyFallback(obj) {
+            var t = typeof obj;
+            if (obj === null) return 'null';
+            if (t === 'string') return '"' + obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+                .replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"';
+            if (t === 'number' || t === 'boolean') return String(obj);
+            if (t === 'undefined') return 'null';
+            if (Object.prototype.toString.call(obj) === '[object Array]') {
+                var parts = [];
+                for (var i = 0; i < obj.length; i++) parts.push(jsonStringifyFallback(obj[i]));
+                return '[' + parts.join(',') + ']';
+            }
+            if (t === 'object') {
+                var parts = [];
+                for (var k in obj) {
+                    if (obj.hasOwnProperty(k)) {
+                        parts.push('"' + k + '":' + jsonStringifyFallback(obj[k]));
+                    }
+                }
+                return '{' + parts.join(',') + '}';
+            }
+            return 'null';
+        }
+    </script>
+</body>
+</html>
