@@ -25,6 +25,8 @@ NUTZUNG:
 
   - Outlook_Live_Abrufen   = Outlook-Ordner waehlen + Tage zurueck
   - Ordner_Scannen         = Ordner mit .msg / .eml waehlen
+  - Mails_Speichern        = Outlook-Ordner -> Dateien (MSG/EML) auf Platte
+                             Format MSG = empfohlen (verlustfrei, mit Anhaengen)
   - JSON_Exportieren       = Tabelle als JSON-Beladungsdatei speichern
                              (zum Hochladen ins Web-Tool)
 
@@ -46,6 +48,16 @@ WORKFLOWS:
      3. Ordner waehlen
      -> Alle .msg / .eml Dateien werden gelesen
      4. Optional: JSON_Exportieren
+
+  C) Mails von Outlook auf Platte sichern (entkoppelt von PST/Postfach):
+     1. Alt+F8 -> Mails_Speichern -> Ausfuehren
+     2. Outlook-Ordner waehlen (PickFolder-Dialog)
+     3. Tage eingeben (0 = alles)
+     4. Format: JA = MSG (empfohlen, verlustfrei, mit Anhaengen)
+                NEIN = EML (Textformat, ohne Anhaenge)
+     5. Zielordner auf Laufwerk waehlen
+     -> Mails werden als <Datum>_<Absender>_<Betreff>.msg/.eml gespeichert
+     6. Spaeter: Ordner_Scannen -> liest die Dateien wieder in Excel ein
 
 ============================================================
 

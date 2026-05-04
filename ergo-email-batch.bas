@@ -14,6 +14,13 @@ Attribute VB_Name = "ErgoEmailBatch"
 '   - Alle .msg und .eml Dateien werden gelesen
 '   - Keine Outlook-MAPI noetig (nur fuer .msg)
 '
+' MODUS 3 (Mails speichern auf Platte):
+'   - Outlook-Ordner waehlen + Tage zurueck
+'   - Zielordner waehlen
+'   - Format: MSG (verlustfrei, empfohlen) oder EML (Textformat)
+'   - Alle Mails werden als Dateien gespeichert
+'   - Danach mit MODUS 2 (Ordner_Scannen) wieder in Excel laden
+'
 ' OUTPUT:
 '   - Tabellenblatt "Emails" mit Spalten:
 '     Nr | Datum | Absender Name | Absender Email | Betreff | Text | Anhaenge
@@ -61,6 +68,10 @@ End Sub
 
 Public Sub JSON_Exportieren()
     ExportiereJson
+End Sub
+
+Public Sub Mails_Speichern()
+    ModusMailsSpeichern
 End Sub
 
 ' === MODUS 1: OUTLOOK LIVE ==================================================
@@ -674,6 +685,259 @@ Private Function ParseEmlDatum(s As String) As Date
     Else
         ParseEmlDatum = 0
     End If
+End Function
+
+' === MODUS 3: MAILS AUF PLATTE SPEICHERN ====================================
+Public Sub ModusMailsSpeichern()
+    Dim olApp As Object, ns As Object, folder As Object
+    On Error GoTo Fehler
+
+    Set olApp = GetOutlook()
+    If olApp Is Nothing Then
+        MsgBox "Outlook konnte nicht gestartet werden.", vbCritical
+        Exit Sub
+    End If
+    Set ns = olApp.GetNamespace("MAPI")
+
+    Set folder = ns.PickFolder()
+    If folder Is Nothing Then Exit Sub
+
+    Dim eingabe As String
+    eingabe = InputBox( _
+        "Wie viele Tage zurueck?" & vbCrLf & vbCrLf & _
+        "0 = ALLE Mails im Ordner speichern" & vbCrLf & _
+        "30 = letzte 30 Tage", _
+        "Zeitraum", "30")
+    If Trim(eingabe) = "" Then Exit Sub
+    Dim daysBack As Long: daysBack = CLng(Val(eingabe))
+    If daysBack < 0 Then daysBack = 0
+
+    Dim formatAntwort As VbMsgBoxResult
+    formatAntwort = MsgBox( _
+        "Welches Dateiformat?" & vbCrLf & vbCrLf & _
+        "JA      = MSG (Outlook-Format, verlustfrei, mit Anhaengen) - EMPFOHLEN" & vbCrLf & _
+        "NEIN    = EML (Textformat, Header + Body, OHNE Anhaenge)" & vbCrLf & _
+        "ABBRECH = Beenden", _
+        vbYesNoCancel + vbQuestion, "Dateiformat waehlen")
+    If formatAntwort = vbCancel Then Exit Sub
+    Dim alsMsg As Boolean: alsMsg = (formatAntwort = vbYes)
+
+    Dim outFolder As String
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "Zielordner fuer gespeicherte Mails waehlen"
+        .AllowMultiSelect = False
+        If .Show <> -1 Then Exit Sub
+        outFolder = .SelectedItems(1)
+    End With
+    If Right(outFolder, 1) = "\" Then outFolder = Left(outFolder, Len(outFolder) - 1)
+
+    Dim cutoff As Date
+    If daysBack > 0 Then
+        cutoff = DateAdd("d", -daysBack, Now)
+    Else
+        cutoff = #1/1/1900#
+    End If
+
+    Application.ScreenUpdating = False
+    Application.StatusBar = "Speichere Mails aus '" & folder.Name & "'..."
+
+    Dim items As Object
+    Set items = folder.Items
+    items.Sort "[ReceivedTime]", True
+
+    Dim usedNames As Object
+    Set usedNames = CreateObject("Scripting.Dictionary")
+
+    Dim gespeichert As Long: gespeichert = 0
+    Dim fehler As Long: fehler = 0
+    Dim it As Object, i As Long
+    For i = 1 To items.Count
+        On Error Resume Next
+        Set it = items.Item(i)
+        If Err.Number <> 0 Then
+            Err.Clear
+            On Error GoTo Fehler
+            GoTo NextItem
+        End If
+        On Error GoTo Fehler
+
+        If it.Class = OL_MAIL_CLASS Then
+            If daysBack > 0 Then
+                If it.ReceivedTime < cutoff Then Exit For
+            End If
+
+            Dim baseName As String
+            baseName = BildeDateiname(it)
+            Dim fullPath As String
+            fullPath = EindeutigerPfad(outFolder, baseName, IIf(alsMsg, "msg", "eml"), usedNames)
+
+            On Error Resume Next
+            Err.Clear
+            If alsMsg Then
+                it.SaveAs fullPath, 9 ' olMSGUnicode
+                If Err.Number = 0 Then
+                    gespeichert = gespeichert + 1
+                Else
+                    fehler = fehler + 1
+                End If
+            Else
+                If SchreibeEml(it, fullPath) Then
+                    gespeichert = gespeichert + 1
+                Else
+                    fehler = fehler + 1
+                End If
+            End If
+            Err.Clear
+            On Error GoTo Fehler
+
+            If (gespeichert + fehler) Mod 10 = 0 And gespeichert > 0 Then
+                Application.StatusBar = "Gespeichert: " & gespeichert & " Mails..."
+                DoEvents
+            End If
+        End If
+NextItem:
+    Next i
+
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+
+    Dim msg As String
+    msg = gespeichert & " Mails gespeichert in:" & vbCrLf & outFolder
+    If fehler > 0 Then msg = msg & vbCrLf & vbCrLf & fehler & " Fehler beim Speichern."
+    msg = msg & vbCrLf & vbCrLf & _
+          "Tipp: Mit 'Ordner_Scannen' kannst du diese Dateien jetzt wieder in Excel laden."
+    MsgBox msg, vbInformation, "Fertig"
+    Exit Sub
+
+Fehler:
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+    MsgBox "Fehler: " & Err.Description, vbCritical
+End Sub
+
+Private Function BildeDateiname(it As Object) As String
+    Dim datum As String: datum = ""
+    Dim absender As String: absender = ""
+    Dim betreff As String: betreff = ""
+    On Error Resume Next
+    datum = Format(it.ReceivedTime, "yyyy-mm-dd_hhnn")
+    absender = CStr(it.SenderName)
+    betreff = CStr(it.Subject)
+    On Error GoTo 0
+
+    Dim n As String
+    n = datum & "_" & SaeubereDateiname(absender) & "_" & SaeubereDateiname(betreff)
+    If Len(n) > 150 Then n = Left(n, 150)
+    If Trim(n) = "" Then n = "mail_" & Format(Now, "yyyymmddhhnnss")
+    BildeDateiname = n
+End Function
+
+Private Function SaeubereDateiname(s As String) As String
+    Dim r As String: r = s
+    Dim verboten As String: verboten = "\/:*?""<>|" & vbCr & vbLf & vbTab
+    Dim i As Long
+    For i = 1 To Len(verboten)
+        r = Replace(r, Mid(verboten, i, 1), "_")
+    Next i
+    Do While InStr(r, "  ") > 0
+        r = Replace(r, "  ", " ")
+    Loop
+    r = Trim(r)
+    If r = "" Then r = "ohne_Inhalt"
+    SaeubereDateiname = r
+End Function
+
+Private Function EindeutigerPfad(ordner As String, basename As String, ext As String, _
+                                  used As Object) As String
+    Dim pfad As String
+    pfad = ordner & "\" & basename & "." & ext
+    If Not used.Exists(LCase(pfad)) And Dir(pfad) = "" Then
+        used(LCase(pfad)) = 1
+        EindeutigerPfad = pfad
+        Exit Function
+    End If
+    Dim n As Long: n = 2
+    Do
+        pfad = ordner & "\" & basename & "_" & n & "." & ext
+        If Not used.Exists(LCase(pfad)) And Dir(pfad) = "" Then
+            used(LCase(pfad)) = 1
+            EindeutigerPfad = pfad
+            Exit Function
+        End If
+        n = n + 1
+        If n > 9999 Then Exit Do
+    Loop
+    EindeutigerPfad = pfad
+End Function
+
+Private Function SchreibeEml(it As Object, pfad As String) As Boolean
+    On Error GoTo Fehler
+
+    Dim datStr As String: datStr = ""
+    On Error Resume Next
+    datStr = Format(it.ReceivedTime, "ddd, dd mmm yyyy hh:nn:ss") & " +0000"
+    On Error GoTo Fehler
+
+    Dim absMail As String: absMail = AbsenderEmail(it)
+    Dim absName As String: absName = ""
+    On Error Resume Next
+    absName = CStr(it.SenderName)
+    On Error GoTo Fehler
+
+    Dim subj As String: subj = ""
+    Dim body As String: body = ""
+    On Error Resume Next
+    subj = CStr(it.Subject)
+    body = CStr(it.Body)
+    On Error GoTo Fehler
+
+    Dim recipients As String: recipients = ""
+    On Error Resume Next
+    Dim rc As Long
+    For rc = 1 To it.Recipients.Count
+        Dim adr As String: adr = ""
+        adr = it.Recipients.Item(rc).Address
+        If adr <> "" Then
+            If recipients <> "" Then recipients = recipients & ", "
+            recipients = recipients & adr
+        End If
+    Next rc
+    On Error GoTo Fehler
+
+    Dim atts As String: atts = ""
+    On Error Resume Next
+    Dim ac As Long
+    For ac = 1 To it.Attachments.Count
+        If atts <> "" Then atts = atts & "; "
+        atts = atts & it.Attachments.Item(ac).FileName
+    Next ac
+    On Error GoTo Fehler
+
+    Dim eml As String
+    eml = "Date: " & datStr & vbCrLf
+    eml = eml & "From: """ & absName & """ <" & absMail & ">" & vbCrLf
+    If recipients <> "" Then eml = eml & "To: " & recipients & vbCrLf
+    eml = eml & "Subject: " & subj & vbCrLf
+    If atts <> "" Then eml = eml & "X-Anhaenge-Liste: " & atts & vbCrLf
+    eml = eml & "MIME-Version: 1.0" & vbCrLf
+    eml = eml & "Content-Type: text/plain; charset=utf-8" & vbCrLf
+    eml = eml & "Content-Transfer-Encoding: 8bit" & vbCrLf
+    eml = eml & vbCrLf
+    eml = eml & body
+
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 2 ' Text
+    stream.Charset = "utf-8"
+    stream.Open
+    stream.WriteText eml
+    stream.SaveToFile pfad, 2 ' overwrite
+    stream.Close
+
+    SchreibeEml = True
+    Exit Function
+Fehler:
+    SchreibeEml = False
 End Function
 
 Private Function MimeDecodeSimple(s As String) As String
