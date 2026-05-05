@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.0"
+        VERSION="1.1"
         WINDOWSTATE="normal"
     />
     <style>
@@ -169,6 +169,7 @@
 
             <div class="mode-toggle">
                 <button class="mode-btn active" id="btnModeRetrieve" onclick="switchMode('retrieve')">&#128229; Emails abrufen</button>
+                <button class="mode-btn" id="btnModeSave" onclick="switchMode('save')">&#128190; Mails speichern</button>
                 <button class="mode-btn" id="btnModeLoad" onclick="switchMode('load')">&#128194; Vorhandene JSON laden</button>
             </div>
 
@@ -204,6 +205,57 @@
                 <button class="btn btn-secondary" onclick="setQuickRange(7)">Letzte 7 Tage</button>
                 <button class="btn btn-secondary" onclick="setQuickRange(30)">Letzte 30 Tage</button>
                 <button class="btn btn-secondary" onclick="setQuickRange(0)">Heute</button>
+            </div>
+
+            <div class="mode-section" id="sectionSave">
+                <div class="info-box">
+                    <strong>Mails als Dateien speichern:</strong> Postfach + Ordner waehlen &rarr; Zeitraum &rarr; Zielordner &rarr; Format. Alle Mails werden auf die Platte gelegt - so bist du unabhaengig von Outlook und kannst die Dateien spaeter mit dem Excel-Makro <code>Ordner_Scannen</code> wieder einlesen.<br><br>
+                    <strong>Format-Empfehlung:</strong> <strong>MSG</strong> = verlustfrei, mit Anhaengen (Outlook-Standard). EML = reines Textformat, ohne Anhaenge - nur fuer schnelle Analysen ohne Outlook.
+                </div>
+
+                <label>Postfach</label>
+                <select id="saveMailboxSelect" onchange="loadFoldersSave()">
+                    <option value="">-- Postfach waehlen --</option>
+                </select>
+
+                <label>Ordner</label>
+                <select id="saveFolderSelect" disabled>
+                    <option value="">-- Erst Postfach waehlen --</option>
+                </select>
+
+                <div class="row">
+                    <div>
+                        <label>Datum von</label>
+                        <input type="date" id="saveDateFrom">
+                    </div>
+                    <div>
+                        <label>Datum bis</label>
+                        <input type="date" id="saveDateTo">
+                    </div>
+                </div>
+
+                <label>Format</label>
+                <div style="display:flex; gap:1rem; margin-bottom:0.85rem;">
+                    <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; margin-bottom:0;">
+                        <input type="radio" name="saveFormat" value="msg" checked> MSG (empfohlen, verlustfrei)
+                    </label>
+                    <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; margin-bottom:0;">
+                        <input type="radio" name="saveFormat" value="eml"> EML (Text, ohne Anhaenge)
+                    </label>
+                </div>
+
+                <label>Zielordner</label>
+                <div style="display:flex; gap:0.5rem; margin-bottom:0.85rem;">
+                    <input type="text" id="saveTargetFolder" placeholder="Klick auf 'Ordner waehlen'" readonly style="margin:0; flex:1;">
+                    <button class="btn btn-secondary" style="margin:0;" onclick="pickSaveFolder()">Ordner waehlen</button>
+                </div>
+
+                <button class="btn btn-primary" id="btnSaveMails" onclick="saveMails()" disabled>
+                    &#128190; Mails speichern
+                </button>
+                <button class="btn btn-secondary" onclick="setQuickRangeSave(7)">Letzte 7 Tage</button>
+                <button class="btn btn-secondary" onclick="setQuickRangeSave(30)">Letzte 30 Tage</button>
+                <button class="btn btn-secondary" onclick="setQuickRangeSave(0)">Heute</button>
             </div>
 
             <div class="mode-section" id="sectionLoad">
@@ -275,6 +327,7 @@
 
             // Default Zeitraum: letzte 7 Tage
             setQuickRange(7);
+            setQuickRangeSave(7);
 
             try {
                 outlookApp = new ActiveXObject("Outlook.Application");
@@ -289,9 +342,20 @@
             currentMode = mode;
             hideStatus();
             document.getElementById('btnModeRetrieve').className = 'mode-btn' + (mode === 'retrieve' ? ' active' : '');
+            document.getElementById('btnModeSave').className = 'mode-btn' + (mode === 'save' ? ' active' : '');
             document.getElementById('btnModeLoad').className = 'mode-btn' + (mode === 'load' ? ' active' : '');
             document.getElementById('sectionRetrieve').className = 'mode-section' + (mode === 'retrieve' ? ' active' : '');
+            document.getElementById('sectionSave').className = 'mode-section' + (mode === 'save' ? ' active' : '');
             document.getElementById('sectionLoad').className = 'mode-section' + (mode === 'load' ? ' active' : '');
+        }
+
+        function setQuickRangeSave(days) {
+            var now = new Date();
+            var to = new Date(now);
+            var from = new Date(now);
+            from.setDate(from.getDate() - days);
+            document.getElementById('saveDateFrom').value = isoDate(from);
+            document.getElementById('saveDateTo').value = isoDate(to);
         }
 
         function setQuickRange(days) {
@@ -309,21 +373,262 @@
 
         function loadMailboxes() {
             try {
-                var select = document.getElementById('mailboxSelect');
-                select.innerHTML = '<option value="">-- Postfach waehlen --</option>';
                 var stores = outlookNS.Stores;
+                var selects = [
+                    document.getElementById('mailboxSelect'),
+                    document.getElementById('saveMailboxSelect')
+                ];
+                for (var s = 0; s < selects.length; s++) {
+                    if (!selects[s]) continue;
+                    selects[s].innerHTML = '<option value="">-- Postfach waehlen --</option>';
+                }
                 for (var i = 1; i <= stores.Count; i++) {
                     try {
                         var store = stores.Item(i);
-                        var opt = document.createElement('option');
-                        opt.value = i;
-                        opt.text = store.DisplayName;
-                        select.appendChild(opt);
+                        for (var s2 = 0; s2 < selects.length; s2++) {
+                            if (!selects[s2]) continue;
+                            var opt = document.createElement('option');
+                            opt.value = i;
+                            opt.text = store.DisplayName;
+                            selects[s2].appendChild(opt);
+                        }
                     } catch (e) {}
                 }
             } catch (e) {
                 showError("Postfaecher konnten nicht geladen werden: " + e.message);
             }
+        }
+
+        function loadFoldersSave() {
+            var select = document.getElementById('saveMailboxSelect');
+            var folderSelect = document.getElementById('saveFolderSelect');
+            folderSelect.innerHTML = '<option value="">-- Ordner waehlen --</option>';
+            folderSelect.disabled = true;
+            updateSaveButton();
+
+            if (!select.value) return;
+            try {
+                var store = outlookNS.Stores.Item(parseInt(select.value));
+                var rootFolder = store.GetRootFolder();
+                var folders = rootFolder.Folders;
+                for (var i = 1; i <= folders.Count; i++) {
+                    try {
+                        var folder = folders.Item(i);
+                        var opt = document.createElement('option');
+                        opt.value = folder.EntryID;
+                        opt.text = folder.Name;
+                        folderSelect.appendChild(opt);
+                        addSubfolders(folder, folderSelect, '  ');
+                    } catch (e) {}
+                }
+                folderSelect.disabled = false;
+                folderSelect.onchange = updateSaveButton;
+            } catch (e) {
+                showError("Ordner konnten nicht geladen werden: " + e.message);
+            }
+        }
+
+        function updateSaveButton() {
+            var hasFolder = !!document.getElementById('saveFolderSelect').value;
+            var hasTarget = !!document.getElementById('saveTargetFolder').value;
+            document.getElementById('btnSaveMails').disabled = !(hasFolder && hasTarget);
+        }
+
+        function pickSaveFolder() {
+            try {
+                var shellApp = new ActiveXObject("Shell.Application");
+                var f = shellApp.BrowseForFolder(0, "Zielordner fuer gespeicherte Mails", 0);
+                if (f && f.Self && f.Self.Path) {
+                    document.getElementById('saveTargetFolder').value = f.Self.Path;
+                    updateSaveButton();
+                }
+            } catch (e) {
+                var path = prompt("Zielordner-Pfad eingeben (z.B. C:\\Mails):", "");
+                if (path) {
+                    document.getElementById('saveTargetFolder').value = path;
+                    updateSaveButton();
+                }
+            }
+        }
+
+        function saveMails() {
+            hideStatus();
+            var folderSelect = document.getElementById('saveFolderSelect');
+            var fromStr = document.getElementById('saveDateFrom').value;
+            var toStr = document.getElementById('saveDateTo').value;
+            var targetFolder = document.getElementById('saveTargetFolder').value;
+            var format = 'msg';
+            var radios = document.getElementsByName('saveFormat');
+            for (var r = 0; r < radios.length; r++) { if (radios[r].checked) format = radios[r].value; }
+
+            if (!folderSelect.value) { showError("Bitte Ordner auswaehlen."); return; }
+            if (!targetFolder) { showError("Bitte Zielordner auswaehlen."); return; }
+            if (!fromStr || !toStr) { showError("Bitte Datum von und bis ausfuellen."); return; }
+
+            var fromDate = new Date(fromStr + "T00:00:00");
+            var toDate = new Date(toStr + "T23:59:59");
+            if (fromDate > toDate) { showError("Datum 'Von' muss vor 'Bis' liegen."); return; }
+
+            // Zielordner muss existieren
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                if (!fso.FolderExists(targetFolder)) {
+                    showError("Zielordner existiert nicht: " + targetFolder); return;
+                }
+            } catch (e) { showError("Dateisystem-Zugriff fehlgeschlagen: " + e.message); return; }
+
+            document.getElementById('btnSaveMails').disabled = true;
+            showProgress("Speichere Mails...");
+
+            setTimeout(function() {
+                try {
+                    var folder = outlookNS.GetFolderFromID(folderSelect.value);
+                    var items = folder.Items;
+                    items.Sort("[ReceivedTime]", true);
+
+                    var total = items.Count;
+                    var saved = 0, errors = 0, processed = 0;
+                    var usedNames = {};
+
+                    for (var i = 1; i <= total; i++) {
+                        try {
+                            var item = items.Item(i);
+                            processed++;
+                            if (item.Class !== 43) continue;
+
+                            var rt;
+                            try { rt = new Date(item.ReceivedTime); } catch(e) { continue; }
+                            if (isNaN(rt.getTime())) continue;
+                            if (rt < fromDate) break; // sortiert desc
+                            if (rt > toDate) continue;
+
+                            var baseName = buildFilename(item, rt);
+                            var fullPath = uniquePath(targetFolder, baseName, format, usedNames);
+
+                            try {
+                                if (format === 'msg') {
+                                    item.SaveAs(fullPath, 9); // olMSGUnicode
+                                } else {
+                                    writeEml(item, fullPath);
+                                }
+                                saved++;
+                            } catch (e) { errors++; }
+
+                            if ((saved + errors) % 10 === 0) {
+                                updateProgress(processed, total, "Gespeichert: " + saved);
+                            }
+                        } catch (e) {}
+                    }
+
+                    hideProgress();
+                    document.getElementById('btnSaveMails').disabled = false;
+
+                    var msg = saved + " Mails gespeichert in " + targetFolder;
+                    if (errors > 0) msg += " (" + errors + " Fehler).";
+                    msg += "<br><br>Tipp: Lade die Dateien spaeter mit dem Excel-Makro <strong>Ordner_Scannen</strong> wieder ein.";
+                    if (saved > 0) showSuccess(msg); else showInfo("Keine Mails im Zeitraum gefunden.");
+                } catch (e) {
+                    hideProgress();
+                    document.getElementById('btnSaveMails').disabled = false;
+                    showError("Fehler beim Speichern: " + e.message);
+                }
+            }, 100);
+        }
+
+        function buildFilename(mailItem, rt) {
+            var datePart = rt.getFullYear() + '-' + pad(rt.getMonth() + 1) + '-' + pad(rt.getDate()) +
+                           '_' + pad(rt.getHours()) + pad(rt.getMinutes());
+            var sender = '';
+            try { sender = mailItem.SenderName || ''; } catch(e) {}
+            var subj = '';
+            try { subj = mailItem.Subject || ''; } catch(e) {}
+            var name = datePart + '_' + sanitizeFilename(sender) + '_' + sanitizeFilename(subj);
+            if (name.length > 150) name = name.substring(0, 150);
+            return name;
+        }
+
+        function sanitizeFilename(s) {
+            if (!s) return 'ohne_Inhalt';
+            var r = String(s).replace(/[\\\/:*?"<>|\r\n\t]/g, '_');
+            r = r.replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+            return r || 'ohne_Inhalt';
+        }
+
+        function uniquePath(folder, basename, ext, used) {
+            var fso = new ActiveXObject("Scripting.FileSystemObject");
+            var p = folder + "\\" + basename + "." + ext;
+            if (!used[p.toLowerCase()] && !fso.FileExists(p)) { used[p.toLowerCase()] = 1; return p; }
+            var n = 2;
+            while (n < 10000) {
+                p = folder + "\\" + basename + "_" + n + "." + ext;
+                if (!used[p.toLowerCase()] && !fso.FileExists(p)) { used[p.toLowerCase()] = 1; return p; }
+                n++;
+            }
+            return p;
+        }
+
+        function writeEml(mailItem, path) {
+            var dStr = '';
+            try {
+                var d = new Date(mailItem.ReceivedTime);
+                if (!isNaN(d.getTime())) {
+                    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    dStr = days[d.getDay()] + ', ' + pad(d.getDate()) + ' ' + months[d.getMonth()] +
+                           ' ' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) +
+                           ':' + pad(d.getSeconds()) + ' +0000';
+                }
+            } catch(e) {}
+
+            var senderName = '';
+            try { senderName = mailItem.SenderName || ''; } catch(e) {}
+            var senderEmail = getSenderEmail(mailItem);
+            var subj = '';
+            try { subj = mailItem.Subject || ''; } catch(e) {}
+            var body = '';
+            try { body = mailItem.Body || ''; } catch(e) {}
+
+            var recipients = '';
+            try {
+                var rc = mailItem.Recipients.Count;
+                for (var i = 1; i <= rc; i++) {
+                    try {
+                        var adr = mailItem.Recipients.Item(i).Address || '';
+                        if (adr) recipients += (recipients ? ', ' : '') + adr;
+                    } catch(e) {}
+                }
+            } catch(e) {}
+
+            var atts = '';
+            try {
+                var ac = mailItem.Attachments.Count;
+                for (var j = 1; j <= ac; j++) {
+                    try {
+                        var fn = mailItem.Attachments.Item(j).FileName || '';
+                        if (fn) atts += (atts ? '; ' : '') + fn;
+                    } catch(e) {}
+                }
+            } catch(e) {}
+
+            var eml = '';
+            eml += 'Date: ' + dStr + '\r\n';
+            eml += 'From: "' + senderName + '" <' + senderEmail + '>\r\n';
+            if (recipients) eml += 'To: ' + recipients + '\r\n';
+            eml += 'Subject: ' + subj + '\r\n';
+            if (atts) eml += 'X-Anhaenge-Liste: ' + atts + '\r\n';
+            eml += 'MIME-Version: 1.0\r\n';
+            eml += 'Content-Type: text/plain; charset=utf-8\r\n';
+            eml += 'Content-Transfer-Encoding: 8bit\r\n';
+            eml += '\r\n';
+            eml += body;
+
+            var stream = new ActiveXObject("ADODB.Stream");
+            stream.Type = 2;
+            stream.Charset = "utf-8";
+            stream.Open();
+            stream.WriteText(eml);
+            stream.SaveToFile(path, 2);
+            stream.Close();
         }
 
         function loadFolders() {
