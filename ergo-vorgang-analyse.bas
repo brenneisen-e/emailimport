@@ -1,135 +1,197 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v1.0)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.0)
 ' ============================================================================
-' Liest die Email-Vorgaenge aus dem Tabellenblatt "Emails" (Output von
-' ergo-email-batch.bas / Ordner_Scannen) und laesst ErgoGPT jeden Vorgang
-' klassifizieren. Schreibt die Ergebnisse als Zusatzspalten I-O zurueck.
+' WORKFLOW:
+'   1) Diese .xlsm in den Ordner legen, in dem die .msg-Dateien liegen
+'      (z.B. Output von ergo-email-batch / Mails_Speichern als MSG).
+'   2) Alt+F8 -> Vorgaenge_Setup -> Ausfuehren (einmalig)
+'        - legt Sheets 'GPT', 'Anleitung', 'Analyse' an
+'        - fragt Cookie ab (wird in Sheet GPT!A7 ODER File hinterlegt)
+'        - Default-Modell: gpt-5.1
+'   3) Alt+F8 -> Vorgaenge_Analysieren -> Ausfuehren
+'        - fragt: Welcher Ordner? (Default: dieser Workbook-Pfad)
+'        - fragt: Wie viele Vorgaenge maximal? (leer = alle)
+'        - laedt pro Vorgang: Email-Text + PDF-Anhaenge zu ErgoGPT hoch
+'        - GPT klassifiziert + prueft Maklervollmacht-Vollstaendigkeit
+'        - Ergebnis landet als Zeile im Sheet 'Analyse'
 '
 ' VORAUSSETZUNGEN:
-'   1) Modul mit Funktion ASK_ErgoGPT(prompt) ist bereits in der Mappe
-'      importiert (aus Test.txt im Repo).
-'   2) Tabellenblatt "GPT" mit Konfig:
-'        A6  = Modell-Name
-'        A9  = Temperature (z.B. 0.0)
-'        A12 = Tone
-'        A20 = (optional) AI_RULES
-'   3) Cookie-Datei vorhanden (Standard: F:\ExcelGPT-Cookie\Cookie.txt)
-'   4) Tabellenblatt "Emails" mit Spalten A-H (Nr/Datum/Datum_ISO/
-'      Absender_Name/Absender_Email/Betreff/Text/Anhaenge)
+'   - Modul mit Funktion ASK_ErgoGPT(prompt, pdfs) muss bereits in der
+'     Mappe importiert sein (aus Test.txt im Repo - die volle Variante
+'     mit PDF-Upload-Faehigkeit!).
+'   - Outlook installiert (fuer .msg-Dateien -> OpenSharedItem).
+'   - Cookie fuer gpt.ergo.com (Sheet GPT!A7 oder File F:\ExcelGPT-Cookie\Cookie.txt)
 '
-' WORKFLOW:
-'   1. Outlook-Mails per ergo-email-batch.bas einlesen (Sheet "Emails")
-'   2. Alt+F8 -> Vorgaenge_Analysieren -> Ausfuehren
-'   3. Pro Zeile wird ErgoGPT befragt (~3-10s pro Zeile)
-'   4. Spalten I-O werden gefuellt (Maklerpool, Makler-Name,
-'      Klassifikation, Geschaefts-Typ, Unterlagen-Anfrage, Sonderfall)
-'
-' RESUME:
-'   Bereits gefuellte Zeilen (Spalte I gefuellt) werden uebersprungen.
-'   Mit Vorgaenge_Analysieren_Reset kannst du Spalten I-O leeren.
+' OUTPUT-SPALTEN im Sheet 'Analyse':
+'   A  Datei
+'   B  Datum
+'   C  Absender_Name
+'   D  Absender_Email
+'   E  Betreff
+'   F  Anhang_Namen
+'   G  Maklerpool
+'   H  Makler_Nachname
+'   I  Makler_Vorname
+'   J  Klassifikation              (Standardvorgang / Nicht-Standard)
+'   K  Geschaefts_Typ              (BUe einfacher Vertrag / BUe Kundenverbindung / Keine BUe)
+'   L  Unterlagen_Angefragt        (ja / nein)
+'   M  Sonderfall                  (Flottengeschaeft / Sondertarif / Kein Sonderfall)
+'   N  Sparte                      (Komposit / Leben / KV / Mehrere / Unbekannt)
+'   O  Anhang_Typen                (Maklervollmacht, Police, Antrag, Schadenmeldung, ...)
+'   P  Maklervollmacht_Enthalten   (ja / nein)
+'   Q  Vollmacht_Vollstaendig      (ja / nein / teilweise / nicht_pruefbar)
+'   R  Vollmacht_Fehlt             (Liste fehlender Felder, kommagetrennt)
+'   S  Hinweis                     (kurzer GPT-Hinweis zum Vorgang)
 ' ============================================================================
 
 Option Explicit
 
-Public Const SHEET_VORGANG As String = "Emails"
+Public Const SHEET_ANALYSE As String = "Analyse"
+Public Const SHEET_GPT As String = "GPT"
+Public Const SHEET_ANLEITUNG As String = "Anleitung"
 
-' Spaltenpositionen Output (1-basiert)
-Private Const COL_MAKLERPOOL As Long = 9    ' I
-Private Const COL_NACHNAME   As Long = 10   ' J
-Private Const COL_VORNAME    As Long = 11   ' K
-Private Const COL_KLASSIFIK  As Long = 12   ' L
-Private Const COL_GESCHTYP   As Long = 13   ' M
-Private Const COL_UNTERLAGEN As Long = 14   ' N
-Private Const COL_SONDERFALL As Long = 15   ' O
-Private Const COL_SPARTE     As Long = 16   ' P
-
-' Pfad zur Cookie-Datei (wird an mehreren Stellen genutzt)
 Private Const COOKIE_PATH As String = "F:\ExcelGPT-Cookie\Cookie.txt"
+Private Const COOKIE_CELL As String = "A7"           ' im Sheet GPT
+Private Const MAX_PDFS_PRO_VORGANG As Long = 3
+Private Const MAX_PDF_GROESSE_MB As Long = 20
+
+' Spaltenpositionen Output
+Private Const COL_DATEI       As Long = 1
+Private Const COL_DATUM       As Long = 2
+Private Const COL_ABS_NAME    As Long = 3
+Private Const COL_ABS_MAIL    As Long = 4
+Private Const COL_BETREFF     As Long = 5
+Private Const COL_ANHANG_LST  As Long = 6
+Private Const COL_MAKLERPOOL  As Long = 7
+Private Const COL_NACHNAME    As Long = 8
+Private Const COL_VORNAME     As Long = 9
+Private Const COL_KLASSIFIK   As Long = 10
+Private Const COL_GESCHTYP    As Long = 11
+Private Const COL_UNTERLAGEN  As Long = 12
+Private Const COL_SONDERFALL  As Long = 13
+Private Const COL_SPARTE      As Long = 14
+Private Const COL_ANH_TYPEN   As Long = 15
+Private Const COL_VM_VORHAND  As Long = 16
+Private Const COL_VM_VOLLST   As Long = 17
+Private Const COL_VM_FEHLT    As Long = 18
+Private Const COL_HINWEIS     As Long = 19
 
 ' === HAUPTEINSTIEG ==========================================================
 Public Sub Vorgaenge_Analysieren()
-    Dim ws As Worksheet
     On Error GoTo Fehler
 
-    ' 0) Cookie-Setup pruefen / abfragen
+    ' 0) Cookie-Setup pruefen
     If Not PruefeCookieMitDialog() Then Exit Sub
 
-    Set ws = HoleEmailsSheet()
-    If ws Is Nothing Then Exit Sub
+    ' 1) Ordner-Auswahl
+    Dim folderPath As String
+    folderPath = WaehleOrdner()
+    If Len(folderPath) = 0 Then Exit Sub
 
-    Dim letzteZeile As Long
-    letzteZeile = ws.cells(ws.Rows.count, 1).End(xlUp).row
-    If letzteZeile < 2 Then
-        MsgBox "Keine Daten im Tabellenblatt '" & SHEET_VORGANG & "' gefunden.", vbExclamation
+    Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FolderExists(folderPath) Then
+        MsgBox "Ordner nicht gefunden: " & folderPath, vbCritical
         Exit Sub
     End If
 
+    ' 2) MSG-Dateien einsammeln
+    Dim msgFiles As Object
+    Set msgFiles = SammleMsgDateien(fso, folderPath)
+    If msgFiles.count = 0 Then
+        MsgBox "Keine .msg-Dateien im Ordner gefunden:" & vbCrLf & folderPath, vbExclamation
+        Exit Sub
+    End If
+
+    ' 3) Limit abfragen
+    Dim limit As Long: limit = FrageLimit(msgFiles.count)
+    If limit < 0 Then Exit Sub
+    If limit = 0 Or limit > msgFiles.count Then limit = msgFiles.count
+
+    ' 4) Bestaetigung
+    Dim ans As VbMsgBoxResult
+    ans = MsgBox("Es werden " & limit & " von " & msgFiles.count & " .msg-Vorgaengen analysiert." & vbCrLf & _
+                 "Pro Vorgang ca. 10-30 Sekunden (mit Anhang-Upload)." & vbCrLf & vbCrLf & _
+                 "Geschaetzte Laufzeit: ~" & Int(limit * 20 / 60) + 1 & " Minuten." & vbCrLf & vbCrLf & _
+                 "Fortfahren?", vbYesNo + vbQuestion, "Vorgang-Analyse starten")
+    If ans <> vbYes Then Exit Sub
+
+    ' 5) Outlook holen
+    Dim olApp As Object
+    Set olApp = HoleOutlook()
+    If olApp Is Nothing Then
+        MsgBox "Outlook konnte nicht gestartet werden.", vbCritical
+        Exit Sub
+    End If
+
+    ' 6) Analyse-Sheet vorbereiten
+    Dim ws As Worksheet
+    Set ws = HoleOderErzeugeAnalyseSheet()
     HeaderSchreiben ws
 
-    Dim antwort As VbMsgBoxResult
-    antwort = MsgBox( _
-        "Es werden " & (letzteZeile - 1) & " Zeilen analysiert." & vbCrLf & _
-        "Pro Zeile dauert das ca. 3-10 Sekunden." & vbCrLf & vbCrLf & _
-        "Geschaetzte Laufzeit: ~" & Int((letzteZeile - 1) * 6 / 60) + 1 & " Minuten." & vbCrLf & vbCrLf & _
-        "Bereits gefuellte Zeilen (Spalte I gefuellt) werden uebersprungen." & vbCrLf & vbCrLf & _
-        "Fortfahren?", _
-        vbYesNo + vbQuestion, "Vorgang-Analyse starten")
-    If antwort <> vbYes Then Exit Sub
+    Dim startRow As Long
+    startRow = ws.cells(ws.Rows.count, 1).End(xlUp).row + 1
+    If startRow < 2 Then startRow = 2
 
     Application.ScreenUpdating = False
     Application.Calculation = xlCalculationManual
 
     Dim verarbeitet As Long: verarbeitet = 0
-    Dim uebersprungen As Long: uebersprungen = 0
     Dim fehler As Long: fehler = 0
-    Dim row As Long
+    Dim row As Long: row = startRow
+    Dim i As Long
+    Dim tempBase As String: tempBase = Environ$("TEMP") & "\ergo_va_" & Format(Now, "yyyymmddhhnnss")
 
-    For row = 2 To letzteZeile
-        ' Skip wenn bereits analysiert
-        If Trim(CStr(ws.cells(row, COL_MAKLERPOOL).Value)) <> "" Then
-            uebersprungen = uebersprungen + 1
-            GoTo NextRow
-        End If
-
-        Application.StatusBar = "Analysiere Zeile " & row & " von " & letzteZeile & _
-                                " (verarbeitet: " & verarbeitet & ", Fehler: " & fehler & ")"
+    For i = 1 To limit
+        Dim msgPath As String: msgPath = msgFiles(i)
+        Application.StatusBar = "Analysiere " & i & "/" & limit & " - " & fso.GetFileName(msgPath) & _
+                                "  (verarbeitet:" & verarbeitet & " fehler:" & fehler & ")"
         DoEvents
 
         On Error Resume Next
         Err.Clear
-        Dim ergebnis As Object
-        Set ergebnis = AnalysiereEineZeile(ws, row)
-        If Err.Number <> 0 Or ergebnis Is Nothing Then
-            ws.cells(row, COL_MAKLERPOOL).Value = "[FEHLER]"
-            ws.cells(row, COL_NACHNAME).Value = Err.Description
+        Dim erfolg As Boolean
+        erfolg = AnalysiereEineDatei(olApp, fso, msgPath, ws, row, tempBase, i)
+        If Err.Number <> 0 Or Not erfolg Then
+            ws.cells(row, COL_DATEI).Value = fso.GetFileName(msgPath)
+            ws.cells(row, COL_HINWEIS).Value = "[FEHLER] " & Err.Description
+            ws.cells(row, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
             fehler = fehler + 1
             Err.Clear
         Else
-            SchreibeErgebnis ws, row, ergebnis
             verarbeitet = verarbeitet + 1
         End If
         On Error GoTo Fehler
 
-        ' Alle 5 Zeilen Calc kurz updaten + Speichern
-        If verarbeitet Mod 5 = 0 And verarbeitet > 0 Then
+        row = row + 1
+
+        ' Auto-Save alle 3 Vorgaenge
+        If i Mod 3 = 0 Then
             Application.Calculation = xlCalculationAutomatic
             Application.Calculation = xlCalculationManual
             On Error Resume Next
             ThisWorkbook.Save
             On Error GoTo Fehler
         End If
-NextRow:
-    Next row
+    Next i
+
+    ' Temp-Verzeichnis aufraeumen
+    On Error Resume Next
+    If Len(tempBase) > 0 And fso.FolderExists(tempBase) Then
+        fso.DeleteFolder tempBase, True
+    End If
+    On Error GoTo Fehler
 
     Application.Calculation = xlCalculationAutomatic
     Application.ScreenUpdating = True
     Application.StatusBar = False
+    On Error Resume Next: ThisWorkbook.Save: On Error GoTo Fehler
+
+    SpaltenbreitenSetzen ws
 
     MsgBox "Analyse abgeschlossen." & vbCrLf & vbCrLf & _
            "Verarbeitet: " & verarbeitet & vbCrLf & _
-           "Uebersprungen (bereits analysiert): " & uebersprungen & vbCrLf & _
-           "Fehler: " & fehler, _
+           "Fehler:      " & fehler, _
            vbInformation, "Vorgaenge_Analysieren"
     Exit Sub
 
@@ -140,65 +202,131 @@ Fehler:
     MsgBox "Fehler: " & Err.Description, vbCritical
 End Sub
 
-' === RESET (Spalten I-O leeren) =============================================
-Public Sub Vorgaenge_Analysieren_Reset()
-    Dim ws As Worksheet
-    Set ws = HoleEmailsSheet()
-    If ws Is Nothing Then Exit Sub
+' === EINE DATEI ANALYSIEREN =================================================
+Private Function AnalysiereEineDatei(olApp As Object, fso As Object, msgPath As String, _
+                                     ws As Worksheet, row As Long, tempBase As String, _
+                                     vorgangNr As Long) As Boolean
+    On Error GoTo FehlerLokal
 
-    Dim antwort As VbMsgBoxResult
-    antwort = MsgBox("Spalten I-O (Analyse-Ergebnisse) im Sheet '" & _
-                     SHEET_VORGANG & "' wirklich loeschen?", _
-                     vbYesNo + vbExclamation, "Reset")
-    If antwort <> vbYes Then Exit Sub
+    ' MSG via Outlook oeffnen
+    Dim it As Object
+    Set it = olApp.Session.OpenSharedItem(msgPath)
 
-    Dim letzteZeile As Long
-    letzteZeile = ws.cells(ws.Rows.count, 1).End(xlUp).row
-    If letzteZeile < 2 Then Exit Sub
+    Dim datum As String: datum = ""
+    Dim absName As String: absName = ""
+    Dim absMail As String: absMail = ""
+    Dim betreff As String: betreff = ""
+    Dim body As String: body = ""
 
-    ws.Range(ws.cells(2, COL_MAKLERPOOL), ws.cells(letzteZeile, COL_SPARTE)).ClearContents
-    MsgBox "Analyse-Spalten geleert.", vbInformation
-End Sub
+    On Error Resume Next
+    datum = Format(it.ReceivedTime, "dd.mm.yyyy hh:nn")
+    absName = CStr(it.SenderName)
+    absMail = HoleSenderEmail(it)
+    betreff = CStr(it.Subject)
+    body = CStr(it.Body)
+    On Error GoTo FehlerLokal
 
-' === EINZELZEILE ANALYSIEREN ================================================
-Private Function AnalysiereEineZeile(ws As Worksheet, row As Long) As Object
-    Dim datum As String, absName As String, absMail As String
-    Dim betreff As String, text As String, anhaenge As String
+    ' Anhaenge extrahieren -> nur PDFs hochladen, alle Namen merken
+    Dim alleAnhangNamen As String: alleAnhangNamen = ""
+    Dim pdfPaths As Object: Set pdfPaths = CreateObject("Scripting.Dictionary")
+    Dim pdfListe As String: pdfListe = ""
 
-    datum = CStr(ws.cells(row, 2).Value)        ' B
-    absName = CStr(ws.cells(row, 4).Value)      ' D
-    absMail = CStr(ws.cells(row, 5).Value)      ' E
-    betreff = CStr(ws.cells(row, 6).Value)      ' F
-    text = CStr(ws.cells(row, 7).Value)         ' G
-    anhaenge = CStr(ws.cells(row, 8).Value)     ' H
+    Dim tempDir As String: tempDir = tempBase & "\v" & vorgangNr
+    On Error Resume Next
+    If Not fso.FolderExists(tempBase) Then fso.CreateFolder tempBase
+    If Not fso.FolderExists(tempDir) Then fso.CreateFolder tempDir
+    On Error GoTo FehlerLokal
 
-    ' Body kappen, damit Prompt nicht explodiert
-    If Len(text) > 6000 Then text = Left(text, 6000) & " [...gekuerzt]"
+    Dim a As Long
+    On Error Resume Next
+    For a = 1 To it.Attachments.count
+        Dim att As Object: Set att = it.Attachments.Item(a)
+        Dim fname As String: fname = CStr(att.FileName)
+        If alleAnhangNamen <> "" Then alleAnhangNamen = alleAnhangNamen & "; "
+        alleAnhangNamen = alleAnhangNamen & fname
 
+        If LCase(fso.GetExtensionName(fname)) = "pdf" And pdfPaths.count < MAX_PDFS_PRO_VORGANG Then
+            Dim safe As String: safe = SaeubereDateiname(fname)
+            Dim outPath As String: outPath = tempDir & "\" & safe
+            att.SaveAsFile outPath
+            ' Groesse pruefen (leise skip wenn zu gross)
+            If fso.FileExists(outPath) Then
+                Dim fSize As Double: fSize = fso.GetFile(outPath).Size / 1048576
+                If fSize <= MAX_PDF_GROESSE_MB Then
+                    pdfPaths.Add CStr(pdfPaths.count + 1), outPath
+                    If pdfListe <> "" Then pdfListe = pdfListe & "; "
+                    pdfListe = pdfListe & fname
+                Else
+                    fso.DeleteFile outPath, True
+                End If
+            End If
+        End If
+    Next a
+    On Error GoTo FehlerLokal
+
+    ' Item schliessen, bevor wir GPT befragen
+    On Error Resume Next: it.Close 1: On Error GoTo FehlerLokal ' olDiscard
+
+    ' Body kappen
+    If Len(body) > 6000 Then body = Left(body, 6000) & " [...gekuerzt]"
+
+    ' Prompt bauen
     Dim prompt As String
-    prompt = BuildVorgangPrompt(datum, absName, absMail, betreff, text, anhaenge)
+    prompt = BuildVorgangPrompt(datum, absName, absMail, betreff, body, _
+                                 alleAnhangNamen, pdfListe)
 
+    ' GPT mit oder ohne PDFs befragen
     Dim antwort As String
-    antwort = ASK_ErgoGPT(prompt)
+    If pdfPaths.count > 0 Then
+        Dim pathArr() As String
+        ReDim pathArr(0 To pdfPaths.count - 1)
+        Dim k As Variant, idx As Long: idx = 0
+        For Each k In pdfPaths.Keys
+            pathArr(idx) = pdfPaths(k)
+            idx = idx + 1
+        Next
+        antwort = ASK_ErgoGPT(prompt, pathArr)
+    Else
+        antwort = ASK_ErgoGPT(prompt)
+    End If
 
-    Set AnalysiereEineZeile = ParseGptJsonAntwort(antwort)
+    ' JSON parsen
+    Dim dict As Object: Set dict = ParseGptJsonAntwort(antwort)
+
+    ' Ergebnis ins Sheet schreiben
+    ws.cells(row, COL_DATEI).Value = fso.GetFileName(msgPath)
+    ws.cells(row, COL_DATUM).Value = datum
+    ws.cells(row, COL_ABS_NAME).Value = absName
+    ws.cells(row, COL_ABS_MAIL).Value = absMail
+    ws.cells(row, COL_BETREFF).Value = betreff
+    ws.cells(row, COL_ANHANG_LST).Value = alleAnhangNamen
+
+    If Not dict Is Nothing Then SchreibeGptErgebnis ws, row, dict
+
+    AnalysiereEineDatei = True
+    Exit Function
+
+FehlerLokal:
+    On Error Resume Next: it.Close 1: On Error GoTo 0
+    AnalysiereEineDatei = False
 End Function
 
-' === DER PROMPT (Kern des Tools!) ===========================================
+' === DER PROMPT (Kern) ======================================================
 Private Function BuildVorgangPrompt(datum As String, absName As String, absMail As String, _
-                                     betreff As String, text As String, anhaenge As String) As String
+                                     betreff As String, text As String, _
+                                     anhangAlle As String, anhangPdfsHochgeladen As String) As String
     Dim p As String
     p = ""
     p = p & "Du bist ein erfahrener Sachbearbeiter im Innendienst eines deutschen" & vbCrLf
     p = p & "Komposit-Versicherers (SHUK: Sach/Haftpflicht/Unfall/Kfz)." & vbCrLf
-    p = p & "Du bekommst eine Email aus dem Posteingang (typischerweise von einem" & vbCrLf
-    p = p & "Versicherungsmakler oder Maklerpool) und klassifizierst den Vorgang." & vbCrLf
+    p = p & "Du analysierst eingehende Makler-Emails inklusive Anhaengen." & vbCrLf
     p = p & vbCrLf
     p = p & "===== EMAIL =====" & vbCrLf
     p = p & "Datum: " & datum & vbCrLf
     p = p & "Absender: " & absName & " <" & absMail & ">" & vbCrLf
     p = p & "Betreff: " & betreff & vbCrLf
-    p = p & "Anhaenge: " & IIf(Len(anhaenge) = 0, "(keine)", anhaenge) & vbCrLf
+    p = p & "Anhaenge (alle): " & IIf(Len(anhangAlle) = 0, "(keine)", anhangAlle) & vbCrLf
+    p = p & "Anhaenge HOCHGELADEN als PDF: " & IIf(Len(anhangPdfsHochgeladen) = 0, "(keine)", anhangPdfsHochgeladen) & vbCrLf
     p = p & vbCrLf
     p = p & "Body:" & vbCrLf
     p = p & "<<<" & vbCrLf
@@ -207,113 +335,116 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "===== ENDE EMAIL =====" & vbCrLf
     p = p & vbCrLf
     p = p & "AUFGABE: Klassifiziere den Vorgang strikt anhand der unten" & vbCrLf
-    p = p & "definierten Felder und Wertelisten." & vbCrLf
+    p = p & "definierten Felder und Wertelisten. Nutze die HOCHGELADENEN PDFs" & vbCrLf
+    p = p & "(falls vorhanden) als zusaetzliche Quelle - schau insbesondere nach" & vbCrLf
+    p = p & "einer Maklervollmacht und pruefe deren Vollstaendigkeit." & vbCrLf
     p = p & vbCrLf
     p = p & "REGELN:" & vbCrLf
-    p = p & "- Nutze die Email-Signatur, die From-Domain und den Body als Quellen." & vbCrLf
-    p = p & "- Wenn Information nicht eindeutig ablesbar ist, nimm den leeren String" & vbCrLf
-    p = p & "  bzw. den Default-Wert. Rate NIE." & vbCrLf
-    p = p & "- Antworte AUSSCHLIESSLICH mit einem einzeiligen JSON-Objekt mit genau" & vbCrLf
-    p = p & "  diesen 7 Schluesseln (alle Werte als String). Kein Markdown, keine" & vbCrLf
+    p = p & "- Nutze Email-Signatur, From-Domain, Body und PDF-Inhalte als Quellen." & vbCrLf
+    p = p & "- Wenn Information nicht eindeutig ablesbar ist: leerer String oder" & vbCrLf
+    p = p & "  'nicht_pruefbar'. Rate NIE." & vbCrLf
+    p = p & "- Antworte AUSSCHLIESSLICH mit einem einzeiligen JSON-Objekt mit GENAU" & vbCrLf
+    p = p & "  diesen 13 Schluesseln (alle Werte als String). Kein Markdown, keine" & vbCrLf
     p = p & "  Code-Fences, kein Vorwort, keine Erklaerung." & vbCrLf
     p = p & vbCrLf
     p = p & "FELDER:" & vbCrLf
     p = p & vbCrLf
     p = p & "1) maklerpool" & vbCrLf
-    p = p & "   Welcher Maklerpool / welche Plattform steht hinter dem Absender?" & vbCrLf
-    p = p & "   Erkennungs-Hinweise: Email-Domain, Footer/Disclaimer, Vertriebsorga." & vbCrLf
-    p = p & "   Erlaubte Werte:" & vbCrLf
-    p = p & "     'Fonds Finanz', 'BCA', 'JDC', 'blau direkt', 'Fondsnet'," & vbCrLf
-    p = p & "     'Maxpool', 'WIFO', 'Aruna', 'Apella', 'Netfonds'," & vbCrLf
-    p = p & "     'VEMA', 'Mr.Money', 'Direktmakler' (= eigenstaendiger Makler ohne Pool)," & vbCrLf
-    p = p & "     '' (= unbekannt / Privatperson / Versicherer-intern)" & vbCrLf
+    p = p & "   Erlaubt: 'Fonds Finanz', 'BCA', 'JDC', 'blau direkt', 'Fondsnet'," & vbCrLf
+    p = p & "   'Maxpool', 'WIFO', 'Aruna', 'Apella', 'Netfonds', 'VEMA', 'Mr.Money'," & vbCrLf
+    p = p & "   'Direktmakler', '' (= unbekannt)" & vbCrLf
     p = p & vbCrLf
-    p = p & "2) makler_nachname" & vbCrLf
-    p = p & "   Nachname des konkreten Bearbeiters/Maklers (aus Signatur oder" & vbCrLf
-    p = p & "   Anschreiben). Bei 'Mustermann, Max' -> 'Mustermann'." & vbCrLf
-    p = p & "   Default: ''" & vbCrLf
-    p = p & vbCrLf
-    p = p & "3) makler_vorname" & vbCrLf
-    p = p & "   Vorname analog. Default: ''" & vbCrLf
+    p = p & "2) makler_nachname / 3) makler_vorname" & vbCrLf
+    p = p & "   Aus Signatur, Anschreiben oder Vollmacht. Default: ''" & vbCrLf
     p = p & vbCrLf
     p = p & "4) klassifikation" & vbCrLf
-    p = p & "   - 'Standardvorgang': Routine-Tagesgeschaeft (Antrag, Aenderungs-" & vbCrLf
-    p = p & "     anzeige, Schadenmeldung, einfache Ruecksprache, Beleg-Nachreichung)." & vbCrLf
-    p = p & "   - 'Nicht-Standard': Eskalation, Beschwerde, Sonderkonstrukt," & vbCrLf
-    p = p & "     juristische Themen, ungewoehnliche Anliegen." & vbCrLf
+    p = p & "   - 'Standardvorgang': Routine-Tagesgeschaeft (BUe, Antrag, Aenderung," & vbCrLf
+    p = p & "     Schadenmeldung, einfache Ruecksprache)." & vbCrLf
+    p = p & "   - 'Nicht-Standard': Eskalation, Beschwerde, Sonderkonstrukt, juristisch." & vbCrLf
     p = p & vbCrLf
     p = p & "5) geschaefts_typ" & vbCrLf
-    p = p & "   Hinweis: 'BUe' (Bestandsuebertragung) bedeutet, dass Vertraege" & vbCrLf
-    p = p & "   ohne inhaltliche Aenderung vom bisherigen Makler/Pool auf einen" & vbCrLf
-    p = p & "   anderen Makler/Pool umgehaengt werden sollen (Maklerwechsel)." & vbCrLf
-    p = p & "   In der Email ist meistens eine Vertragsnummer (VNR) genannt." & vbCrLf
-    p = p & "   Entscheidend ist NICHT, ob eine VNR drin steht, sondern OB der" & vbCrLf
-    p = p & "   Makler nur diesen einen Vertrag oder die gesamte Kundenverbindung" & vbCrLf
-    p = p & "   (= alle Vertraege dieses Kunden) uebernehmen will." & vbCrLf
-    p = p & "   - 'BUe einfacher Vertrag': Es soll explizit nur DER eine konkret" & vbCrLf
-    p = p & "     genannte Vertrag (oder eine eng begrenzte Liste einzelner" & vbCrLf
-    p = p & "     Vertraege) uebertragen werden. Andere Vertraege des Kunden" & vbCrLf
-    p = p & "     bleiben unberuehrt." & vbCrLf
-    p = p & "   - 'BUe Kundenverbindung': Die gesamte Kundenverbindung soll" & vbCrLf
-    p = p & "     uebertragen werden, also alle Vertraege dieses Kunden -" & vbCrLf
-    p = p & "     auch wenn als 'Aufhaenger' nur eine einzige VNR genannt ist." & vbCrLf
-    p = p & "     Hinweise: Worte wie 'gesamte Kundenverbindung', 'alle" & vbCrLf
-    p = p & "     Vertraege', 'kompletter Bestand des Kunden', 'Kundenwechsel'," & vbCrLf
-    p = p & "     'wir uebernehmen den Kunden komplett'." & vbCrLf
-    p = p & "   - 'Keine BUe': Der Vorgang ist KEINE Bestandsuebertragung," & vbCrLf
-    p = p & "     sondern z.B. eine Schadenmeldung, ein Antrag, eine Vertrags-" & vbCrLf
-    p = p & "     aenderung, eine Beleg-Nachreichung, eine Ruecksprache o.ae." & vbCrLf
-    p = p & "   Erkennungs-Hinweise fuer BUe insgesamt: Worte wie 'Bestands-" & vbCrLf
-    p = p & "   uebertragung', 'Maklerwechsel', 'BUe', 'Courtagezession'," & vbCrLf
-    p = p & "   'Bestandsumdeckung', beigefuegte Maklervollmacht / Courtagezusage." & vbCrLf
+    p = p & "   BUe = Bestandsuebertragung. Vertraege wandern ohne inhaltliche" & vbCrLf
+    p = p & "   Aenderung von Makler B zu Makler A. Eine VNR ist meistens drin," & vbCrLf
+    p = p & "   ABER entscheidend ist: nur DER eine Vertrag oder ALLE Vertraege" & vbCrLf
+    p = p & "   des Kunden?" & vbCrLf
+    p = p & "   - 'BUe einfacher Vertrag': nur die genannten einzelnen Vertraege." & vbCrLf
+    p = p & "   - 'BUe Kundenverbindung': gesamte Kundenverbindung / alle Vertraege" & vbCrLf
+    p = p & "     dieses Kunden (Hinweise: 'gesamte Kundenverbindung', 'alle" & vbCrLf
+    p = p & "     Vertraege', 'Kunde komplett')." & vbCrLf
+    p = p & "   - 'Keine BUe': Vorgang ist was anderes (Schaden, Antrag, Aenderung)." & vbCrLf
+    p = p & "   Erkennungs-Hinweise BUe: 'Bestandsuebertragung', 'Maklerwechsel'," & vbCrLf
+    p = p & "   'BUe', 'Courtagezession', beigefuegte Maklervollmacht." & vbCrLf
     p = p & vbCrLf
     p = p & "6) unterlagen_angefragt" & vbCrLf
-    p = p & "   - 'ja': Der Versicherer muss zusaetzliche Unterlagen anfordern" & vbCrLf
-    p = p & "     ODER der Makler bittet darum, dass weitere Unterlagen nachgereicht" & vbCrLf
-    p = p & "     werden ODER es ist offensichtlich, dass der Vorgang ohne weitere" & vbCrLf
-    p = p & "     Unterlagen nicht abgeschlossen werden kann." & vbCrLf
-    p = p & "   - 'nein': Vorgang ist mit den vorliegenden Infos/Anhaengen vollstaendig." & vbCrLf
+    p = p & "   - 'ja': Versicherer muss noch Unterlagen anfordern ODER Makler bittet" & vbCrLf
+    p = p & "     um Nachreichung ODER Vorgang ohne weitere Unterlagen unvollstaendig." & vbCrLf
+    p = p & "   - 'nein': mit den vorliegenden Anhaengen abschliessbar." & vbCrLf
     p = p & vbCrLf
     p = p & "7) sonderfall" & vbCrLf
-    p = p & "   - 'Flottengeschaeft': Kfz-Flotten, mehrere Fahrzeuge eines" & vbCrLf
-    p = p & "     Gewerbekunden, Flottentarif." & vbCrLf
+    p = p & "   - 'Flottengeschaeft': Kfz-Flotten / mehrere Fahrzeuge Gewerbe." & vbCrLf
     p = p & "   - 'Sondertarif': ungewoehnliche Tarifkonstruktion, Konsortium," & vbCrLf
-    p = p & "     Grossrisiko, Industrie-Police, individueller Wording-Anhang." & vbCrLf
-    p = p & "   - 'Kein Sonderfall': normaler Privat- oder Kleingewerbe-Vorgang." & vbCrLf
+    p = p & "     Grossrisiko, Industrie-Police." & vbCrLf
+    p = p & "   - 'Kein Sonderfall': normaler Privat-/Kleingewerbe-Vorgang." & vbCrLf
     p = p & vbCrLf
     p = p & "8) sparte" & vbCrLf
-    p = p & "   Um welche Versicherungssparte geht es im Vorgang?" & vbCrLf
-    p = p & "   - 'Komposit': SHUK-Komposit (Sach, Haftpflicht, Unfall, Kfz," & vbCrLf
-    p = p & "     Hausrat, Wohngebaeude, Rechtsschutz, Tierhalter, Gewerbe etc.)." & vbCrLf
-    p = p & "   - 'Leben': Lebensversicherung, Rentenversicherung, BU, Risiko-LV," & vbCrLf
-    p = p & "     fondsgebundene LV." & vbCrLf
-    p = p & "   - 'KV': Krankenversicherung (PKV, Zusatzversicherung, KT, KZV)." & vbCrLf
-    p = p & "   - 'Mehrere': Vorgang erstreckt sich nachweislich auf mehrere der" & vbCrLf
-    p = p & "     drei Sparten gleichzeitig (z.B. komplette Kundenverbindung mit" & vbCrLf
-    p = p & "     Kfz + LV + KV)." & vbCrLf
-    p = p & "   - 'Unbekannt': Sparte aus der Email nicht eindeutig erkennbar." & vbCrLf
+    p = p & "   - 'Komposit' (SHUK), 'Leben' (LV/RV/BU), 'KV' (PKV/Zusatz)," & vbCrLf
+    p = p & "     'Mehrere', 'Unbekannt'" & vbCrLf
     p = p & vbCrLf
-    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON):" & vbCrLf
+    p = p & "9) anhang_typen" & vbCrLf
+    p = p & "   Kommagetrennte Liste der erkannten Anhang-Typen (basierend auf" & vbCrLf
+    p = p & "   Dateinamen UND PDF-Inhalt). Erlaubte Werte (Mehrfachnennung ok):" & vbCrLf
+    p = p & "   'Maklervollmacht', 'Police', 'Antrag', 'Schadenmeldung'," & vbCrLf
+    p = p & "   'Beitragsrechnung', 'Anschreiben', 'Kuendigung', 'Datenblatt'," & vbCrLf
+    p = p & "   'Sonstiges'. Default '' wenn keine Anhaenge oder nicht erkennbar." & vbCrLf
+    p = p & vbCrLf
+    p = p & "10) enthaelt_maklervollmacht" & vbCrLf
+    p = p & "    'ja' wenn mindestens ein Anhang eine Maklervollmacht ist," & vbCrLf
+    p = p & "    sonst 'nein'." & vbCrLf
+    p = p & vbCrLf
+    p = p & "11) maklervollmacht_vollstaendig" & vbCrLf
+    p = p & "    Pruefung der Pflichtfelder einer Maklervollmacht:" & vbCrLf
+    p = p & "      a) Vollstaendiger Kundenname (Vor- + Nachname)" & vbCrLf
+    p = p & "      b) Geburtsdatum des Kunden" & vbCrLf
+    p = p & "      c) Anschrift des Kunden" & vbCrLf
+    p = p & "      d) Datum der Vollmacht" & vbCrLf
+    p = p & "      e) Eigenhaendige Unterschrift des Kunden (sichtbar)" & vbCrLf
+    p = p & "      f) Maklerangaben (Name + Firma + Vermittlernummer/BD-Nummer)" & vbCrLf
+    p = p & "    Werte:" & vbCrLf
+    p = p & "      - 'ja': alle 6 Pflichtfelder erkennbar vorhanden" & vbCrLf
+    p = p & "      - 'teilweise': Vollmacht da, einzelne Felder fehlen" & vbCrLf
+    p = p & "      - 'nein': als Vollmacht erkennbar, aber Pflichtfelder grosszuegig fehlen" & vbCrLf
+    p = p & "      - 'nicht_pruefbar': keine Vollmacht im Anhang oder PDF nicht ausgewertet" & vbCrLf
+    p = p & vbCrLf
+    p = p & "12) maklervollmacht_fehlt" & vbCrLf
+    p = p & "    Komma-getrennte Liste der fehlenden Felder (a-f aus Punkt 11)," & vbCrLf
+    p = p & "    benannt z.B.: 'Geburtsdatum, Unterschrift Kunde'. Leer wenn" & vbCrLf
+    p = p & "    Vollmacht vollstaendig oder nicht pruefbar." & vbCrLf
+    p = p & vbCrLf
+    p = p & "13) hinweis" & vbCrLf
+    p = p & "    EIN kurzer Satz (max 200 Zeichen) was an dem Vorgang auffaellig" & vbCrLf
+    p = p & "    ist - z.B. fehlende Unterlagen, ungewoehnliche Konstellation," & vbCrLf
+    p = p & "    Eskalationspotenzial. Leer wenn nichts auffaellt." & vbCrLf
+    p = p & vbCrLf
+    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 13 Schluessel):" & vbCrLf
     p = p & "{""maklerpool"":""..."",""makler_nachname"":""..."",""makler_vorname"":""...""," & vbCrLf
     p = p & " ""klassifikation"":""..."",""geschaefts_typ"":""..."",""unterlagen_angefragt"":""...""," & vbCrLf
-    p = p & " ""sonderfall"":""..."",""sparte"":""...""}" & vbCrLf
+    p = p & " ""sonderfall"":""..."",""sparte"":""..."",""anhang_typen"":""...""," & vbCrLf
+    p = p & " ""enthaelt_maklervollmacht"":""..."",""maklervollmacht_vollstaendig"":""...""," & vbCrLf
+    p = p & " ""maklervollmacht_fehlt"":""..."",""hinweis"":""...""}" & vbCrLf
     p = p & vbCrLf
     p = p & "Antworte JETZT, nur das JSON-Objekt:" & vbCrLf
     BuildVorgangPrompt = p
 End Function
 
-' === JSON-ANTWORT PARSEN ====================================================
+' === JSON-PARSING ===========================================================
 Private Function ParseGptJsonAntwort(antwort As String) As Object
-    Dim dict As Object
-    Set dict = CreateObject("Scripting.Dictionary")
+    Dim dict As Object: Set dict = CreateObject("Scripting.Dictionary")
 
     Dim clean As String: clean = antwort
-    ' Markdown-Code-Fences entfernen, falls das Modell sie doch ausgibt
     clean = Replace(clean, "```json", "")
     clean = Replace(clean, "```", "")
     clean = Trim(clean)
 
-    ' Inhalt zwischen erster { und letzter } extrahieren (robust gegen Vorwort)
     Dim p1 As Long: p1 = InStr(clean, "{")
     Dim p2 As Long: p2 = InStrRev(clean, "}")
     If p1 = 0 Or p2 <= p1 Then
@@ -325,55 +456,335 @@ Private Function ParseGptJsonAntwort(antwort As String) As Object
     Dim keys As Variant
     keys = Array("maklerpool", "makler_nachname", "makler_vorname", _
                  "klassifikation", "geschaefts_typ", "unterlagen_angefragt", _
-                 "sonderfall", "sparte")
-
+                 "sonderfall", "sparte", "anhang_typen", _
+                 "enthaelt_maklervollmacht", "maklervollmacht_vollstaendig", _
+                 "maklervollmacht_fehlt", "hinweis")
     Dim i As Long
     For i = LBound(keys) To UBound(keys)
         dict(keys(i)) = ExtrahiereJsonString(clean, CStr(keys(i)))
     Next i
-
     Set ParseGptJsonAntwort = dict
 End Function
 
 Private Function ExtrahiereJsonString(json As String, key As String) As String
-    Dim re As Object
-    Set re = CreateObject("VBScript.RegExp")
-    re.Global = False
-    re.IgnoreCase = True
-    ' "key" : "value" - value darf escaped Quotes enthalten
+    Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+    re.Global = False: re.IgnoreCase = True
     re.Pattern = """" & key & """\s*:\s*""((?:\\.|[^""\\])*)"""
     If re.test(json) Then
-        Dim ms As Object: Set ms = re.Execute(json)
-        Dim raw As String: raw = ms(0).SubMatches(0)
-        ' Einfache JSON-Unescape
+        Dim raw As String: raw = re.Execute(json)(0).SubMatches(0)
         raw = Replace(raw, "\""", """")
         raw = Replace(raw, "\\", "\")
         raw = Replace(raw, "\n", " ")
         raw = Replace(raw, "\r", " ")
         raw = Replace(raw, "\t", " ")
         ExtrahiereJsonString = Trim(raw)
-    Else
-        ExtrahiereJsonString = ""
     End If
 End Function
 
-' === SHEET HELPER ===========================================================
-Private Function HoleEmailsSheet() As Worksheet
-    Dim ws As Worksheet
-    On Error Resume Next
-    Set ws = ThisWorkbook.Sheets(SHEET_VORGANG)
-    On Error GoTo 0
+' === COOKIE-DIALOG ==========================================================
+Private Function PruefeCookieMitDialog() As Boolean
+    Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
+    Dim cookieAusSheet As String: cookieAusSheet = HoleCookieAusSheet()
+    Dim hatDatei As Boolean: hatDatei = fso.FileExists(COOKIE_PATH)
 
-    If ws Is Nothing Then
-        MsgBox "Tabellenblatt '" & SHEET_VORGANG & "' nicht gefunden." & vbCrLf & _
-               "Bitte zuerst Mails per ergo-email-batch.bas (Ordner_Scannen / " & _
-               "Outlook_Live_Abrufen) einlesen.", _
-               vbExclamation
+    Dim altInhalt As String: altInhalt = ""
+    If hatDatei Then
+        On Error Resume Next
+        Dim ts As Object
+        Set ts = fso.OpenTextFile(COOKIE_PATH, 1, False, -2)
+        altInhalt = Trim(ts.ReadAll): ts.Close
+        On Error GoTo 0
     End If
-    Set HoleEmailsSheet = ws
+
+    ' Wenn Cookie im Sheet vorhanden -> in Datei spiegeln (damit ASK_ErgoGPT ihn liest)
+    If Len(cookieAusSheet) > 50 Then
+        SchreibeCookieDatei cookieAusSheet, fso
+        PruefeCookieMitDialog = True
+        Exit Function
+    End If
+
+    Dim msg As String, ans As VbMsgBoxResult
+    If hatDatei And Len(altInhalt) > 50 Then
+        Dim preview As String: preview = Left(altInhalt, 100) & IIf(Len(altInhalt) > 100, "...", "")
+        msg = "Cookie-Datei gefunden:" & vbCrLf & COOKIE_PATH & vbCrLf & vbCrLf & _
+              "Auszug: " & preview & vbCrLf & vbCrLf & _
+              "JA      = vorhandenen Cookie verwenden" & vbCrLf & _
+              "NEIN    = Cookie neu eingeben (nach Session-Ablauf)" & vbCrLf & _
+              "ABBRECH = Beenden"
+        ans = MsgBox(msg, vbYesNoCancel + vbQuestion, "Cookie-Setup")
+        If ans = vbCancel Then Exit Function
+        If ans = vbYes Then PruefeCookieMitDialog = True: Exit Function
+    Else
+        ans = MsgBox("Es ist noch kein Cookie hinterlegt." & vbCrLf & vbCrLf & _
+                     "Pfad: " & COOKIE_PATH & vbCrLf & vbCrLf & _
+                     "JA  = Cookie jetzt eingeben (wird automatisch gespeichert)" & vbCrLf & _
+                     "NEIN = Beenden", _
+                     vbYesNo + vbQuestion, "Cookie fehlt")
+        If ans <> vbYes Then Exit Function
+    End If
+
+    ' Manuelle Eingabe
+    Dim cookie As String
+    cookie = InputBox( _
+        "Cookie-String einfuegen." & vbCrLf & vbCrLf & _
+        "Browser -> gpt.ergo.com einloggen -> F12 (DevTools) ->" & vbCrLf & _
+        "Tab Network -> beliebigen Request -> Request Headers ->" & vbCrLf & _
+        "Wert hinter 'Cookie:' kopieren und hier einfuegen.", _
+        "Cookie eingeben")
+    cookie = Trim(cookie)
+    If Len(cookie) < 50 Then
+        MsgBox "Cookie zu kurz oder leer - Abbruch.", vbExclamation
+        Exit Function
+    End If
+
+    SchreibeCookieDatei cookie, fso
+    MsgBox "Cookie gespeichert. Analyse startet jetzt.", vbInformation
+    PruefeCookieMitDialog = True
+End Function
+
+Private Sub SchreibeCookieDatei(cookie As String, fso As Object)
+    Dim dirPath As String: dirPath = Left(COOKIE_PATH, InStrRev(COOKIE_PATH, "\") - 1)
+    On Error Resume Next
+    If Len(dirPath) > 0 And Not fso.FolderExists(dirPath) Then fso.CreateFolder dirPath
+    Dim out As Object
+    Set out = fso.CreateTextFile(COOKIE_PATH, True, False)
+    out.Write cookie
+    out.Close
+    On Error GoTo 0
+End Sub
+
+Private Function HoleCookieAusSheet() As String
+    On Error Resume Next
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets(SHEET_GPT)
+    If ws Is Nothing Then HoleCookieAusSheet = "": Exit Function
+    HoleCookieAusSheet = Trim(CStr(ws.Range(COOKIE_CELL).Value))
+    On Error GoTo 0
+End Function
+
+' === SETUP ===================================================================
+Public Sub Vorgaenge_Setup()
+    Dim ans As VbMsgBoxResult
+    ans = MsgBox( _
+        "Setup richtet die Excel-Mappe fuer die Vorgang-Analyse v2.0 ein:" & vbCrLf & vbCrLf & _
+        "  - Sheet 'GPT' (Modell, Cookie-Zelle, Temperature, Tone)" & vbCrLf & _
+        "  - Sheet 'Anleitung' (Step-by-Step in Excel)" & vbCrLf & _
+        "  - Sheet 'Analyse' (Output-Spalten)" & vbCrLf & _
+        "  - Cookie abfragen / pruefen" & vbCrLf & vbCrLf & _
+        "Fortfahren?", _
+        vbYesNo + vbQuestion, "Vorgaenge_Setup")
+    If ans <> vbYes Then Exit Sub
+
+    SetupGptSheet
+    SetupAnleitungSheet
+    Dim ws As Worksheet: Set ws = HoleOderErzeugeAnalyseSheet()
+    HeaderSchreiben ws
+    SpaltenbreitenSetzen ws
+
+    PruefeCookieMitDialog
+
+    On Error Resume Next: ThisWorkbook.Sheets(SHEET_ANLEITUNG).Activate
+End Sub
+
+Private Sub SetupGptSheet()
+    Dim ws As Worksheet
+    On Error Resume Next: Set ws = ThisWorkbook.Sheets(SHEET_GPT): On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.count))
+        ws.name = SHEET_GPT
+    End If
+
+    ws.Range("B6").Value = "<- Modell-Name (z.B. gpt-5.1, gpt-4o)"
+    ws.Range("B7").Value = "<- Cookie (HIER einfuegen ODER per Dialog -> wird in F:\ExcelGPT-Cookie\Cookie.txt gespiegelt)"
+    ws.Range("B9").Value = "<- Temperature (0 = deterministisch)"
+    ws.Range("B12").Value = "<- Tone (z.B. 'Sachlich' oder leer)"
+
+    If Trim(CStr(ws.Range("A6").Value)) = "" Then ws.Range("A6").Value = "gpt-5.1"
+    If Trim(CStr(ws.Range("A9").Value)) = "" Then ws.Range("A9").Value = 0
+    If Trim(CStr(ws.Range("A12").Value)) = "" Then ws.Range("A12").Value = "Sachlich"
+
+    ws.Columns("A").ColumnWidth = 30
+    ws.Columns("B").ColumnWidth = 80
+    ws.Range("A7").WrapText = False
+End Sub
+
+Private Sub SetupAnleitungSheet()
+    Dim ws As Worksheet
+    On Error Resume Next: Set ws = ThisWorkbook.Sheets(SHEET_ANLEITUNG): On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(Before:=ThisWorkbook.Sheets(1))
+        ws.name = SHEET_ANLEITUNG
+    Else
+        ws.cells.Clear
+    End If
+
+    Dim r As Long: r = 1
+    ws.cells(r, 1).Value = "ERGO Vorgang-Analyse v2.0 - Anleitung": Bold ws, r, 16: r = r + 2
+
+    ws.cells(r, 1).Value = "WORKFLOW (kurz)": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "1. Diese .xlsm in den Ordner legen, in dem .msg-Dateien liegen.": r = r + 1
+    ws.cells(r, 1).Value = "2. Vorgaenge_Setup einmalig ausfuehren (Cookie hinterlegen).": r = r + 1
+    ws.cells(r, 1).Value = "3. Vorgaenge_Analysieren ausfuehren -> Ordner + Anzahl waehlen.": r = r + 2
+
+    ws.cells(r, 1).Value = "VORAUSSETZUNGEN": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "- Modul ASK_ErgoGPT (volle Variante mit PDF-Upload aus Test.txt) ist importiert.": r = r + 1
+    ws.cells(r, 1).Value = "- Outlook installiert (zum Oeffnen der .msg-Dateien).": r = r + 1
+    ws.cells(r, 1).Value = "- Cookie fuer gpt.ergo.com (Sheet GPT!A7 ODER F:\ExcelGPT-Cookie\Cookie.txt).": r = r + 2
+
+    ws.cells(r, 1).Value = "AUSFUEHRUNG VORGAENGE_ANALYSIEREN": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "Schritt a) Cookie-Dialog erscheint:": r = r + 1
+    ws.cells(r, 1).Value = "   - vorhandenen Cookie nutzen ODER neu eingeben": r = r + 1
+    ws.cells(r, 1).Value = "Schritt b) Ordner-Dialog (Default: dieser Workbook-Pfad)": r = r + 1
+    ws.cells(r, 1).Value = "Schritt c) Anzahl-Eingabe (leer = alle .msg-Dateien)": r = r + 1
+    ws.cells(r, 1).Value = "Schritt d) Bestaetigung mit geschaetzter Laufzeit": r = r + 1
+    ws.cells(r, 1).Value = "Schritt e) Pro Vorgang: Email + max. 3 PDFs (<20 MB) -> ErgoGPT.": r = r + 1
+    ws.cells(r, 1).Value = "           Auto-Save alle 3 Vorgaenge.": r = r + 2
+
+    ws.cells(r, 1).Value = "OUTPUT-SPALTEN im Sheet 'Analyse'": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "A Datei | B Datum | C Absender_Name | D Absender_Email | E Betreff": r = r + 1
+    ws.cells(r, 1).Value = "F Anhang_Namen | G Maklerpool | H Makler_Nachname | I Makler_Vorname": r = r + 1
+    ws.cells(r, 1).Value = "J Klassifikation | K Geschaefts_Typ | L Unterlagen_Angefragt": r = r + 1
+    ws.cells(r, 1).Value = "M Sonderfall | N Sparte | O Anhang_Typen": r = r + 1
+    ws.cells(r, 1).Value = "P Maklervollmacht_Enthalten | Q Vollmacht_Vollstaendig": r = r + 1
+    ws.cells(r, 1).Value = "R Vollmacht_Fehlt | S Hinweis": r = r + 2
+
+    ws.cells(r, 1).Value = "BUE-LOGIK": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "BUe = Bestandsuebertragung (Maklerwechsel ohne Vertragsaenderung).": r = r + 1
+    ws.cells(r, 1).Value = "Eine VNR ist meistens da. Frage ist: nur DER eine Vertrag oder": r = r + 1
+    ws.cells(r, 1).Value = "die GANZE Kundenverbindung des Kunden?": r = r + 2
+
+    ws.cells(r, 1).Value = "MAKLERVOLLMACHT-PRUEFUNG": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "GPT prueft im PDF: Kundenname, Geburtsdatum, Anschrift, Datum,": r = r + 1
+    ws.cells(r, 1).Value = "Unterschrift, Maklerangaben (Firma + Vermittlernummer).": r = r + 1
+    ws.cells(r, 1).Value = "Fehlende Felder werden in Spalte R aufgelistet.": r = r + 2
+
+    ws.cells(r, 1).Value = "ZURUECKSETZEN": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "Alt+F8 -> 'Vorgaenge_Analysieren_Reset' loescht das Sheet 'Analyse'.": r = r + 2
+
+    ws.Columns("A").ColumnWidth = 110
+End Sub
+
+' === RESET ==================================================================
+Public Sub Vorgaenge_Analysieren_Reset()
+    Dim ws As Worksheet
+    On Error Resume Next: Set ws = ThisWorkbook.Sheets(SHEET_ANALYSE): On Error GoTo 0
+    If ws Is Nothing Then Exit Sub
+
+    Dim ans As VbMsgBoxResult
+    ans = MsgBox("Sheet '" & SHEET_ANALYSE & "' komplett leeren?", vbYesNo + vbExclamation, "Reset")
+    If ans <> vbYes Then Exit Sub
+
+    ws.cells.Clear
+    HeaderSchreiben ws
+    SpaltenbreitenSetzen ws
+    MsgBox "Sheet '" & SHEET_ANALYSE & "' geleert.", vbInformation
+End Sub
+
+' === HELFER =================================================================
+Private Function WaehleOrdner() As String
+    Dim defaultPath As String
+    defaultPath = ThisWorkbook.Path
+    Dim ans As VbMsgBoxResult
+    ans = MsgBox("Welcher Ordner soll gescannt werden?" & vbCrLf & vbCrLf & _
+                 "JA      = aktueller Workbook-Pfad:" & vbCrLf & "  " & defaultPath & vbCrLf & vbCrLf & _
+                 "NEIN    = anderen Ordner waehlen" & vbCrLf & _
+                 "ABBRECH = Beenden", _
+                 vbYesNoCancel + vbQuestion, "Ordner-Auswahl")
+    If ans = vbCancel Then WaehleOrdner = "": Exit Function
+    If ans = vbYes Then WaehleOrdner = defaultPath: Exit Function
+
+    ' Anderen Ordner waehlen
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "Ordner mit .msg-Dateien waehlen"
+        .AllowMultiSelect = False
+        If .Show <> -1 Then WaehleOrdner = "": Exit Function
+        WaehleOrdner = .SelectedItems(1)
+    End With
+End Function
+
+Private Function FrageLimit(maxAnzahl As Long) As Long
+    Dim eing As String
+    eing = InputBox("Wie viele Vorgaenge sollen analysiert werden?" & vbCrLf & vbCrLf & _
+                    "  Im Ordner gefunden: " & maxAnzahl & " .msg-Dateien" & vbCrLf & _
+                    "  Leer oder 0 = ALLE" & vbCrLf & _
+                    "  Sonst: maximale Anzahl (z.B. 10 zum Testen)", _
+                    "Anzahl Vorgaenge", "10")
+    If eing = "" Then FrageLimit = -1: Exit Function
+    On Error Resume Next
+    FrageLimit = CLng(Val(eing))
+    If FrageLimit < 0 Then FrageLimit = 0
+End Function
+
+Private Function SammleMsgDateien(fso As Object, folderPath As String) As Object
+    Dim col As Object: Set col = CreateObject("Scripting.Dictionary")
+    Dim i As Long: i = 0
+    Dim folder As Object: Set folder = fso.GetFolder(folderPath)
+    Dim file As Object
+    For Each file In folder.Files
+        If LCase(fso.GetExtensionName(file.name)) = "msg" Then
+            i = i + 1
+            col.Add CStr(i), file.path
+        End If
+    Next file
+    Set SammleMsgDateien = col
+End Function
+
+Private Function HoleOutlook() As Object
+    On Error Resume Next
+    Dim app As Object
+    Set app = GetObject(, "Outlook.Application")
+    If app Is Nothing Then Set app = CreateObject("Outlook.Application")
+    Set HoleOutlook = app
+End Function
+
+Private Function HoleSenderEmail(it As Object) As String
+    On Error Resume Next
+    Dim typ As String: typ = it.SenderEmailType
+    If typ = "EX" Then
+        Dim sender As Object: Set sender = it.sender
+        If Not sender Is Nothing Then
+            Dim eu As Object: Set eu = sender.GetExchangeUser()
+            If Not eu Is Nothing Then
+                HoleSenderEmail = eu.PrimarySmtpAddress
+                If HoleSenderEmail <> "" Then Exit Function
+            End If
+        End If
+    End If
+    HoleSenderEmail = it.SenderEmailAddress
+End Function
+
+Private Function SaeubereDateiname(s As String) As String
+    Dim r As String: r = s
+    Dim verboten As String: verboten = "\/:*?""<>|"
+    Dim i As Long
+    For i = 1 To Len(verboten)
+        r = Replace(r, Mid(verboten, i, 1), "_")
+    Next i
+    If Len(r) > 100 Then
+        Dim ext As String
+        Dim posDot As Long: posDot = InStrRev(r, ".")
+        If posDot > 0 Then ext = Mid(r, posDot)
+        r = Left(r, 100 - Len(ext)) & ext
+    End If
+    SaeubereDateiname = r
+End Function
+
+Private Function HoleOderErzeugeAnalyseSheet() As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next: Set ws = ThisWorkbook.Sheets(SHEET_ANALYSE): On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.count))
+        ws.name = SHEET_ANALYSE
+    End If
+    Set HoleOderErzeugeAnalyseSheet = ws
 End Function
 
 Private Sub HeaderSchreiben(ws As Worksheet)
+    ws.cells(1, COL_DATEI).Value = "Datei"
+    ws.cells(1, COL_DATUM).Value = "Datum"
+    ws.cells(1, COL_ABS_NAME).Value = "Absender_Name"
+    ws.cells(1, COL_ABS_MAIL).Value = "Absender_Email"
+    ws.cells(1, COL_BETREFF).Value = "Betreff"
+    ws.cells(1, COL_ANHANG_LST).Value = "Anhang_Namen"
     ws.cells(1, COL_MAKLERPOOL).Value = "Maklerpool"
     ws.cells(1, COL_NACHNAME).Value = "Makler_Nachname"
     ws.cells(1, COL_VORNAME).Value = "Makler_Vorname"
@@ -382,14 +793,30 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_UNTERLAGEN).Value = "Unterlagen_Angefragt"
     ws.cells(1, COL_SONDERFALL).Value = "Sonderfall"
     ws.cells(1, COL_SPARTE).Value = "Sparte"
+    ws.cells(1, COL_ANH_TYPEN).Value = "Anhang_Typen"
+    ws.cells(1, COL_VM_VORHAND).Value = "Maklervollmacht_Enthalten"
+    ws.cells(1, COL_VM_VOLLST).Value = "Vollmacht_Vollstaendig"
+    ws.cells(1, COL_VM_FEHLT).Value = "Vollmacht_Fehlt"
+    ws.cells(1, COL_HINWEIS).Value = "Hinweis"
 
-    With ws.Range(ws.cells(1, COL_MAKLERPOOL), ws.cells(1, COL_SPARTE))
+    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_HINWEIS))
         .Font.Bold = True
-        .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau zur Abgrenzung von ERGO-rot
+        .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau
         .Font.Color = RGB(255, 255, 255)
         .HorizontalAlignment = xlCenter
     End With
+    ws.Rows(1).RowHeight = 22
+    ws.Range("A2").Select
+    On Error Resume Next: ActiveWindow.FreezePanes = False: ActiveWindow.FreezePanes = True: On Error GoTo 0
+End Sub
 
+Private Sub SpaltenbreitenSetzen(ws As Worksheet)
+    ws.Columns(COL_DATEI).ColumnWidth = 30
+    ws.Columns(COL_DATUM).ColumnWidth = 16
+    ws.Columns(COL_ABS_NAME).ColumnWidth = 22
+    ws.Columns(COL_ABS_MAIL).ColumnWidth = 28
+    ws.Columns(COL_BETREFF).ColumnWidth = 40
+    ws.Columns(COL_ANHANG_LST).ColumnWidth = 28
     ws.Columns(COL_MAKLERPOOL).ColumnWidth = 18
     ws.Columns(COL_NACHNAME).ColumnWidth = 18
     ws.Columns(COL_VORNAME).ColumnWidth = 14
@@ -398,9 +825,14 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.Columns(COL_UNTERLAGEN).ColumnWidth = 16
     ws.Columns(COL_SONDERFALL).ColumnWidth = 18
     ws.Columns(COL_SPARTE).ColumnWidth = 12
+    ws.Columns(COL_ANH_TYPEN).ColumnWidth = 28
+    ws.Columns(COL_VM_VORHAND).ColumnWidth = 18
+    ws.Columns(COL_VM_VOLLST).ColumnWidth = 18
+    ws.Columns(COL_VM_FEHLT).ColumnWidth = 32
+    ws.Columns(COL_HINWEIS).ColumnWidth = 50
 End Sub
 
-Private Sub SchreibeErgebnis(ws As Worksheet, row As Long, dict As Object)
+Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
     ws.cells(row, COL_MAKLERPOOL).Value = SafeGet(dict, "maklerpool")
     ws.cells(row, COL_NACHNAME).Value = SafeGet(dict, "makler_nachname")
     ws.cells(row, COL_VORNAME).Value = SafeGet(dict, "makler_vorname")
@@ -409,16 +841,30 @@ Private Sub SchreibeErgebnis(ws As Worksheet, row As Long, dict As Object)
     ws.cells(row, COL_UNTERLAGEN).Value = SafeGet(dict, "unterlagen_angefragt")
     ws.cells(row, COL_SONDERFALL).Value = SafeGet(dict, "sonderfall")
     ws.cells(row, COL_SPARTE).Value = SafeGet(dict, "sparte")
+    ws.cells(row, COL_ANH_TYPEN).Value = SafeGet(dict, "anhang_typen")
+    ws.cells(row, COL_VM_VORHAND).Value = SafeGet(dict, "enthaelt_maklervollmacht")
+    ws.cells(row, COL_VM_VOLLST).Value = SafeGet(dict, "maklervollmacht_vollstaendig")
+    ws.cells(row, COL_VM_FEHLT).Value = SafeGet(dict, "maklervollmacht_fehlt")
+    ws.cells(row, COL_HINWEIS).Value = SafeGet(dict, "hinweis")
 
-    ' Farbliche Hervorhebung: Sonderfall (rot) / Nicht-Standard (orange)
+    ' Hervorhebungen
     Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
     Dim klass As String: klass = LCase(SafeGet(dict, "klassifikation"))
+    Dim vmVollst As String: vmVollst = LCase(SafeGet(dict, "maklervollmacht_vollstaendig"))
+    Dim vmEnthalten As String: vmEnthalten = LCase(SafeGet(dict, "enthaelt_maklervollmacht"))
 
     If InStr(sonder, "flotten") > 0 Or InStr(sonder, "sondertarif") > 0 Then
-        ws.cells(row, COL_SONDERFALL).Interior.Color = RGB(252, 165, 165) ' hellrot
+        ws.cells(row, COL_SONDERFALL).Interior.Color = RGB(252, 165, 165)
     End If
     If InStr(klass, "nicht-standard") > 0 Then
-        ws.cells(row, COL_KLASSIFIK).Interior.Color = RGB(253, 230, 138) ' hellgelb
+        ws.cells(row, COL_KLASSIFIK).Interior.Color = RGB(253, 230, 138)
+    End If
+    If vmEnthalten = "ja" Then
+        If vmVollst = "teilweise" Or vmVollst = "nein" Then
+            ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(252, 165, 165)
+        ElseIf vmVollst = "ja" Then
+            ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(187, 247, 208) ' hellgruen
+        End If
     End If
 End Sub
 
@@ -427,218 +873,6 @@ Private Function SafeGet(dict As Object, key As String) As String
     If dict.Exists(key) Then SafeGet = CStr(dict(key)) Else SafeGet = ""
 End Function
 
-' === COOKIE-DIALOG ==========================================================
-Private Function PruefeCookieMitDialog() As Boolean
-    Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
-    Dim hatDatei As Boolean: hatDatei = fso.FileExists(COOKIE_PATH)
-    Dim alt As String: alt = ""
-
-    If hatDatei Then
-        On Error Resume Next
-        Dim ts As Object
-        Set ts = fso.OpenTextFile(COOKIE_PATH, 1, False, -2)
-        alt = Trim(ts.ReadAll)
-        ts.Close
-        On Error GoTo 0
-    End If
-
-    Dim msg As String, ans As VbMsgBoxResult
-    If hatDatei And Len(alt) > 0 Then
-        Dim preview As String: preview = Left(alt, 100)
-        If Len(alt) > 100 Then preview = preview & "..."
-        msg = "Cookie-Datei gefunden:" & vbCrLf & COOKIE_PATH & vbCrLf & vbCrLf & _
-              "Aktueller Inhalt (Auszug):" & vbCrLf & preview & vbCrLf & vbCrLf & _
-              "Cookies laufen periodisch ab. Wenn du heute bei gpt.ergo.com schon" & vbCrLf & _
-              "eingeloggt warst, ist der Cookie wahrscheinlich noch gueltig." & vbCrLf & vbCrLf & _
-              "JA      = Cookie-Datei verwenden (weiter)" & vbCrLf & _
-              "NEIN    = Cookie neu eingeben (z.B. wenn 401-Fehler kommt)" & vbCrLf & _
-              "ABBRECH = Beenden"
-        ans = MsgBox(msg, vbYesNoCancel + vbQuestion, "Cookie-Setup")
-        If ans = vbCancel Then PruefeCookieMitDialog = False: Exit Function
-        If ans = vbYes Then PruefeCookieMitDialog = True: Exit Function
-    Else
-        msg = "Es ist noch keine Cookie-Datei vorhanden:" & vbCrLf & COOKIE_PATH & vbCrLf & vbCrLf & _
-              "JA  = Cookie jetzt eingeben (wird automatisch in die Datei geschrieben)" & vbCrLf & _
-              "NEIN = Beenden"
-        ans = MsgBox(msg, vbYesNo + vbQuestion, "Cookie fehlt")
-        If ans <> vbYes Then PruefeCookieMitDialog = False: Exit Function
-    End If
-
-    ' Manuelle Eingabe
-    Dim cookie As String
-    cookie = InputBox( _
-        "Cookie-String einfuegen." & vbCrLf & vbCrLf & _
-        "So bekommst du den Cookie:" & vbCrLf & _
-        "  1) gpt.ergo.com im Browser oeffnen + einloggen" & vbCrLf & _
-        "  2) F12 (DevTools) -> Tab 'Network' -> beliebigen Request anklicken" & vbCrLf & _
-        "  3) Headers -> Request Headers -> Wert hinter 'Cookie:' kopieren" & vbCrLf & _
-        "  4) Hier einfuegen und OK." & vbCrLf & vbCrLf & _
-        "Hinweis: Sehr lange Strings sind normal.", _
-        "Cookie eingeben")
-    cookie = Trim(cookie)
-    If Len(cookie) = 0 Then
-        MsgBox "Kein Cookie eingegeben - Abbruch.", vbInformation
-        PruefeCookieMitDialog = False
-        Exit Function
-    End If
-
-    ' Verzeichnis sicherstellen
-    Dim dirPath As String: dirPath = Left(COOKIE_PATH, InStrRev(COOKIE_PATH, "\") - 1)
-    If Len(dirPath) > 0 And Not fso.FolderExists(dirPath) Then
-        On Error Resume Next
-        fso.CreateFolder dirPath
-        If Err.Number <> 0 Then
-            MsgBox "Verzeichnis konnte nicht erstellt werden:" & vbCrLf & dirPath & vbCrLf & _
-                   "Bitte manuell anlegen und Schreibrechte pruefen.", vbCritical
-            Err.Clear
-            PruefeCookieMitDialog = False
-            On Error GoTo 0
-            Exit Function
-        End If
-        On Error GoTo 0
-    End If
-
-    ' Cookie schreiben (UTF-8 ohne BOM via ADODB.Stream waere overkill - ASCII reicht)
-    On Error Resume Next
-    Dim out As Object
-    Set out = fso.CreateTextFile(COOKIE_PATH, True, False) ' overwrite, ASCII
-    If Err.Number <> 0 Then
-        MsgBox "Cookie-Datei konnte nicht geschrieben werden:" & vbCrLf & COOKIE_PATH & vbCrLf & _
-               Err.Description, vbCritical
-        Err.Clear
-        PruefeCookieMitDialog = False
-        On Error GoTo 0
-        Exit Function
-    End If
-    out.Write cookie
-    out.Close
-    On Error GoTo 0
-
-    MsgBox "Cookie gespeichert. Analyse startet jetzt.", vbInformation
-    PruefeCookieMitDialog = True
-End Function
-
-' === SETUP / ANLEITUNG IN EXCEL =============================================
-Public Sub Vorgaenge_Setup()
-    Dim antwort As VbMsgBoxResult
-    antwort = MsgBox( _
-        "Dieses Setup richtet die Excel-Mappe fuer die Vorgang-Analyse ein:" & vbCrLf & vbCrLf & _
-        "  - Tabellenblatt 'GPT' mit Default-Konfig anlegen (falls fehlt)" & vbCrLf & _
-        "  - Tabellenblatt 'Anleitung' mit Schritt-fuer-Schritt-Beschreibung" & vbCrLf & _
-        "  - Cookie-Setup pruefen (Dialog kommt im Anschluss)" & vbCrLf & vbCrLf & _
-        "Fortfahren?", _
-        vbYesNo + vbQuestion, "Vorgaenge_Setup")
-    If antwort <> vbYes Then Exit Sub
-
-    SetupGptSheet
-    SetupAnleitungSheet
-
-    ' Cookie-Dialog
-    PruefeCookieMitDialog
-
-    On Error Resume Next
-    ThisWorkbook.Sheets("Anleitung").Activate
-    On Error GoTo 0
-End Sub
-
-Private Sub SetupGptSheet()
-    Dim ws As Worksheet
-    On Error Resume Next
-    Set ws = ThisWorkbook.Sheets("GPT")
-    On Error GoTo 0
-    If ws Is Nothing Then
-        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.count))
-        ws.name = "GPT"
-    End If
-
-    ' Header in Spalte B (Beschriftung), Werte in A
-    If Trim(CStr(ws.Range("B6").Value)) = "" Then ws.Range("B6").Value = "<- Modell-Name (z.B. gpt-5.1, gpt-4o)"
-    If Trim(CStr(ws.Range("B7").Value)) = "" Then ws.Range("B7").Value = "<- (nicht genutzt - Cookie kommt aus File)"
-    If Trim(CStr(ws.Range("B9").Value)) = "" Then ws.Range("B9").Value = "<- Temperature (0.0 = deterministisch)"
-    If Trim(CStr(ws.Range("B12").Value)) = "" Then ws.Range("B12").Value = "<- Tone (z.B. Sachlich, oder leer)"
-    If Trim(CStr(ws.Range("B20").Value)) = "" Then ws.Range("B20").Value = "<- (optional) AI_RULES fuer AutoCode"
-
-    ' Defaults nur setzen, wenn leer
-    If Trim(CStr(ws.Range("A6").Value)) = "" Then ws.Range("A6").Value = "gpt-5.1"
-    If Trim(CStr(ws.Range("A9").Value)) = "" Then ws.Range("A9").Value = 0
-    If Trim(CStr(ws.Range("A12").Value)) = "" Then ws.Range("A12").Value = "Sachlich"
-
-    ws.Columns("A").ColumnWidth = 22
-    ws.Columns("B").ColumnWidth = 50
-End Sub
-
-Private Sub SetupAnleitungSheet()
-    Dim ws As Worksheet
-    On Error Resume Next
-    Set ws = ThisWorkbook.Sheets("Anleitung")
-    On Error GoTo 0
-    If ws Is Nothing Then
-        Set ws = ThisWorkbook.Sheets.Add(Before:=ThisWorkbook.Sheets(1))
-        ws.name = "Anleitung"
-    Else
-        ws.cells.Clear
-    End If
-
-    Dim r As Long: r = 1
-    ws.cells(r, 1).Value = "ERGO Vorgang-Analyse - Anleitung": Bold ws, r, True, 16: r = r + 2
-
-    ws.cells(r, 1).Value = "VORAUSSETZUNGEN": Bold ws, r, True, 12: r = r + 1
-    ws.cells(r, 1).Value = "1. Modul ASK_ErgoGPT (aus Test.txt im Repo) ist importiert.": r = r + 1
-    ws.cells(r, 1).Value = "2. Tabellenblatt 'GPT' mit:": r = r + 1
-    ws.cells(r, 1).Value = "     A6  = Modell-Name  (Standard: gpt-5.1)": r = r + 1
-    ws.cells(r, 1).Value = "     A9  = Temperature  (Standard: 0)": r = r + 1
-    ws.cells(r, 1).Value = "     A12 = Tone         (z.B. 'Sachlich')": r = r + 1
-    ws.cells(r, 1).Value = "3. Cookie-Datei: " & COOKIE_PATH: r = r + 1
-    ws.cells(r, 1).Value = "   (kann beim Start des Tools auch manuell eingegeben werden)": r = r + 2
-
-    ws.cells(r, 1).Value = "WORKFLOW": Bold ws, r, True, 12: r = r + 1
-    ws.cells(r, 1).Value = "Schritt 1: Mails einlesen": Bold ws, r, True, 11: r = r + 1
-    ws.cells(r, 1).Value = "  Alt+F8 -> 'Outlook_Live_Abrufen' oder 'Ordner_Scannen' aus": r = r + 1
-    ws.cells(r, 1).Value = "  ergo-email-batch.bas. Dadurch entsteht das Tabellenblatt 'Emails'.": r = r + 2
-
-    ws.cells(r, 1).Value = "Schritt 2: Vorgang-Analyse starten": Bold ws, r, True, 11: r = r + 1
-    ws.cells(r, 1).Value = "  Alt+F8 -> 'Vorgaenge_Analysieren' -> Ausfuehren": r = r + 1
-    ws.cells(r, 1).Value = "  -> Cookie-Dialog erscheint: Datei nutzen ODER Cookie neu eingeben.": r = r + 1
-    ws.cells(r, 1).Value = "  -> Bestaetigung mit geschaetzter Laufzeit erscheint.": r = r + 1
-    ws.cells(r, 1).Value = "  -> Pro Zeile ca. 3-10 Sekunden. Bei jeder 5. Zeile wird automatisch": r = r + 1
-    ws.cells(r, 1).Value = "     zwischengespeichert.": r = r + 2
-
-    ws.cells(r, 1).Value = "Schritt 3: Ergebnisse pruefen": Bold ws, r, True, 11: r = r + 1
-    ws.cells(r, 1).Value = "  Spalten I-P im Sheet 'Emails' sind gefuellt:": r = r + 1
-    ws.cells(r, 1).Value = "    I  Maklerpool         (Fonds Finanz / BCA / JDC / blau direkt / ...)": r = r + 1
-    ws.cells(r, 1).Value = "    J  Makler_Nachname": r = r + 1
-    ws.cells(r, 1).Value = "    K  Makler_Vorname": r = r + 1
-    ws.cells(r, 1).Value = "    L  Klassifikation     (Standardvorgang / Nicht-Standard)": r = r + 1
-    ws.cells(r, 1).Value = "    M  Geschaefts_Typ     (BUe einfacher Vertrag / BUe Kundenverbindung / Keine BUe)": r = r + 1
-    ws.cells(r, 1).Value = "    N  Unterlagen_Angefragt (ja / nein)": r = r + 1
-    ws.cells(r, 1).Value = "    O  Sonderfall         (Flottengeschaeft / Sondertarif / Kein Sonderfall)": r = r + 1
-    ws.cells(r, 1).Value = "    P  Sparte             (Komposit / Leben / KV / Mehrere / Unbekannt)": r = r + 2
-
-    ws.cells(r, 1).Value = "WIEDER-AUFNAHME": Bold ws, r, True, 12: r = r + 1
-    ws.cells(r, 1).Value = "Schon analysierte Zeilen (Spalte I gefuellt) werden uebersprungen.": r = r + 1
-    ws.cells(r, 1).Value = "Du kannst Vorgaenge_Analysieren also beliebig oft starten -": r = r + 1
-    ws.cells(r, 1).Value = "die Analyse macht da weiter, wo sie aufgehoert hat.": r = r + 2
-
-    ws.cells(r, 1).Value = "ZURUECKSETZEN": Bold ws, r, True, 12: r = r + 1
-    ws.cells(r, 1).Value = "Alt+F8 -> 'Vorgaenge_Analysieren_Reset' loescht die Spalten I-P.": r = r + 2
-
-    ws.cells(r, 1).Value = "DOMAIN-LOGIK BUe": Bold ws, r, True, 12: r = r + 1
-    ws.cells(r, 1).Value = "BUe = Bestandsuebertragung. Makler A uebernimmt Bestand des Kunden": r = r + 1
-    ws.cells(r, 1).Value = "von Makler B. Eine VNR ist meistens in der Email genannt - entscheidend": r = r + 1
-    ws.cells(r, 1).Value = "ist aber, ob NUR DIESER Vertrag oder die GANZE Kundenverbindung": r = r + 1
-    ws.cells(r, 1).Value = "(alle Vertraege des Kunden) uebertragen werden soll.": r = r + 2
-
-    ws.cells(r, 1).Value = "PROMPT ANPASSEN": Bold ws, r, True, 12: r = r + 1
-    ws.cells(r, 1).Value = "VBA-Editor (Alt+F11) -> Modul ErgoVorgangAnalyse -> BuildVorgangPrompt.": r = r + 1
-    ws.cells(r, 1).Value = "Dort koennen Maklerpool-Liste, Wertelisten und Definitionen direkt": r = r + 1
-    ws.cells(r, 1).Value = "editiert werden.": r = r + 2
-
-    ws.Columns("A").ColumnWidth = 110
-End Sub
-
-Private Sub Bold(ws As Worksheet, row As Long, b As Boolean, fontSize As Long)
-    With ws.cells(row, 1).Font
-        .Bold = b
-        .Size = fontSize
-    End With
+Private Sub Bold(ws As Worksheet, row As Long, fontSize As Long)
+    With ws.cells(row, 1).Font: .Bold = True: .Size = fontSize: End With
 End Sub

@@ -1558,14 +1558,14 @@
                                 <span class="tool-tag">XLSM / VBA + ErgoGPT</span>
                             </summary>
                             <div class="tool-body">
-                                <p><strong>KI-Klassifikation</strong> der Email-Vorgaenge: nimmt das Tabellenblatt "Emails" aus dem ERGO-Email-Batch-Tool und laesst <strong>ErgoGPT (gpt-5.1)</strong> jeden Vorgang in 8 Spalten klassifizieren - Maklerpool, Makler-Name (Nachname/Vorname), Klassifikation (Standard/Nicht-Standard), Geschaefts-Typ (BUe einfacher Vertrag / BUe Kundenverbindung / Keine BUe), Unterlagen-Anfrage, Sonderfall (Flotte/Sondertarif), Sparte (Komposit/Leben/KV/Mehrere). <strong>Beim ersten Start</strong> erzeugt <code>Vorgaenge_Setup</code> die Sheets "GPT" + "Anleitung" und fragt den Cookie ab.</p>
+                                <p><strong>KI-Klassifikation</strong> mit <strong>Anhang-Analyse</strong>: .xlsm in den Ordner mit den .msg-Dateien legen, Cookie hinterlegen, ausfuehren. Tool scannt den Ordner, oeffnet jede .msg via Outlook, extrahiert Anhaenge und laedt bis zu 3 PDFs (max. 20 MB) zu <strong>ErgoGPT (gpt-5.1)</strong> hoch. GPT klassifiziert in 13 Felder - inkl. Anhang-Typen, Maklervollmacht-Pruefung (Vollstaendigkeit + fehlende Felder). Anzahl-Limit waehlbar (z.B. erst 10 Vorgaenge testen). Voraussetzung: Modul <code>ASK_ErgoGPT</code> mit PDF-Upload aus <code>Test.txt</code>.</p>
                                 <div class="tool-actions">
-                                    <a href="ERGO-Vorgang-Analyse-v1.0.zip" download class="btn-download">
+                                    <a href="ERGO-Vorgang-Analyse-v2.0.zip" download class="btn-download">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        ERGO-Vorgang-Analyse-v1.0.zip
+                                        ERGO-Vorgang-Analyse-v2.0.zip
                                     </a>
                                 </div>
-                                <div class="tool-meta">ergo-vorgang-analyse-v1.0.bas + ANLEITUNG-ERGO-VORGANG-ANALYSE.txt | Voraussetzung: Modul ASK_ErgoGPT (aus Test.txt) + Cookie-Datei (oder beim Start eingeben)</div>
+                                <div class="tool-meta">ergo-vorgang-analyse-v2.0.bas + ANLEITUNG-ERGO-VORGANG-ANALYSE.txt | Voraussetzung: ASK_ErgoGPT (volle Variante mit PDF-Upload aus Test.txt) + Outlook + Cookie</div>
                             </div>
                         </details>
 
@@ -1574,7 +1574,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 8.3
+                Version 8.4
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
