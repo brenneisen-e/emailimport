@@ -1,12 +1,17 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.3)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.4)
 ' ============================================================================
+' v2.4: Modell-Fehler ("nicht mehr unterstuetzt") werden erkannt und brechen
+'       sofort ab, mit Hinweis auf Sheet GPT!A6. Kleine Pause zwischen den
+'       Calls (1.2s) verhindert das Rate-Limit von gpt.ergo.com (Azure-Gateway
+'       schickt sonst 403). Setup-Spalte B bekommt einen Hinweis, dass der
+'       Modellname EXAKT mit dem ErgoGPT-API-Wert uebereinstimmen muss.
 ' v2.3: Auth-/403-Fehler werden erkannt und brechen die Analyse sofort ab,
 '       mit Dialog zum Cookie-Erneuern. HTML-Antworten (Azure-403-Seite)
 '       werden nicht mehr roh in die Zelle geschrieben, sondern auf eine
 '       lesbare Kurzform reduziert. Nach 5 Fehlern in Folge bricht der
-'       Lauf ab, statt ueber alle Vorgaenge weiter zu hagelten.
+'       Lauf ab, statt ueber alle Vorgaenge weiter zu hageln.
 ' ============================================================================
 ' WORKFLOW:
 '   1) Diese .xlsm in den Ordner legen, in dem die .msg-Dateien liegen
@@ -182,6 +187,12 @@ Public Sub Vorgaenge_Analysieren()
             fehlerInFolge = fehlerInFolge + 1
             row = row + 1
 
+            ' Modell-Fehler? -> Sofort abbrechen, Hinweis auf Sheet GPT!A6
+            If IstModellFehler(einzelErrDesc) Then
+                abbruchGrund = "MODELL"
+                Exit For
+            End If
+
             ' Auth-/403-Fehler? -> Sofort abbrechen, Cookie-Dialog anbieten
             If IstAuthFehler(einzelErrDesc) Then
                 abbruchGrund = "AUTH"
@@ -198,6 +209,9 @@ Public Sub Vorgaenge_Analysieren()
             fehlerInFolge = 0
             row = row + 1
         End If
+
+        ' Kleine Pause gegen Rate-Limit / Azure-Gateway-403
+        On Error Resume Next: Application.Wait Now + TimeSerial(0, 0, 1): On Error GoTo Fehler
 
         ' Auto-Save alle 3 Vorgaenge
         If i Mod 3 = 0 Then
@@ -224,6 +238,15 @@ Public Sub Vorgaenge_Analysieren()
     SpaltenbreitenSetzen ws
 
     Select Case abbruchGrund
+        Case "MODELL"
+            MsgBox _
+                "Analyse abgebrochen: MODELL-FEHLER." & vbCrLf & vbCrLf & _
+                "Der ErgoGPT-Server lehnt das in Sheet GPT!A6 eingetragene Modell ab" & vbCrLf & _
+                "(z.B. 'gpt-51' oder 'gpt-5.1' wird nicht mehr unterstuetzt)." & vbCrLf & vbCrLf & _
+                "Aktion: Im ErgoGPT-Browser oben rechts den aktuellen Modell-Namen" & vbCrLf & _
+                "ablesen und in Sheet GPT!A6 EXAKT so eintragen.  Verarbeitet: " & verarbeitet & _
+                "  Fehler: " & fehler, _
+                vbExclamation, "Modell wird nicht unterstuetzt"
         Case "AUTH"
             Dim ansAuth As VbMsgBoxResult
             ansAuth = MsgBox( _
@@ -469,8 +492,21 @@ Fehler:
 End Sub
 
 ' === FEHLER-AUFBEREITUNG ====================================================
-' Erkennt Auth/403-Fehler (Cookie abgelaufen) - dann lohnt es sich nicht,
-' alle weiteren Vorgaenge zu probieren.
+' Erkennt Modell-Fehler in der Server-Antwort (z.B. "gpt-51 wird nicht
+' mehr unterstuetzt"). Setzt voraus, dass ASK_ErgoGPT in Test.txt v2 den
+' Server-Hinweis in die Fehlerbeschreibung uebernimmt.
+Private Function IstModellFehler(desc As String) As Boolean
+    Dim s As String: s = LCase(desc)
+    If InStr(s, "nicht mehr unterst") > 0 Then IstModellFehler = True: Exit Function
+    If InStr(s, "modell") > 0 And InStr(s, "unterstuetzt") > 0 Then IstModellFehler = True: Exit Function
+    If InStr(s, "model") > 0 And InStr(s, "not supported") > 0 Then IstModellFehler = True: Exit Function
+    If InStr(s, "unknown model") > 0 Then IstModellFehler = True: Exit Function
+    IstModellFehler = False
+End Function
+
+' Erkennt Auth/403-Fehler (Cookie abgelaufen oder Rate-Limit vom
+' Azure-Application-Gateway) - dann lohnt es sich nicht, alle weiteren
+' Vorgaenge zu probieren.
 Private Function IstAuthFehler(desc As String) As Boolean
     Dim s As String: s = LCase(desc)
     If InStr(s, "create failed: 403") > 0 Then IstAuthFehler = True: Exit Function
@@ -490,9 +526,17 @@ Private Function BereinigeFehlerHinweis(num As Long, desc As String) As String
         Exit Function
     End If
 
+    ' Modell-Fehler -> klare Klartext-Meldung (Sheet GPT!A6 anpassen)
+    If IstModellFehler(d) Then
+        BereinigeFehlerHinweis = "[MODELL-FEHLER] Modell in Sheet GPT!A6 wird vom Server " & _
+                                 "abgelehnt. Aktuellen Modellnamen aus dem ErgoGPT-Browser " & _
+                                 "(oben rechts) eintragen."
+        Exit Function
+    End If
+
     ' Auth-Fehler -> klare Klartext-Meldung
     If IstAuthFehler(d) Then
-        BereinigeFehlerHinweis = "[AUTH-FEHLER 403] Cookie abgelaufen oder ungueltig. " & _
+        BereinigeFehlerHinweis = "[AUTH-FEHLER 403] Cookie abgelaufen oder Rate-Limit. " & _
                                  "Bitte Cookie erneuern (Vorgaenge_Setup oder Sheet GPT!A7)."
         Exit Function
     End If
@@ -873,7 +917,7 @@ Private Sub SetupGptSheet()
         ws.name = SHEET_GPT
     End If
 
-    ws.Range("B6").Value = "<- Modell-Name (z.B. gpt-5.1, gpt-4o)"
+    ws.Range("B6").Value = "<- Modell-Name EXAKT wie im ErgoGPT-Browser (oben rechts ablesen). Beispiele: 'gpt-5.1', 'gpt-4o'. Aenderung sofort uebernehmen."
     ws.Range("B7").Value = "<- Cookie als Text (langer String) - ODER leer lassen und A8/Dialog nutzen"
     ws.Range("B8").Value = "<- Pfad zu Cookie-Datei (z.B. C:\Users\...\Desktop\cookie.txt) - leer = Default F:\ExcelGPT-Cookie\Cookie.txt"
     ws.Range("B9").Value = "<- Temperature (0 = deterministisch)"

@@ -574,18 +574,83 @@ Public Function ASK_ErgoGPT(userPrompt As String, Optional pdfs As Variant) As S
     http.SetRequestHeader "Accept", "*/*"
     http.Send payload
  
+    Dim status2 As Long: status2 = http.status
     resp = http.ResponseText
     answer = ExtractAssistantFromNdjson(resp)
-    If Len(answer) = 0 Then Err.Raise vbObjectError + 4, , "Keine Assistant-Nachricht gefunden."
+
+    If Len(answer) = 0 Then
+        ' Conversation aufraeumen, damit keine Karteileichen in ErgoGPT bleiben
+        On Error Resume Next
+        Dim delPayload As String: delPayload = BuildDeletePayload(convId)
+        http.Open "DELETE", BASE_URL & "/conversation", False
+        SetCommonHeaders http, cookie, bearer
+        http.SetRequestHeader "Accept", "*/*"
+        http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+        http.Send delPayload
+        On Error GoTo 0
+
+        ' Server-Fehlertext aus dem Response-Body herausziehen (Modell-Fehler etc.)
+        Dim hint As String: hint = ExtractServerErrorHint(resp)
+        Dim msg As String
+        If status2 <> 200 Then
+            msg = "Antwort-Call: HTTP " & status2 & ". " & hint
+        Else
+            msg = "Keine Assistant-Nachricht gefunden. " & hint
+        End If
+        Err.Raise vbObjectError + 4, , msg
+    End If
+
     ASK_ErgoGPT = Replace(JsonUnescape(answer), "\n", vbCrLf)
- 
-    ' 4) Aufräumen (optional)
+
+    ' 4) Aufräumen
     payload = BuildDeletePayload(convId)
     http.Open "DELETE", BASE_URL & "/conversation", False
     SetCommonHeaders http, cookie, bearer
     http.SetRequestHeader "Accept", "*/*"
     http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
     http.Send payload
+End Function
+
+' Sucht in der NDJSON/JSON-Antwort nach typischen Server-Fehlertext-Feldern
+' ("error", "message", "detail") und liefert eine Kurzform davon, damit der
+' Aufrufer einen sinnvollen Hinweis loggen kann (Modellname falsch etc.).
+Private Function ExtractServerErrorHint(ByVal raw As String) As String
+    If Len(raw) = 0 Then ExtractServerErrorHint = "(leere Antwort)": Exit Function
+
+    Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.IgnoreCase = True
+
+    ' Versuch 1: "message":"..." oder "error":"..." oder "detail":"..."
+    Dim keys As Variant: keys = Array("message", "error", "detail", "error_description")
+    Dim k As Variant, m As String
+    For Each k In keys
+        re.Pattern = """" & k & """\s*:\s*""((?:\\.|[^""]){0,500})"""
+        If re.Test(raw) Then
+            Dim ms As Object: Set ms = re.Execute(raw)
+            m = ms(0).SubMatches(0)
+            If Len(m) > 0 Then
+                ExtractServerErrorHint = "Server-Hinweis: " & Left$(m, 240)
+                Exit Function
+            End If
+        End If
+    Next k
+
+    ' Versuch 2: "nicht mehr unterstuetzt" / "not supported" Klartext
+    Dim s As String: s = LCase$(raw)
+    If InStr(s, "nicht mehr unterst") > 0 Or InStr(s, "not supported") > 0 _
+       Or InStr(s, "deprecated") > 0 Or InStr(s, "unknown model") > 0 Then
+        ExtractServerErrorHint = "Server-Hinweis: Modell wird nicht (mehr) unterstuetzt - Sheet GPT!A6 anpassen."
+        Exit Function
+    End If
+
+    ' Fallback: erste 200 Zeichen, ohne Tags
+    Dim plain As String: plain = raw
+    re.Pattern = "<[^>]+>": plain = re.Replace(plain, " ")
+    plain = Replace(plain, vbCrLf, " "): plain = Replace(plain, vbLf, " "): plain = Replace(plain, vbTab, " ")
+    Do While InStr(plain, "  ") > 0: plain = Replace(plain, "  ", " "): Loop
+    plain = Trim$(plain)
+    If Len(plain) > 200 Then plain = Left$(plain, 197) & "..."
+    ExtractServerErrorHint = "Antwort-Anfang: " & plain
 End Function
 
 
