@@ -1,7 +1,36 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.7.2)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.8)
 ' ============================================================================
+' v2.8: GROSSE Ueberarbeitung der Maklervollmacht-Pruefung. Bisherige Heuristik
+'       (6 Form-Pflichtfelder: Name, Geburtsdatum, Anschrift, Datum, Unter-
+'       schrift, Maklerangaben) entspricht nicht der echten Pruefpraxis im
+'       Innendienst. Neue Logik basiert auf der juristischen Vorgabe aus
+'       AAW-Allg + PVC2D + Hospitationen T2/T3:
+'         - INHALTLICHE Vollumfaenglichkeit: Schlagwort-Suche
+'           ("abschliessen, aendern und kuendigen", "aktiv und passiv
+'           vertreten", "bevollmaechtigt zu vertreten" etc.)
+'         - EINSCHRAENKUNGEN als Ablehnungsgrund: "KV ausgeschlossen",
+'           "schriftliche Zustimmung VN" etc.
+'         - 4 flankierende Pflichten getrennt prueft: VN-Unterschrift,
+'           Makler-Unterschrift (optional), Ausstellung auf VN, Makler
+'           namentlich.
+'       Spalten Q+R semantisch umbenannt:
+'         Q: Vollmacht_Vollstaendig -> MV_Vollumfaenglich
+'         R: Vollmacht_Fehlt -> MV_Einschraenkungen
+'       Neue Spalten W (Auf_VN_Ausgestellt) und X (Makler_Namentlich).
+'       Schlagwort-Liste als Doku: output/Maklervollmacht_..._Schlagworte.md.
+'
+'       Default-Modell auf 'gpt-51-chat' (war 'gpt-51-reasoning'):
+'       Studien (Vellum, Galileo) zeigen, dass Reasoning-Modelle bei
+'       strukturierter Klassifikation NICHT besser sind als Chat-Modelle,
+'       aber 5-30x teurer/langsamer + halluzinieren MEHR bei Faktenextrak-
+'       tion (PersonQA: o3 33% vs o1 16%). Bei Maklervollmacht-Feldern
+'       ist ein leeres Feld besser als ein erfundener Name.
+'
+'       Optionale Textdatei pro Vorgang: am Anfang der Analyse fragt das
+'       Tool, ob fuer jeden Vorgang eine .txt mit allen Klassifikations-
+'       Daten im Unterordner '_KI-Analyse' angelegt werden soll.
 ' v2.7.2: Default-Modell auf 'gpt-51-reasoning' aktualisiert. Modelle_Testen-
 '         Lauf vom 11/2025 hat gezeigt: ErgoGPT akzeptiert exakt drei Namen,
 '         alle ohne Punkt:
@@ -80,12 +109,21 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '   N  Sparte                      (Komposit / Leben / KV / Mehrere / Unbekannt)
 '   O  Anhang_Typen                (Maklervollmacht, Police, Antrag, Schadenmeldung, ...)
 '   P  Maklervollmacht_Enthalten   (ja / nein)
-'   Q  Vollmacht_Vollstaendig      (ja / nein / teilweise / nicht_pruefbar)
-'   R  Vollmacht_Fehlt             (Liste fehlender Felder, kommagetrennt)
+'   Q  MV_Vollumfaenglich          (ja / nein / teilweise / nicht_pruefbar -
+'                                   basiert auf Schlagwort-Suche, NICHT auf
+'                                   Form-Pflichtfeldern)
+'   R  MV_Einschraenkungen         (Klartext: gefundene Einschraenkung oder
+'                                   fehlendes Schlagwort)
 '   S  Hinweis                     (kurzer GPT-Hinweis zum Vorgang)
-'   T  Vorgangstyp                 (Triage: Makler-Vorgang / Bounce-NDR /
-'                                   Ergo-Outbound / System-Mail /
-'                                   Werbung-Spam / Unklar)
+'   T  Vorgangstyp                 (Triage)
+'   U  Unterschrift_Kunde          (ja / nein / nicht_pruefbar - Pflicht)
+'   V  Unterschrift_Makler         (ja / nein / nicht_pruefbar - optional)
+'   W  Auf_VN_Ausgestellt          (ja / nein / nicht_pruefbar - Pflicht)
+'   X  Makler_Namentlich           (ja / nein / nicht_pruefbar - Pflicht)
+'
+' Pruefgrundlage Maklervollmacht: AAW-Allg 2.1.1+2.1.2, AAW-GES Kap. 5,
+' PVC2D-Vorgabe (Rechtsabteilung). Schlagwort-Liste:
+' output/Maklervollmacht_Vollumfaenglichkeit_Schlagworte.md
 ' ============================================================================
 
 Option Explicit
@@ -125,6 +163,10 @@ Private Const COL_VM_VOLLST   As Long = 17
 Private Const COL_VM_FEHLT    As Long = 18
 Private Const COL_HINWEIS     As Long = 19
 Private Const COL_VORGANGSTYP As Long = 20    ' T: Triage - "Makler-Vorgang" / "Bounce-NDR" / "Ergo-Outbound" / "System-Mail" / "Werbung-Spam" / "Unklar"
+Private Const COL_UNTERSCHR_K As Long = 21    ' U: Unterschrift Kunde vorhanden  (ja / nein / nicht_pruefbar) - Pflicht
+Private Const COL_UNTERSCHR_M As Long = 22    ' V: Unterschrift Makler vorhanden (ja / nein / nicht_pruefbar) - optional
+Private Const COL_AUF_VN      As Long = 23    ' W: MV auf VN ausgestellt          (ja / nein / nicht_pruefbar)
+Private Const COL_MAKL_NAM    As Long = 24    ' X: Makler/Pool namentlich genannt (ja / nein / nicht_pruefbar)
 
 ' === HAUPTEINSTIEG ==========================================================
 Public Sub Vorgaenge_Analysieren()
@@ -165,6 +207,29 @@ Public Sub Vorgaenge_Analysieren()
                  "Fortfahren?", vbYesNo + vbQuestion, "Vorgang-Analyse starten")
     If ans <> vbYes Then Exit Sub
 
+    ' 4b) Pro-Vorgang-Textdatei?
+    Dim txtAns As VbMsgBoxResult
+    txtAns = MsgBox( _
+        "Soll fuer JEDEN Vorgang zusaetzlich eine Textdatei mit allen KI-Analyse-" & vbCrLf & _
+        "Ergebnissen erzeugt werden?" & vbCrLf & vbCrLf & _
+        "Speicherort: Unterordner '_KI-Analyse' im Vorgangs-Ordner." & vbCrLf & _
+        "Dateiname:   <msg-Name>.txt" & vbCrLf & vbCrLf & _
+        "JA = Textdatei je Vorgang erzeugen" & vbCrLf & _
+        "NEIN = nur Excel-Sheet befuellen", _
+        vbYesNo + vbQuestion, "Textdatei pro Vorgang?")
+    Dim txtOrdner As String: txtOrdner = ""
+    If txtAns = vbYes Then
+        txtOrdner = folderPath & "\_KI-Analyse"
+        On Error Resume Next
+        If Not fso.FolderExists(txtOrdner) Then fso.CreateFolder txtOrdner
+        On Error GoTo Fehler
+        If Not fso.FolderExists(txtOrdner) Then
+            MsgBox "Konnte Unterordner nicht anlegen: " & txtOrdner & vbCrLf & _
+                   "Es wird ohne Textdatei-Erzeugung weitergemacht.", vbExclamation
+            txtOrdner = ""
+        End If
+    End If
+
     ' 5) Outlook holen
     Dim olApp As Object
     Set olApp = HoleOutlook()
@@ -202,7 +267,7 @@ Public Sub Vorgaenge_Analysieren()
         On Error Resume Next
         Err.Clear
         Dim erfolg As Boolean
-        erfolg = AnalysiereEineDatei(olApp, fso, msgPath, ws, row, tempBase, i)
+        erfolg = AnalysiereEineDatei(olApp, fso, msgPath, ws, row, tempBase, i, txtOrdner)
         Dim einzelErrNum As Long: einzelErrNum = Err.Number
         Dim einzelErrDesc As String: einzelErrDesc = Err.Description
         Err.Clear
@@ -315,7 +380,7 @@ End Sub
 ' === EINE DATEI ANALYSIEREN =================================================
 Private Function AnalysiereEineDatei(olApp As Object, fso As Object, msgPath As String, _
                                      ws As Worksheet, row As Long, tempBase As String, _
-                                     vorgangNr As Long) As Boolean
+                                     vorgangNr As Long, txtOrdner As String) As Boolean
     Dim it As Object
     Dim schritt As String: schritt = "Init"
     On Error GoTo FehlerLokal
@@ -433,6 +498,14 @@ Private Function AnalysiereEineDatei(olApp As Object, fso As Object, msgPath As 
     ws.cells(row, COL_BETREFF).Value = betreff
     ws.cells(row, COL_ANHANG_LST).Value = alleAnhangNamen
     SchreibeGptErgebnis ws, row, dict
+
+    ' --- Schritt 9: optionale Textdatei pro Vorgang ---
+    If Len(txtOrdner) > 0 Then
+        On Error Resume Next
+        SchreibeKiTextDatei txtOrdner, fso.GetFileName(msgPath), datum, absName, _
+                            absMail, betreff, alleAnhangNamen, pdfListe, dict
+        On Error GoTo FehlerLokal
+    End If
 
     AnalysiereEineDatei = True
     Exit Function
@@ -870,36 +943,68 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "    'ja' wenn mindestens ein Anhang eine Maklervollmacht ist," & vbCrLf
     p = p & "    sonst 'nein'." & vbCrLf
     p = p & vbCrLf
-    p = p & "11) maklervollmacht_vollstaendig" & vbCrLf
-    p = p & "    Pruefung der Pflichtfelder einer Maklervollmacht:" & vbCrLf
-    p = p & "      a) Vollstaendiger Kundenname (Vor- + Nachname)" & vbCrLf
-    p = p & "      b) Geburtsdatum des Kunden" & vbCrLf
-    p = p & "      c) Anschrift des Kunden" & vbCrLf
-    p = p & "      d) Datum der Vollmacht" & vbCrLf
-    p = p & "      e) Eigenhaendige Unterschrift des Kunden (sichtbar)" & vbCrLf
-    p = p & "      f) Maklerangaben (Name + Firma + Vermittlernummer/BD-Nummer)" & vbCrLf
+    p = p & "11) mv_vollumfaenglich  (juristisch maßgeblich für Bestandsuebertragung)" & vbCrLf
+    p = p & "    Pruefe inhaltlich auf SCHLAGWOERTER. Eine der folgenden Formulie-" & vbCrLf
+    p = p & "    rungen muss in der MV erkennbar sein, damit sie vollumfaenglich ist:" & vbCrLf
+    p = p & "      (a) 'abschliessen, aendern und kuendigen' (in Bezug auf VV)" & vbCrLf
+    p = p & "      (b) 'Willenserklaerungen abgeben und entgegen[nehmen]' /" & vbCrLf
+    p = p & "          'aktiv und passiv vertreten'" & vbCrLf
+    p = p & "      (c) 'bevollmaechtigt zu vertreten' (uneingeschraenkt)" & vbCrLf
+    p = p & "      (d) 'Abgabe und Entgegennahme von Willenserklaerungen' kombiniert" & vbCrLf
+    p = p & "          mit Aenderung, Kuendigung, Abschluss eines Folgevertrages" & vbCrLf
+    p = p & "      (e) 'uneingeschraenkte aktive und passive Vertretung ...'" & vbCrLf
+    p = p & "          (juristischer Minimalstandard PVC2D)" & vbCrLf
     p = p & "    Werte:" & vbCrLf
-    p = p & "      - 'ja': alle 6 Pflichtfelder erkennbar vorhanden" & vbCrLf
-    p = p & "      - 'teilweise': Vollmacht da, einzelne Felder fehlen" & vbCrLf
-    p = p & "      - 'nein': als Vollmacht erkennbar, aber Pflichtfelder grosszuegig fehlen" & vbCrLf
-    p = p & "      - 'nicht_pruefbar': keine Vollmacht im Anhang oder PDF nicht ausgewertet" & vbCrLf
+    p = p & "      - 'ja':              mindestens eine Schlagwort-Formulierung erkennbar" & vbCrLf
+    p = p & "      - 'teilweise':       Schlagwort vorhanden ABER mit Einschraenkung" & vbCrLf
+    p = p & "                           (z.B. 'KV ausgeschlossen', 'schriftliche Zustimmung VN')" & vbCrLf
+    p = p & "      - 'nein':            Schlagwoerter fehlen oder MV ist explizit eingeschraenkt" & vbCrLf
+    p = p & "      - 'nicht_pruefbar':  keine MV im Anhang ODER PDF nicht ausgewertet" & vbCrLf
+    p = p & "    WICHTIG: 'Vollumfaenglich' meint NICHT die Form (Name/Geburtsdatum/...)," & vbCrLf
+    p = p & "    sondern den INHALT der Bevollmaechtigung. Eine MV ohne Geburtsdatum" & vbCrLf
+    p = p & "    kann trotzdem 'vollumfaenglich = ja' sein, wenn die Schlagwoerter passen." & vbCrLf
     p = p & vbCrLf
-    p = p & "12) maklervollmacht_fehlt" & vbCrLf
-    p = p & "    Komma-getrennte Liste der fehlenden Felder (a-f aus Punkt 11)," & vbCrLf
-    p = p & "    benannt z.B.: 'Geburtsdatum, Unterschrift Kunde'. Leer wenn" & vbCrLf
-    p = p & "    Vollmacht vollstaendig oder nicht pruefbar." & vbCrLf
+    p = p & "12) mv_einschraenkungen" & vbCrLf
+    p = p & "    Klartext-Liste der gefundenen Einschraenkungen oder fehlenden" & vbCrLf
+    p = p & "    Schlagwoerter. Beispiele: 'KV ausgeschlossen', 'schriftliche" & vbCrLf
+    p = p & "    Zustimmung VN gefordert', 'kein Schlagwort gefunden', 'Vollmacht" & vbCrLf
+    p = p & "    nur fuer Schadensbearbeitung'. Leer wenn vollumfaenglich oder" & vbCrLf
+    p = p & "    nicht pruefbar." & vbCrLf
     p = p & vbCrLf
-    p = p & "13) hinweis" & vbCrLf
+    p = p & "13) unterschrift_kunde  (Pflicht: VN-Unterschrift)" & vbCrLf
+    p = p & "    Ist eine eigenhaendige oder digitale Unterschrift des KUNDEN/VN" & vbCrLf
+    p = p & "    sichtbar?  AUSNAHMEN (zaehlen als 'ja'):" & vbCrLf
+    p = p & "      - Check 24 digital ohne Unterschrift" & vbCrLf
+    p = p & "      - Verifox / Fonds Finanz / Impuls / Watson: Unterschrift im" & vbCrLf
+    p = p & "        separaten Datenschutz-Anhang" & vbCrLf
+    p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & vbCrLf
+    p = p & "14) unterschrift_makler  (optional, kein Ablehnungsgrund)" & vbCrLf
+    p = p & "    Ist zusaetzlich eine Unterschrift/Stempel des MAKLERS sichtbar?" & vbCrLf
+    p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & vbCrLf
+    p = p & "15) auf_vn_ausgestellt  (Pflicht)" & vbCrLf
+    p = p & "    Ist die MV auf den VERSICHERUNGSNEHMER ausgestellt (nicht auf eine" & vbCrLf
+    p = p & "    versicherte Person, nicht auf einen Bevollmaechtigten Dritter)?" & vbCrLf
+    p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & vbCrLf
+    p = p & "16) makler_namentlich_genannt  (Pflicht)" & vbCrLf
+    p = p & "    Ist der Makler ODER der Maklerpool namentlich in der MV benannt?" & vbCrLf
+    p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & vbCrLf
+    p = p & "17) hinweis" & vbCrLf
     p = p & "    EIN kurzer Satz (max 200 Zeichen) was an dem Vorgang auffaellig" & vbCrLf
     p = p & "    ist - z.B. fehlende Unterlagen, ungewoehnliche Konstellation," & vbCrLf
     p = p & "    Eskalationspotenzial. Leer wenn nichts auffaellt." & vbCrLf
     p = p & vbCrLf
-    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 14 Schluessel):" & vbCrLf
+    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 18 Schluessel):" & vbCrLf
     p = p & "{""vorgangstyp"":""..."",""maklerpool"":""..."",""makler_nachname"":""...""," & vbCrLf
     p = p & " ""makler_vorname"":""..."",""klassifikation"":""..."",""geschaefts_typ"":""...""," & vbCrLf
     p = p & " ""unterlagen_angefragt"":""..."",""sonderfall"":""..."",""sparte"":""...""," & vbCrLf
     p = p & " ""anhang_typen"":""..."",""enthaelt_maklervollmacht"":""...""," & vbCrLf
-    p = p & " ""maklervollmacht_vollstaendig"":""..."",""maklervollmacht_fehlt"":""...""," & vbCrLf
+    p = p & " ""mv_vollumfaenglich"":""..."",""mv_einschraenkungen"":""...""," & vbCrLf
+    p = p & " ""unterschrift_kunde"":""..."",""unterschrift_makler"":""...""," & vbCrLf
+    p = p & " ""auf_vn_ausgestellt"":""..."",""makler_namentlich_genannt"":""...""," & vbCrLf
     p = p & " ""hinweis"":""...""}" & vbCrLf
     p = p & vbCrLf
     p = p & "Antworte JETZT, nur das JSON-Objekt:" & vbCrLf
@@ -928,8 +1033,11 @@ Private Function ParseGptJsonAntwort(antwort As String) As Object
                  "maklerpool", "makler_nachname", "makler_vorname", _
                  "klassifikation", "geschaefts_typ", "unterlagen_angefragt", _
                  "sonderfall", "sparte", "anhang_typen", _
-                 "enthaelt_maklervollmacht", "maklervollmacht_vollstaendig", _
-                 "maklervollmacht_fehlt", "hinweis")
+                 "enthaelt_maklervollmacht", "mv_vollumfaenglich", _
+                 "mv_einschraenkungen", _
+                 "unterschrift_kunde", "unterschrift_makler", _
+                 "auf_vn_ausgestellt", "makler_namentlich_genannt", _
+                 "hinweis")
     Dim i As Long
     For i = LBound(keys) To UBound(keys)
         dict(keys(i)) = ExtrahiereJsonString(clean, CStr(keys(i)))
@@ -1138,13 +1246,13 @@ Private Sub SetupGptSheet()
         ws.name = SHEET_GPT
     End If
 
-    ws.Range("B6").Value = "<- Modell-Name. Bestaetigte Werte (Stand 11/2025): 'gpt-51-reasoning' (empfohlen, denkt nach), 'gpt-51-chat' (schneller), 'gpt-41' (alt). Bei Server-Fehler: Modelle_Testen ausfuehren."
+    ws.Range("B6").Value = "<- Modell. Empfehlung: 'gpt-51-chat' (Default, schnell+guenstig, weniger Halluzinationen bei Extraktion). Reasoning ('gpt-51-reasoning') nur bei schlechten Scans/komplexen Sonderfaellen - kostet 5-10x mehr und halluziniert mehr Felder. Studien dazu siehe Anleitung. 'gpt-41' = alt."
     ws.Range("B7").Value = "<- Cookie als Text (langer String) - ODER leer lassen und A8/Dialog nutzen"
     ws.Range("B8").Value = "<- Pfad zu Cookie-Datei (z.B. C:\Users\...\Desktop\cookie.txt) - leer = Default F:\ExcelGPT-Cookie\Cookie.txt"
     ws.Range("B9").Value = "<- Temperature (0 = deterministisch)"
     ws.Range("B12").Value = "<- Tone (z.B. 'Sachlich' oder leer)"
 
-    If Trim(CStr(ws.Range("A6").Value)) = "" Then ws.Range("A6").Value = "gpt-51-reasoning"
+    If Trim(CStr(ws.Range("A6").Value)) = "" Then ws.Range("A6").Value = "gpt-51-chat"
     If Trim(CStr(ws.Range("A9").Value)) = "" Then ws.Range("A9").Value = 0
     If Trim(CStr(ws.Range("A12").Value)) = "" Then ws.Range("A12").Value = "Sachlich"
 
@@ -1355,12 +1463,16 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_SPARTE).Value = "Sparte"
     ws.cells(1, COL_ANH_TYPEN).Value = "Anhang_Typen"
     ws.cells(1, COL_VM_VORHAND).Value = "Maklervollmacht_Enthalten"
-    ws.cells(1, COL_VM_VOLLST).Value = "Vollmacht_Vollstaendig"
-    ws.cells(1, COL_VM_FEHLT).Value = "Vollmacht_Fehlt"
+    ws.cells(1, COL_VM_VOLLST).Value = "MV_Vollumfaenglich"
+    ws.cells(1, COL_VM_FEHLT).Value = "MV_Einschraenkungen"
     ws.cells(1, COL_HINWEIS).Value = "Hinweis"
     ws.cells(1, COL_VORGANGSTYP).Value = "Vorgangstyp"
+    ws.cells(1, COL_UNTERSCHR_K).Value = "Unterschrift_Kunde"
+    ws.cells(1, COL_UNTERSCHR_M).Value = "Unterschrift_Makler"
+    ws.cells(1, COL_AUF_VN).Value = "Auf_VN_Ausgestellt"
+    ws.cells(1, COL_MAKL_NAM).Value = "Makler_Namentlich"
 
-    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_VORGANGSTYP))
+    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_MAKL_NAM))
         .Font.Bold = True
         .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau
         .Font.Color = RGB(255, 255, 255)
@@ -1392,6 +1504,11 @@ Private Sub SpaltenbreitenSetzen(ws As Worksheet)
     ws.Columns(COL_VM_FEHLT).ColumnWidth = 32
     ws.Columns(COL_HINWEIS).ColumnWidth = 50
     ws.Columns(COL_VORGANGSTYP).ColumnWidth = 18
+    ws.Columns(COL_UNTERSCHR_K).ColumnWidth = 14
+    ws.Columns(COL_UNTERSCHR_M).ColumnWidth = 14
+    ws.Columns(COL_AUF_VN).ColumnWidth = 14
+    ws.Columns(COL_MAKL_NAM).ColumnWidth = 14
+    ws.Columns(COL_VM_FEHLT).ColumnWidth = 36
 End Sub
 
 Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
@@ -1412,13 +1529,17 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
         ws.cells(row, COL_SPARTE).Value = SafeGet(dict, "sparte")
         ws.cells(row, COL_ANH_TYPEN).Value = SafeGet(dict, "anhang_typen")
         ws.cells(row, COL_VM_VORHAND).Value = SafeGet(dict, "enthaelt_maklervollmacht")
-        ws.cells(row, COL_VM_VOLLST).Value = SafeGet(dict, "maklervollmacht_vollstaendig")
-        ws.cells(row, COL_VM_FEHLT).Value = SafeGet(dict, "maklervollmacht_fehlt")
+        ws.cells(row, COL_VM_VOLLST).Value = SafeGet(dict, "mv_vollumfaenglich")
+        ws.cells(row, COL_VM_FEHLT).Value = SafeGet(dict, "mv_einschraenkungen")
+        ws.cells(row, COL_UNTERSCHR_K).Value = SafeGet(dict, "unterschrift_kunde")
+        ws.cells(row, COL_UNTERSCHR_M).Value = SafeGet(dict, "unterschrift_makler")
+        ws.cells(row, COL_AUF_VN).Value = SafeGet(dict, "auf_vn_ausgestellt")
+        ws.cells(row, COL_MAKL_NAM).Value = SafeGet(dict, "makler_namentlich_genannt")
 
         ' Hervorhebungen NUR fuer echte Makler-Vorgaenge
         Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
         Dim klass As String: klass = LCase(SafeGet(dict, "klassifikation"))
-        Dim vmVollst As String: vmVollst = LCase(SafeGet(dict, "maklervollmacht_vollstaendig"))
+        Dim vmVollst As String: vmVollst = LCase(SafeGet(dict, "mv_vollumfaenglich"))
         Dim vmEnthalten As String: vmEnthalten = LCase(SafeGet(dict, "enthaelt_maklervollmacht"))
 
         If InStr(sonder, "flotten") > 0 Or InStr(sonder, "sondertarif") > 0 Then
@@ -1433,11 +1554,25 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
             ElseIf vmVollst = "ja" Then
                 ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(187, 247, 208)
             End If
+
+            ' Unterschriften: rot wenn 'nein', gruen wenn 'ja'
+            Dim uk As String: uk = LCase(SafeGet(dict, "unterschrift_kunde"))
+            Dim um As String: um = LCase(SafeGet(dict, "unterschrift_makler"))
+            If uk = "nein" Then
+                ws.cells(row, COL_UNTERSCHR_K).Interior.Color = RGB(252, 165, 165)
+            ElseIf uk = "ja" Then
+                ws.cells(row, COL_UNTERSCHR_K).Interior.Color = RGB(187, 247, 208)
+            End If
+            If um = "nein" Then
+                ws.cells(row, COL_UNTERSCHR_M).Interior.Color = RGB(252, 165, 165)
+            ElseIf um = "ja" Then
+                ws.cells(row, COL_UNTERSCHR_M).Interior.Color = RGB(187, 247, 208)
+            End If
         End If
     Else
-        ' Kein Makler-Vorgang: Felder G-S leer lassen, Zeile grau einfaerben
+        ' Kein Makler-Vorgang: Felder G-X leer lassen, Zeile grau einfaerben
         Dim grau As Long: grau = RGB(229, 231, 235)
-        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_HINWEIS)).Interior.Color = grau
+        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_MAKL_NAM)).Interior.Color = grau
         ws.cells(row, COL_VORGANGSTYP).Interior.Color = RGB(254, 215, 170) ' helles Orange
         ws.cells(row, COL_VORGANGSTYP).Font.Bold = True
     End If
@@ -1450,6 +1585,98 @@ End Function
 
 Private Sub Bold(ws As Worksheet, row As Long, fontSize As Long)
     With ws.cells(row, 1).Font: .Bold = True: .Size = fontSize: End With
+End Sub
+
+' Schreibt fuer einen Vorgang eine .txt-Datei mit allen KI-Analyse-Daten.
+' Dateiname: <msg-Basename>.txt im uebergebenen Ordner (typischerweise
+' '_KI-Analyse' im Vorgangs-Ordner).
+Private Sub SchreibeKiTextDatei(ordner As String, msgName As String, _
+                                datum As String, absName As String, absMail As String, _
+                                betreff As String, anhangAlle As String, pdfListe As String, _
+                                dict As Object)
+    Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
+    Dim base As String: base = msgName
+    If LCase(Right(base, 4)) = ".msg" Then base = Left(base, Len(base) - 4)
+    base = SaeubereDateiname(base)
+    Dim outPath As String: outPath = ordner & "\" & base & ".txt"
+
+    Dim modellAktuell As String: modellAktuell = ""
+    On Error Resume Next
+    modellAktuell = Trim$(CStr(ThisWorkbook.Worksheets(SHEET_GPT).Range("A6").Value2))
+    On Error GoTo 0
+
+    Dim s As String
+    Dim sep As String: sep = String(72, "=") & vbCrLf
+    Dim sub_ As String: sub_ = String(40, "-") & vbCrLf
+
+    s = sep
+    s = s & "ERGO Vorgang-Analyse  -  KI-Klassifikation" & vbCrLf
+    s = s & sep & vbCrLf
+
+    s = s & "Datei:           " & msgName & vbCrLf
+    s = s & "Datum:           " & datum & vbCrLf
+    s = s & "Absender:        " & absName & "  <" & absMail & ">" & vbCrLf
+    s = s & "Betreff:         " & betreff & vbCrLf
+    s = s & "Anhaenge (alle): " & IIf(Len(anhangAlle) = 0, "(keine)", anhangAlle) & vbCrLf
+    s = s & "Anhaenge (PDF):  " & IIf(Len(pdfListe) = 0, "(keine)", pdfListe) & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sub_
+    s = s & "TRIAGE" & vbCrLf
+    s = s & sub_
+    s = s & "Vorgangstyp:           " & SafeGet(dict, "vorgangstyp") & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sub_
+    s = s & "KLASSIFIKATION" & vbCrLf
+    s = s & sub_
+    s = s & "Klassifikation:        " & SafeGet(dict, "klassifikation") & vbCrLf
+    s = s & "Geschaefts_Typ:        " & SafeGet(dict, "geschaefts_typ") & vbCrLf
+    s = s & "Unterlagen_Angefragt:  " & SafeGet(dict, "unterlagen_angefragt") & vbCrLf
+    s = s & "Sonderfall:            " & SafeGet(dict, "sonderfall") & vbCrLf
+    s = s & "Sparte:                " & SafeGet(dict, "sparte") & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sub_
+    s = s & "MAKLER" & vbCrLf
+    s = s & sub_
+    s = s & "Maklerpool:            " & SafeGet(dict, "maklerpool") & vbCrLf
+    s = s & "Nachname:              " & SafeGet(dict, "makler_nachname") & vbCrLf
+    s = s & "Vorname:               " & SafeGet(dict, "makler_vorname") & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sub_
+    s = s & "ANHANG-ANALYSE" & vbCrLf
+    s = s & sub_
+    s = s & "Anhang_Typen:          " & SafeGet(dict, "anhang_typen") & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sub_
+    s = s & "MAKLERVOLLMACHT (juristische Pruefung nach AAW-Allg)" & vbCrLf
+    s = s & sub_
+    s = s & "Enthalten:             " & SafeGet(dict, "enthaelt_maklervollmacht") & vbCrLf
+    s = s & "Vollumfaenglich:       " & SafeGet(dict, "mv_vollumfaenglich") & vbCrLf
+    s = s & "Einschraenkungen:      " & SafeGet(dict, "mv_einschraenkungen") & vbCrLf
+    s = s & "Unterschrift Kunde:    " & SafeGet(dict, "unterschrift_kunde") & "  (Pflicht)" & vbCrLf
+    s = s & "Unterschrift Makler:   " & SafeGet(dict, "unterschrift_makler") & "  (optional)" & vbCrLf
+    s = s & "Auf VN ausgestellt:    " & SafeGet(dict, "auf_vn_ausgestellt") & vbCrLf
+    s = s & "Makler namentlich:     " & SafeGet(dict, "makler_namentlich_genannt") & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sub_
+    s = s & "HINWEIS" & vbCrLf
+    s = s & sub_
+    s = s & SafeGet(dict, "hinweis") & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sep
+    s = s & "Erstellt: " & Format(Now, "yyyy-mm-dd hh:nn:ss") & vbCrLf
+    s = s & "Modell:   " & modellAktuell & vbCrLf
+    s = s & sep
+
+    Dim ts As Object: Set ts = fso.CreateTextFile(outPath, True, True) ' True=Unicode
+    ts.Write s
+    ts.Close
 End Sub
 
 ' ============================================================================
@@ -1551,7 +1778,7 @@ Private Function BuildPayload(prompt As String, Optional docIdsJson As String = 
 
     raw = ThisWorkbook.Worksheets(SHEET_GPT).Range("A6").Value2
     If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
-        model = "gpt-51-reasoning"
+        model = "gpt-51-chat"
     Else
         model = Trim$(CStr(raw))
         model = Replace(model, vbCr, ""): model = Replace(model, vbLf, ""): model = Replace(model, vbTab, "")
