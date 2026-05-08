@@ -1,7 +1,19 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.8)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.9)
 ' ============================================================================
+' v2.9: NEUE Spalte Y 'Ist_Reminder' (ja/nein/nicht_pruefbar) - erkennt
+'       Erinnerungen / Mahnungen / Wiedervorlagen anhand von Betreff-/
+'       Body-Indikatoren (Erinnerung, Reminder, WV, Sachstandsanfrage,
+'       'wir warten noch', '2. Mahnung', etc.). Unabhaengig von Vorgangs-
+'       typ - ein Reminder kann gleichzeitig ein Makler-Vorgang sein.
+'       Cell-Highlight in Orange wenn 'ja'.
+'
+'       Unterschrift_Kunde + Unterschrift_Makler werden jetzt rein
+'       FAKTISCH geprueft (ist eine sichtbar?). Pool-Ausnahmen (Check 24
+'       digital, Verifox / Fonds Finanz / Impuls / Watson) wurden aus
+'       der Unterschrift-Pruefung entfernt - die gehoeren semantisch in
+'       die mv_einschraenkungen, nicht in die Unterschrift-Spalte.
 ' v2.8: GROSSE Ueberarbeitung der Maklervollmacht-Pruefung. Bisherige Heuristik
 '       (6 Form-Pflichtfelder: Name, Geburtsdatum, Anschrift, Datum, Unter-
 '       schrift, Maklerangaben) entspricht nicht der echten Pruefpraxis im
@@ -120,6 +132,8 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '   V  Unterschrift_Makler         (ja / nein / nicht_pruefbar - optional)
 '   W  Auf_VN_Ausgestellt          (ja / nein / nicht_pruefbar - Pflicht)
 '   X  Makler_Namentlich           (ja / nein / nicht_pruefbar - Pflicht)
+'   Y  Ist_Reminder                (ja / nein / nicht_pruefbar -
+'                                   Erinnerung/Mahnung/Wiedervorlage)
 '
 ' Pruefgrundlage Maklervollmacht: AAW-Allg 2.1.1+2.1.2, AAW-GES Kap. 5,
 ' PVC2D-Vorgabe (Rechtsabteilung). Schlagwort-Liste:
@@ -167,6 +181,7 @@ Private Const COL_UNTERSCHR_K As Long = 21    ' U: Unterschrift Kunde vorhanden 
 Private Const COL_UNTERSCHR_M As Long = 22    ' V: Unterschrift Makler vorhanden (ja / nein / nicht_pruefbar) - optional
 Private Const COL_AUF_VN      As Long = 23    ' W: MV auf VN ausgestellt          (ja / nein / nicht_pruefbar)
 Private Const COL_MAKL_NAM    As Long = 24    ' X: Makler/Pool namentlich genannt (ja / nein / nicht_pruefbar)
+Private Const COL_REMINDER    As Long = 25    ' Y: Reminder / Mahnung / Wiedervorlage (ja / nein / nicht_pruefbar)
 
 ' === HAUPTEINSTIEG ==========================================================
 Public Sub Vorgaenge_Analysieren()
@@ -971,17 +986,22 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "    nur fuer Schadensbearbeitung'. Leer wenn vollumfaenglich oder" & vbCrLf
     p = p & "    nicht pruefbar." & vbCrLf
     p = p & vbCrLf
-    p = p & "13) unterschrift_kunde  (Pflicht: VN-Unterschrift)" & vbCrLf
-    p = p & "    Ist eine eigenhaendige oder digitale Unterschrift des KUNDEN/VN" & vbCrLf
-    p = p & "    sichtbar?  AUSNAHMEN (zaehlen als 'ja'):" & vbCrLf
-    p = p & "      - Check 24 digital ohne Unterschrift" & vbCrLf
-    p = p & "      - Verifox / Fonds Finanz / Impuls / Watson: Unterschrift im" & vbCrLf
-    p = p & "        separaten Datenschutz-Anhang" & vbCrLf
+    p = p & "13) unterschrift_kunde  (rein faktisch: ist eine sichtbar?)" & vbCrLf
+    p = p & "    Ist auf der MV eine eigenhaendige oder digitale Unterschrift" & vbCrLf
+    p = p & "    des KUNDEN/VN klar erkennbar (Schriftzug, Unterschriftenbild," & vbCrLf
+    p = p & "    'digital signed'-Block)?" & vbCrLf
     p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & "    HINWEIS: Bei Pool-Templates Check 24 digital, Verifox, Fonds" & vbCrLf
+    p = p & "    Finanz, Impuls, Watson kann die Unterschrift in einem separaten" & vbCrLf
+    p = p & "    Datenschutz-Anhang stehen - in dem Fall hier 'nein' (faktisch" & vbCrLf
+    p = p & "    nicht auf der MV) und in 'mv_einschraenkungen' ergaenzen, dass" & vbCrLf
+    p = p & "    es ein digital-signiertes Pool-Template ist (kein Ablehnungs-" & vbCrLf
+    p = p & "    grund laut AAW-Allg)." & vbCrLf
     p = p & vbCrLf
-    p = p & "14) unterschrift_makler  (optional, kein Ablehnungsgrund)" & vbCrLf
-    p = p & "    Ist zusaetzlich eine Unterschrift/Stempel des MAKLERS sichtbar?" & vbCrLf
-    p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & "14) unterschrift_makler  (rein faktisch)" & vbCrLf
+    p = p & "    Ist zusaetzlich eine Unterschrift / Stempel des MAKLERS auf der" & vbCrLf
+    p = p & "    MV sichtbar?  Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & "    Optional - kein Ablehnungsgrund laut AAW-Allg." & vbCrLf
     p = p & vbCrLf
     p = p & "15) auf_vn_ausgestellt  (Pflicht)" & vbCrLf
     p = p & "    Ist die MV auf den VERSICHERUNGSNEHMER ausgestellt (nicht auf eine" & vbCrLf
@@ -992,12 +1012,27 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "    Ist der Makler ODER der Maklerpool namentlich in der MV benannt?" & vbCrLf
     p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
     p = p & vbCrLf
-    p = p & "17) hinweis" & vbCrLf
+    p = p & "17) ist_reminder" & vbCrLf
+    p = p & "    Ist diese Mail eine Erinnerung / Mahnung / Wiedervorlage zu einem" & vbCrLf
+    p = p & "    bereits laufenden Vorgang? Indikatoren:" & vbCrLf
+    p = p & "      - Betreff: 'Erinnerung', 'Reminder', 'Wiedervorlage', 'Mahnung'," & vbCrLf
+    p = p & "        '2. Mahnung', 'zweite Anfrage', 'Sachstandsanfrage', 'Nach-" & vbCrLf
+    p = p & "        frage', 'Bearbeitungsstatus', 'WV', 'AW:' bzw. 'Re:' mit" & vbCrLf
+    p = p & "        zeitlichem Bezug auf eine frueher Mail" & vbCrLf
+    p = p & "      - Body: 'wir warten noch', 'haben wir noch nichts erhalten'," & vbCrLf
+    p = p & "        'bitten um Rueckmeldung', 'weiterhin keine Antwort', 'wie" & vbCrLf
+    p = p & "        ist der Stand', 'in obiger Angelegenheit', 'haben wir" & vbCrLf
+    p = p & "        bereits am ... angeschrieben'" & vbCrLf
+    p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
+    p = p & "    Ein Reminder kann gleichzeitig ein Makler-Vorgang sein - das" & vbCrLf
+    p = p & "    Feld ist unabhaengig von 'vorgangstyp' und 'klassifikation'." & vbCrLf
+    p = p & vbCrLf
+    p = p & "18) hinweis" & vbCrLf
     p = p & "    EIN kurzer Satz (max 200 Zeichen) was an dem Vorgang auffaellig" & vbCrLf
     p = p & "    ist - z.B. fehlende Unterlagen, ungewoehnliche Konstellation," & vbCrLf
     p = p & "    Eskalationspotenzial. Leer wenn nichts auffaellt." & vbCrLf
     p = p & vbCrLf
-    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 18 Schluessel):" & vbCrLf
+    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 19 Schluessel):" & vbCrLf
     p = p & "{""vorgangstyp"":""..."",""maklerpool"":""..."",""makler_nachname"":""...""," & vbCrLf
     p = p & " ""makler_vorname"":""..."",""klassifikation"":""..."",""geschaefts_typ"":""...""," & vbCrLf
     p = p & " ""unterlagen_angefragt"":""..."",""sonderfall"":""..."",""sparte"":""...""," & vbCrLf
@@ -1005,6 +1040,7 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & " ""mv_vollumfaenglich"":""..."",""mv_einschraenkungen"":""...""," & vbCrLf
     p = p & " ""unterschrift_kunde"":""..."",""unterschrift_makler"":""...""," & vbCrLf
     p = p & " ""auf_vn_ausgestellt"":""..."",""makler_namentlich_genannt"":""...""," & vbCrLf
+    p = p & " ""ist_reminder"":""...""," & vbCrLf
     p = p & " ""hinweis"":""...""}" & vbCrLf
     p = p & vbCrLf
     p = p & "Antworte JETZT, nur das JSON-Objekt:" & vbCrLf
@@ -1037,6 +1073,7 @@ Private Function ParseGptJsonAntwort(antwort As String) As Object
                  "mv_einschraenkungen", _
                  "unterschrift_kunde", "unterschrift_makler", _
                  "auf_vn_ausgestellt", "makler_namentlich_genannt", _
+                 "ist_reminder", _
                  "hinweis")
     Dim i As Long
     For i = LBound(keys) To UBound(keys)
@@ -1471,8 +1508,9 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_UNTERSCHR_M).Value = "Unterschrift_Makler"
     ws.cells(1, COL_AUF_VN).Value = "Auf_VN_Ausgestellt"
     ws.cells(1, COL_MAKL_NAM).Value = "Makler_Namentlich"
+    ws.cells(1, COL_REMINDER).Value = "Ist_Reminder"
 
-    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_MAKL_NAM))
+    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_REMINDER))
         .Font.Bold = True
         .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau
         .Font.Color = RGB(255, 255, 255)
@@ -1508,6 +1546,7 @@ Private Sub SpaltenbreitenSetzen(ws As Worksheet)
     ws.Columns(COL_UNTERSCHR_M).ColumnWidth = 14
     ws.Columns(COL_AUF_VN).ColumnWidth = 14
     ws.Columns(COL_MAKL_NAM).ColumnWidth = 14
+    ws.Columns(COL_REMINDER).ColumnWidth = 12
     ws.Columns(COL_VM_FEHLT).ColumnWidth = 36
 End Sub
 
@@ -1535,6 +1574,11 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
         ws.cells(row, COL_UNTERSCHR_M).Value = SafeGet(dict, "unterschrift_makler")
         ws.cells(row, COL_AUF_VN).Value = SafeGet(dict, "auf_vn_ausgestellt")
         ws.cells(row, COL_MAKL_NAM).Value = SafeGet(dict, "makler_namentlich_genannt")
+        ws.cells(row, COL_REMINDER).Value = SafeGet(dict, "ist_reminder")
+        If LCase(SafeGet(dict, "ist_reminder")) = "ja" Then
+            ws.cells(row, COL_REMINDER).Interior.Color = RGB(254, 215, 170) ' helles Orange
+            ws.cells(row, COL_REMINDER).Font.Bold = True
+        End If
 
         ' Hervorhebungen NUR fuer echte Makler-Vorgaenge
         Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
@@ -1570,9 +1614,9 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
             End If
         End If
     Else
-        ' Kein Makler-Vorgang: Felder G-X leer lassen, Zeile grau einfaerben
+        ' Kein Makler-Vorgang: Felder G-Y leer lassen, Zeile grau einfaerben
         Dim grau As Long: grau = RGB(229, 231, 235)
-        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_MAKL_NAM)).Interior.Color = grau
+        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_REMINDER)).Interior.Color = grau
         ws.cells(row, COL_VORGANGSTYP).Interior.Color = RGB(254, 215, 170) ' helles Orange
         ws.cells(row, COL_VORGANGSTYP).Font.Bold = True
     End If
@@ -1625,6 +1669,7 @@ Private Sub SchreibeKiTextDatei(ordner As String, msgName As String, _
     s = s & "TRIAGE" & vbCrLf
     s = s & sub_
     s = s & "Vorgangstyp:           " & SafeGet(dict, "vorgangstyp") & vbCrLf
+    s = s & "Ist Reminder:          " & SafeGet(dict, "ist_reminder") & vbCrLf
     s = s & vbCrLf
 
     s = s & sub_
