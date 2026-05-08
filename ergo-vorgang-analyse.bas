@@ -1,6 +1,12 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.0)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.3)
+' ============================================================================
+' v2.3: Auth-/403-Fehler werden erkannt und brechen die Analyse sofort ab,
+'       mit Dialog zum Cookie-Erneuern. HTML-Antworten (Azure-403-Seite)
+'       werden nicht mehr roh in die Zelle geschrieben, sondern auf eine
+'       lesbare Kurzform reduziert. Nach 5 Fehlern in Folge bricht der
+'       Lauf ab, statt ueber alle Vorgaenge weiter zu hagelten.
 ' ============================================================================
 ' WORKFLOW:
 '   1) Diese .xlsm in den Ordner legen, in dem die .msg-Dateien liegen
@@ -143,6 +149,8 @@ Public Sub Vorgaenge_Analysieren()
 
     Dim verarbeitet As Long: verarbeitet = 0
     Dim fehler As Long: fehler = 0
+    Dim fehlerInFolge As Long: fehlerInFolge = 0
+    Dim abbruchGrund As String: abbruchGrund = ""
     Dim row As Long: row = startRow
     Dim i As Long
     Dim tempBase As String: tempBase = Environ$("TEMP") & "\ergo_va_" & Format(Now, "yyyymmddhhnnss")
@@ -164,22 +172,32 @@ Public Sub Vorgaenge_Analysieren()
 
         If einzelErrNum <> 0 Or Not erfolg Then
             Dim hint As String
-            If Len(einzelErrDesc) > 0 Then
-                hint = "[FEHLER " & einzelErrNum & "] " & einzelErrDesc
-            Else
-                hint = "[FEHLER] (keine Beschreibung - Schritt unklar)"
-            End If
+            hint = BereinigeFehlerHinweis(einzelErrNum, einzelErrDesc)
             ws.cells(row, COL_DATEI).Value = fso.GetFileName(msgPath)
             ws.cells(row, COL_HINWEIS).Value = hint
             ws.cells(row, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
             Debug.Print "[" & Format(Now, "hh:nn:ss") & "] Zeile " & row & " " & _
                         fso.GetFileName(msgPath) & ": " & hint
             fehler = fehler + 1
+            fehlerInFolge = fehlerInFolge + 1
+            row = row + 1
+
+            ' Auth-/403-Fehler? -> Sofort abbrechen, Cookie-Dialog anbieten
+            If IstAuthFehler(einzelErrDesc) Then
+                abbruchGrund = "AUTH"
+                Exit For
+            End If
+
+            ' 5 Fehler in Folge -> Etwas ist grundlegend kaputt, weiter macht keinen Sinn
+            If fehlerInFolge >= 5 Then
+                abbruchGrund = "REPEAT"
+                Exit For
+            End If
         Else
             verarbeitet = verarbeitet + 1
+            fehlerInFolge = 0
+            row = row + 1
         End If
-
-        row = row + 1
 
         ' Auto-Save alle 3 Vorgaenge
         If i Mod 3 = 0 Then
@@ -205,10 +223,30 @@ Public Sub Vorgaenge_Analysieren()
 
     SpaltenbreitenSetzen ws
 
-    MsgBox "Analyse abgeschlossen." & vbCrLf & vbCrLf & _
-           "Verarbeitet: " & verarbeitet & vbCrLf & _
-           "Fehler:      " & fehler, _
-           vbInformation, "Vorgaenge_Analysieren"
+    Select Case abbruchGrund
+        Case "AUTH"
+            Dim ansAuth As VbMsgBoxResult
+            ansAuth = MsgBox( _
+                "Analyse abgebrochen: AUTH-FEHLER (403 Forbidden)." & vbCrLf & vbCrLf & _
+                "Der Cookie fuer gpt.ergo.com ist sehr wahrscheinlich abgelaufen oder ungueltig." & vbCrLf & _
+                "Verarbeitet: " & verarbeitet & "  Fehler: " & fehler & vbCrLf & vbCrLf & _
+                "Jetzt Cookie neu setzen und gleich weitermachen?" & vbCrLf & _
+                "(JA = Cookie-Dialog oeffnen, NEIN = nur Hinweis)", _
+                vbYesNo + vbExclamation, "Cookie abgelaufen")
+            If ansAuth = vbYes Then PruefeCookieMitDialog
+        Case "REPEAT"
+            MsgBox _
+                "Analyse abgebrochen: 5 Fehler in Folge." & vbCrLf & vbCrLf & _
+                "Verarbeitet: " & verarbeitet & "  Fehler: " & fehler & vbCrLf & vbCrLf & _
+                "Bitte Vorgaenge_Diagnose laufen lassen (Alt+F8) und das Direktfenster" & vbCrLf & _
+                "im VBA-Editor (Strg+G) pruefen.", _
+                vbExclamation, "Vorgaenge_Analysieren - Abbruch"
+        Case Else
+            MsgBox "Analyse abgeschlossen." & vbCrLf & vbCrLf & _
+                   "Verarbeitet: " & verarbeitet & vbCrLf & _
+                   "Fehler:      " & fehler, _
+                   vbInformation, "Vorgaenge_Analysieren"
+    End Select
     Exit Sub
 
 Fehler:
@@ -429,6 +467,55 @@ Fehler:
     Debug.Print out
     MsgBox out, vbCritical, "Diagnose"
 End Sub
+
+' === FEHLER-AUFBEREITUNG ====================================================
+' Erkennt Auth/403-Fehler (Cookie abgelaufen) - dann lohnt es sich nicht,
+' alle weiteren Vorgaenge zu probieren.
+Private Function IstAuthFehler(desc As String) As Boolean
+    Dim s As String: s = LCase(desc)
+    If InStr(s, "create failed: 403") > 0 Then IstAuthFehler = True: Exit Function
+    If InStr(s, "403 forbidden") > 0 Then IstAuthFehler = True: Exit Function
+    If InStr(s, "azure-application-gateway") > 0 Then IstAuthFehler = True: Exit Function
+    If InStr(s, "401") > 0 And InStr(s, "unauthorized") > 0 Then IstAuthFehler = True: Exit Function
+    IstAuthFehler = False
+End Function
+
+' Macht aus rohen Err.Description-Strings (inkl. eingebettetem HTML der
+' Azure-403-Seite) eine kurze, lesbare Zelle. Verhindert mehrzeilige
+' <html>-Bloecke in der Spalte 'Hinweis'.
+Private Function BereinigeFehlerHinweis(num As Long, desc As String) As String
+    Dim d As String: d = desc
+    If Len(Trim(d)) = 0 Then
+        BereinigeFehlerHinweis = "[FEHLER " & num & "] (keine Beschreibung - Schritt unklar)"
+        Exit Function
+    End If
+
+    ' Auth-Fehler -> klare Klartext-Meldung
+    If IstAuthFehler(d) Then
+        BereinigeFehlerHinweis = "[AUTH-FEHLER 403] Cookie abgelaufen oder ungueltig. " & _
+                                 "Bitte Cookie erneuern (Vorgaenge_Setup oder Sheet GPT!A7)."
+        Exit Function
+    End If
+
+    ' HTML/Tags entfernen + Whitespace normalisieren
+    If InStr(d, "<") > 0 And InStr(d, ">") > 0 Then
+        Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+        re.Global = True
+        re.Pattern = "<[^>]+>"
+        d = re.Replace(d, " ")
+    End If
+    d = Replace(d, vbCrLf, " ")
+    d = Replace(d, vbCr, " ")
+    d = Replace(d, vbLf, " ")
+    d = Replace(d, vbTab, " ")
+    Do While InStr(d, "  ") > 0
+        d = Replace(d, "  ", " ")
+    Loop
+    d = Trim(d)
+    If Len(d) > 280 Then d = Left(d, 277) & "..."
+
+    BereinigeFehlerHinweis = "[FEHLER " & num & "] " & d
+End Function
 
 ' === DER PROMPT (Kern) ======================================================
 Private Function BuildVorgangPrompt(datum As String, absName As String, absMail As String, _
