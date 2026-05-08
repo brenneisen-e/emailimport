@@ -1,12 +1,33 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.3)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.7)
 ' ============================================================================
+' v2.7: ASK_ErgoGPT + alle HTTP/Upload/JSON-Helfer sind direkt in dieses
+'       Modul integriert. Kein separater Test.txt-Import mehr noetig - die
+'       alten Module 'Agent', 'AI_Excel_Functions' und 'GPT' koennen aus
+'       der Mappe geloescht werden.
+' v2.6: NEUE Routine 'Modelle_Testen' - probiert systematisch eine Liste
+'       von Modellnamen-Varianten gegen ErgoGPT (gpt-51, gpt-5.1,
+'       gpt-5.1-chat, gpt-5.1-reasoning, gpt-4o ...) und schreibt das
+'       Ergebnis in Sheet 'ModellTest'. So kann man sehen, welcher Name
+'       die aktuelle ErgoGPT-API anspricht. Original-Modell in GPT!A6
+'       wird vor und nach dem Test gesichert/restauriert.
+' v2.5: NEUES Triage-Feld 'vorgangstyp' (Spalte T). Bounce-NDR-Mails,
+'       ergo-Outbound, System-Mails, Werbung etc. werden NICHT mehr als
+'       'Standardvorgang / BUe einfacher Vertrag' missklassifiziert,
+'       sondern bekommen den korrekten Typ und alle anderen Felder
+'       bleiben leer. Zeilen ohne echten Makler-Vorgang werden grau
+'       hinterlegt, vorgangstyp-Zelle in Orange.
+' v2.4: Modell-Fehler ("nicht mehr unterstuetzt") werden erkannt und brechen
+'       sofort ab, mit Hinweis auf Sheet GPT!A6. Kleine Pause zwischen den
+'       Calls (1.2s) verhindert das Rate-Limit von gpt.ergo.com (Azure-Gateway
+'       schickt sonst 403). Setup-Spalte B bekommt einen Hinweis, dass der
+'       Modellname EXAKT mit dem ErgoGPT-API-Wert uebereinstimmen muss.
 ' v2.3: Auth-/403-Fehler werden erkannt und brechen die Analyse sofort ab,
 '       mit Dialog zum Cookie-Erneuern. HTML-Antworten (Azure-403-Seite)
 '       werden nicht mehr roh in die Zelle geschrieben, sondern auf eine
 '       lesbare Kurzform reduziert. Nach 5 Fehlern in Folge bricht der
-'       Lauf ab, statt ueber alle Vorgaenge weiter zu hagelten.
+'       Lauf ab, statt ueber alle Vorgaenge weiter zu hageln.
 ' ============================================================================
 ' WORKFLOW:
 '   1) Diese .xlsm in den Ordner legen, in dem die .msg-Dateien liegen
@@ -23,9 +44,6 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '        - Ergebnis landet als Zeile im Sheet 'Analyse'
 '
 ' VORAUSSETZUNGEN:
-'   - Modul mit Funktion ASK_ErgoGPT(prompt, pdfs) muss bereits in der
-'     Mappe importiert sein (aus Test.txt im Repo - die volle Variante
-'     mit PDF-Upload-Faehigkeit!).
 '   - Outlook installiert (fuer .msg-Dateien -> OpenSharedItem).
 '   - Cookie fuer gpt.ergo.com - 4 unterstuetzte Quellen:
 '       1) Sheet GPT!A7 als Text-String
@@ -53,6 +71,9 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '   Q  Vollmacht_Vollstaendig      (ja / nein / teilweise / nicht_pruefbar)
 '   R  Vollmacht_Fehlt             (Liste fehlender Felder, kommagetrennt)
 '   S  Hinweis                     (kurzer GPT-Hinweis zum Vorgang)
+'   T  Vorgangstyp                 (Triage: Makler-Vorgang / Bounce-NDR /
+'                                   Ergo-Outbound / System-Mail /
+'                                   Werbung-Spam / Unklar)
 ' ============================================================================
 
 Option Explicit
@@ -87,6 +108,7 @@ Private Const COL_VM_VORHAND  As Long = 16
 Private Const COL_VM_VOLLST   As Long = 17
 Private Const COL_VM_FEHLT    As Long = 18
 Private Const COL_HINWEIS     As Long = 19
+Private Const COL_VORGANGSTYP As Long = 20    ' T: Triage - "Makler-Vorgang" / "Bounce-NDR" / "Ergo-Outbound" / "System-Mail" / "Werbung-Spam" / "Unklar"
 
 ' === HAUPTEINSTIEG ==========================================================
 Public Sub Vorgaenge_Analysieren()
@@ -182,6 +204,12 @@ Public Sub Vorgaenge_Analysieren()
             fehlerInFolge = fehlerInFolge + 1
             row = row + 1
 
+            ' Modell-Fehler? -> Sofort abbrechen, Hinweis auf Sheet GPT!A6
+            If IstModellFehler(einzelErrDesc) Then
+                abbruchGrund = "MODELL"
+                Exit For
+            End If
+
             ' Auth-/403-Fehler? -> Sofort abbrechen, Cookie-Dialog anbieten
             If IstAuthFehler(einzelErrDesc) Then
                 abbruchGrund = "AUTH"
@@ -198,6 +226,9 @@ Public Sub Vorgaenge_Analysieren()
             fehlerInFolge = 0
             row = row + 1
         End If
+
+        ' Kleine Pause gegen Rate-Limit / Azure-Gateway-403
+        On Error Resume Next: Application.Wait Now + TimeSerial(0, 0, 1): On Error GoTo Fehler
 
         ' Auto-Save alle 3 Vorgaenge
         If i Mod 3 = 0 Then
@@ -224,6 +255,15 @@ Public Sub Vorgaenge_Analysieren()
     SpaltenbreitenSetzen ws
 
     Select Case abbruchGrund
+        Case "MODELL"
+            MsgBox _
+                "Analyse abgebrochen: MODELL-FEHLER." & vbCrLf & vbCrLf & _
+                "Der ErgoGPT-Server lehnt das in Sheet GPT!A6 eingetragene Modell ab" & vbCrLf & _
+                "(z.B. 'gpt-51' oder 'gpt-5.1' wird nicht mehr unterstuetzt)." & vbCrLf & vbCrLf & _
+                "Aktion: Im ErgoGPT-Browser oben rechts den aktuellen Modell-Namen" & vbCrLf & _
+                "ablesen und in Sheet GPT!A6 EXAKT so eintragen.  Verarbeitet: " & verarbeitet & _
+                "  Fehler: " & fehler, _
+                vbExclamation, "Modell wird nicht unterstuetzt"
         Case "AUTH"
             Dim ansAuth As VbMsgBoxResult
             ansAuth = MsgBox( _
@@ -468,9 +508,178 @@ Fehler:
     MsgBox out, vbCritical, "Diagnose"
 End Sub
 
+' === MODELL-TEST ============================================================
+' Probiert systematisch verschiedene Modellnamen-Varianten gegen ErgoGPT,
+' loggt fuer jede Variante in Sheet 'ModellTest', ob sie funktioniert und
+' welche Antwort/Fehler zurueckkommt. Ziel: rausfinden, welcher Name das
+' GPT-5.1-Chat- bzw. das GPT-5.1-Reasoning-Modell anspricht.
+'
+' Der Original-Wert in Sheet GPT!A6 wird vor dem Test gespeichert und
+' am Ende wiederhergestellt - egal ob der Test erfolgreich oder mit
+' Fehler endet.
+Public Sub Modelle_Testen()
+    Const PING_PROMPT As String = "Antworte mit einem einzigen Wort: OK"
+
+    ' Kandidaten-Liste: alles plausibel, geordnet von 'wahrscheinlich aktuell'
+    ' nach 'eher alt'. Wenn die ErgoGPT-API neue Namen einfuehrt, hier ergaenzen.
+    Dim kandidaten As Variant
+    kandidaten = Array( _
+        "gpt-41", "gpt-4.1", "gpt-4-1", _
+        "gpt-51", "gpt-5.1", "gpt-5-1", _
+        "gpt-51-chat", "gpt-5.1-chat", "gpt-5-1-chat", _
+        "gpt-5-chat", "gpt-5chat", _
+        "gpt-51-reasoning", "gpt-5.1-reasoning", "gpt-5-1-reasoning", _
+        "gpt-5-reasoning", "gpt-51-thinking", "gpt-5.1-thinking", _
+        "gpt-5", "gpt-5-mini", "gpt-5-nano", _
+        "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", _
+        "o1", "o1-mini", "o3", "o3-mini", _
+        "claude-3-5-sonnet", "claude-3.5-sonnet" _
+    )
+
+    Dim total As Long: total = UBound(kandidaten) - LBound(kandidaten) + 1
+
+    Dim ans As VbMsgBoxResult
+    ans = MsgBox( _
+        "Modell-Test: pingt " & total & " Modellnamen mit einem Mini-Prompt." & vbCrLf & _
+        "Pro Modell ca. 5-15s + 2s Pause -> insgesamt grob " & _
+        Int(total * 12 / 60) + 1 & " Minuten." & vbCrLf & vbCrLf & _
+        "Cookie muss aktuell sein. Sheet 'ModellTest' wird angelegt/geleert." & _
+        vbCrLf & vbCrLf & "Fortfahren?", _
+        vbYesNo + vbQuestion, "Modelle_Testen")
+    If ans <> vbYes Then Exit Sub
+
+    If Not PruefeCookieMitDialog() Then Exit Sub
+
+    Dim wsGpt As Worksheet
+    On Error Resume Next: Set wsGpt = ThisWorkbook.Sheets(SHEET_GPT): On Error GoTo 0
+    If wsGpt Is Nothing Then
+        MsgBox "Sheet '" & SHEET_GPT & "' fehlt. Bitte vorher Vorgaenge_Setup laufen lassen.", vbCritical
+        Exit Sub
+    End If
+
+    Dim originalModell As String: originalModell = CStr(wsGpt.Range("A6").Value)
+
+    ' Test-Sheet
+    Dim wsTest As Worksheet
+    On Error Resume Next: Set wsTest = ThisWorkbook.Sheets("ModellTest"): On Error GoTo 0
+    If wsTest Is Nothing Then
+        Set wsTest = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.count))
+        wsTest.name = "ModellTest"
+    Else
+        wsTest.cells.Clear
+    End If
+
+    wsTest.cells(1, 1).Value = "Modellname"
+    wsTest.cells(1, 2).Value = "Status"
+    wsTest.cells(1, 3).Value = "Dauer (s)"
+    wsTest.cells(1, 4).Value = "Antwort / Fehler"
+    With wsTest.Range(wsTest.cells(1, 1), wsTest.cells(1, 4))
+        .Font.Bold = True
+        .Interior.Color = RGB(30, 64, 175)
+        .Font.Color = RGB(255, 255, 255)
+        .HorizontalAlignment = xlCenter
+    End With
+    wsTest.Columns(1).ColumnWidth = 28
+    wsTest.Columns(2).ColumnWidth = 14
+    wsTest.Columns(3).ColumnWidth = 12
+    wsTest.Columns(4).ColumnWidth = 100
+    wsTest.Rows(1).RowHeight = 22
+    On Error Resume Next: ActiveWindow.FreezePanes = False: ActiveWindow.FreezePanes = True: On Error GoTo 0
+
+    Application.ScreenUpdating = False
+
+    Dim r As Long: r = 2
+    Dim erfolgreich As Long: erfolgreich = 0
+    Dim authFehler As Long: authFehler = 0
+    Dim i As Long
+    For i = LBound(kandidaten) To UBound(kandidaten)
+        Dim modellName As String: modellName = CStr(kandidaten(i))
+        Application.StatusBar = "Modell-Test " & (i - LBound(kandidaten) + 1) & "/" & total & ": " & modellName
+        DoEvents
+
+        wsGpt.Range("A6").Value = modellName
+
+        Dim t0 As Double: t0 = Timer
+        Dim antwort As String: antwort = ""
+        Dim eN As Long: eN = 0
+        Dim errDesc As String: errDesc = ""
+
+        On Error Resume Next
+        Err.Clear
+        antwort = ASK_ErgoGPT(PING_PROMPT)
+        eN = Err.Number
+        errDesc = Err.Description
+        Err.Clear
+        On Error GoTo 0
+
+        Dim dauer As Double: dauer = Timer - t0
+
+        wsTest.cells(r, 1).Value = modellName
+        wsTest.cells(r, 3).Value = Round(dauer, 1)
+
+        If eN = 0 And Len(Trim(antwort)) > 0 Then
+            wsTest.cells(r, 2).Value = "OK"
+            wsTest.cells(r, 2).Interior.Color = RGB(187, 247, 208)
+            wsTest.cells(r, 4).Value = Left(antwort, 500)
+            erfolgreich = erfolgreich + 1
+        Else
+            wsTest.cells(r, 2).Value = "FEHLER"
+            wsTest.cells(r, 2).Interior.Color = RGB(252, 165, 165)
+            wsTest.cells(r, 4).Value = Left(BereinigeFehlerHinweis(eN, errDesc), 500)
+            If IstAuthFehler(errDesc) Then
+                authFehler = authFehler + 1
+                ' Bei 3 Auth-Fehlern in Folge: Cookie scheint tot, Test abbrechen
+                If authFehler >= 3 Then
+                    r = r + 1
+                    wsTest.cells(r, 1).Value = "(Test abgebrochen)"
+                    wsTest.cells(r, 4).Value = "3 AUTH-Fehler in Folge - Cookie pruefen, dann Modelle_Testen erneut starten."
+                    wsTest.cells(r, 4).Interior.Color = RGB(254, 215, 170)
+                    Exit For
+                End If
+            Else
+                authFehler = 0
+            End If
+        End If
+
+        Debug.Print "[Modell-Test] " & modellName & " -> " & wsTest.cells(r, 2).Value & " (" & Round(dauer, 1) & "s)"
+        r = r + 1
+
+        ' Pause gegen Rate-Limit
+        On Error Resume Next: Application.Wait Now + TimeSerial(0, 0, 2): On Error GoTo 0
+    Next i
+
+    ' Original wiederherstellen
+    wsGpt.Range("A6").Value = originalModell
+
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+
+    On Error Resume Next: wsTest.Activate: wsTest.Range("A2").Select: On Error GoTo 0
+
+    MsgBox "Modell-Test fertig." & vbCrLf & vbCrLf & _
+           "Erfolgreich: " & erfolgreich & " / " & total & vbCrLf & _
+           "Original-Modell '" & originalModell & "' wiederhergestellt." & vbCrLf & vbCrLf & _
+           "Ergebnisse: Sheet 'ModellTest'.  Den fuer Reasoning/Chat passenden" & vbCrLf & _
+           "Namen einfach in Sheet GPT!A6 uebernehmen.", _
+           vbInformation, "Modelle_Testen"
+End Sub
+
 ' === FEHLER-AUFBEREITUNG ====================================================
-' Erkennt Auth/403-Fehler (Cookie abgelaufen) - dann lohnt es sich nicht,
-' alle weiteren Vorgaenge zu probieren.
+' Erkennt Modell-Fehler in der Server-Antwort (z.B. "gpt-51 wird nicht
+' mehr unterstuetzt"). Setzt voraus, dass ASK_ErgoGPT in Test.txt v2 den
+' Server-Hinweis in die Fehlerbeschreibung uebernimmt.
+Private Function IstModellFehler(desc As String) As Boolean
+    Dim s As String: s = LCase(desc)
+    If InStr(s, "nicht mehr unterst") > 0 Then IstModellFehler = True: Exit Function
+    If InStr(s, "modell") > 0 And InStr(s, "unterstuetzt") > 0 Then IstModellFehler = True: Exit Function
+    If InStr(s, "model") > 0 And InStr(s, "not supported") > 0 Then IstModellFehler = True: Exit Function
+    If InStr(s, "unknown model") > 0 Then IstModellFehler = True: Exit Function
+    IstModellFehler = False
+End Function
+
+' Erkennt Auth/403-Fehler (Cookie abgelaufen oder Rate-Limit vom
+' Azure-Application-Gateway) - dann lohnt es sich nicht, alle weiteren
+' Vorgaenge zu probieren.
 Private Function IstAuthFehler(desc As String) As Boolean
     Dim s As String: s = LCase(desc)
     If InStr(s, "create failed: 403") > 0 Then IstAuthFehler = True: Exit Function
@@ -490,9 +699,17 @@ Private Function BereinigeFehlerHinweis(num As Long, desc As String) As String
         Exit Function
     End If
 
+    ' Modell-Fehler -> klare Klartext-Meldung (Sheet GPT!A6 anpassen)
+    If IstModellFehler(d) Then
+        BereinigeFehlerHinweis = "[MODELL-FEHLER] Modell in Sheet GPT!A6 wird vom Server " & _
+                                 "abgelehnt. Aktuellen Modellnamen aus dem ErgoGPT-Browser " & _
+                                 "(oben rechts) eintragen."
+        Exit Function
+    End If
+
     ' Auth-Fehler -> klare Klartext-Meldung
     If IstAuthFehler(d) Then
-        BereinigeFehlerHinweis = "[AUTH-FEHLER 403] Cookie abgelaufen oder ungueltig. " & _
+        BereinigeFehlerHinweis = "[AUTH-FEHLER 403] Cookie abgelaufen oder Rate-Limit. " & _
                                  "Bitte Cookie erneuern (Vorgaenge_Setup oder Sheet GPT!A7)."
         Exit Function
     End If
@@ -540,20 +757,50 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & ">>>" & vbCrLf
     p = p & "===== ENDE EMAIL =====" & vbCrLf
     p = p & vbCrLf
-    p = p & "AUFGABE: Klassifiziere den Vorgang strikt anhand der unten" & vbCrLf
-    p = p & "definierten Felder und Wertelisten. Nutze die HOCHGELADENEN PDFs" & vbCrLf
-    p = p & "(falls vorhanden) als zusaetzliche Quelle - schau insbesondere nach" & vbCrLf
-    p = p & "einer Maklervollmacht und pruefe deren Vollstaendigkeit." & vbCrLf
+    p = p & "AUFGABE: Klassifiziere die Mail strikt anhand der unten definierten" & vbCrLf
+    p = p & "Felder und Wertelisten." & vbCrLf
+    p = p & vbCrLf
+    p = p & "WICHTIG - SCHRITT 0 (Triage): Pruefe ZUERST das Feld 'vorgangstyp'." & vbCrLf
+    p = p & "Wenn die Mail KEIN echter eingehender Makler-Vorgang ist (also Bounce-" & vbCrLf
+    p = p & "NDR, von ergo selbst rausgegangen, automatische System-Mail, Werbung)," & vbCrLf
+    p = p & "dann setze ALLE anderen 13 Felder auf '' (leerer String) - nur" & vbCrLf
+    p = p & "'vorgangstyp' und 'hinweis' werden befuellt. NICHT raten, NICHT klassi-" & vbCrLf
+    p = p & "fizieren. Hinweis erklaert in einem Satz, was die Mail wirklich ist." & vbCrLf
+    p = p & vbCrLf
+    p = p & "Nur wenn vorgangstyp == 'Makler-Vorgang': die uebrigen 13 Felder" & vbCrLf
+    p = p & "befuellen. Nutze die HOCHGELADENEN PDFs (falls vorhanden) als" & vbCrLf
+    p = p & "zusaetzliche Quelle - insbesondere fuer die Maklervollmacht-Pruefung." & vbCrLf
     p = p & vbCrLf
     p = p & "REGELN:" & vbCrLf
     p = p & "- Nutze Email-Signatur, From-Domain, Body und PDF-Inhalte als Quellen." & vbCrLf
     p = p & "- Wenn Information nicht eindeutig ablesbar ist: leerer String oder" & vbCrLf
     p = p & "  'nicht_pruefbar'. Rate NIE." & vbCrLf
     p = p & "- Antworte AUSSCHLIESSLICH mit einem einzeiligen JSON-Objekt mit GENAU" & vbCrLf
-    p = p & "  diesen 13 Schluesseln (alle Werte als String). Kein Markdown, keine" & vbCrLf
+    p = p & "  14 Schluesseln (alle Werte als String). Kein Markdown, keine" & vbCrLf
     p = p & "  Code-Fences, kein Vorwort, keine Erklaerung." & vbCrLf
     p = p & vbCrLf
     p = p & "FELDER:" & vbCrLf
+    p = p & vbCrLf
+    p = p & "0) vorgangstyp  (TRIAGE - immer ausfuellen)" & vbCrLf
+    p = p & "   - 'Makler-Vorgang': echte eingehende Mail von einem Makler/Maklerpool" & vbCrLf
+    p = p & "     an ergo (BUe, Antrag, Schaden, Aenderung, Ruecksprache)." & vbCrLf
+    p = p & "   - 'Bounce-NDR': Nichtzustellbarkeits-/Delivery-Failure-Benachrichti-" & vbCrLf
+    p = p & "     gung. Indizien: Absender enthaelt 'postmaster', 'mailer-daemon'," & vbCrLf
+    p = p & "     'ITERGO-Security', 'noreply'; Betreff 'Nachricht nicht zustellbar'," & vbCrLf
+    p = p & "     'Undelivered Mail', 'Mail Delivery Failure', 'Returned mail';" & vbCrLf
+    p = p & "     Body enthaelt 'Relay access denied', '5.7.1', 'delivery failed'," & vbCrLf
+    p = p & "     'konnte nicht zugestellt werden'." & vbCrLf
+    p = p & "   - 'Ergo-Outbound': Mail wurde von ergo selbst verschickt (Absender-" & vbCrLf
+    p = p & "     Domain @ergo.de / @itergo.com / @ergo.com), z.B. eine Antwort des" & vbCrLf
+    p = p & "     Bestandsuebertragungs-Teams. KEIN eingehender Vorgang." & vbCrLf
+    p = p & "   - 'System-Mail': automatische Lese-/Empfangsbestaetigung, Out-of-" & vbCrLf
+    p = p & "     Office, Kalender-Einladung, Newsletter, Calendar/iCal-Termin." & vbCrLf
+    p = p & "   - 'Werbung-Spam': klare Werbung, Phishing, Externer-Anbieter-Pitch." & vbCrLf
+    p = p & "   - 'Unklar': passt in keine Kategorie - dann ALLE Felder leer." & vbCrLf
+    p = p & "   ACHTUNG: Wenn die Mail eine Bounce-Benachrichtigung im Anhang die" & vbCrLf
+    p = p & "   urspruengliche ergo-Outbound-Mail enthaelt, ist DAS hier dennoch" & vbCrLf
+    p = p & "   ein Bounce-NDR und kein Vorgang - die Inhalte des Anhangs sind nur" & vbCrLf
+    p = p & "   Beweis fuer die Zustellung, nicht der Vorgang selbst." & vbCrLf
     p = p & vbCrLf
     p = p & "1) maklerpool" & vbCrLf
     p = p & "   Erlaubt: 'Fonds Finanz', 'BCA', 'JDC', 'blau direkt', 'Fondsnet'," & vbCrLf
@@ -631,12 +878,13 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "    ist - z.B. fehlende Unterlagen, ungewoehnliche Konstellation," & vbCrLf
     p = p & "    Eskalationspotenzial. Leer wenn nichts auffaellt." & vbCrLf
     p = p & vbCrLf
-    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 13 Schluessel):" & vbCrLf
-    p = p & "{""maklerpool"":""..."",""makler_nachname"":""..."",""makler_vorname"":""...""," & vbCrLf
-    p = p & " ""klassifikation"":""..."",""geschaefts_typ"":""..."",""unterlagen_angefragt"":""...""," & vbCrLf
-    p = p & " ""sonderfall"":""..."",""sparte"":""..."",""anhang_typen"":""...""," & vbCrLf
-    p = p & " ""enthaelt_maklervollmacht"":""..."",""maklervollmacht_vollstaendig"":""...""," & vbCrLf
-    p = p & " ""maklervollmacht_fehlt"":""..."",""hinweis"":""...""}" & vbCrLf
+    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 14 Schluessel):" & vbCrLf
+    p = p & "{""vorgangstyp"":""..."",""maklerpool"":""..."",""makler_nachname"":""...""," & vbCrLf
+    p = p & " ""makler_vorname"":""..."",""klassifikation"":""..."",""geschaefts_typ"":""...""," & vbCrLf
+    p = p & " ""unterlagen_angefragt"":""..."",""sonderfall"":""..."",""sparte"":""...""," & vbCrLf
+    p = p & " ""anhang_typen"":""..."",""enthaelt_maklervollmacht"":""...""," & vbCrLf
+    p = p & " ""maklervollmacht_vollstaendig"":""..."",""maklervollmacht_fehlt"":""...""," & vbCrLf
+    p = p & " ""hinweis"":""...""}" & vbCrLf
     p = p & vbCrLf
     p = p & "Antworte JETZT, nur das JSON-Objekt:" & vbCrLf
     BuildVorgangPrompt = p
@@ -660,7 +908,8 @@ Private Function ParseGptJsonAntwort(antwort As String) As Object
     clean = Mid(clean, p1, p2 - p1 + 1)
 
     Dim keys As Variant
-    keys = Array("maklerpool", "makler_nachname", "makler_vorname", _
+    keys = Array("vorgangstyp", _
+                 "maklerpool", "makler_nachname", "makler_vorname", _
                  "klassifikation", "geschaefts_typ", "unterlagen_angefragt", _
                  "sonderfall", "sparte", "anhang_typen", _
                  "enthaelt_maklervollmacht", "maklervollmacht_vollstaendig", _
@@ -873,7 +1122,7 @@ Private Sub SetupGptSheet()
         ws.name = SHEET_GPT
     End If
 
-    ws.Range("B6").Value = "<- Modell-Name (z.B. gpt-5.1, gpt-4o)"
+    ws.Range("B6").Value = "<- Modell-Name EXAKT wie im ErgoGPT-Browser (oben rechts ablesen). Beispiele: 'gpt-5.1', 'gpt-4o'. Aenderung sofort uebernehmen."
     ws.Range("B7").Value = "<- Cookie als Text (langer String) - ODER leer lassen und A8/Dialog nutzen"
     ws.Range("B8").Value = "<- Pfad zu Cookie-Datei (z.B. C:\Users\...\Desktop\cookie.txt) - leer = Default F:\ExcelGPT-Cookie\Cookie.txt"
     ws.Range("B9").Value = "<- Temperature (0 = deterministisch)"
@@ -908,7 +1157,7 @@ Private Sub SetupAnleitungSheet()
     ws.cells(r, 1).Value = "3. Vorgaenge_Analysieren ausfuehren -> Ordner + Anzahl waehlen.": r = r + 2
 
     ws.cells(r, 1).Value = "VORAUSSETZUNGEN": Bold ws, r, 12: r = r + 1
-    ws.cells(r, 1).Value = "- Modul ASK_ErgoGPT (volle Variante mit PDF-Upload aus Test.txt) ist importiert.": r = r + 1
+    ws.cells(r, 1).Value = "- ASK_ErgoGPT ist seit v2.7 in diesem Modul integriert (kein Test.txt noetig).": r = r + 1
     ws.cells(r, 1).Value = "- Outlook installiert (zum Oeffnen der .msg-Dateien).": r = r + 1
     ws.cells(r, 1).Value = "- Cookie fuer gpt.ergo.com - 4 Quellen werden unterstuetzt:": r = r + 1
     ws.cells(r, 1).Value = "    1) Sheet GPT!A7 als Text-String (lang)": r = r + 1
@@ -950,6 +1199,12 @@ Private Sub SetupAnleitungSheet()
     ws.cells(r, 1).Value = "Wenn die Analyse fehlschlaegt: Alt+F8 -> 'Vorgaenge_Diagnose'.": r = r + 1
     ws.cells(r, 1).Value = "Testet Outlook, MSG-Dateien und gibt fuer die erste Datei jeden Schritt aus.": r = r + 1
     ws.cells(r, 1).Value = "Detail-Log: VBA-Editor (Alt+F11) -> Direktfenster (Strg+G).": r = r + 2
+
+    ws.cells(r, 1).Value = "MODELL-TEST (welcher Modellname klappt?)": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "Alt+F8 -> 'Modelle_Testen' probiert ca. 25 Modellnamen-Varianten durch": r = r + 1
+    ws.cells(r, 1).Value = "(gpt-41, gpt-51, gpt-5.1-chat, gpt-5.1-reasoning, gpt-4o, o3 ...) und": r = r + 1
+    ws.cells(r, 1).Value = "schreibt das Ergebnis pro Modell ins Sheet 'ModellTest'.": r = r + 1
+    ws.cells(r, 1).Value = "Den passenden Namen einfach in GPT!A6 uebernehmen.": r = r + 2
 
     ws.Columns("A").ColumnWidth = 110
 End Sub
@@ -1087,8 +1342,9 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_VM_VOLLST).Value = "Vollmacht_Vollstaendig"
     ws.cells(1, COL_VM_FEHLT).Value = "Vollmacht_Fehlt"
     ws.cells(1, COL_HINWEIS).Value = "Hinweis"
+    ws.cells(1, COL_VORGANGSTYP).Value = "Vorgangstyp"
 
-    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_HINWEIS))
+    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_VORGANGSTYP))
         .Font.Bold = True
         .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau
         .Font.Color = RGB(255, 255, 255)
@@ -1119,41 +1375,55 @@ Private Sub SpaltenbreitenSetzen(ws As Worksheet)
     ws.Columns(COL_VM_VOLLST).ColumnWidth = 18
     ws.Columns(COL_VM_FEHLT).ColumnWidth = 32
     ws.Columns(COL_HINWEIS).ColumnWidth = 50
+    ws.Columns(COL_VORGANGSTYP).ColumnWidth = 18
 End Sub
 
 Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
-    ws.cells(row, COL_MAKLERPOOL).Value = SafeGet(dict, "maklerpool")
-    ws.cells(row, COL_NACHNAME).Value = SafeGet(dict, "makler_nachname")
-    ws.cells(row, COL_VORNAME).Value = SafeGet(dict, "makler_vorname")
-    ws.cells(row, COL_KLASSIFIK).Value = SafeGet(dict, "klassifikation")
-    ws.cells(row, COL_GESCHTYP).Value = SafeGet(dict, "geschaefts_typ")
-    ws.cells(row, COL_UNTERLAGEN).Value = SafeGet(dict, "unterlagen_angefragt")
-    ws.cells(row, COL_SONDERFALL).Value = SafeGet(dict, "sonderfall")
-    ws.cells(row, COL_SPARTE).Value = SafeGet(dict, "sparte")
-    ws.cells(row, COL_ANH_TYPEN).Value = SafeGet(dict, "anhang_typen")
-    ws.cells(row, COL_VM_VORHAND).Value = SafeGet(dict, "enthaelt_maklervollmacht")
-    ws.cells(row, COL_VM_VOLLST).Value = SafeGet(dict, "maklervollmacht_vollstaendig")
-    ws.cells(row, COL_VM_FEHLT).Value = SafeGet(dict, "maklervollmacht_fehlt")
+    Dim vtyp As String: vtyp = SafeGet(dict, "vorgangstyp")
+    ws.cells(row, COL_VORGANGSTYP).Value = vtyp
     ws.cells(row, COL_HINWEIS).Value = SafeGet(dict, "hinweis")
 
-    ' Hervorhebungen
-    Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
-    Dim klass As String: klass = LCase(SafeGet(dict, "klassifikation"))
-    Dim vmVollst As String: vmVollst = LCase(SafeGet(dict, "maklervollmacht_vollstaendig"))
-    Dim vmEnthalten As String: vmEnthalten = LCase(SafeGet(dict, "enthaelt_maklervollmacht"))
+    Dim istMakler As Boolean: istMakler = (LCase(vtyp) = "makler-vorgang")
 
-    If InStr(sonder, "flotten") > 0 Or InStr(sonder, "sondertarif") > 0 Then
-        ws.cells(row, COL_SONDERFALL).Interior.Color = RGB(252, 165, 165)
-    End If
-    If InStr(klass, "nicht-standard") > 0 Then
-        ws.cells(row, COL_KLASSIFIK).Interior.Color = RGB(253, 230, 138)
-    End If
-    If vmEnthalten = "ja" Then
-        If vmVollst = "teilweise" Or vmVollst = "nein" Then
-            ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(252, 165, 165)
-        ElseIf vmVollst = "ja" Then
-            ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(187, 247, 208) ' hellgruen
+    If istMakler Then
+        ws.cells(row, COL_MAKLERPOOL).Value = SafeGet(dict, "maklerpool")
+        ws.cells(row, COL_NACHNAME).Value = SafeGet(dict, "makler_nachname")
+        ws.cells(row, COL_VORNAME).Value = SafeGet(dict, "makler_vorname")
+        ws.cells(row, COL_KLASSIFIK).Value = SafeGet(dict, "klassifikation")
+        ws.cells(row, COL_GESCHTYP).Value = SafeGet(dict, "geschaefts_typ")
+        ws.cells(row, COL_UNTERLAGEN).Value = SafeGet(dict, "unterlagen_angefragt")
+        ws.cells(row, COL_SONDERFALL).Value = SafeGet(dict, "sonderfall")
+        ws.cells(row, COL_SPARTE).Value = SafeGet(dict, "sparte")
+        ws.cells(row, COL_ANH_TYPEN).Value = SafeGet(dict, "anhang_typen")
+        ws.cells(row, COL_VM_VORHAND).Value = SafeGet(dict, "enthaelt_maklervollmacht")
+        ws.cells(row, COL_VM_VOLLST).Value = SafeGet(dict, "maklervollmacht_vollstaendig")
+        ws.cells(row, COL_VM_FEHLT).Value = SafeGet(dict, "maklervollmacht_fehlt")
+
+        ' Hervorhebungen NUR fuer echte Makler-Vorgaenge
+        Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
+        Dim klass As String: klass = LCase(SafeGet(dict, "klassifikation"))
+        Dim vmVollst As String: vmVollst = LCase(SafeGet(dict, "maklervollmacht_vollstaendig"))
+        Dim vmEnthalten As String: vmEnthalten = LCase(SafeGet(dict, "enthaelt_maklervollmacht"))
+
+        If InStr(sonder, "flotten") > 0 Or InStr(sonder, "sondertarif") > 0 Then
+            ws.cells(row, COL_SONDERFALL).Interior.Color = RGB(252, 165, 165)
         End If
+        If InStr(klass, "nicht-standard") > 0 Then
+            ws.cells(row, COL_KLASSIFIK).Interior.Color = RGB(253, 230, 138)
+        End If
+        If vmEnthalten = "ja" Then
+            If vmVollst = "teilweise" Or vmVollst = "nein" Then
+                ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(252, 165, 165)
+            ElseIf vmVollst = "ja" Then
+                ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(187, 247, 208)
+            End If
+        End If
+    Else
+        ' Kein Makler-Vorgang: Felder G-S leer lassen, Zeile grau einfaerben
+        Dim grau As Long: grau = RGB(229, 231, 235)
+        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_HINWEIS)).Interior.Color = grau
+        ws.cells(row, COL_VORGANGSTYP).Interior.Color = RGB(254, 215, 170) ' helles Orange
+        ws.cells(row, COL_VORGANGSTYP).Font.Bold = True
     End If
 End Sub
 
@@ -1165,3 +1435,494 @@ End Function
 Private Sub Bold(ws As Worksheet, row As Long, fontSize As Long)
     With ws.cells(row, 1).Font: .Bold = True: .Size = fontSize: End With
 End Sub
+
+' ============================================================================
+' === INLINE ASK_ErgoGPT (frueher in separatem Modul / Test.txt) =============
+' ============================================================================
+' Ab v2.7 ist ASK_ErgoGPT direkt hier integriert, damit die Mappe nur noch
+' EIN Modul braucht. Die alten Module 'Agent', 'AI_Excel_Functions' und
+' 'GPT' koennen geloescht werden - sofern dort keine andere Funktionalitaet
+' (XVERWEIS-AI etc.) drinsteht, die dauerhaft gebraucht wird.
+' ============================================================================
+
+Private Const ERGO_BASE_URL As String = "https://gpt.ergo.com/api"
+Private Const MAX_PARALLEL_PDF_UPLOADS As Long = 3
+
+' === Haupteinstieg ==========================================================
+Public Function ASK_ErgoGPT(userPrompt As String, Optional pdfs As Variant) As String
+    Dim http As Object: Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    Dim cookie As String, bearer As String
+    Dim payload As String, convId As String, resp As String, answer As String
+    Dim docIdsJson As String
+
+    cookie = ReadCookieFromFile()
+    bearer = ""
+
+    ' 1) Conversation anlegen
+    payload = BuildPayload(CleanForJson(userPrompt), "[]")
+    http.Open "PUT", ERGO_BASE_URL & "/conversation", False
+    SetCommonHeaders http, cookie, bearer
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.Send payload
+    If http.status <> 200 Then Err.Raise vbObjectError + 2, , "Create failed: " & http.status & " - " & http.ResponseText
+
+    convId = ParseJsonStr(http.ResponseText, "id")
+    If Len(convId) = 0 Then Err.Raise vbObjectError + 3, , "Keine conversation_id gefunden."
+
+    ' 2) PDFs hochladen (parallel, bis zu 3)
+    docIdsJson = UploadManyPdfsReturnJsonArray(convId, pdfs, cookie, bearer)
+
+    ' 3) Antwort holen
+    payload = BuildPayload(CleanForJson(userPrompt), docIdsJson)
+    http.Open "PUT", ERGO_BASE_URL & "/conversation/" & convId, False
+    SetCommonHeaders http, cookie, bearer
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.SetRequestHeader "Accept", "*/*"
+    http.Send payload
+
+    Dim status2 As Long: status2 = http.status
+    resp = http.ResponseText
+    answer = ExtractAssistantFromNdjson(resp)
+
+    If Len(answer) = 0 Then
+        ' Conversation aufraeumen, damit keine Karteileichen in ErgoGPT bleiben
+        On Error Resume Next
+        Dim delPayload As String: delPayload = BuildDeletePayload(convId)
+        http.Open "DELETE", ERGO_BASE_URL & "/conversation", False
+        SetCommonHeaders http, cookie, bearer
+        http.SetRequestHeader "Accept", "*/*"
+        http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+        http.Send delPayload
+        On Error GoTo 0
+
+        Dim hint As String: hint = ExtractServerErrorHint(resp)
+        Dim msg As String
+        If status2 <> 200 Then
+            msg = "Antwort-Call: HTTP " & status2 & ". " & hint
+        Else
+            msg = "Keine Assistant-Nachricht gefunden. " & hint
+        End If
+        Err.Raise vbObjectError + 4, , msg
+    End If
+
+    ASK_ErgoGPT = Replace(JsonUnescape(answer), "\n", vbCrLf)
+
+    ' 4) Aufraeumen
+    payload = BuildDeletePayload(convId)
+    http.Open "DELETE", ERGO_BASE_URL & "/conversation", False
+    SetCommonHeaders http, cookie, bearer
+    http.SetRequestHeader "Accept", "*/*"
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.Send payload
+End Function
+
+' === Cookie ==================================================================
+Private Function ReadCookieFromFile() As String
+    Dim fso As Object, ts As Object, s As String
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FileExists(COOKIE_PATH) Then
+        Err.Raise vbObjectError + 1, , "Cookie-Datei nicht gefunden: " & COOKIE_PATH
+    End If
+    Set ts = fso.OpenTextFile(COOKIE_PATH, 1, False, -2)
+    s = ts.ReadAll
+    ts.Close
+    s = Trim$(s)
+    If Len(s) = 0 Then Err.Raise vbObjectError + 1, , "Cookie-Datei ist leer: " & COOKIE_PATH
+    ReadCookieFromFile = s
+End Function
+
+' === Payload-Bau =============================================================
+Private Function BuildPayload(prompt As String, Optional docIdsJson As String = "[]") As String
+    Dim model As String, t As Double, tone As String, tempStr As String
+    Dim raw As Variant
+
+    raw = ThisWorkbook.Worksheets(SHEET_GPT).Range("A6").Value2
+    If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
+        model = "gpt-4o"
+    Else
+        model = Trim$(CStr(raw))
+        model = Replace(model, vbCr, ""): model = Replace(model, vbLf, ""): model = Replace(model, vbTab, "")
+        If Len(model) = 0 Then model = "gpt-4o"
+    End If
+
+    raw = ThisWorkbook.Worksheets(SHEET_GPT).Range("A9").Value2
+    If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
+        t = 0
+    ElseIf IsNumeric(raw) Then
+        t = CDbl(raw)
+    Else
+        t = 0
+    End If
+    tempStr = Replace(CStr(t), ",", ".")
+
+    raw = ThisWorkbook.Worksheets(SHEET_GPT).Range("A12").Value2
+    If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
+        tone = ""
+    Else
+        tone = Trim$(CStr(raw))
+    End If
+
+    BuildPayload = "{""conversation_title"":""New conversation"",""messages"":[{" & _
+                   """id"":""" & Uuid4() & """,""role"":""user"",""content"":""" & prompt & """,""date"":""" & IsoNow() & """}]," & _
+                   """model"":""" & model & """,""temperature"":" & tempStr & ",""pinned"":false,""tone"":""" & JsonEscape(tone) & """,""document_ids"":" & docIdsJson & "}"
+End Function
+
+Private Function BuildDeletePayload(conv_id As String) As String
+    BuildDeletePayload = "{""conversation_ids"":[""" & conv_id & """]}"
+End Function
+
+' === HTTP-Header =============================================================
+Private Sub SetCommonHeaders(http As Object, ByVal cookie As String, ByVal bearer As String)
+    If Len(cookie) > 0 Then http.SetRequestHeader "Cookie", cookie
+    Dim xsrf As String: xsrf = ExtractCsrfFromCookie(cookie)
+    If Len(xsrf) > 0 Then
+        http.SetRequestHeader "X-XSRF-TOKEN", xsrf
+        http.SetRequestHeader "X-CSRF-TOKEN", xsrf
+    End If
+    If Len(bearer) > 0 Then http.SetRequestHeader "Authorization", bearer
+    http.SetRequestHeader "User-Agent", "Mozilla/5.0"
+    http.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+    http.SetRequestHeader "Origin", "https://gpt.ergo.com"
+    http.SetRequestHeader "Referer", "https://gpt.ergo.com/"
+    http.SetRequestHeader "X-Requested-With", "XMLHttpRequest"
+End Sub
+
+' === NDJSON / Server-Antwort ================================================
+Private Function ExtractAssistantFromNdjson(ByVal raw As String) As String
+    Dim lines() As String, i As Long, ln As String, lastText As String
+    raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
+    lines = Split(raw, vbLf)
+    For i = LBound(lines) To UBound(lines)
+        ln = Trim$(lines(i))
+        If Len(ln) > 0 Then
+            If LCase$(Left$(ln, 5)) = "data:" Then ln = Trim$(Mid$(ln, 6))
+            If Left$(ln, 1) = "{" And Right$(ln, 1) = "}" Then
+                Dim t As String: t = ExtractAssistantFromChunk(ln)
+                If Len(t) > 0 Then lastText = t
+            End If
+        End If
+    Next
+    ExtractAssistantFromNdjson = lastText
+End Function
+
+Private Function ExtractAssistantFromChunk(json As String) As String
+    Dim re As Object, ms As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.MultiLine = True: re.IgnoreCase = True
+
+    re.Pattern = """choices""\s*:\s*\[\s*\{[\s\S]*?""messages""\s*:\s*\[\s*\{[\s\S]*?""role""\s*:\s*""assistant""[\s\S]*?""content""\s*:\s*""((?:\\.|[^""])*)"""
+    If re.test(json) Then
+        Set ms = re.Execute(json)
+        ExtractAssistantFromChunk = ms(ms.count - 1).SubMatches(0)
+        Exit Function
+    End If
+
+    re.Pattern = """choices""\s*:\s*\[[\s\S]*?""delta""[\s\S]*?""content""\s*:\s*""((?:\\.|[^""])*)"""
+    If re.test(json) Then
+        Set ms = re.Execute(json)
+        ExtractAssistantFromChunk = ms(ms.count - 1).SubMatches(0)
+    End If
+End Function
+
+Private Function ExtractServerErrorHint(ByVal raw As String) As String
+    If Len(raw) = 0 Then ExtractServerErrorHint = "(leere Antwort)": Exit Function
+
+    Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.IgnoreCase = True
+
+    Dim keys As Variant: keys = Array("message", "error", "detail", "error_description")
+    Dim k As Variant, m As String
+    For Each k In keys
+        re.Pattern = """" & k & """\s*:\s*""((?:\\.|[^""]){0,500})"""
+        If re.test(raw) Then
+            Dim ms As Object: Set ms = re.Execute(raw)
+            m = ms(0).SubMatches(0)
+            If Len(m) > 0 Then
+                ExtractServerErrorHint = "Server-Hinweis: " & Left$(m, 240)
+                Exit Function
+            End If
+        End If
+    Next k
+
+    Dim s As String: s = LCase$(raw)
+    If InStr(s, "nicht mehr unterst") > 0 Or InStr(s, "not supported") > 0 _
+       Or InStr(s, "deprecated") > 0 Or InStr(s, "unknown model") > 0 Then
+        ExtractServerErrorHint = "Server-Hinweis: Modell wird nicht (mehr) unterstuetzt - Sheet GPT!A6 anpassen."
+        Exit Function
+    End If
+
+    Dim plain As String: plain = raw
+    re.Pattern = "<[^>]+>": plain = re.Replace(plain, " ")
+    plain = Replace(plain, vbCrLf, " "): plain = Replace(plain, vbLf, " "): plain = Replace(plain, vbTab, " ")
+    Do While InStr(plain, "  ") > 0: plain = Replace(plain, "  ", " "): Loop
+    plain = Trim$(plain)
+    If Len(plain) > 200 Then plain = Left$(plain, 197) & "..."
+    ExtractServerErrorHint = "Antwort-Anfang: " & plain
+End Function
+
+' === JSON-Helpers ===========================================================
+Private Function ParseJsonStr(json As String, key As String) As String
+    Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+    re.Pattern = """" & key & """" & "\s*:\s*""([^""]*)"""
+    re.IgnoreCase = True
+    If re.test(json) Then ParseJsonStr = re.Execute(json)(0).SubMatches(0)
+End Function
+
+Private Function JsonEscape(s As String) As String
+    s = Replace(s, "\", "\\")
+    s = Replace(s, """", "\""")
+    s = Replace(s, vbCrLf, "\n")
+    s = Replace(s, vbCr, "\n")
+    s = Replace(s, vbLf, "\n")
+    s = Replace(s, vbTab, " ")
+    JsonEscape = s
+End Function
+
+Private Function JsonUnescape(s As String) As String
+    Dim re As Object, mc As Object, it As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.Pattern = "\\u([0-9a-fA-F]{4})"
+    Set mc = re.Execute(s)
+    For Each it In mc
+        s = Replace(s, it.Value, ChrW(CLng("&H" & it.SubMatches(0))))
+    Next
+    s = Replace(s, "\""", """")
+    s = Replace(s, "\\/", "/")
+    s = Replace(s, "\\n", vbCrLf)
+    s = Replace(s, "\\r", "")
+    s = Replace(s, "\\t", vbTab)
+    s = Replace(s, "\\\\", "\")
+    JsonUnescape = s
+End Function
+
+Private Function CleanForJson(ByVal s As String) As String
+    s = Replace(s, vbCrLf, "\n")
+    s = Replace(s, vbCr, "\n")
+    s = Replace(s, vbLf, "\n")
+    CleanForJson = JsonEscape(s)
+End Function
+
+Private Function IsoNow() As String
+    IsoNow = Format$(Now, "yyyy-mm-dd\THH:nn:ss") & ".000Z"
+End Function
+
+Private Function Uuid4() As String
+    Dim a(): a = Array(8, 4, 4, 4, 12)
+    Dim i As Long, j As Long, s As String
+    Randomize
+    For i = 0 To UBound(a)
+        For j = 1 To a(i): s = s & LCase$(Hex$(Int(Rnd() * 16))): Next
+        If i < UBound(a) Then s = s & "-"
+    Next
+    Uuid4 = s
+End Function
+
+Private Function ExtractCsrfFromCookie(ByVal cookie As String) As String
+    Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.IgnoreCase = True
+    re.Pattern = "(?:XSRF-TOKEN|CSRF-TOKEN|csrfToken|_csrf)=([^;]+)"
+    If re.test(cookie) Then ExtractCsrfFromCookie = UrlDecode(re.Execute(cookie)(0).SubMatches(0))
+End Function
+
+Private Function UrlDecode(ByVal s As String) As String
+    Dim i As Long, r As String, ch As String
+    i = 1
+    Do While i <= Len(s)
+        ch = Mid$(s, i, 1)
+        If ch = "+" Then
+            r = r & " "
+        ElseIf ch = "%" And i + 2 <= Len(s) Then
+            r = r & Chr(CLng("&H" & Mid$(s, i + 1, 2))): i = i + 2
+        Else
+            r = r & ch
+        End If
+        i = i + 1
+    Loop
+    UrlDecode = r
+End Function
+
+' === PDF-Upload (parallel) ==================================================
+Private Function UploadManyPdfsReturnJsonArray(convId As String, pdfs As Variant, cookie As String, bearer As String) As String
+    Dim paths As Collection: Set paths = PathsFromVariant(pdfs)
+    If paths Is Nothing Or paths.count = 0 Then
+        UploadManyPdfsReturnJsonArray = "[]"
+        Exit Function
+    End If
+
+    Dim xsrf As String: xsrf = ExtractCsrfFromCookie(cookie)
+    Dim url As String: url = "https://gpt.ergo.com/api/document"
+
+    Dim ids() As String: ReDim ids(1 To paths.count)
+    Dim inflight As Object: Set inflight = CreateObject("Scripting.Dictionary")
+    Dim nextIdx As Long: nextIdx = 1
+
+    Do While nextIdx <= paths.count Or inflight.count > 0
+        Do While nextIdx <= paths.count And inflight.count < MAX_PARALLEL_PDF_UPLOADS
+            Dim p As String: p = Trim$(paths(nextIdx))
+            If Len(p) = 0 Then
+                ids(nextIdx) = ""
+                nextIdx = nextIdx + 1
+            Else
+                Dim win As Object: Set win = CreateObject("WinHttp.WinHttpRequest.5.1")
+                Dim boundary As String: boundary = "----WebKitFormBoundary" & Left$(Replace(Uuid4(), "-", ""), 16)
+                Dim filename As String: filename = CreateObject("Scripting.FileSystemObject").GetFileName(p)
+
+                Dim pre As String, post As String, body As Variant
+                pre = "--" & boundary & vbCrLf & _
+                      "Content-Disposition: form-data; name=""file_content""; filename=""" & filename & """" & vbCrLf & _
+                      "Content-Type: application/pdf" & vbCrLf & vbCrLf
+                post = vbCrLf & _
+                       "--" & boundary & vbCrLf & _
+                       "Content-Disposition: form-data; name=""filename""" & vbCrLf & vbCrLf & _
+                       filename & vbCrLf & _
+                       "--" & boundary & vbCrLf & _
+                       "Content-Disposition: form-data; name=""conversation_id""" & vbCrLf & vbCrLf & _
+                       convId & vbCrLf & _
+                       "--" & boundary & "--" & vbCrLf
+                body = BuildMultipartBinary_NoBom(pre, p, post)
+
+                win.Open "POST", url, True
+                On Error Resume Next: win.SetProxy 0: On Error GoTo 0
+                win.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36"
+                win.SetRequestHeader "Accept", "*/*"
+                win.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+                win.SetRequestHeader "Cookie", cookie
+                win.SetRequestHeader "Origin", "https://gpt.ergo.com"
+                win.SetRequestHeader "Referer", "https://gpt.ergo.com/"
+                If Len(xsrf) > 0 Then
+                    win.SetRequestHeader "X-XSRF-TOKEN", xsrf
+                    win.SetRequestHeader "X-CSRF-TOKEN", xsrf
+                End If
+                win.SetRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+                On Error Resume Next
+                win.SetRequestHeader "Content-Length", CStr(UBound(body) - LBound(body) + 1)
+                On Error GoTo 0
+
+                win.Send body
+                inflight.Add CStr(nextIdx), Array(win, p)
+                nextIdx = nextIdx + 1
+            End If
+        Loop
+
+        Dim k As Variant, finished As Collection: Set finished = New Collection
+        For Each k In inflight.Keys
+            Dim req As Object, meta As Variant
+            meta = inflight(k): Set req = meta(0)
+            If req.WaitForResponse(0) Then
+                If req.status = 200 Then
+                    Dim did As String: did = ParseJsonStr(req.ResponseText, "document_id")
+                    If Len(did) = 0 Then
+                        Err.Raise vbObjectError + 211, , "document_id fehlt bei " & meta(1) & " - " & Left$(req.ResponseText, 200)
+                    End If
+                    ids(CLng(k)) = did
+                Else
+                    Err.Raise vbObjectError + 210, , "Upload fehlgeschlagen (" & meta(1) & "): " & req.status & " - " & Left$(req.ResponseText, 300)
+                End If
+                finished.Add k
+            End If
+        Next
+        For Each k In finished
+            inflight.Remove k
+        Next
+
+        If inflight.count > 0 Then DoEvents
+    Loop
+
+    Dim i As Long, s As String
+    For i = 1 To UBound(ids)
+        If Len(ids(i)) > 0 Then
+            If Len(s) > 0 Then s = s & ","
+            s = s & """" & ids(i) & """"
+        End If
+    Next
+    UploadManyPdfsReturnJsonArray = "[" & s & "]"
+End Function
+
+Private Function PathsFromVariant(v As Variant) As Collection
+    Dim col As Collection: Set col = New Collection
+    Dim i As Long
+
+    If IsMissing(v) Then GoTo done
+    If IsEmpty(v) Then GoTo done
+    If TypeName(v) = "Nothing" Then GoTo done
+
+    Select Case TypeName(v)
+        Case "String"
+            Dim s As String: s = Trim$(CStr(v))
+            If Len(s) > 0 Then
+                Dim arr As Variant
+                s = Replace(s, vbCrLf, vbLf): s = Replace(s, vbCr, vbLf)
+                s = Replace(Replace(Replace(s, ";", vbLf), "|", vbLf), ",", vbLf)
+                arr = Split(s, vbLf)
+                For i = LBound(arr) To UBound(arr)
+                    If Len(Trim$(arr(i))) > 0 Then col.Add Trim$(arr(i))
+                Next
+            End If
+        Case "Range"
+            Dim c As Range
+            For Each c In v.cells
+                If Len(Trim$(CStr(c.Value))) > 0 Then col.Add Trim$(CStr(c.Value))
+            Next
+        Case "Collection"
+            For i = 1 To v.count
+                If Len(Trim$(CStr(v(i)))) > 0 Then col.Add Trim$(CStr(v(i)))
+            Next
+        Case Else
+            If IsArray(v) Then
+                For i = LBound(v) To UBound(v)
+                    If Len(Trim$(CStr(v(i)))) > 0 Then col.Add Trim$(CStr(v(i)))
+                Next
+            Else
+                col.Add Trim$(CStr(v))
+            End If
+    End Select
+done:
+    Set PathsFromVariant = col
+End Function
+
+Private Function BuildMultipartBinary_NoBom(pre As String, filePath As String, post As String) As Variant
+    Dim prefix() As Byte, suffix() As Byte, fileBytes() As Byte
+    prefix = Utf8NoBomBytes(pre)
+    suffix = Utf8NoBomBytes(post)
+    fileBytes = ReadAllBytes(filePath)
+
+    Dim stm As Object: Set stm = CreateObject("ADODB.Stream")
+    stm.Type = 1: stm.Open
+    If (Not Not prefix) <> 0 Then stm.Write prefix
+    If (Not Not fileBytes) <> 0 Then stm.Write fileBytes
+    If (Not Not suffix) <> 0 Then stm.Write suffix
+    stm.Position = 0
+    BuildMultipartBinary_NoBom = stm.Read
+    stm.Close
+End Function
+
+Private Function Utf8NoBomBytes(ByVal s As String) As Byte()
+    Dim st As Object: Set st = CreateObject("ADODB.Stream")
+    st.Type = 2: st.Charset = "utf-8": st.Open
+    st.WriteText s, 0
+    st.Position = 0
+    st.Type = 1
+    Dim b() As Byte: b = st.Read
+    st.Close
+
+    If UBound(b) >= 2 Then
+        If b(0) = &HEF And b(1) = &HBB And b(2) = &HBF Then
+            Dim res() As Byte, i As Long
+            ReDim res(0 To UBound(b) - 3)
+            For i = 3 To UBound(b)
+                res(i - 3) = b(i)
+            Next
+            Utf8NoBomBytes = res
+            Exit Function
+        End If
+    End If
+    Utf8NoBomBytes = b
+End Function
+
+Private Function ReadAllBytes(fp As String) As Byte()
+    Dim st As Object: Set st = CreateObject("ADODB.Stream")
+    st.Type = 1: st.Open
+    st.LoadFromFile fp
+    ReadAllBytes = st.Read
+    st.Close
+End Function
