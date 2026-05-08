@@ -1,7 +1,21 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.11)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.12)
 ' ============================================================================
+' v2.12: SCHEMA-Reorganisation auf 34 Spalten (A-AH):
+'        - NEUE Spalte C 'Auftrag_Datum' (Datum aus MV / Briefkopf, NICHT
+'          das Mail-Eingangsdatum).
+'        - Vorgangstyp + Ist_Reminder NACH VORN gerueckt (Spalten P+Q,
+'          direkt nach den Personen-/Identifier-Spalten - vor der
+'          Klassifikation, weil Triage zuerst kommt).
+'        - Hinweis ans Ende verschoben (AH).
+'        - Maklernummer-Prompt geschaerft: STRENGE Priorisierung
+'          'Agentur-Nr.' / 'Vermittler-Nr.' (Versicherer-seitig)
+'          VOR Pool-IDs wie 'MAKID', 'DEMMAK', 'BCA-ID' etc.
+'        - Kunde bekommt eigene Farbe (Petrol) statt Makler-Gruen.
+'        - Spaltenbreiten so gesetzt, dass alle Header voll lesbar sind.
+'        - Header vertikal+horizontal zentriert, mit WrapText fuer lange
+'          Bezeichner. Schrift global 'Open Sans' (Calibri-Fallback).
 ' v2.11: GROSSER Schema-Umbau auf 33 Spalten (A-AG):
 '        - NEUE Spalten direkt hinter Makler: Maklernummer (J), Kunde_Nachname
 '          (K), Kunde_Vorname (L), Kundennummer (M), Versicherungsnummer (N).
@@ -196,40 +210,41 @@ Private Const MAX_PDF_GROESSE_MB As Long = 20
 Private Const ERGO_BASE_URL As String = "https://gpt.ergo.com/api"
 Private Const MAX_PARALLEL_PDF_UPLOADS As Long = 3
 
-' Spaltenpositionen Output (ab v2.11: Kunde + Nummern direkt hinter Makler)
-Private Const COL_DATEI       As Long = 1     ' A
-Private Const COL_DATUM       As Long = 2     ' B
-Private Const COL_ABS_NAME    As Long = 3     ' C
-Private Const COL_ABS_MAIL    As Long = 4     ' D
-Private Const COL_BETREFF     As Long = 5     ' E
-Private Const COL_ANHANG_LST  As Long = 6     ' F
-Private Const COL_MAKLERPOOL  As Long = 7     ' G
-Private Const COL_NACHNAME    As Long = 8     ' H  Makler_Nachname
-Private Const COL_VORNAME     As Long = 9     ' I  Makler_Vorname
-Private Const COL_MAKLER_NR   As Long = 10    ' J  Maklernummer / Vermittlernr / BD-Nr / MAKID
-Private Const COL_KUNDE_NACH  As Long = 11    ' K  Kunde_Nachname (VN/Vollmachtgeber)
-Private Const COL_KUNDE_VOR   As Long = 12    ' L  Kunde_Vorname
-Private Const COL_KUNDE_NR    As Long = 13    ' M  Kundennummer / Person-Nr
-Private Const COL_VERS_NR     As Long = 14    ' N  Versicherungsnummer / VNR
-Private Const COL_KLASSIFIK   As Long = 15    ' O
-Private Const COL_KLASS_GRUND As Long = 16    ' P  Begruendung
-Private Const COL_GESCHTYP    As Long = 17    ' Q
-Private Const COL_UNTERLAGEN  As Long = 18    ' R
-Private Const COL_UNTERLAGEN_LST As Long = 19 ' S  Welche Unterlagen fehlen (Klartext)
-Private Const COL_SONDERFALL  As Long = 20    ' T
-Private Const COL_SPARTE      As Long = 21    ' U
-Private Const COL_ANH_TYPEN   As Long = 22    ' V
-Private Const COL_PDF_QUAL    As Long = 23    ' W  PDF-Qualitaet
-Private Const COL_VM_VORHAND  As Long = 24    ' X
-Private Const COL_VM_VOLLST   As Long = 25    ' Y
-Private Const COL_VM_FEHLT    As Long = 26    ' Z
-Private Const COL_HINWEIS     As Long = 27    ' AA
-Private Const COL_VORGANGSTYP As Long = 28    ' AB Triage
-Private Const COL_UNTERSCHR_K As Long = 29    ' AC Unterschrift Kunde
-Private Const COL_UNTERSCHR_M As Long = 30    ' AD Unterschrift Makler (optional)
-Private Const COL_AUF_VN      As Long = 31    ' AE MV auf VN ausgestellt
-Private Const COL_MAKL_NAM    As Long = 32    ' AF Makler/Pool namentlich genannt
-Private Const COL_REMINDER    As Long = 33    ' AG Reminder / Mahnung / WV
+' Spaltenpositionen Output (v2.12: 34 Spalten, Triage vorn, Hinweis am Ende)
+Private Const COL_DATEI         As Long = 1     ' A
+Private Const COL_DATUM         As Long = 2     ' B  Mail-Datum (ReceivedTime)
+Private Const COL_AUFTR_DATUM   As Long = 3     ' C  Datum aus MV / Anschreiben
+Private Const COL_ABS_NAME      As Long = 4     ' D
+Private Const COL_ABS_MAIL      As Long = 5     ' E
+Private Const COL_BETREFF       As Long = 6     ' F
+Private Const COL_ANHANG_LST    As Long = 7     ' G
+Private Const COL_MAKLERPOOL    As Long = 8     ' H
+Private Const COL_NACHNAME      As Long = 9     ' I  Makler_Nachname
+Private Const COL_VORNAME       As Long = 10    ' J  Makler_Vorname
+Private Const COL_MAKLER_NR     As Long = 11    ' K  Maklernummer (Agentur-Nr beim Versicherer)
+Private Const COL_KUNDE_NACH    As Long = 12    ' L
+Private Const COL_KUNDE_VOR     As Long = 13    ' M
+Private Const COL_KUNDE_NR      As Long = 14    ' N
+Private Const COL_VERS_NR       As Long = 15    ' O
+Private Const COL_VORGANGSTYP   As Long = 16    ' P  Triage - vorn!
+Private Const COL_REMINDER      As Long = 17    ' Q  Reminder - vorn!
+Private Const COL_KLASSIFIK     As Long = 18    ' R
+Private Const COL_KLASS_GRUND   As Long = 19    ' S
+Private Const COL_GESCHTYP      As Long = 20    ' T
+Private Const COL_UNTERLAGEN    As Long = 21    ' U
+Private Const COL_UNTERLAGEN_LST As Long = 22   ' V
+Private Const COL_SONDERFALL    As Long = 23    ' W
+Private Const COL_SPARTE        As Long = 24    ' X
+Private Const COL_ANH_TYPEN     As Long = 25    ' Y
+Private Const COL_PDF_QUAL      As Long = 26    ' Z
+Private Const COL_VM_VORHAND    As Long = 27    ' AA
+Private Const COL_VM_VOLLST     As Long = 28    ' AB
+Private Const COL_VM_FEHLT      As Long = 29    ' AC
+Private Const COL_UNTERSCHR_K   As Long = 30    ' AD
+Private Const COL_UNTERSCHR_M   As Long = 31    ' AE
+Private Const COL_AUF_VN        As Long = 32    ' AF
+Private Const COL_MAKL_NAM      As Long = 33    ' AG
+Private Const COL_HINWEIS       As Long = 34    ' AH
 
 ' === HAUPTEINSTIEG ==========================================================
 Public Sub Vorgaenge_Analysieren()
@@ -966,15 +981,32 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "   Sehr lange Firmen-Bezeichnungen sinnvoll auf 60 Zeichen kuerzen." & vbCrLf
     p = p & "   '' nur wenn faktisch nichts erkennbar." & vbCrLf
     p = p & vbCrLf
+    p = p & "1z) auftrag_datum" & vbCrLf
+    p = p & "    Datum aus dem Maklerauftrag / der Maklervollmacht ODER dem Pool-" & vbCrLf
+    p = p & "    Anschreiben (z.B. 'Grossaitingen, 28.11.2025', '04.05.2026' im" & vbCrLf
+    p = p & "    Briefkopf). NICHT das Mail-Eingangsdatum (das steht schon in" & vbCrLf
+    p = p & "    Spalte B). Format wie im Original (z.B. '28.11.2025'). Bei mehreren" & vbCrLf
+    p = p & "    Daten: das Datum der MV bevorzugen. Default ''." & vbCrLf
+    p = p & vbCrLf
     p = p & "2) makler_nachname / 3) makler_vorname" & vbCrLf
     p = p & "   Name der konkret HANDELNDEN Person beim Makler/Pool aus" & vbCrLf
     p = p & "   Email-Signatur, Anschreiben, Telefon-Notiz oder MV-Vermittler-" & vbCrLf
     p = p & "   feld. NICHT der Kunde / VN. Default ''." & vbCrLf
     p = p & vbCrLf
     p = p & "3a) makler_nummer" & vbCrLf
-    p = p & "    Vermittlernummer / BD-Nummer / MAKID / Pool-interne Maklernummer" & vbCrLf
-    p = p & "    aus MV, Email-Footer oder Anschreiben (z.B. 'MAKID: 583006'," & vbCrLf
-    p = p & "    'Vermittlernummer 12345', 'BD-Nr.: ABC123'). Default ''." & vbCrLf
+    p = p & "    Identifikator des Maklers/Pools BEIM VERSICHERER (also die Nummer," & vbCrLf
+    p = p & "    unter der ergo den Makler kennt). STRENGE Priorisierung:" & vbCrLf
+    p = p & "      1. 'Agentur-Nr.' / 'Agenturnummer' / 'Vermittler-Nr.' /" & vbCrLf
+    p = p & "         'Vermittlernummer' im Briefkopf-Block des Anschreibens" & vbCrLf
+    p = p & "         (z.B. 'Agentur-Nr.: 600082061'). DAS ist die Wunsch-Nummer." & vbCrLf
+    p = p & "      2. 'BD-Nummer' / 'Bestandsnummer' / 'Beraterzeichen' /" & vbCrLf
+    p = p & "         'Geschaeftsstellen-Nr.' aus Anschreiben oder MV." & vbCrLf
+    p = p & "      3. NUR Fallback wenn 1+2 fehlen: Pool-interne ID wie" & vbCrLf
+    p = p & "         'MAKID:', 'DEMMAK', interne Strichcode-Nummer am Maklerauftrag." & vbCrLf
+    p = p & "    WICHTIG: 'MAKID', 'DEMMAK', 'BCA-ID', 'JDC-ID' und aehnliche sind" & vbCrLf
+    p = p & "    POOL-INTERNE IDs - sie identifizieren den Makler im Pool-System," & vbCrLf
+    p = p & "    NICHT beim Versicherer. Nur nutzen wenn keine Agentur-/Vermittler-" & vbCrLf
+    p = p & "    Nr. auffindbar ist. Default ''." & vbCrLf
     p = p & vbCrLf
     p = p & "3b) kunde_nachname / 3c) kunde_vorname" & vbCrLf
     p = p & "    Name des VERSICHERUNGSNEHMERS / Vollmachtgebers. Quellen:" & vbCrLf
@@ -1166,9 +1198,10 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "    ist - z.B. fehlende Unterlagen, ungewoehnliche Konstellation," & vbCrLf
     p = p & "    Eskalationspotenzial. Leer wenn nichts auffaellt." & vbCrLf
     p = p & vbCrLf
-    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 27 Schluessel):" & vbCrLf
-    p = p & "{""vorgangstyp"":""..."",""maklerpool"":""...""," & vbCrLf
-    p = p & " ""makler_nachname"":""..."",""makler_vorname"":""..."",""makler_nummer"":""...""," & vbCrLf
+    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 28 Schluessel):" & vbCrLf
+    p = p & "{""vorgangstyp"":""..."",""auftrag_datum"":""...""," & vbCrLf
+    p = p & " ""maklerpool"":""..."",""makler_nachname"":""...""," & vbCrLf
+    p = p & " ""makler_vorname"":""..."",""makler_nummer"":""...""," & vbCrLf
     p = p & " ""kunde_nachname"":""..."",""kunde_vorname"":""..."",""kunde_nummer"":""...""," & vbCrLf
     p = p & " ""versicherungsnummer"":""...""," & vbCrLf
     p = p & " ""klassifikation"":""..."",""klassifikation_grund"":""...""," & vbCrLf
@@ -1204,6 +1237,7 @@ Private Function ParseGptJsonAntwort(antwort As String) As Object
 
     Dim keys As Variant
     keys = Array("vorgangstyp", _
+                 "auftrag_datum", _
                  "maklerpool", "makler_nachname", "makler_vorname", "makler_nummer", _
                  "kunde_nachname", "kunde_vorname", "kunde_nummer", "versicherungsnummer", _
                  "klassifikation", "klassifikation_grund", _
@@ -1638,6 +1672,7 @@ End Function
 Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_DATEI).Value = "Datei"
     ws.cells(1, COL_DATUM).Value = "Datum"
+    ws.cells(1, COL_AUFTR_DATUM).Value = "Auftrag_Datum"
     ws.cells(1, COL_ABS_NAME).Value = "Absender_Name"
     ws.cells(1, COL_ABS_MAIL).Value = "Absender_Email"
     ws.cells(1, COL_BETREFF).Value = "Betreff"
@@ -1650,6 +1685,8 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_KUNDE_VOR).Value = "Kunde_Vorname"
     ws.cells(1, COL_KUNDE_NR).Value = "Kundennummer"
     ws.cells(1, COL_VERS_NR).Value = "Versicherungsnummer"
+    ws.cells(1, COL_VORGANGSTYP).Value = "Vorgangstyp"
+    ws.cells(1, COL_REMINDER).Value = "Ist_Reminder"
     ws.cells(1, COL_KLASSIFIK).Value = "Klassifikation"
     ws.cells(1, COL_KLASS_GRUND).Value = "Klassifikation_Grund"
     ws.cells(1, COL_GESCHTYP).Value = "Geschaefts_Typ"
@@ -1662,87 +1699,93 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_VM_VORHAND).Value = "Maklervollmacht_Enthalten"
     ws.cells(1, COL_VM_VOLLST).Value = "MV_Vollumfaenglich"
     ws.cells(1, COL_VM_FEHLT).Value = "MV_Einschraenkungen"
-    ws.cells(1, COL_HINWEIS).Value = "Hinweis"
-    ws.cells(1, COL_VORGANGSTYP).Value = "Vorgangstyp"
     ws.cells(1, COL_UNTERSCHR_K).Value = "Unterschrift_Kunde"
     ws.cells(1, COL_UNTERSCHR_M).Value = "Unterschrift_Makler"
     ws.cells(1, COL_AUF_VN).Value = "Auf_VN_Ausgestellt"
     ws.cells(1, COL_MAKL_NAM).Value = "Makler_Namentlich"
-    ws.cells(1, COL_REMINDER).Value = "Ist_Reminder"
+    ws.cells(1, COL_HINWEIS).Value = "Hinweis"
 
-    ' Basis-Formatierung (Schrift + Ausrichtung) fuer ganze Header-Zeile
-    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_REMINDER))
+    ' Schrift global: Open Sans (mit Calibri-Fallback wenn nicht installiert)
+    On Error Resume Next
+    ws.cells.Font.name = "Open Sans"
+    On Error GoTo 0
+
+    ' Header-Formatierung: fett, weiss, beidseitig zentriert
+    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_HINWEIS))
         .Font.Bold = True
         .Font.Color = RGB(255, 255, 255)
         .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .WrapText = True
     End With
 
-    ' Farbcode nach Funktionsgruppe (gleiche Farbe = thematisch verwandt)
+    ' Farbcode nach Funktionsgruppe
     Dim F_STAMM As Long:  F_STAMM = RGB(30, 64, 175)    ' Indigo   - Mail-Stammdaten
-    Dim F_PERSON As Long: F_PERSON = RGB(22, 101, 52)   ' Gruen    - Personen (Makler + Kunde + IDs)
+    Dim F_MAKLER As Long: F_MAKLER = RGB(22, 101, 52)   ' Gruen    - Makler
+    Dim F_KUNDE As Long:  F_KUNDE = RGB(14, 116, 144)   ' Petrol   - Kunde
+    Dim F_TRIAGE As Long: F_TRIAGE = RGB(76, 29, 149)   ' Lila     - Triage / Reminder / Hinweis
     Dim F_KLASS As Long:  F_KLASS = RGB(15, 118, 110)   ' Teal     - Klassifikation
     Dim F_ANHANG As Long: F_ANHANG = RGB(154, 52, 18)   ' Bronze   - Anhang-Analyse
     Dim F_MV As Long:     F_MV = RGB(159, 18, 57)       ' Bordeaux - Maklervollmacht
-    Dim F_TRIAGE As Long: F_TRIAGE = RGB(76, 29, 149)   ' Lila     - Triage / Reminder / Hinweis
 
-    ' A-F  Stammdaten
+    ' A-G  Stammdaten
     ws.Range(ws.cells(1, COL_DATEI), ws.cells(1, COL_ANHANG_LST)).Interior.Color = F_STAMM
-    ' G-I  Makler  +  J-M  Kunde + Nummern (alle 'Personen/Identifier')
-    ws.Range(ws.cells(1, COL_MAKLERPOOL), ws.cells(1, COL_VERS_NR)).Interior.Color = F_PERSON
-    ' N-S  Klassifikation + Klassifikation_Grund + GeschaeftsTyp + Unterlagen + Sonderfall + Sparte
+    ' H-K  Makler
+    ws.Range(ws.cells(1, COL_MAKLERPOOL), ws.cells(1, COL_MAKLER_NR)).Interior.Color = F_MAKLER
+    ' L-O  Kunde
+    ws.Range(ws.cells(1, COL_KUNDE_NACH), ws.cells(1, COL_VERS_NR)).Interior.Color = F_KUNDE
+    ' P-Q  Triage (Vorgangstyp + Reminder)
+    ws.Range(ws.cells(1, COL_VORGANGSTYP), ws.cells(1, COL_REMINDER)).Interior.Color = F_TRIAGE
+    ' R-X  Klassifikation
     ws.Range(ws.cells(1, COL_KLASSIFIK), ws.cells(1, COL_SPARTE)).Interior.Color = F_KLASS
-    ' V-W  Anhang-Typen + PDF_Qualitaet
+    ' Y-Z  Anhang-Analyse
     ws.Range(ws.cells(1, COL_ANH_TYPEN), ws.cells(1, COL_PDF_QUAL)).Interior.Color = F_ANHANG
-    ' U-W  Maklervollmacht-Inhalt
-    ws.Range(ws.cells(1, COL_VM_VORHAND), ws.cells(1, COL_VM_FEHLT)).Interior.Color = F_MV
-    ' X-Y  Hinweis + Vorgangstyp
-    ws.Range(ws.cells(1, COL_HINWEIS), ws.cells(1, COL_VORGANGSTYP)).Interior.Color = F_TRIAGE
-    ' Z-AC Maklervollmacht-Pflichten
-    ws.Range(ws.cells(1, COL_UNTERSCHR_K), ws.cells(1, COL_MAKL_NAM)).Interior.Color = F_MV
-    ' AD   Reminder
-    ws.cells(1, COL_REMINDER).Interior.Color = F_TRIAGE
-    ws.Rows(1).RowHeight = 22
+    ' AA-AG Maklervollmacht (Inhalt + Pflichten)
+    ws.Range(ws.cells(1, COL_VM_VORHAND), ws.cells(1, COL_MAKL_NAM)).Interior.Color = F_MV
+    ' AH   Hinweis
+    ws.cells(1, COL_HINWEIS).Interior.Color = F_TRIAGE
+
+    ws.Rows(1).RowHeight = 32
     ws.Range("A2").Select
     On Error Resume Next: ActiveWindow.FreezePanes = False: ActiveWindow.FreezePanes = True: On Error GoTo 0
 End Sub
 
 Private Sub SpaltenbreitenSetzen(ws As Worksheet)
+    ' Mindestbreiten = Header-Laenge + 2 (damit Header voll lesbar ist)
     ws.Columns(COL_DATEI).ColumnWidth = 30
     ws.Columns(COL_DATUM).ColumnWidth = 16
+    ws.Columns(COL_AUFTR_DATUM).ColumnWidth = 16
     ws.Columns(COL_ABS_NAME).ColumnWidth = 22
     ws.Columns(COL_ABS_MAIL).ColumnWidth = 28
     ws.Columns(COL_BETREFF).ColumnWidth = 40
     ws.Columns(COL_ANHANG_LST).ColumnWidth = 28
-    ws.Columns(COL_MAKLERPOOL).ColumnWidth = 18
+    ws.Columns(COL_MAKLERPOOL).ColumnWidth = 22
     ws.Columns(COL_NACHNAME).ColumnWidth = 18
-    ws.Columns(COL_VORNAME).ColumnWidth = 14
+    ws.Columns(COL_VORNAME).ColumnWidth = 16
     ws.Columns(COL_MAKLER_NR).ColumnWidth = 16
     ws.Columns(COL_KUNDE_NACH).ColumnWidth = 18
-    ws.Columns(COL_KUNDE_VOR).ColumnWidth = 14
-    ws.Columns(COL_KUNDE_NR).ColumnWidth = 14
-    ws.Columns(COL_VERS_NR).ColumnWidth = 18
-    ws.Columns(COL_KLASSIFIK).ColumnWidth = 16
+    ws.Columns(COL_KUNDE_VOR).ColumnWidth = 16
+    ws.Columns(COL_KUNDE_NR).ColumnWidth = 16
+    ws.Columns(COL_VERS_NR).ColumnWidth = 22
+    ws.Columns(COL_VORGANGSTYP).ColumnWidth = 16
+    ws.Columns(COL_REMINDER).ColumnWidth = 14
+    ws.Columns(COL_KLASSIFIK).ColumnWidth = 22
     ws.Columns(COL_KLASS_GRUND).ColumnWidth = 36
-    ws.Columns(COL_GESCHTYP).ColumnWidth = 24
-    ws.Columns(COL_UNTERLAGEN).ColumnWidth = 16
+    ws.Columns(COL_GESCHTYP).ColumnWidth = 22
+    ws.Columns(COL_UNTERLAGEN).ColumnWidth = 22
     ws.Columns(COL_UNTERLAGEN_LST).ColumnWidth = 36
     ws.Columns(COL_SONDERFALL).ColumnWidth = 18
     ws.Columns(COL_SPARTE).ColumnWidth = 12
     ws.Columns(COL_ANH_TYPEN).ColumnWidth = 28
-    ws.Columns(COL_PDF_QUAL).ColumnWidth = 14
-    ws.Columns(COL_VM_VORHAND).ColumnWidth = 18
-    ws.Columns(COL_VM_VOLLST).ColumnWidth = 18
-    ws.Columns(COL_VM_FEHLT).ColumnWidth = 32
-    ws.Columns(COL_HINWEIS).ColumnWidth = 50
-    ws.Columns(COL_VORGANGSTYP).ColumnWidth = 18
-    ws.Columns(COL_UNTERSCHR_K).ColumnWidth = 14
-    ws.Columns(COL_UNTERSCHR_M).ColumnWidth = 14
-    ws.Columns(COL_AUF_VN).ColumnWidth = 14
-    ws.Columns(COL_MAKL_NAM).ColumnWidth = 14
-    ws.Columns(COL_REMINDER).ColumnWidth = 12
-    ws.Columns(COL_KUNDE_NACH).ColumnWidth = 18
-    ws.Columns(COL_KUNDE_VOR).ColumnWidth = 14
+    ws.Columns(COL_PDF_QUAL).ColumnWidth = 16
+    ws.Columns(COL_VM_VORHAND).ColumnWidth = 26
+    ws.Columns(COL_VM_VOLLST).ColumnWidth = 20
     ws.Columns(COL_VM_FEHLT).ColumnWidth = 36
+    ws.Columns(COL_UNTERSCHR_K).ColumnWidth = 20
+    ws.Columns(COL_UNTERSCHR_M).ColumnWidth = 20
+    ws.Columns(COL_AUF_VN).ColumnWidth = 20
+    ws.Columns(COL_MAKL_NAM).ColumnWidth = 20
+    ws.Columns(COL_HINWEIS).ColumnWidth = 50
 End Sub
 
 Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
@@ -1751,6 +1794,8 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
     ws.cells(row, COL_HINWEIS).Value = SafeGet(dict, "hinweis")
 
     Dim istMakler As Boolean: istMakler = (LCase(vtyp) = "makler-vorgang")
+
+    ws.cells(row, COL_AUFTR_DATUM).Value = SafeGet(dict, "auftrag_datum")
 
     If istMakler Then
         ws.cells(row, COL_MAKLERPOOL).Value = SafeGet(dict, "maklerpool")
@@ -1824,9 +1869,9 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
             End If
         End If
     Else
-        ' Kein Makler-Vorgang: Felder G-AG grau, Vorgangstyp orange
+        ' Kein Makler-Vorgang: Felder H-AG grau, Vorgangstyp orange
         Dim grau As Long: grau = RGB(229, 231, 235)
-        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_REMINDER)).Interior.Color = grau
+        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_HINWEIS)).Interior.Color = grau
         ws.cells(row, COL_VORGANGSTYP).Interior.Color = RGB(254, 215, 170)
         ws.cells(row, COL_VORGANGSTYP).Font.Bold = True
     End If
@@ -1868,7 +1913,8 @@ Private Sub SchreibeKiTextDatei(ordner As String, msgName As String, _
     s = s & sep & vbCrLf
 
     s = s & "Datei:           " & msgName & vbCrLf
-    s = s & "Datum:           " & datum & vbCrLf
+    s = s & "Datum (Mail):    " & datum & vbCrLf
+    s = s & "Datum (Auftrag): " & SafeGet(dict, "auftrag_datum") & vbCrLf
     s = s & "Absender:        " & absName & "  <" & absMail & ">" & vbCrLf
     s = s & "Betreff:         " & betreff & vbCrLf
     s = s & "Anhaenge (alle): " & IIf(Len(anhangAlle) = 0, "(keine)", anhangAlle) & vbCrLf
