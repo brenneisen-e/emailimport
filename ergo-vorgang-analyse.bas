@@ -1,7 +1,11 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.10)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.10.1)
 ' ============================================================================
+' v2.10.1: Header-Zeile im Sheet 'Analyse' bekommt einen Farbcode nach
+'          Funktionsgruppe (Indigo / Gruen / Teal / Bronze / Bordeaux / Lila).
+'          Legende im Anleitung-Sheet. Weniger einfaerben muss man manuell.
+'          Reine UI-Aenderung - keine neue Spalte, keine geaenderte Logik.
 ' v2.10: Maklerpool wird jetzt ERGEBNISOFFEN extrahiert (keine Whitelist mehr).
 '        Bisher waren nur 13 Pools erlaubt (Fonds Finanz, BCA, JDC, ...) -
 '        kleinere/regionale Pools wie 'DEMA Deutsche Versicherungsmakler AG'
@@ -1407,6 +1411,14 @@ Private Sub SetupAnleitungSheet()
     ws.cells(r, 1).Value = "Testet Outlook, MSG-Dateien und gibt fuer die erste Datei jeden Schritt aus.": r = r + 1
     ws.cells(r, 1).Value = "Detail-Log: VBA-Editor (Alt+F11) -> Direktfenster (Strg+G).": r = r + 2
 
+    ws.cells(r, 1).Value = "FARBCODE im Sheet 'Analyse' (Header-Zeile)": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "  Indigo   = Stammdaten (Datei, Datum, Absender, Betreff, Anhang_Namen)": r = r + 1
+    ws.cells(r, 1).Value = "  Gruen    = Personen-Daten (Makler-Spalten G-I + Kunde-Spalten Z-AA)": r = r + 1
+    ws.cells(r, 1).Value = "  Teal     = Klassifikation (J-N: Klassifikation, Geschaefts_Typ, ...)": r = r + 1
+    ws.cells(r, 1).Value = "  Bronze   = Anhang-Analyse (O: Anhang_Typen)": r = r + 1
+    ws.cells(r, 1).Value = "  Bordeaux = Maklervollmacht (P-R Inhalt + U-X Pflichten)": r = r + 1
+    ws.cells(r, 1).Value = "  Lila     = Triage (S Hinweis, T Vorgangstyp, Y Ist_Reminder)": r = r + 2
+
     ws.cells(r, 1).Value = "MODELL-TEST (welcher Modellname klappt?)": Bold ws, r, 12: r = r + 1
     ws.cells(r, 1).Value = "Alt+F8 -> 'Modelle_Testen' probiert ca. 25 Modellnamen-Varianten durch": r = r + 1
     ws.cells(r, 1).Value = "(gpt-41, gpt-51, gpt-5.1-chat, gpt-5.1-reasoning, gpt-4o, o3 ...) und": r = r + 1
@@ -1558,12 +1570,39 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_KUNDE_NACH).Value = "Kunde_Nachname"
     ws.cells(1, COL_KUNDE_VOR).Value = "Kunde_Vorname"
 
+    ' Basis-Formatierung (Schrift + Ausrichtung) fuer ganze Header-Zeile
     With ws.Range(ws.cells(1, 1), ws.cells(1, COL_KUNDE_VOR))
         .Font.Bold = True
-        .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau
         .Font.Color = RGB(255, 255, 255)
         .HorizontalAlignment = xlCenter
     End With
+
+    ' Farbcode nach Funktionsgruppe (gleiche Farbe = thematisch verwandt)
+    Dim F_STAMM As Long:  F_STAMM = RGB(30, 64, 175)    ' Indigo   - Mail-Stammdaten
+    Dim F_PERSON As Long: F_PERSON = RGB(22, 101, 52)   ' Gruen    - Personen (Makler + Kunde)
+    Dim F_KLASS As Long:  F_KLASS = RGB(15, 118, 110)   ' Teal     - Klassifikation
+    Dim F_ANHANG As Long: F_ANHANG = RGB(154, 52, 18)   ' Bronze   - Anhang-Analyse
+    Dim F_MV As Long:     F_MV = RGB(159, 18, 57)       ' Bordeaux - Maklervollmacht
+    Dim F_TRIAGE As Long: F_TRIAGE = RGB(76, 29, 149)   ' Lila     - Triage / Reminder / Hinweis
+
+    ' A-F Stammdaten (Datei, Datum, Absender, Betreff, Anhang_Namen)
+    ws.Range(ws.cells(1, COL_DATEI), ws.cells(1, COL_ANHANG_LST)).Interior.Color = F_STAMM
+    ' G-I Makler-Personendaten
+    ws.Range(ws.cells(1, COL_MAKLERPOOL), ws.cells(1, COL_VORNAME)).Interior.Color = F_PERSON
+    ' J-N Klassifikation
+    ws.Range(ws.cells(1, COL_KLASSIFIK), ws.cells(1, COL_SPARTE)).Interior.Color = F_KLASS
+    ' O Anhang-Typen
+    ws.cells(1, COL_ANH_TYPEN).Interior.Color = F_ANHANG
+    ' P-R Maklervollmacht-Inhalt
+    ws.Range(ws.cells(1, COL_VM_VORHAND), ws.cells(1, COL_VM_FEHLT)).Interior.Color = F_MV
+    ' S Hinweis  +  T Vorgangstyp
+    ws.Range(ws.cells(1, COL_HINWEIS), ws.cells(1, COL_VORGANGSTYP)).Interior.Color = F_TRIAGE
+    ' U-X Maklervollmacht-Pflichten (Unterschriften + Auf_VN + Makler_Namentlich)
+    ws.Range(ws.cells(1, COL_UNTERSCHR_K), ws.cells(1, COL_MAKL_NAM)).Interior.Color = F_MV
+    ' Y Reminder
+    ws.cells(1, COL_REMINDER).Interior.Color = F_TRIAGE
+    ' Z-AA Kunde-Personendaten
+    ws.Range(ws.cells(1, COL_KUNDE_NACH), ws.cells(1, COL_KUNDE_VOR)).Interior.Color = F_PERSON
     ws.Rows(1).RowHeight = 22
     ws.Range("A2").Select
     On Error Resume Next: ActiveWindow.FreezePanes = False: ActiveWindow.FreezePanes = True: On Error GoTo 0
