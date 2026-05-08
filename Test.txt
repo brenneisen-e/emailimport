@@ -1,0 +1,1210 @@
+Const SHEET    As String = "GPT"
+Private Const RULES_NAME As String = "AI_RULES"
+Private Const RULES_CELL As String = "A20"
+
+Public Sub AI_EXCEL_AUTOCODE(Optional ByVal userPrompt As String = "", Optional ByVal dryRun As Boolean = False)
+    On Error GoTo EH
+ 
+    If Len(userPrompt) = 0 Then
+        userPrompt = InputBox( _
+            "Beschreibe die Aufgabe (z.B.: 'Färbe die Auswahl grün', 'Lösche Blatt ""Test""', 'Ersetze in Auswahl ""abc"" durch ""def""').", _
+            "ErgoGPT Autocode")
+        If Len(Trim$(userPrompt)) = 0 Then Exit Sub
+    End If
+ 
+    ' 1) Compiler-Prompt bauen + LLM fragen
+    Dim spec As String, reply As String, code As String, entry As String, modName As String
+    spec = BuildExcelCompilerPrompt(userPrompt)
+    reply = ASK_ErgoGPT(spec)
+ 
+    ' 2) Code & Metadaten extrahieren
+    modName = ExtractDirectiveValue(reply, "NAME")
+    If Len(modName) = 0 Then modName = "AI_Generated_" & Format$(Now, "hhmmss")
+    entry = ExtractDirectiveValue(reply, "ENTRYPOINT")
+    If Len(entry) = 0 Then entry = "Run"
+    code = ExtractFence(reply, "[[VBA]]", "[[/VBA]]")
+    If Len(code) = 0 Then Err.Raise 5, , "Kein VBA-Codeblock ([[VBA]]...[[/VBA]]) erhalten." & vbCrLf & Left$(reply, 3000)
+ 
+    ' 3) Sicherheitscheck
+    Dim secMsg As String
+    secMsg = ValidateGeneratedVBA(code)
+    If Len(secMsg) > 0 Then Err.Raise 5, , "Sicherheitscheck fehlgeschlagen: " & secMsg
+ 
+    ' 4) Warnung vor destruktiven Aktionen
+    If RequiresDestructiveConfirm(code) Then
+        Dim ans As VbMsgBoxResult
+        ans = MsgBox("Der generierte Code enthält potenziell destruktive Aktionen (Delete/Clear)." & vbCrLf & _
+                     "Willst du wirklich fortfahren?", vbYesNo + vbExclamation, "Warnung")
+        If ans <> vbYes Then Exit Sub
+    End If
+ 
+    If dryRun Then
+        Debug.Print "===== GENERIERTER CODE (" & modName & "." & entry & ") ====="
+        Debug.Print code
+        MsgBox "Dry-Run: Code geprüft und in Direktfenster ausgegeben, keine Ausführung.", vbInformation
+        Exit Sub
+    End If
+ 
+    ' 5) Injizieren, ausführen, aufräumen
+    InjectAndRun modName, code, entry
+    Exit Sub
+ 
+EH:
+    MsgBox "Fehler: " & Err.Description, vbExclamation, "Autocode"
+End Sub
+
+Private Function ValidateGeneratedVBA(ByVal code As String) As String
+    Dim bad As Variant, t As Variant
+    bad = Array()
+    Dim lc As String: lc = LCase$(code)
+ 
+    ' Länge begrenzen
+    If Len(code) > 50000 Then
+        ValidateGeneratedVBA = "Code zu lang (>50k Zeichen)."
+        Exit Function
+    End If
+ 
+    For Each t In bad
+        If InStr(1, lc, t, vbTextCompare) > 0 Then
+            ValidateGeneratedVBA = "Verbotenes Token gefunden: " & CStr(t)
+            Exit Function
+        End If
+    Next t
+    ValidateGeneratedVBA = "" ' ok
+End Function
+ 
+Private Function RequiresDestructiveConfirm(ByVal code As String) As Boolean
+    Dim marks As Variant, m As Variant, lc As String
+    lc = LCase$(code)
+    marks = Array(".delete", "clearcontents", "clearall", "cells.clear", "rows.delete", "columns.delete")
+    For Each m In marks
+        If InStr(1, lc, m, vbTextCompare) > 0 Then RequiresDestructiveConfirm = True: Exit Function
+    Next m
+End Function
+ 
+' -------------------------------------------
+' Injektion + Ausführung + Aufräumen
+' -------------------------------------------
+Private Sub InjectAndRun(ByVal moduleName As String, ByVal code As String, ByVal entry As String)
+    On Error GoTo EH
+ 
+    Dim vbProj As Object, comp As Object, cm As Object
+    Set vbProj = Application.VBE.ActiveVBProject
+ 
+    ' Eindeutigen Modulnamen erzeugen
+    moduleName = MakeValidModuleName(moduleName)
+    moduleName = EnsureUniqueModuleName(vbProj, moduleName)
+ 
+    ' Modul hinzufügen
+    Set comp = vbProj.VBComponents.Add(1) ' 1 = vbext_ct_StdModule
+    comp.name = moduleName
+    comp.CodeModule.AddFromString code
+ 
+    ' Ausführen
+    Application.Run moduleName & "." & entry
+ 
+    ' Aufräumen
+    vbProj.VBComponents.Remove comp
+    Exit Sub
+EH:
+    ' Bei Kompilierfehlern das Modul wieder entfernen, wenn vorhanden
+    On Error Resume Next
+    If Not comp Is Nothing Then vbProj.VBComponents.Remove comp
+    On Error GoTo 0
+    Err.Raise Err.Number, , Err.Description
+End Sub
+ 
+Private Function MakeValidModuleName(ByVal s As String) As String
+    Dim i As Long, ch As String, out As String
+    For i = 1 To Len(s)
+        ch = Mid$(s, i, 1)
+        If (ch Like "[A-Za-z0-9_]") Then out = out & ch
+    Next
+    If Len(out) = 0 Then out = "AI_Generated"
+    ' Modulname darf nicht mit Zahl beginnen
+    If Mid$(out, 1, 1) Like "[0-9]" Then out = "M_" & out
+    MakeValidModuleName = Left$(out, 30)
+End Function
+ 
+Private Function EnsureUniqueModuleName(ByVal vbProj As Object, ByVal baseName As String) As String
+    Dim name As String, i As Long
+    name = baseName
+    Do While VBComponentExists(vbProj, name)
+        i = i + 1
+        name = Left$(baseName & "_" & i, 30)
+    Loop
+    EnsureUniqueModuleName = name
+End Function
+ 
+Private Function VBComponentExists(ByVal vbProj As Object, ByVal name As String) As Boolean
+    Dim comp As Object
+    For Each comp In vbProj.VBComponents
+        If StrComp(comp.name, name, vbTextCompare) = 0 Then VBComponentExists = True: Exit Function
+    Next comp
+End Function
+ 
+' -------------------------------------------
+' Hilfen: Parsing/Extraktion
+' -------------------------------------------
+Private Function ExtractFence(ByVal s As String, ByVal openTag As String, ByVal closeTag As String) As String
+    Dim p1 As Long, p2 As Long
+    p1 = InStr(1, s, openTag, vbTextCompare)
+    If p1 = 0 Then Exit Function
+    p2 = InStr(p1 + Len(openTag), s, closeTag, vbTextCompare)
+    If p2 = 0 Then Exit Function
+    ExtractFence = Mid$(s, p1 + Len(openTag), p2 - (p1 + Len(openTag)))
+End Function
+ 
+Private Function ExtractDirectiveValue(ByVal s As String, ByVal key As String) As String
+    Dim re As Object, ms As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.IgnoreCase = True
+    re.Pattern = "(^|\n|\r)" & key & "\s*=\s*([^\r\n]+)"
+    If re.Test(s) Then
+        Set ms = re.Execute(s)
+        ExtractDirectiveValue = Trim$(ms(0).SubMatches(1))
+        ' Anführungszeichen außen entfernen
+        If Left$(ExtractDirectiveValue, 1) = """" And Right$(ExtractDirectiveValue, 1) = """" Then
+            ExtractDirectiveValue = Mid$(ExtractDirectiveValue, 2, Len(ExtractDirectiveValue) - 2)
+        End If
+    End If
+End Function
+Private Function GetCompilerRulesText() As String
+    Dim rng As Range, s As String, nm As name
+    On Error Resume Next
+    ' 1) bevorzugt: benannter Bereich AI_RULES
+    For Each nm In ThisWorkbook.names
+        If StrComp(nm.name, RULES_NAME, vbTextCompare) = 0 Or _
+           StrComp(nm.NameLocal, RULES_NAME, vbTextCompare) = 0 Then
+            Set rng = nm.RefersToRange
+            Exit For
+        End If
+    Next nm
+    ' 2) Fallback: feste Zelle auf SHEET
+    If rng Is Nothing Then Set rng = ThisWorkbook.Worksheets(SHEET).Range(RULES_CELL)
+    s = CStr(rng.Value2)
+    On Error GoTo 0
+
+    ' Zeilenumbrüche normalisieren
+    s = Replace(Replace(Replace(s, vbCrLf, vbLf), vbCr, vbLf), vbLf, vbCrLf)
+    If Len(Trim$(s)) = 0 Then Err.Raise 5, , _
+        "Die Regeln sind leer. Bitte fülle '" & RULES_NAME & "' oder " & SHEET & "!" & RULES_CELL & "."
+    GetCompilerRulesText = vbCrLf & vbCrLf & s
+End Function
+
+Private Function BuildExcelCompilerPrompt(ByVal userPrompt As String) As String
+    Dim names As String, ws As Worksheet, i As Long
+    For Each ws In ThisWorkbook.Worksheets
+        names = names & IIf(Len(names) > 0, ", ", "") & """" & ws.name & """"
+        i = i + 1: If i >= 40 Then Exit For
+    Next ws
+
+    Dim actSheet As String, selAddr As String, usedAddr As String
+    actSheet = ActiveSheet.name
+    On Error Resume Next
+    selAddr = IIf(TypeName(Selection) = "Range", Selection.Address(True, True), "(keine)")
+    usedAddr = ActiveSheet.UsedRange.Address(True, True)
+    On Error GoTo 0
+
+    Dim ctx As String
+    ctx = Join(Array( _
+        "Kontext:", _
+        "- Aktives Blatt: """ & actSheet & """", _
+        "- Auswahl: " & selAddr, _
+        "- UsedRange: " & usedAddr, _
+        "- Blattnamen: [" & names & "]", _
+        "", _
+        "Nutzeranfrage: """ & CleanOneLine(userPrompt) & """", _
+        "" _
+    ), vbCrLf)
+
+    BuildExcelCompilerPrompt = ctx & GetCompilerRulesText()
+End Function
+
+
+Sub Automate()
+    Dim prompt As String
+    Dim i As Integer
+    Application.ScreenUpdating = False
+    Dim ws As Worksheet
+    Dim error As Boolean
+    Dim errormsg As String
+    
+    Set ws = ThisWorkbook.Worksheets("Agent")
+    error = False
+    errormsg = "Error in Task: "
+    i = 2
+    Do Until ws.cells(i, 2) = ""
+        On Error GoTo Fehler
+        prompt = ws.cells(i, 2)
+        AI_EXCEL_AUTOCODE prompt
+        
+    If error = True Then
+Fehler: errormsg = errormsg & prompt & "; "
+    End If
+
+        i = i + 1
+    Loop
+    Application.ScreenUpdating = True
+    MsgBox errormsg
+End Sub
+
+
+
+
+' ===========================================
+' Intelligenter XVERWEIS über ErgoGPT
+' Nutzt die existierende Funktion ASK_ErgoGPT(prompt As String)
+' ===========================================
+
+' Öffentliche Funktionen:
+' 1) AI_XVERWEIS(prompt, lookupRange, returnRange, [maxItems As Long = 200]) As Variant
+' 2) AI_XFIND(prompt, lookupRange, [maxItems As Long = 200]) As Variant
+' 3) AI_XADDRESS(prompt, lookupRange, [maxItems As Long = 200]) As String
+
+Public Function AI_XVERWEIS(ByVal userPrompt As String, _
+                            ByVal lookupRange As Range, _
+                            ByVal returnRange As Range, _
+                            Optional ByVal maxItems As Long = 200) As Variant
+    On Error GoTo EH
+
+    ' Validierung
+    If lookupRange Is Nothing Then Err.Raise 5, , "lookupRange fehlt."
+    If returnRange Is Nothing Then Err.Raise 5, , "returnRange fehlt."
+    If lookupRange.count <> returnRange.count Then
+        Err.Raise 5, , "lookupRange und returnRange müssen gleich viele Zellen haben (ein-dimensionale Vektoren)."
+    End If
+    If maxItems < 1 Then maxItems = 1
+
+    Dim items As Variant, cells As Variant, n As Long
+    items = CollectItemsFromRange(lookupRange, cells, maxItems, True) ' items() sind Texte, cells() sind Range-Objekte (als Variant)
+    n = UBound(items)
+    If n = 0 Then Err.Raise 5, , "Suchbereich ist leer."
+
+    ' Prompt aufbauen
+    Dim prompt As String
+    prompt = BuildAiLookupPrompt(userPrompt, items, "Wähle den Index des am besten passenden Eintrags zur Nutzeranfrage.")
+    prompt = MakeJsonSafe(prompt)
+    ' LLM befragen -> erwartet "INDEX:<n>"
+    Dim raw As String, idx As Long
+    raw = ASK_ErgoGPT(prompt)
+    idx = ParseIndexFromReply(raw)
+    Debug.Print idx
+    If idx < 1 Or idx > n Then
+        Err.Raise 5, , "Kein gültiger INDEX aus Antwort: " & raw
+    End If
+    
+    
+    ' idx -> entsprechende Zelle im returnRange mappen
+    Dim retCell As Range
+    Set retCell = NthCellOfRange(returnRange, idx)
+    AI_XVERWEIS = retCell.Value
+
+    Exit Function
+EH:
+    AI_XVERWEIS = CVErr(xlErrNA)
+End Function
+
+
+Public Function AI_XFIND(ByVal userPrompt As String, _
+                         ByVal lookupRange As Range, _
+                         Optional ByVal maxItems As Long = 200) As Variant
+    On Error GoTo EH
+
+    If lookupRange Is Nothing Then Err.Raise 5, , "lookupRange fehlt."
+    If maxItems < 1 Then maxItems = 1
+
+    Dim items As Variant, cells As Variant, n As Long
+    items = CollectItemsFromRange(lookupRange, cells, maxItems, True)
+    n = UBound(items)
+    If n = 0 Then Err.Raise 5, , "Suchbereich ist leer."
+
+    Dim prompt As String
+    prompt = BuildAiLookupPrompt(userPrompt, items, "Finde den besten passenden Eintrag und gib nur den Index zurück.")
+    prompt = MakeJsonSafe(prompt)
+    
+    Dim raw As String, idx As Long
+    raw = ASK_ErgoGPT(prompt)
+    idx = ParseIndexFromReply(raw)
+    If idx < 1 Or idx > n Then Err.Raise 5, , "Kein gültiger INDEX aus Antwort: " & raw
+
+    Dim c As Range
+    Set c = cells(idx)
+    AI_XFIND = c.Value
+    Exit Function
+EH:
+    AI_XFIND = CVErr(xlErrNA)
+End Function
+
+
+Public Function AI_XADDRESS(ByVal userPrompt As String, _
+                            ByVal lookupRange As Range, _
+                            Optional ByVal maxItems As Long = 200) As String
+    On Error GoTo EH
+
+    If lookupRange Is Nothing Then Err.Raise 5, , "lookupRange fehlt."
+    If maxItems < 1 Then maxItems = 1
+
+    Dim items As Variant, cells As Variant, n As Long
+    items = CollectItemsFromRange(lookupRange, cells, maxItems, True)
+    n = UBound(items)
+    If n = 0 Then Err.Raise 5, , "Suchbereich ist leer."
+
+    Dim prompt As String
+    prompt = BuildAiLookupPrompt(userPrompt, items, "Gib nur den Index des besten Treffers zurück.")
+    prompt = MakeJsonSafe(prompt)
+    
+    Dim raw As String, idx As Long
+    raw = ASK_ErgoGPT(prompt)
+    idx = ParseIndexFromReply(raw)
+    If idx < 1 Or idx > n Then Err.Raise 5, , "Kein gültiger INDEX aus Antwort: " & raw
+
+    AI_XADDRESS = cells(idx).Address(True, True)
+    Exit Function
+EH:
+    AI_XADDRESS = CVErr(xlErrNA)
+End Function
+
+
+' ==============================
+' Hilfsfunktionen (intern)
+' ==============================
+
+' Baut einen strikten Prompt: Kandidaten werden nummeriert,
+' das Modell MUSS nur "INDEX:<n>" antworten.
+Private Function BuildAiLookupPrompt(ByVal userPrompt As String, _
+                                     ByRef items As Variant, _
+                                     ByVal taskLine As String) As String
+    Dim sb As String
+    Dim i As Long, n As Long
+    n = UBound(items)
+
+    sb = ""
+    sb = sb & "Du bist ein präzises Matching-System." & vbCrLf
+    sb = sb & taskLine & vbCrLf & vbCrLf
+    sb = sb & "Nutzeranfrage (Prompt):" & vbCrLf
+    sb = sb & """" & CleanOneLine(userPrompt) & """" & vbCrLf & vbCrLf
+
+    sb = sb & "Kandidaten (n=" & n & "):" & vbCrLf
+    sb = sb & "Jede Zeile hat das Format: <Index>\t<Wert>" & vbCrLf
+    For i = 1 To n
+        sb = sb & i & vbTab & items(i) & vbCrLf
+    Next i
+
+    sb = sb & vbCrLf & "WICHTIGE AUSGABEREGELN:" & vbCrLf
+    sb = sb & "- Antworte ausschließlich in einer Zeile mit: INDEX:<Zahl>" & vbCrLf
+    sb = sb & "- Keine Erklärungen, kein JSON, kein weiterer Text." & vbCrLf
+    BuildAiLookupPrompt = sb
+End Function
+
+
+' Sammle Werte aus einem Range als 1-basierte Liste (items) und merke die Zellen (cells)
+' - Ignoriert komplett leere Zellen
+' - Begrenzt auf maxItems, um Token zu sparen
+' - AlsText: True -> formatiert Werte zu kurzen, einzeiligen Strings
+Private Function CollectItemsFromRange(ByVal r As Range, _
+                                       ByRef cells As Variant, _
+                                       ByVal maxItems As Long, _
+                                       ByVal AsText As Boolean) As Variant
+    Dim arr() As Variant
+    Dim cellList() As Variant
+    Dim c As Range
+    Dim v As Variant
+    Dim i As Long: i = 0
+
+    ReDim arr(0 To 0) As Variant ' später 1..n
+    ReDim cellList(0 To 0) As Variant
+
+    For Each c In r.cells
+        v = c.Value2
+        If Not IsEmpty(v) And Not (VarType(v) = vbError) Then
+            i = i + 1
+            If i = 1 Then
+                ReDim arr(1 To 1)
+                ReDim cellList(1 To 1)
+            Else
+                ReDim Preserve arr(1 To i)
+                ReDim Preserve cellList(1 To i)
+            End If
+            If AsText Then
+                arr(i) = TruncateForPrompt(ValueAsOneLine(v, c))
+            Else
+                arr(i) = v
+            End If
+            Set cellList(i) = c
+            If i >= maxItems Then Exit For
+        End If
+    Next c
+
+    If i = 0 Then
+        ReDim arr(0 To 0)
+        ReDim cellList(0 To 0)
+    End If
+
+    CollectItemsFromRange = arr
+    cells = cellList
+End Function
+
+
+' Konvertiere Zellwert in eine kurze, einzeilige Darstellung
+Private Function ValueAsOneLine(ByVal v As Variant, ByVal c As Range) As String
+    On Error Resume Next
+    Dim s As String
+    If IsDate(c.Value) Then
+        s = Format$(c.Value, "yyyy-mm-dd")
+    ElseIf IsNumeric(v) Then
+        s = CStr(v)
+    Else
+        s = CStr(v)
+    End If
+    s = CleanOneLine(s)
+    ValueAsOneLine = s
+End Function
+
+' Entfernt Zeilenumbrüche, trimmt, begrenzt auf moderate Länge
+Function CleanOneLine(ByVal s As String) As String
+    s = Replace(s, vbCrLf, " ")
+    s = Replace(s, vbCr, " ")
+    s = Replace(s, vbLf, " ")
+    s = Trim$(s)
+    CleanOneLine = s
+End Function
+
+' Kürzt sehr lange Kandidaten, damit der Prompt handlich bleibt
+Private Function TruncateForPrompt(ByVal s As String, Optional ByVal maxLen As Long = 160) As String
+    If Len(s) > maxLen Then
+        TruncateForPrompt = Left$(s, maxLen - 1) & "…"
+    Else
+        TruncateForPrompt = s
+    End If
+End Function
+
+' Parse "INDEX:<zahl>" aus der LLM-Antwort
+Private Function ParseIndexFromReply(ByVal s As String) As Long
+    Dim re As Object, ms As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = False
+    re.IgnoreCase = True
+    re.Pattern = "INDEX\s*:\s*(\d+)"
+    If re.Test(s) Then
+        Set ms = re.Execute(s)
+        ParseIndexFromReply = CLng(ms(0).SubMatches(0))
+        Exit Function
+    End If
+
+    ' Fallback: erste Zahl
+    re.Pattern = "(\d+)"
+    If re.Test(s) Then
+        Set ms = re.Execute(s)
+        ParseIndexFromReply = CLng(ms(0).SubMatches(0))
+        Exit Function
+    End If
+
+    ParseIndexFromReply = 0
+End Function
+
+' Liefert die n-te Zelle eines (einzeiligen/einspaltigen) Bereichs in der Enumerationsreihenfolge
+Private Function NthCellOfRange(ByVal r As Range, ByVal n As Long) As Range
+    Dim i As Long
+    Dim c As Range
+    i = 0
+    For Each c In r.cells
+        i = i + 1
+        If i = n Then
+            Set NthCellOfRange = c
+            Exit Function
+        End If
+    Next c
+    Err.Raise 5, , "Index außerhalb des Bereichs."
+End Function
+
+' Prompt für JSON sicher machen (Tabs/Steuerzeichen entfernen) ---
+Private Function MakeJsonSafe(ByVal s As String) As String
+    Dim i As Long, ch As String, out As String, code As Long
+    ' 1) Tabs ? Leerzeichen
+    s = Replace(s, vbTab, " ")
+    ' 2) Steuerzeichen < 32 (außer CR/LF) entfernen
+    For i = 1 To Len(s)
+        ch = Mid$(s, i, 1)
+        code = AscW(ch)
+        If code >= 32 Or code = 10 Or code = 13 Then
+            out = out & ch
+        End If
+    Next
+    MakeJsonSafe = out
+End Function
+
+
+Option Explicit
+
+'--- Minimal-Konfig ---
+Const BASE_URL As String = "https://gpt.ergo.com/api"
+Const SHEET    As String = "GPT"
+Const AUTH_CELL   As String = "A7"
+Private Const DEBUG_MULTIPART As Boolean = True
+
+Public Function ASK_ErgoGPT(userPrompt As String, Optional pdfs As Variant) As String
+    Dim http As Object: Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    Dim cookie As String, bearer As String
+    Dim payload As String, convId As String, resp As String, answer As String
+    Dim docIdsJson As String
+ 
+    cookie = ReadCookieFromFile()
+    bearer = ""
+ 
+    ' 1) Conversation anlegen
+    payload = BuildPayload(CleanForJson(userPrompt), "[]")
+    http.Open "PUT", BASE_URL & "/conversation", False
+    SetCommonHeaders http, cookie, bearer
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.Send payload
+    If http.status <> 200 Then Err.Raise vbObjectError + 2, , "Create failed: " & http.status & " - " & http.ResponseText
+ 
+    convId = ParseJsonStr(http.ResponseText, "id")
+    If Len(convId) = 0 Then Err.Raise vbObjectError + 3, , "Keine conversation_id gefunden."
+ 
+    ' 2) (Optional) mehrere PDFs hochladen ? JSON-Array der document_ids
+    docIdsJson = UploadManyPdfsReturnJsonArray(convId, pdfs, cookie, bearer) ' "[]", wenn nichts übergeben
+ 
+    ' 3) Antwort holen (mit document_ids)
+    payload = BuildPayload(CleanForJson(userPrompt), docIdsJson)
+    http.Open "PUT", BASE_URL & "/conversation/" & convId, False
+    SetCommonHeaders http, cookie, bearer
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.SetRequestHeader "Accept", "*/*"
+    http.Send payload
+ 
+    resp = http.ResponseText
+    answer = ExtractAssistantFromNdjson(resp)
+    If Len(answer) = 0 Then Err.Raise vbObjectError + 4, , "Keine Assistant-Nachricht gefunden."
+    ASK_ErgoGPT = Replace(JsonUnescape(answer), "\n", vbCrLf)
+ 
+    ' 4) Aufräumen (optional)
+    payload = BuildDeletePayload(convId)
+    http.Open "DELETE", BASE_URL & "/conversation", False
+    SetCommonHeaders http, cookie, bearer
+    http.SetRequestHeader "Accept", "*/*"
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.Send payload
+End Function
+
+
+' Baut das JSON für /conversation und /conversation/{id}
+Private Function BuildPayload(prompt As String, Optional docIdsJson As String = "[]") As String
+    Dim Model As String, t As Double, tone As String
+    Model = ThisWorkbook.Worksheets("GPT").Range("A6").Value2
+    t = ThisWorkbook.Worksheets("GPT").Range("A9").Value2
+    tone = ThisWorkbook.Worksheets("GPT").Range("A12").Value2
+
+    BuildPayload = "{""conversation_title"":""New conversation"",""messages"":[{" & _
+                   """id"":""" & Uuid4() & """,""role"":""user"",""content"":""" & prompt & """,""date"":""" & IsoNow() & """}]," & _
+                   """model"":""" & Model & """,""temperature"":" & Replace(CStr(t), ",", ".") & ",""pinned"":false,""tone"":""" & JsonEscape(tone) & """,""document_ids"":" & docIdsJson & "}"
+End Function
+
+
+' NDJSON/SSE -> letzten Assistant-Text holen
+Private Function ExtractAssistantFromNdjson(ByVal raw As String) As String
+    Dim lines() As String, i As Long, ln As String, lastText As String
+    raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
+    lines = Split(raw, vbLf)
+    For i = LBound(lines) To UBound(lines)
+        ln = Trim$(lines(i))
+        If Len(ln) = 0 Then GoTo cont
+        If LCase$(Left$(ln, 5)) = "data:" Then ln = Trim$(Mid$(ln, 6))
+        If Left$(ln, 1) = "{" And Right$(ln, 1) = "}" Then
+            Dim t As String: t = ExtractAssistantFromChunk(ln)
+            If Len(t) > 0 Then lastText = t
+        End If
+cont:
+    Next
+    ExtractAssistantFromNdjson = lastText
+End Function
+Private Function ExtractAssistantFromChunk(json As String) As String
+    Dim re As Object, ms As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.MultiLine = True: re.IgnoreCase = True
+
+    ' a) choices -> messages -> content
+    re.Pattern = """choices""\s*:\s*\[\s*\{[\s\S]*?""messages""\s*:\s*\[\s*\{[\s\S]*?""role""\s*:\s*""assistant""[\s\S]*?""content""\s*:\s*""((?:\\.|[^""])*)"""
+    If re.Test(json) Then
+        Set ms = re.Execute(json)
+        ExtractAssistantFromChunk = ms(ms.count - 1).SubMatches(0)
+        Exit Function
+    End If
+
+    ' b) choices -> delta -> content
+    re.Pattern = """choices""\s*:\s*\[[\s\S]*?""delta""[\s\S]*?""content""\s*:\s*""((?:\\.|[^""])*)"""
+    If re.Test(json) Then
+        Set ms = re.Execute(json)
+        ExtractAssistantFromChunk = ms(ms.count - 1).SubMatches(0)
+    End If
+End Function
+
+Private Sub SetCommonHeaders(http As Object, ByVal cookie As String, ByVal bearer As String)
+    If Len(cookie) > 0 Then http.SetRequestHeader "Cookie", cookie
+    Dim xsrf As String: xsrf = ExtractCsrfFromCookie(cookie)
+    If Len(xsrf) > 0 Then
+        http.SetRequestHeader "X-XSRF-TOKEN", xsrf
+        http.SetRequestHeader "X-CSRF-TOKEN", xsrf
+    End If
+    If Len(bearer) > 0 Then http.SetRequestHeader "Authorization", bearer
+    http.SetRequestHeader "User-Agent", "Mozilla/5.0"
+    http.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+    http.SetRequestHeader "Origin", "https://gpt.ergo.com"
+    http.SetRequestHeader "Referer", "https://gpt.ergo.com/"
+    http.SetRequestHeader "X-Requested-With", "XMLHttpRequest"
+End Sub
+
+
+Private Function ParseJsonStr(json As String, key As String) As String
+    Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+    re.Pattern = """" & key & """" & "\s*:\s*""([^""]*)"""
+    re.IgnoreCase = True
+    If re.Test(json) Then ParseJsonStr = re.Execute(json)(0).SubMatches(0)
+End Function
+
+Private Function JsonEscape(s As String) As String
+    s = Replace(s, "\", "\\"): s = Replace(s, """", "\""")
+    s = Replace(s, vbCrLf, "\n"): JsonEscape = s
+End Function
+
+Private Function JsonUnescape(s As String) As String
+    Dim re As Object, mc As Object, it As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.Pattern = "\\u([0-9a-fA-F]{4})"
+    Set mc = re.Execute(s)
+    For Each it In mc
+        s = Replace(s, it.Value, ChrW(CLng("&H" & it.SubMatches(0))))
+    Next
+    s = Replace(s, "\""", """"): s = Replace(s, "\\/", "/")
+    s = Replace(s, "\\n", vbCrLf): s = Replace(s, "\\r", "")
+    s = Replace(s, "\\t", vbTab): s = Replace(s, "\\\\", "\")
+    JsonUnescape = s
+End Function
+
+Private Function IsoNow() As String
+    IsoNow = Format$(Now, "yyyy-mm-dd\THH:nn:ss") & ".000Z"
+End Function
+
+Private Function Uuid4() As String
+    Dim a(): a = Array(8, 4, 4, 4, 12)
+    Dim i As Long, j As Long, s As String
+    Randomize
+    For i = 0 To UBound(a)
+        For j = 1 To a(i): s = s & LCase$(Hex$(Int(Rnd() * 16))): Next
+        If i < UBound(a) Then s = s & "-"
+    Next
+    Uuid4 = s
+End Function
+
+Private Function ExtractCsrfFromCookie(ByVal cookie As String) As String
+    Dim re As Object: Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.IgnoreCase = True
+    re.Pattern = "(?:XSRF-TOKEN|CSRF-TOKEN|csrfToken|_csrf)=([^;]+)"
+    If re.Test(cookie) Then ExtractCsrfFromCookie = UrlDecode(re.Execute(cookie)(0).SubMatches(0))
+End Function
+
+Private Function UrlDecode(ByVal s As String) As String
+    Dim i As Long, r As String, ch As String
+    i = 1
+    Do While i <= Len(s)
+        ch = Mid$(s, i, 1)
+        If ch = "+" Then
+            r = r & " "
+        ElseIf ch = "%" And i + 2 <= Len(s) Then
+            r = r & Chr(CLng("&H" & Mid$(s, i + 1, 2))): i = i + 2
+        Else: r = r & ch
+        End If
+        i = i + 1
+    Loop
+    UrlDecode = r
+End Function
+
+Private Function BuildDeletePayload(conv_id) As String
+    BuildDeletePayload = "{""conversation_ids"":[""" & conv_id & """]}"
+End Function
+
+
+Private Function ReadCookieFromFile() As String
+    Dim fso As Object, ts As Object, s As String
+    Const COOKIE_PATH As String = "F:\ExcelGPT-Cookie\Cookie.txt"
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FileExists(COOKIE_PATH) Then
+        Err.Raise vbObjectError + 1, , "Cookie-Datei nicht gefunden: " & COOKIE_PATH
+    End If
+    Set ts = fso.OpenTextFile(COOKIE_PATH, 1, False, -2)
+    s = ts.ReadAll
+    ts.Close
+    s = Trim$(s)
+    If Len(s) = 0 Then Err.Raise vbObjectError + 1, , "Cookie-Datei ist leer: " & COOKIE_PATH
+    ReadCookieFromFile = s
+End Function
+
+
+' --- PDF Upload(s) ---
+
+' pdfArg kann sein:
+'   - String (ein Pfad) oder
+'   - Array/Collection von Strings (mehrere Pfade)
+Private Function UploadAnyPdfsReturnJsonArray(convId As String, pdfArg As Variant, cookie As String, bearer As String) As String
+    Dim ids As Collection: Set ids = New Collection
+    Dim i As Long
+
+    If IsArray(pdfArg) Then
+        For i = LBound(pdfArg) To UBound(pdfArg)
+            ids.Add UploadLocalPdf(convId, CStr(pdfArg(i)), cookie, bearer)
+        Next
+    ElseIf TypeName(pdfArg) = "Collection" Then
+        For i = 1 To pdfArg.count
+            ids.Add UploadLocalPdf(convId, CStr(pdfArg.Item(i)), cookie, bearer)
+        Next
+    ElseIf Len(Trim$(CStr(pdfArg))) > 0 Then
+        ids.Add UploadLocalPdf(convId, CStr(pdfArg), cookie, bearer)
+    End If
+
+    ' Als JSON-Array zurückgeben
+    Dim s As String
+    For i = 1 To ids.count
+        If Len(s) > 0 Then s = s & ","
+        s = s & """" & ids.Item(i) & """"
+    Next
+    UploadAnyPdfsReturnJsonArray = "[" & s & "]"
+End Function
+
+
+Private Function UploadLocalPdf(convId As String, filePath As String, cookie As String, bearer As String) As String
+    ' Prüfen
+    Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FileExists(filePath) Then Err.Raise vbObjectError + 100, , "Datei nicht gefunden: " & filePath
+    If LCase$(fso.GetExtensionName(filePath)) <> "pdf" Then Err.Raise vbObjectError + 101, , "Nur PDF erlaubt: " & filePath
+    If Len(convId) = 0 Then Err.Raise vbObjectError + 102, , "conversation_id ist leer."
+    Dim filename As String: filename = fso.GetFileName(filePath)
+
+    ' Boundary im WebKit-Stil
+    Dim boundary As String
+    boundary = "----WebKitFormBoundary" & Left$(Replace(Uuid4(), "-", ""), 16)
+
+    ' Multipart-Parts
+    Dim pre As String, post As String
+    pre = "--" & boundary & vbCrLf & _
+          "Content-Disposition: form-data; name=""file_content""; filename=""" & filename & """" & vbCrLf & _
+          "Content-Type: application/pdf" & vbCrLf & vbCrLf
+
+    post = vbCrLf & _
+           "--" & boundary & vbCrLf & _
+           "Content-Disposition: form-data; name=""filename""" & vbCrLf & vbCrLf & _
+           filename & vbCrLf & _
+           "--" & boundary & vbCrLf & _
+           "Content-Disposition: form-data; name=""conversation_id""" & vbCrLf & vbCrLf & _
+           convId & vbCrLf & _
+           "--" & boundary & "--" & vbCrLf
+
+    ' Body als Variant(Byte()) - UTF-8 ohne BOM
+    Dim bodyVar As Variant
+    bodyVar = BuildMultipartBinary_NoBom(pre, filePath, post)
+
+    ' XSRF aus Cookie (falls vorhanden)
+    Dim xsrf As String: xsrf = ExtractCsrfFromCookie(cookie)
+
+    ' --- POST /api/document via WinHTTP ---
+    Dim win As Object: Set win = CreateObject("WinHttp.WinHttpRequest.5.1")
+    Dim url As String: url = "https://gpt.ergo.com/api/document"
+    win.Open "POST", url, False
+    On Error Resume Next
+    win.SetProxy 0
+    On Error GoTo 0
+
+ 
+    win.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36"
+    win.SetRequestHeader "Accept", "*/*"
+    win.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+    win.SetRequestHeader "Cookie", cookie
+    win.SetRequestHeader "Origin", "https://gpt.ergo.com"
+    win.SetRequestHeader "Referer", "https://gpt.ergo.com/"
+    If Len(xsrf) > 0 Then
+        win.SetRequestHeader "X-XSRF-TOKEN", xsrf
+        win.SetRequestHeader "X-CSRF-TOKEN", xsrf
+    End If
+    win.SetRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+    On Error Resume Next
+    win.SetRequestHeader "Content-Length", CStr(UBound(bodyVar) - LBound(bodyVar) + 1)
+    On Error GoTo 0
+
+    win.Send bodyVar
+
+    If win.status <> 200 Then
+        Err.Raise vbObjectError + 110, , "Upload fehlgeschlagen: " & win.status & " - " & Left$(win.ResponseText, 500)
+    End If
+
+    Dim docId As String
+    docId = ParseJsonStr(win.ResponseText, "document_id")
+    If Len(docId) = 0 Then Err.Raise vbObjectError + 111, , "document_id fehlt - Antwort: " & win.ResponseText
+    UploadLocalPdf = docId
+End Function
+
+ 
+' === Sendeprofile ===
+Private Sub SendMultipart_MSXML(url As String, boundary As String, body As Variant, cookie As String, _
+                                origin As String, referer As String, xsrf As String, _
+                                ByRef status As Long, ByRef respText As String, ByRef respHdr As String, _
+                                Optional useExpect100 As Boolean = False)
+    On Error GoTo EH
+    Dim http As Object: Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    http.Open "POST", url, False
+    http.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36"
+    http.SetRequestHeader "Accept", "*/*"
+    http.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+    http.SetRequestHeader "Cookie", cookie
+    If Len(origin) > 0 Then http.SetRequestHeader "Origin", origin
+    If Len(referer) > 0 Then http.SetRequestHeader "Referer", referer
+    If Len(xsrf) > 0 Then
+        http.SetRequestHeader "X-XSRF-TOKEN", xsrf
+        http.SetRequestHeader "X-CSRF-TOKEN", xsrf
+    End If
+    http.SetRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+    On Error Resume Next
+    http.SetRequestHeader "Content-Length", CStr(UBound(body) - LBound(body) + 1)
+    If useExpect100 Then http.SetRequestHeader "Expect", "100-continue" Else http.SetRequestHeader "Expect", ""
+    On Error GoTo 0
+ 
+    http.Send body
+    status = http.status
+    respText = http.ResponseText
+    respHdr = http.GetAllResponseHeaders
+    Exit Sub
+EH:
+    status = 0: respText = "MSXML.Send Fehler: " & Err.Number & " - " & Err.Description: respHdr = ""
+End Sub
+ 
+Private Sub SendMultipart_WinHTTP(url As String, boundary As String, body As Variant, cookie As String, _
+                                  origin As String, referer As String, xsrf As String, _
+                                  ByRef status As Long, ByRef respText As String, ByRef respHdr As String)
+    On Error GoTo EH
+    Dim win As Object: Set win = CreateObject("WinHttp.WinHttpRequest.5.1")
+    win.Open "POST", url, False
+   
+    On Error Resume Next
+    win.SetProxy 0 ' WINHTTP_ACCESS_TYPE_DEFAULT_PROXY
+    On Error GoTo 0
+    win.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36"
+    win.SetRequestHeader "Accept", "*/*"
+    win.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+    win.SetRequestHeader "Cookie", cookie
+    If Len(origin) > 0 Then win.SetRequestHeader "Origin", origin
+    If Len(referer) > 0 Then win.SetRequestHeader "Referer", referer
+    If Len(xsrf) > 0 Then
+        win.SetRequestHeader "X-XSRF-TOKEN", xsrf
+        win.SetRequestHeader "X-CSRF-TOKEN", xsrf
+    End If
+    win.SetRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+    On Error Resume Next
+    win.SetRequestHeader "Content-Length", CStr(UBound(body) - LBound(body) + 1)
+    On Error GoTo 0
+ 
+    win.Send body
+    status = win.status
+    respText = win.ResponseText
+    respHdr = win.GetAllResponseHeaders
+    Exit Sub
+EH:
+    status = 0: respText = "WinHTTP.Send Fehler: " & Err.Number & " - " & Err.Description: respHdr = ""
+End Sub
+
+' Mehrere PDFs parallel hochladen (Standard: bis zu 3 gleichzeitig)
+Private Function UploadManyPdfsReturnJsonArray(convId As String, pdfs As Variant, cookie As String, bearer As String) As String
+    Const MAX_PAR As Long = 3   ' << hier Parallelität einstellen (1..6 ist i. d. R. sinnvoll)
+    Dim paths As Collection: Set paths = PathsFromVariant(pdfs)
+    If paths Is Nothing Or paths.count = 0 Then
+        UploadManyPdfsReturnJsonArray = "[]"
+        Exit Function
+    End If
+
+    Dim xsrf As String: xsrf = ExtractCsrfFromCookie(cookie)
+    Dim url As String: url = "https://gpt.ergo.com/api/document"
+
+    Dim ids() As String: ReDim ids(1 To paths.count)
+    Dim inflight As Object: Set inflight = CreateObject("Scripting.Dictionary")
+    Dim nextIdx As Long: nextIdx = 1
+
+    Do While nextIdx <= paths.count Or inflight.count > 0
+        ' neue Uploads starten, bis MAX_PAR erreicht
+        Do While nextIdx <= paths.count And inflight.count < MAX_PAR
+            Dim p As String: p = Trim$(paths(nextIdx))
+            If Len(p) = 0 Then
+                ids(nextIdx) = ""
+                nextIdx = nextIdx + 1
+            Else
+                Dim win As Object: Set win = CreateObject("WinHttp.WinHttpRequest.5.1")
+                Dim boundary As String: boundary = "----WebKitFormBoundary" & Left$(Replace(Uuid4(), "-", ""), 16)
+                Dim filename As String: filename = CreateObject("Scripting.FileSystemObject").GetFileName(p)
+
+                ' Multipart-Body bauen (UTF-8 ohne BOM)
+                Dim pre As String, post As String, body As Variant
+                pre = "--" & boundary & vbCrLf & _
+                      "Content-Disposition: form-data; name=""file_content""; filename=""" & filename & """" & vbCrLf & _
+                      "Content-Type: application/pdf" & vbCrLf & vbCrLf
+                post = vbCrLf & _
+                       "--" & boundary & vbCrLf & _
+                       "Content-Disposition: form-data; name=""filename""" & vbCrLf & vbCrLf & _
+                       filename & vbCrLf & _
+                       "--" & boundary & vbCrLf & _
+                       "Content-Disposition: form-data; name=""conversation_id""" & vbCrLf & vbCrLf & _
+                       convId & vbCrLf & _
+                       "--" & boundary & "--" & vbCrLf
+                body = BuildMultipartBinary_NoBom(pre, p, post)
+
+                ' Request asynchron öffnen & Header setzen (Profil 4 aus deinem Log)
+                win.Open "POST", url, True
+                On Error Resume Next: win.SetProxy 0: On Error GoTo 0
+                win.SetRequestHeader "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36"
+                win.SetRequestHeader "Accept", "*/*"
+                win.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+                win.SetRequestHeader "Cookie", cookie
+                win.SetRequestHeader "Origin", "https://gpt.ergo.com"
+                win.SetRequestHeader "Referer", "https://gpt.ergo.com/"
+                If Len(xsrf) > 0 Then
+                    win.SetRequestHeader "X-XSRF-TOKEN", xsrf
+                    win.SetRequestHeader "X-CSRF-TOKEN", xsrf
+                End If
+                win.SetRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+                On Error Resume Next
+                win.SetRequestHeader "Content-Length", CStr(UBound(body) - LBound(body) + 1)
+                On Error GoTo 0
+
+                win.Send body
+                inflight.Add CStr(nextIdx), Array(win, p)
+                nextIdx = nextIdx + 1
+            End If
+        Loop
+
+        ' fertige Antworten einsammeln (non-blocking)
+        Dim k As Variant, finished As Collection: Set finished = New Collection
+        For Each k In inflight.Keys
+            Dim req As Object, meta As Variant
+            meta = inflight(k): Set req = meta(0)
+            If req.WaitForResponse(0) Then
+                If req.status = 200 Then
+                    Dim did As String: did = ParseJsonStr(req.ResponseText, "document_id")
+                    If Len(did) = 0 Then
+                        Err.Raise vbObjectError + 211, , "document_id fehlt bei " & meta(1) & " - " & Left$(req.ResponseText, 200)
+                    End If
+                    ids(CLng(k)) = did
+                Else
+                    Err.Raise vbObjectError + 210, , "Upload fehlgeschlagen (" & meta(1) & "): " & req.status & " - " & Left$(req.ResponseText, 300)
+                End If
+                finished.Add k
+            End If
+        Next
+        For Each k In finished
+            inflight.Remove k
+        Next
+
+        If inflight.count > 0 Then DoEvents ' UI/Excel reaktionsfähig halten
+    Loop
+
+    ' JSON-Array zurückgeben
+    Dim i As Long, s As String
+    For i = 1 To UBound(ids)
+        If Len(ids(i)) > 0 Then
+            If Len(s) > 0 Then s = s & ","
+            s = s & """" & ids(i) & """"
+        End If
+    Next
+    UploadManyPdfsReturnJsonArray = "[" & s & "]"
+End Function
+
+ 
+' akzeptiert:
+'  - Array("C:\A.pdf","C:\B.pdf")
+'  - Range (z. B. C1:C5 mit Pfaden)
+'  - String "C:\A.pdf; C:\B.pdf" oder mit Zeilenumbrüchen
+'  - Collection mit Strings
+Private Function PathsFromVariant(v As Variant) As Collection
+    Dim col As Collection: Set col = New Collection
+    Dim i As Long
+ 
+    If IsMissing(v) Then GoTo done
+    If IsEmpty(v) Then GoTo done
+    If TypeName(v) = "Nothing" Then GoTo done
+ 
+    Select Case TypeName(v)
+        Case "String"
+            Dim s As String: s = Trim$(CStr(v))
+            If Len(s) > 0 Then
+                Dim arr As Variant
+                s = Replace(s, vbCrLf, vbLf)
+                s = Replace(s, vbCr, vbLf)
+                ' split auf ; , | oder Zeilenumbruch
+                s = Replace(Replace(Replace(s, ";", vbLf), "|", vbLf), ",", vbLf)
+                arr = Split(s, vbLf)
+                For i = LBound(arr) To UBound(arr)
+                    If Len(Trim$(arr(i))) > 0 Then col.Add Trim$(arr(i))
+                Next
+            End If
+ 
+        Case "Range"
+            Dim c As Range
+            For Each c In v.cells
+                If Len(Trim$(CStr(c.Value))) > 0 Then col.Add Trim$(CStr(c.Value))
+            Next
+ 
+        Case "Collection"
+            For i = 1 To v.count
+                If Len(Trim$(CStr(v(i)))) > 0 Then col.Add Trim$(CStr(v(i)))
+            Next
+ 
+        Case Else
+            If IsArray(v) Then
+                For i = LBound(v) To UBound(v)
+                    If Len(Trim$(CStr(v(i)))) > 0 Then col.Add Trim$(CStr(v(i)))
+                Next
+            Else
+                ' Ein einzelner Wert, der kein Array/Range ist:
+                col.Add Trim$(CStr(v))
+            End If
+    End Select
+ 
+done:
+    Set PathsFromVariant = col
+End Function
+
+
+' --------- Debug & Binary-Bau ohne BOM ----------
+
+Private Function BuildMultipartBinary_NoBom(pre As String, filePath As String, post As String) As Variant
+    Dim prefix() As Byte, suffix() As Byte, fileBytes() As Byte
+    prefix = Utf8NoBomBytes(pre)
+    suffix = Utf8NoBomBytes(post)
+    fileBytes = ReadAllBytes(filePath)
+
+    Dim stm As Object: Set stm = CreateObject("ADODB.Stream")
+    stm.Type = 1: stm.Open                ' adTypeBinary
+    If (Not Not prefix) <> 0 Then stm.Write prefix
+    If (Not Not fileBytes) <> 0 Then stm.Write fileBytes
+    If (Not Not suffix) <> 0 Then stm.Write suffix
+    stm.Position = 0
+    BuildMultipartBinary_NoBom = stm.Read ' Variant(Byte())
+    stm.Close
+End Function
+
+Private Function Utf8NoBomBytes(ByVal s As String) As Byte()
+    ' Erzeugt UTF-8 Bytes OHNE EF BB BF am Anfang
+    Dim st As Object: Set st = CreateObject("ADODB.Stream")
+    st.Type = 2: st.Charset = "utf-8": st.Open
+    st.WriteText s, 0
+    st.Position = 0
+    st.Type = 1
+    Dim b() As Byte: b = st.Read
+    st.Close
+
+    If UBound(b) >= 2 Then
+        If b(0) = &HEF And b(1) = &HBB And b(2) = &HBF Then
+            Dim res() As Byte, i As Long
+            ReDim res(0 To UBound(b) - 3)
+            For i = 3 To UBound(b)
+                res(i - 3) = b(i)
+            Next
+            Utf8NoBomBytes = res
+            Exit Function
+        End If
+    End If
+    Utf8NoBomBytes = b
+End Function
+
+Private Function ReadAllBytes(fp As String) As Byte()
+    Dim st As Object: Set st = CreateObject("ADODB.Stream")
+    st.Type = 1: st.Open
+    st.LoadFromFile fp
+    ReadAllBytes = st.Read
+    st.Close
+End Function
+
+Private Sub DebugMultipart(boundary As String, body As Variant)
+    On Error Resume Next
+    Dim n As Long: n = UBound(body) - LBound(body) + 1
+    Debug.Print "Multipart length: "; n
+    Debug.Print "Boundary: "; boundary
+    Debug.Print "Head (32 bytes): "; HexDump(body, 0, 32)
+    Debug.Print "Has BOM at start: "; IIf(StartsWithBom(body), "YES (bad!)", "no")
+
+    Dim dumpPath As String
+    dumpPath = Environ$("TEMP") & "\ergo_multipart_dump.bin"
+    SaveBytes dumpPath, body
+    Debug.Print "Dump written: "; dumpPath
+    On Error GoTo 0
+End Sub
+
+Private Function StartsWithBom(body As Variant) As Boolean
+    On Error Resume Next
+    StartsWithBom = (body(0) = &HEF And body(1) = &HBB And body(2) = &HBF)
+    On Error GoTo 0
+End Function
+
+Private Sub SaveBytes(path As String, body As Variant)
+    Dim st As Object: Set st = CreateObject("ADODB.Stream")
+    st.Type = 1: st.Open
+    st.Write body
+    st.SaveToFile path, 2 ' adSaveCreateOverWrite
+    st.Close
+End Sub
+
+Private Function HexDump(body As Variant, ByVal startIdx As Long, ByVal count As Long) As String
+    Dim i As Long, lastIdx As Long, s As String
+    lastIdx = startIdx + count - 1
+    For i = startIdx To lastIdx
+        If i > UBound(body) Then Exit For
+        s = s & Right$("0" & Hex$(body(i)), 2) & " "
+    Next
+    HexDump = Trim$(s)
+End Function
+
+' Hilfsroutine: Strings (UTF-8) + File-Bytes zu einem Byte()-Body zusammenführen
+Private Function BuildMultipartBinary(prefixText As String, filePath As String, suffixText As String) As Byte()
+    Dim stmFinal As Object, stmText As Object, stmFile As Object
+
+    ' finaler Binärstream
+    Set stmFinal = CreateObject("ADODB.Stream")
+    stmFinal.Type = 1: stmFinal.Open 'adTypeBinary
+
+    ' Prefix (UTF-8)
+    Set stmText = CreateObject("ADODB.Stream")
+    stmText.Type = 2 'adTypeText
+    stmText.Charset = "utf-8"
+    stmText.Open
+    stmText.WriteText prefixText, 0
+    stmText.Position = 0
+    stmText.Type = 1
+    stmFinal.Write stmText.Read
+    stmText.Close
+
+    ' Datei
+    Set stmFile = CreateObject("ADODB.Stream")
+    stmFile.Type = 1: stmFile.Open
+    stmFile.LoadFromFile filePath
+    stmFinal.Write stmFile.Read
+    stmFile.Close
+
+    ' Suffix (UTF-8)
+    Set stmText = CreateObject("ADODB.Stream")
+    stmText.Type = 2: stmText.Charset = "utf-8"
+    stmText.Open
+    stmText.WriteText suffixText, 0
+    stmText.Position = 0
+    stmText.Type = 1
+    stmFinal.Write stmText.Read
+    stmText.Close
+
+    ' Ergebnis
+    stmFinal.Position = 0
+    BuildMultipartBinary = stmFinal.Read
+    stmFinal.Close
+End Function
+
+' Kleine Helferlein
+Private Function CleanForJson(ByVal s As String) As String
+    s = Replace(s, vbCrLf, "\n")
+    s = Replace(s, vbCr, "\n")
+    s = Replace(s, vbLf, "\n")
+    CleanForJson = JsonEscape(s)
+End Function
+
