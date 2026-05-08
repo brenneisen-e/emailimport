@@ -1,135 +1,147 @@
 ============================================================
-ERGO Vorgang-Analyse - Excel-Tool (v1.0)
+ERGO Vorgang-Analyse - Excel-Tool (v2.0)
 ============================================================
 
-ZWECK:
-  Liest die Email-Vorgaenge aus dem Tabellenblatt "Emails"
-  (Output von ergo-email-batch.bas / Ordner_Scannen) und laesst
-  ErgoGPT jeden Vorgang automatisch klassifizieren. Schreibt
-  acht Zusatzspalten (I-P) zurueck.
+NEU IN v2.0:
+  - Tool scannt direkt einen ORDNER mit .msg-Dateien (statt
+    aus dem Excel-Sheet "Emails" zu lesen).
+  - Anhaenge werden automatisch extrahiert und PDFs an ErgoGPT
+    HOCHGELADEN -> GPT analysiert auch den PDF-Inhalt.
+  - Maklervollmacht-Pruefung: GPT pruef bei Vollmacht-PDFs die
+    Pflichtfelder (Kundenname, Geburtsdatum, Anschrift, Datum,
+    Unterschrift, Maklerangaben).
+  - Anzahl-Limit beim Start waehlbar (z.B. 10 zum Testen).
+  - Cookie kann direkt im Sheet 'GPT' (Zelle A7) eingetragen ODER
+    im Setup-Dialog eingegeben werden -> wird automatisch in die
+    Cookie-Datei gespiegelt.
 
-AUSGABE-SPALTEN:
-  I  Maklerpool          -> Fonds Finanz / BCA / JDC / blau direkt /
-                            Fondsnet / Maxpool / WIFO / Aruna /
-                            Apella / Netfonds / VEMA / Mr.Money /
-                            Direktmakler / "" (unbekannt)
-  J  Makler_Nachname     -> aus Signatur / From-Feld
-  K  Makler_Vorname
-  L  Klassifikation      -> Standardvorgang / Nicht-Standard
-  M  Geschaefts_Typ      -> BUe einfacher Vertrag /
-                            BUe Kundenverbindung /
-                            Keine BUe
-  N  Unterlagen_Angefragt -> ja / nein
-  O  Sonderfall          -> Flottengeschaeft / Sondertarif /
-                            Kein Sonderfall
-  P  Sparte              -> Komposit / Leben / KV / Mehrere /
-                            Unbekannt
+============================================================
+
+WORKFLOW:
+
+  1) Diese .xlsm in den Ordner legen, in dem die .msg-Dateien
+     liegen (z.B. Output von Mails_Speichern als MSG).
+
+  2) Vorgaenge_Setup einmal ausfuehren:
+        - Sheets 'GPT' (mit Default gpt-5.1, Temp 0)
+        - Sheet 'Anleitung' (Step-by-Step in Excel)
+        - Sheet 'Analyse' (Output-Tabelle)
+        - Cookie-Dialog (vorhandene Datei nutzen ODER neu eingeben)
+
+  3) Vorgaenge_Analysieren ausfuehren:
+        a) Cookie-Dialog
+        b) Ordner-Auswahl (Default: dieser Workbook-Pfad)
+        c) Anzahl-Eingabe (leer/0 = alle, sonst Limit z.B. 10)
+        d) Bestaetigung mit geschaetzter Laufzeit
+        e) Pro .msg-Datei:
+             - Outlook oeffnet das MSG
+             - Anhaenge extrahieren -> max. 3 PDFs (<20 MB) hochladen
+             - Email + PDFs an ErgoGPT
+             - JSON-Antwort -> in Sheet 'Analyse' als Zeile
 
 ============================================================
 
 VORAUSSETZUNGEN:
 
-  1) Modul mit Funktion ASK_ErgoGPT(prompt) MUSS bereits in der
-     Mappe importiert sein. Den Code findest du im Repo unter
-     'Test.txt' (oder in deinem bestehenden ErgoGPT-Modul).
+  1) Modul mit Funktion ASK_ErgoGPT(prompt, pdfs) muss in der Mappe
+     bereits importiert sein. Den Code findest du im Repo unter
+     'Test.txt' - es muss die VOLLE Variante mit PDF-Upload sein
+     (UploadManyPdfsReturnJsonArray etc.).
 
-  2) Tabellenblatt "GPT" mit folgenden Konfig-Zellen:
-        A6  = Modell-Name           (z.B. "gpt-5.1" - EMPFOHLEN)
-        A9  = Temperature           (z.B. 0.0 fuer deterministische Antworten)
-        A12 = Tone                  (z.B. "Sachlich" oder leer)
-        A20 = (optional) AI_RULES
+  2) Outlook ist installiert (zum Oeffnen der .msg-Dateien via
+     Session.OpenSharedItem).
 
-  3) Cookie-Datei:
-        F:\ExcelGPT-Cookie\Cookie.txt
-     muss vorhanden und gefuellt sein (gleiches Setup wie fuer
-     dein bestehendes ErgoGPT-Tool).
+  3) Cookie fuer gpt.ergo.com:
+       Variante A: in Sheet 'GPT' Zelle A7 eingeben
+       Variante B: im Cookie-Dialog beim Start eingeben
+                   (wird in F:\ExcelGPT-Cookie\Cookie.txt geschrieben,
+                   Verzeichnis wird ggf. erstellt)
 
-  4) Tabellenblatt "Emails" mit Spalten A-H (entsteht automatisch
-     durch Outlook_Live_Abrufen oder Ordner_Scannen aus
-     ergo-email-batch.bas):
-        A Nr | B Datum | C Datum_ISO | D Absender_Name |
-        E Absender_Email | F Betreff | G Text | H Anhaenge
-
-============================================================
-
-INSTALLATION (1x):
-
-  1. Excel-Mappe oeffnen, in der bereits ASK_ErgoGPT importiert ist
-     (oder erst Test.txt importieren - Alt+F11 -> Importieren).
-  2. Alt+F11 -> Datei -> Datei importieren -> ergo-vorgang-analyse-v1.0.bas
-  3. VBA-Editor schliessen, Mappe als .xlsm speichern.
-  4. Alt+F8 -> 'Vorgaenge_Setup' ausfuehren.
-       -> legt Sheet 'GPT' mit Default-Werten (gpt-5.1, Temp 0) an
-       -> legt Sheet 'Anleitung' mit Step-by-Step-Beschreibung an
-       -> fragt nach Cookie (entweder vorhandene Datei nutzen oder
-          jetzt eingeben; wird nach F:\ExcelGPT-Cookie\Cookie.txt
-          geschrieben - Verzeichnis wird ggf. erstellt)
+  4) Sheet 'GPT' Konfig (wird von Vorgaenge_Setup angelegt):
+        A6  = Modell-Name        (Default: 'gpt-5.1')
+        A7  = Cookie             (optional - sonst File)
+        A9  = Temperature        (Default: 0)
+        A12 = Tone               (z.B. 'Sachlich')
 
 ============================================================
 
-NUTZUNG:
+OUTPUT-SPALTEN im Sheet 'Analyse':
 
-  Schritt 1: Mails einlesen
-     Mit Outlook_Live_Abrufen oder Ordner_Scannen (aus
-     ergo-email-batch) das Tabellenblatt "Emails" fuellen.
+  A  Datei                       Dateiname der MSG
+  B  Datum                       Empfangsdatum (DE-Format)
+  C  Absender_Name
+  D  Absender_Email
+  E  Betreff
+  F  Anhang_Namen                alle Anhang-Dateinamen
+  G  Maklerpool                  Fonds Finanz / BCA / JDC / ...
+  H  Makler_Nachname
+  I  Makler_Vorname
+  J  Klassifikation              Standardvorgang / Nicht-Standard
+  K  Geschaefts_Typ              BUe einfacher Vertrag /
+                                 BUe Kundenverbindung /
+                                 Keine BUe
+  L  Unterlagen_Angefragt        ja / nein
+  M  Sonderfall                  Flottengeschaeft / Sondertarif /
+                                 Kein Sonderfall
+  N  Sparte                      Komposit / Leben / KV / Mehrere /
+                                 Unbekannt
+  O  Anhang_Typen                Maklervollmacht, Police, Antrag, ...
+  P  Maklervollmacht_Enthalten   ja / nein
+  Q  Vollmacht_Vollstaendig      ja / nein / teilweise / nicht_pruefbar
+  R  Vollmacht_Fehlt             Liste fehlender Felder
+  S  Hinweis                     1-Satz-Hinweis von GPT
 
-  Schritt 2: Analyse starten
-     Alt+F8 -> Vorgaenge_Analysieren -> Ausfuehren
-
-     a) Cookie-Dialog erscheint:
-        - Cookie-Datei vorhanden -> JA = nutzen / NEIN = neu eingeben
-        - Cookie-Datei fehlt     -> JA = jetzt eingeben (wird gespeichert)
-     b) Bestaetigung mit geschaetzter Laufzeit (~3-10 Sek/Zeile)
-
-  Schritt 3: Ergebnisse pruefen
-     Spalten I-P werden gefuellt. Bei jeder 5. Zeile speichert
-     das Tool automatisch zwischen.
-
-     Hervorhebungen:
-       - "Nicht-Standard" -> hellgelb in Spalte L
-       - "Flottengeschaeft" / "Sondertarif" -> hellrot in Spalte O
-
-  Wieder-Aufnahme nach Abbruch:
-     Bereits gefuellte Zeilen (Spalte I gefuellt) werden
-     uebersprungen. Du kannst Vorgaenge_Analysieren also einfach
-     nochmal starten - die Analyse setzt fort wo sie aufgehoert hat.
-
-  Reset:
-     Alt+F8 -> Vorgaenge_Analysieren_Reset
-     Loescht Spalten I-P im Sheet "Emails".
+  Hervorhebungen:
+    - "Nicht-Standard"          -> hellgelb (Spalte J)
+    - "Flottengeschaeft" /
+      "Sondertarif"             -> hellrot  (Spalte M)
+    - Vollmacht "teilweise"/"nein" -> hellrot (Spalte Q)
+    - Vollmacht "ja"            -> hellgruen (Spalte Q)
+    - Fehler bei einer Datei    -> hellrot (Spalte S, mit [FEHLER]-Praefix)
 
 ============================================================
 
-DOMAIN-LOGIK (kurz):
+MAKLERVOLLMACHT-PFLICHTFELDER:
 
-  BUe = Bestandsuebertragung. Makler A moechte den Bestand
-  des Kunden von Makler B auf sich uebertragen. Eine VNR
-  (Vertragsnummer) ist meistens in der Email angegeben.
+  GPT prueft pro PDF (das als Vollmacht erkannt wird):
+    a) Vollstaendiger Kundenname (Vor- und Nachname)
+    b) Geburtsdatum des Kunden
+    c) Anschrift des Kunden
+    d) Datum der Vollmacht
+    e) Eigenhaendige Unterschrift des Kunden (sichtbar)
+    f) Maklerangaben (Name + Firma + Vermittlernummer/BD-Nummer)
 
-  Entscheidend ist NICHT die VNR, sondern was uebertragen wird:
-    - "BUe einfacher Vertrag":   nur dieser eine konkrete Vertrag
-    - "BUe Kundenverbindung":    der gesamte Kundenstamm /
-                                 alle Vertraege des Kunden
-    - "Keine BUe":               Vorgang ist was anderes
-                                 (Schaden, Antrag, Aenderung etc.)
+  Fehlende Felder werden in Spalte R kommagetrennt aufgelistet,
+  z.B. "Geburtsdatum, Unterschrift Kunde".
+
+============================================================
+
+LIMITS / HINWEISE:
+
+  - Pro Vorgang werden max. 3 PDFs hochgeladen (=  Token-Budget).
+  - PDFs > 20 MB werden uebersprungen.
+  - Body wird auf 6.000 Zeichen gekappt (lange Auto-Replies abschneiden).
+  - Auto-Save alle 3 verarbeiteten Vorgaenge.
+  - Fehler bei einzelnen Dateien -> Zeile bekommt [FEHLER]-Hinweis,
+    Tool laeuft weiter.
+  - Nur .msg-Dateien werden verarbeitet (.eml NICHT, da Anhang-
+    Extraktion aus EML ohne Outlook-MAPI nicht zuverlaessig).
 
 ============================================================
 
 PROMPT ANPASSEN:
 
-  Wenn du den Prompt an dein Tagesgeschaeft anpassen willst,
-  oeffne ergo-vorgang-analyse-v1.0.bas und suche nach:
-     Private Function BuildVorgangPrompt(...)
-  Dort kannst du Maklerpool-Liste, Werteliste pro Feld und die
-  Definitionen direkt editieren.
+  Im VBA-Editor (Alt+F11) -> Modul ErgoVorgangAnalyse ->
+  Private Function BuildVorgangPrompt(...). Dort koennen Werte-
+  listen, Maklerpool-Liste und die Maklervollmacht-Pflichtfelder
+  direkt editiert werden.
 
 ============================================================
 
-HINWEIS:
-  Das Tool LIEST nur Outlook/Excel und SCHREIBT in dein eigenes
-  Excel-Sheet. Es schickt aber den Email-Inhalt an ErgoGPT
-  (gpt.ergo.com), das ist datenschutzrechtlich nur OK, wenn
-  ErgoGPT als interner Dienst freigegeben ist - was bei der
-  ERGO der Fall ist.
+DATENSCHUTZ:
+
+  Das Tool laedt Email-Inhalte UND PDFs an ErgoGPT
+  (gpt.ergo.com) hoch. Das ist ok, weil ErgoGPT als interner
+  Dienst der ERGO freigegeben ist.
 
 ============================================================

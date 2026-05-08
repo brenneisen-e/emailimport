@@ -14,14 +14,14 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
-(aktuell **8.3**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
+(aktuell **8.4**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
 damit auf der Homepage sofort sichtbar ist, dass es eine neue Version gibt.
 Schema: Major.Minor — bei kleinen Aenderungen Minor +1, bei groesseren Major +1.
 
 Fuer reine VBA-Tools (`ergo-email-batch.bas`, `ergo-vorgang-analyse.bas`) gibt es
 keine VERSION-Konstante im Code; die Versionsnummer steckt **im Dateinamen** der
 ZIP-Inhalte (siehe Punkt 2). Aktuell:
-- `ergo-vorgang-analyse.bas` → ZIP-Version **1.0**
+- `ergo-vorgang-analyse.bas` → ZIP-Version **2.0**
 
 ### 2. ZIP-Dateien aktualisieren — PFLICHT bei jeder Aenderung
 **Nach jeder Code-Aenderung an einer HTA-Datei oder am `.bas`-Modul MUSS die zugehoerige
