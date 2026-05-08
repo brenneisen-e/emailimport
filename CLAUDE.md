@@ -21,7 +21,7 @@ Schema: Major.Minor — bei kleinen Aenderungen Minor +1, bei groesseren Major +
 Fuer reine VBA-Tools (`ergo-email-batch.bas`, `ergo-vorgang-analyse.bas`) gibt es
 keine VERSION-Konstante im Code; die Versionsnummer steckt **im Dateinamen** der
 ZIP-Inhalte (siehe Punkt 2). Aktuell:
-- `ergo-vorgang-analyse.bas` → ZIP-Version **2.9** (Default-Modell: `gpt-51-chat`; juristische MV-Pruefung mit Schlagwort-Suche; optionale Pro-Vorgang-Textdatei; Reminder-Spalte Y)
+- `ergo-vorgang-analyse.bas` → ZIP-Version **2.10** (ergebnisoffener Maklerpool, Kunde_Nachname/Vorname Z+AA, Reminder erkennt Anhang-Dateinamen)
 
 ### 2. ZIP-Dateien aktualisieren — PFLICHT bei jeder Aenderung
 **Nach jeder Code-Aenderung an einer HTA-Datei oder am `.bas`-Modul MUSS die zugehoerige

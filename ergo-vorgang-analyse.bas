@@ -1,7 +1,22 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.9)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.10)
 ' ============================================================================
+' v2.10: Maklerpool wird jetzt ERGEBNISOFFEN extrahiert (keine Whitelist mehr).
+'        Bisher waren nur 13 Pools erlaubt (Fonds Finanz, BCA, JDC, ...) -
+'        kleinere/regionale Pools wie 'DEMA Deutsche Versicherungsmakler AG'
+'        wurden weggemappt. GPT nimmt den Namen jetzt aus Signatur,
+'        Absender-Domain oder MV-Briefkopf wie er dort steht.
+'
+'        Neue Spalten Z (Kunde_Nachname) und AA (Kunde_Vorname) -
+'        Versicherungsnehmer / Vollmachtgeber. Quellen in Reihenfolge:
+'        MV-Felder, Anschreiben-Body ('zu unserem Kunden ...'), Betreff.
+'
+'        Reminder-Erkennung erweitert: 'Mahnungsanschreiben' im Body
+'        und 'Mahnung' / 'Reminder' / 'Erinnerung' in ANHANG-Dateinamen
+'        werden jetzt mitberuecksichtigt (z.B. 'Maklerauftrag_Mahnung_*.pdf').
+'        Substring-Match ist case-insensitive ('Mahnung' matcht
+'        'Mahnungsanschreiben').
 ' v2.9: NEUE Spalte Y 'Ist_Reminder' (ja/nein/nicht_pruefbar) - erkennt
 '       Erinnerungen / Mahnungen / Wiedervorlagen anhand von Betreff-/
 '       Body-Indikatoren (Erinnerung, Reminder, WV, Sachstandsanfrage,
@@ -134,6 +149,8 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '   X  Makler_Namentlich           (ja / nein / nicht_pruefbar - Pflicht)
 '   Y  Ist_Reminder                (ja / nein / nicht_pruefbar -
 '                                   Erinnerung/Mahnung/Wiedervorlage)
+'   Z  Kunde_Nachname              (Versicherungsnehmer / Vollmachtgeber)
+'   AA Kunde_Vorname
 '
 ' Pruefgrundlage Maklervollmacht: AAW-Allg 2.1.1+2.1.2, AAW-GES Kap. 5,
 ' PVC2D-Vorgabe (Rechtsabteilung). Schlagwort-Liste:
@@ -182,6 +199,8 @@ Private Const COL_UNTERSCHR_M As Long = 22    ' V: Unterschrift Makler vorhanden
 Private Const COL_AUF_VN      As Long = 23    ' W: MV auf VN ausgestellt          (ja / nein / nicht_pruefbar)
 Private Const COL_MAKL_NAM    As Long = 24    ' X: Makler/Pool namentlich genannt (ja / nein / nicht_pruefbar)
 Private Const COL_REMINDER    As Long = 25    ' Y: Reminder / Mahnung / Wiedervorlage (ja / nein / nicht_pruefbar)
+Private Const COL_KUNDE_NACH  As Long = 26    ' Z: Versicherungsnehmer / Vollmachtgeber Nachname
+Private Const COL_KUNDE_VOR   As Long = 27    ' AA: Versicherungsnehmer / Vollmachtgeber Vorname
 
 ' === HAUPTEINSTIEG ==========================================================
 Public Sub Vorgaenge_Analysieren()
@@ -907,12 +926,21 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "   Beweis fuer die Zustellung, nicht der Vorgang selbst." & vbCrLf
     p = p & vbCrLf
     p = p & "1) maklerpool" & vbCrLf
-    p = p & "   Erlaubt: 'Fonds Finanz', 'BCA', 'JDC', 'blau direkt', 'Fondsnet'," & vbCrLf
-    p = p & "   'Maxpool', 'WIFO', 'Aruna', 'Apella', 'Netfonds', 'VEMA', 'Mr.Money'," & vbCrLf
-    p = p & "   'Direktmakler', '' (= unbekannt)" & vbCrLf
+    p = p & "   ERGEBNISOFFEN extrahieren - keine Whitelist. Nimm den Namen des" & vbCrLf
+    p = p & "   Maklerpools / der Maklergesellschaft so, wie er in Signatur," & vbCrLf
+    p = p & "   Absender-Domain, MV-Briefkopf oder Body steht. Beispiele:" & vbCrLf
+    p = p & "     - 'Fonds Finanz Maklerservice GmbH'" & vbCrLf
+    p = p & "     - 'DEMA Deutsche Versicherungsmakler AG'" & vbCrLf
+    p = p & "     - 'BCA AG'" & vbCrLf
+    p = p & "     - 'Maxpool Maklerkooperation GmbH'" & vbCrLf
+    p = p & "     - 'Mueller & Partner OHG'  (auch kleine/unbekannte Pools)" & vbCrLf
+    p = p & "   Sehr lange Firmen-Bezeichnungen sinnvoll auf 60 Zeichen kuerzen." & vbCrLf
+    p = p & "   '' nur wenn faktisch nichts erkennbar." & vbCrLf
     p = p & vbCrLf
     p = p & "2) makler_nachname / 3) makler_vorname" & vbCrLf
-    p = p & "   Aus Signatur, Anschreiben oder Vollmacht. Default: ''" & vbCrLf
+    p = p & "   Name der konkret HANDELNDEN Person beim Makler/Pool aus" & vbCrLf
+    p = p & "   Email-Signatur, Anschreiben, Telefon-Notiz oder MV-Vermittler-" & vbCrLf
+    p = p & "   feld. NICHT der Kunde / VN. Default ''." & vbCrLf
     p = p & vbCrLf
     p = p & "4) klassifikation" & vbCrLf
     p = p & "   - 'Standardvorgang': Routine-Tagesgeschaeft (BUe, Antrag, Aenderung," & vbCrLf
@@ -1014,25 +1042,41 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & vbCrLf
     p = p & "17) ist_reminder" & vbCrLf
     p = p & "    Ist diese Mail eine Erinnerung / Mahnung / Wiedervorlage zu einem" & vbCrLf
-    p = p & "    bereits laufenden Vorgang? Indikatoren:" & vbCrLf
-    p = p & "      - Betreff: 'Erinnerung', 'Reminder', 'Wiedervorlage', 'Mahnung'," & vbCrLf
-    p = p & "        '2. Mahnung', 'zweite Anfrage', 'Sachstandsanfrage', 'Nach-" & vbCrLf
-    p = p & "        frage', 'Bearbeitungsstatus', 'WV', 'AW:' bzw. 'Re:' mit" & vbCrLf
-    p = p & "        zeitlichem Bezug auf eine frueher Mail" & vbCrLf
+    p = p & "    bereits laufenden Vorgang? Indikatoren - case-insensitiver" & vbCrLf
+    p = p & "    Substring-Match (z.B. 'Mahnung' matcht auch 'Mahnungsanschreiben'):" & vbCrLf
+    p = p & "      - Betreff: 'Erinnerung', 'Reminder', 'Wiedervorlage'," & vbCrLf
+    p = p & "        'Mahnung', 'Mahnungsanschreiben', '2. Mahnung'," & vbCrLf
+    p = p & "        'zweite Anfrage', 'Sachstandsanfrage', 'Nachfrage'," & vbCrLf
+    p = p & "        'Bearbeitungsstatus', 'WV', 'AW:' bzw. 'Re:' mit" & vbCrLf
+    p = p & "        zeitlichem Bezug auf eine fruehere Mail" & vbCrLf
     p = p & "      - Body: 'wir warten noch', 'haben wir noch nichts erhalten'," & vbCrLf
     p = p & "        'bitten um Rueckmeldung', 'weiterhin keine Antwort', 'wie" & vbCrLf
-    p = p & "        ist der Stand', 'in obiger Angelegenheit', 'haben wir" & vbCrLf
-    p = p & "        bereits am ... angeschrieben'" & vbCrLf
+    p = p & "        ist der Stand', 'Mahnungsanschreiben', 'in obiger" & vbCrLf
+    p = p & "        Angelegenheit', 'haben wir bereits am ... angeschrieben'" & vbCrLf
+    p = p & "      - Anhang-DATEINAMEN: enthalten 'Mahnung', 'Reminder' oder" & vbCrLf
+    p = p & "        'Erinnerung' im Dateinamen (z.B. 'Maklerauftrag_Mahnung_*.pdf')" & vbCrLf
     p = p & "    Werte: 'ja' / 'nein' / 'nicht_pruefbar'" & vbCrLf
     p = p & "    Ein Reminder kann gleichzeitig ein Makler-Vorgang sein - das" & vbCrLf
     p = p & "    Feld ist unabhaengig von 'vorgangstyp' und 'klassifikation'." & vbCrLf
     p = p & vbCrLf
-    p = p & "18) hinweis" & vbCrLf
+    p = p & "18) kunde_nachname / 19) kunde_vorname" & vbCrLf
+    p = p & "    Name des VERSICHERUNGSNEHMERS / Vollmachtgebers / Mandanten." & vbCrLf
+    p = p & "    Quellen in dieser Reihenfolge:" & vbCrLf
+    p = p & "      a) Maklervollmacht-PDF (Felder 'Name', 'Vorname', 'Mandant')" & vbCrLf
+    p = p & "      b) Anschreiben-Body ('zu unserem gemeinsamen Kunden ...')" & vbCrLf
+    p = p & "      c) Betreff (sofern eindeutig genannt)" & vbCrLf
+    p = p & "      d) Anhang-Dateinamen (selten brauchbar)" & vbCrLf
+    p = p & "    NICHT der Makler/Vermittler - die Person, fuer die der Makler" & vbCrLf
+    p = p & "    handelt. Beispiel: 'zu unserem gemeinsamen Kunden Alexandra" & vbCrLf
+    p = p & "    Schaebel' -> kunde_vorname='Alexandra', kunde_nachname='Schaebel'." & vbCrLf
+    p = p & "    Default '' wenn nicht eindeutig erkennbar - NICHT raten." & vbCrLf
+    p = p & vbCrLf
+    p = p & "20) hinweis" & vbCrLf
     p = p & "    EIN kurzer Satz (max 200 Zeichen) was an dem Vorgang auffaellig" & vbCrLf
     p = p & "    ist - z.B. fehlende Unterlagen, ungewoehnliche Konstellation," & vbCrLf
     p = p & "    Eskalationspotenzial. Leer wenn nichts auffaellt." & vbCrLf
     p = p & vbCrLf
-    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 19 Schluessel):" & vbCrLf
+    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 21 Schluessel):" & vbCrLf
     p = p & "{""vorgangstyp"":""..."",""maklerpool"":""..."",""makler_nachname"":""...""," & vbCrLf
     p = p & " ""makler_vorname"":""..."",""klassifikation"":""..."",""geschaefts_typ"":""...""," & vbCrLf
     p = p & " ""unterlagen_angefragt"":""..."",""sonderfall"":""..."",""sparte"":""...""," & vbCrLf
@@ -1041,6 +1085,7 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & " ""unterschrift_kunde"":""..."",""unterschrift_makler"":""...""," & vbCrLf
     p = p & " ""auf_vn_ausgestellt"":""..."",""makler_namentlich_genannt"":""...""," & vbCrLf
     p = p & " ""ist_reminder"":""...""," & vbCrLf
+    p = p & " ""kunde_nachname"":""..."",""kunde_vorname"":""...""," & vbCrLf
     p = p & " ""hinweis"":""...""}" & vbCrLf
     p = p & vbCrLf
     p = p & "Antworte JETZT, nur das JSON-Objekt:" & vbCrLf
@@ -1074,6 +1119,7 @@ Private Function ParseGptJsonAntwort(antwort As String) As Object
                  "unterschrift_kunde", "unterschrift_makler", _
                  "auf_vn_ausgestellt", "makler_namentlich_genannt", _
                  "ist_reminder", _
+                 "kunde_nachname", "kunde_vorname", _
                  "hinweis")
     Dim i As Long
     For i = LBound(keys) To UBound(keys)
@@ -1509,8 +1555,10 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_AUF_VN).Value = "Auf_VN_Ausgestellt"
     ws.cells(1, COL_MAKL_NAM).Value = "Makler_Namentlich"
     ws.cells(1, COL_REMINDER).Value = "Ist_Reminder"
+    ws.cells(1, COL_KUNDE_NACH).Value = "Kunde_Nachname"
+    ws.cells(1, COL_KUNDE_VOR).Value = "Kunde_Vorname"
 
-    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_REMINDER))
+    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_KUNDE_VOR))
         .Font.Bold = True
         .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau
         .Font.Color = RGB(255, 255, 255)
@@ -1547,6 +1595,8 @@ Private Sub SpaltenbreitenSetzen(ws As Worksheet)
     ws.Columns(COL_AUF_VN).ColumnWidth = 14
     ws.Columns(COL_MAKL_NAM).ColumnWidth = 14
     ws.Columns(COL_REMINDER).ColumnWidth = 12
+    ws.Columns(COL_KUNDE_NACH).ColumnWidth = 18
+    ws.Columns(COL_KUNDE_VOR).ColumnWidth = 14
     ws.Columns(COL_VM_FEHLT).ColumnWidth = 36
 End Sub
 
@@ -1579,6 +1629,8 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
             ws.cells(row, COL_REMINDER).Interior.Color = RGB(254, 215, 170) ' helles Orange
             ws.cells(row, COL_REMINDER).Font.Bold = True
         End If
+        ws.cells(row, COL_KUNDE_NACH).Value = SafeGet(dict, "kunde_nachname")
+        ws.cells(row, COL_KUNDE_VOR).Value = SafeGet(dict, "kunde_vorname")
 
         ' Hervorhebungen NUR fuer echte Makler-Vorgaenge
         Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
@@ -1614,9 +1666,9 @@ Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
             End If
         End If
     Else
-        ' Kein Makler-Vorgang: Felder G-Y leer lassen, Zeile grau einfaerben
+        ' Kein Makler-Vorgang: Felder G-AA leer lassen, Zeile grau einfaerben
         Dim grau As Long: grau = RGB(229, 231, 235)
-        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_REMINDER)).Interior.Color = grau
+        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_KUNDE_VOR)).Interior.Color = grau
         ws.cells(row, COL_VORGANGSTYP).Interior.Color = RGB(254, 215, 170) ' helles Orange
         ws.cells(row, COL_VORGANGSTYP).Font.Bold = True
     End If
@@ -1688,6 +1740,13 @@ Private Sub SchreibeKiTextDatei(ordner As String, msgName As String, _
     s = s & "Maklerpool:            " & SafeGet(dict, "maklerpool") & vbCrLf
     s = s & "Nachname:              " & SafeGet(dict, "makler_nachname") & vbCrLf
     s = s & "Vorname:               " & SafeGet(dict, "makler_vorname") & vbCrLf
+    s = s & vbCrLf
+
+    s = s & sub_
+    s = s & "KUNDE / VERSICHERUNGSNEHMER" & vbCrLf
+    s = s & sub_
+    s = s & "Nachname:              " & SafeGet(dict, "kunde_nachname") & vbCrLf
+    s = s & "Vorname:               " & SafeGet(dict, "kunde_vorname") & vbCrLf
     s = s & vbCrLf
 
     s = s & sub_
