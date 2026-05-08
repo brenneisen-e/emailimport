@@ -101,7 +101,7 @@ Public Sub Vorgaenge_Analysieren()
     End If
 
     ' 2) MSG-Dateien einsammeln
-    Dim msgFiles As Object
+    Dim msgFiles As Collection
     Set msgFiles = SammleMsgDateien(fso, folderPath)
     If msgFiles.count = 0 Then
         MsgBox "Keine .msg-Dateien im Ordner gefunden:" & vbCrLf & folderPath, vbExclamation
@@ -157,16 +157,27 @@ Public Sub Vorgaenge_Analysieren()
         Err.Clear
         Dim erfolg As Boolean
         erfolg = AnalysiereEineDatei(olApp, fso, msgPath, ws, row, tempBase, i)
-        If Err.Number <> 0 Or Not erfolg Then
+        Dim einzelErrNum As Long: einzelErrNum = Err.Number
+        Dim einzelErrDesc As String: einzelErrDesc = Err.Description
+        Err.Clear
+        On Error GoTo Fehler
+
+        If einzelErrNum <> 0 Or Not erfolg Then
+            Dim hint As String
+            If Len(einzelErrDesc) > 0 Then
+                hint = "[FEHLER " & einzelErrNum & "] " & einzelErrDesc
+            Else
+                hint = "[FEHLER] (keine Beschreibung - Schritt unklar)"
+            End If
             ws.cells(row, COL_DATEI).Value = fso.GetFileName(msgPath)
-            ws.cells(row, COL_HINWEIS).Value = "[FEHLER] " & Err.Description
+            ws.cells(row, COL_HINWEIS).Value = hint
             ws.cells(row, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+            Debug.Print "[" & Format(Now, "hh:nn:ss") & "] Zeile " & row & " " & _
+                        fso.GetFileName(msgPath) & ": " & hint
             fehler = fehler + 1
-            Err.Clear
         Else
             verarbeitet = verarbeitet + 1
         End If
-        On Error GoTo Fehler
 
         row = row + 1
 
@@ -211,12 +222,22 @@ End Sub
 Private Function AnalysiereEineDatei(olApp As Object, fso As Object, msgPath As String, _
                                      ws As Worksheet, row As Long, tempBase As String, _
                                      vorgangNr As Long) As Boolean
+    Dim it As Object
+    Dim schritt As String: schritt = "Init"
     On Error GoTo FehlerLokal
 
-    ' MSG via Outlook oeffnen
-    Dim it As Object
-    Set it = olApp.Session.OpenSharedItem(msgPath)
+    ' --- Schritt 1: Datei pruefen ---
+    schritt = "Datei pruefen"
+    If Len(Trim(msgPath)) = 0 Then Err.Raise 5, , "msgPath ist leer"
+    If Not fso.FileExists(msgPath) Then Err.Raise 53, , "Datei nicht gefunden: " & msgPath
 
+    ' --- Schritt 2: MSG via Outlook oeffnen ---
+    schritt = "Outlook OpenSharedItem"
+    Set it = olApp.Session.OpenSharedItem(msgPath)
+    If it Is Nothing Then Err.Raise 91, , "OpenSharedItem hat Nothing zurueckgegeben fuer: " & msgPath
+
+    ' --- Schritt 3: Properties extrahieren ---
+    schritt = "Mail-Properties lesen"
     Dim datum As String: datum = ""
     Dim absName As String: absName = ""
     Dim absMail As String: absMail = ""
@@ -231,9 +252,10 @@ Private Function AnalysiereEineDatei(olApp As Object, fso As Object, msgPath As 
     body = CStr(it.Body)
     On Error GoTo FehlerLokal
 
-    ' Anhaenge extrahieren -> nur PDFs hochladen, alle Namen merken
+    ' --- Schritt 4: Anhaenge extrahieren (PDFs hochladen) ---
+    schritt = "Anhaenge extrahieren"
     Dim alleAnhangNamen As String: alleAnhangNamen = ""
-    Dim pdfPaths As Object: Set pdfPaths = CreateObject("Scripting.Dictionary")
+    Dim pdfPaths As Collection: Set pdfPaths = New Collection
     Dim pdfListe As String: pdfListe = ""
 
     Dim tempDir As String: tempDir = tempBase & "\v" & vorgangNr
@@ -243,78 +265,170 @@ Private Function AnalysiereEineDatei(olApp As Object, fso As Object, msgPath As 
     On Error GoTo FehlerLokal
 
     Dim a As Long
-    On Error Resume Next
-    For a = 1 To it.Attachments.count
-        Dim att As Object: Set att = it.Attachments.Item(a)
-        Dim fname As String: fname = CStr(att.FileName)
-        If alleAnhangNamen <> "" Then alleAnhangNamen = alleAnhangNamen & "; "
-        alleAnhangNamen = alleAnhangNamen & fname
+    Dim attCount As Long: attCount = 0
+    On Error Resume Next: attCount = it.Attachments.count: On Error GoTo FehlerLokal
 
-        If LCase(fso.GetExtensionName(fname)) = "pdf" And pdfPaths.count < MAX_PDFS_PRO_VORGANG Then
-            Dim safe As String: safe = SaeubereDateiname(fname)
-            Dim outPath As String: outPath = tempDir & "\" & safe
-            att.SaveAsFile outPath
-            ' Groesse pruefen (leise skip wenn zu gross)
-            If fso.FileExists(outPath) Then
-                Dim fSize As Double: fSize = fso.GetFile(outPath).Size / 1048576
-                If fSize <= MAX_PDF_GROESSE_MB Then
-                    pdfPaths.Add CStr(pdfPaths.count + 1), outPath
-                    If pdfListe <> "" Then pdfListe = pdfListe & "; "
-                    pdfListe = pdfListe & fname
-                Else
-                    fso.DeleteFile outPath, True
+    For a = 1 To attCount
+        On Error Resume Next
+        Dim att As Object: Set att = it.Attachments.Item(a)
+        Dim fname As String: fname = ""
+        If Not att Is Nothing Then fname = CStr(att.FileName)
+        If Len(fname) > 0 Then
+            If alleAnhangNamen <> "" Then alleAnhangNamen = alleAnhangNamen & "; "
+            alleAnhangNamen = alleAnhangNamen & fname
+
+            If LCase(fso.GetExtensionName(fname)) = "pdf" And pdfPaths.count < MAX_PDFS_PRO_VORGANG Then
+                Dim safe As String: safe = SaeubereDateiname(fname)
+                Dim outPath As String: outPath = tempDir & "\" & safe
+                att.SaveAsFile outPath
+                If fso.FileExists(outPath) Then
+                    Dim fSize As Double: fSize = fso.GetFile(outPath).Size / 1048576
+                    If fSize <= MAX_PDF_GROESSE_MB Then
+                        pdfPaths.Add outPath
+                        If pdfListe <> "" Then pdfListe = pdfListe & "; "
+                        pdfListe = pdfListe & fname
+                    Else
+                        fso.DeleteFile outPath, True
+                    End If
                 End If
             End If
         End If
+        Err.Clear
+        On Error GoTo FehlerLokal
     Next a
-    On Error GoTo FehlerLokal
 
-    ' Item schliessen, bevor wir GPT befragen
+    ' --- Schritt 5: Item schliessen ---
+    schritt = "Mail schliessen"
     On Error Resume Next: it.Close 1: On Error GoTo FehlerLokal ' olDiscard
+    Set it = Nothing
 
-    ' Body kappen
+    ' --- Schritt 6: Body kappen + Prompt bauen ---
+    schritt = "Prompt bauen"
     If Len(body) > 6000 Then body = Left(body, 6000) & " [...gekuerzt]"
 
-    ' Prompt bauen
     Dim prompt As String
     prompt = BuildVorgangPrompt(datum, absName, absMail, betreff, body, _
                                  alleAnhangNamen, pdfListe)
 
-    ' GPT mit oder ohne PDFs befragen
+    ' --- Schritt 7: GPT befragen ---
+    schritt = "ASK_ErgoGPT"
     Dim antwort As String
     If pdfPaths.count > 0 Then
         Dim pathArr() As String
         ReDim pathArr(0 To pdfPaths.count - 1)
-        Dim k As Variant, idx As Long: idx = 0
-        For Each k In pdfPaths.Keys
-            pathArr(idx) = pdfPaths(k)
-            idx = idx + 1
-        Next
+        Dim k As Long
+        For k = 1 To pdfPaths.count
+            pathArr(k - 1) = pdfPaths(k)
+        Next k
         antwort = ASK_ErgoGPT(prompt, pathArr)
     Else
         antwort = ASK_ErgoGPT(prompt)
     End If
+    If Len(Trim(antwort)) = 0 Then Err.Raise 5, , "ASK_ErgoGPT hat leere Antwort geliefert"
 
-    ' JSON parsen
+    ' --- Schritt 8: JSON parsen + Schreiben ---
+    schritt = "JSON parsen"
     Dim dict As Object: Set dict = ParseGptJsonAntwort(antwort)
+    If dict Is Nothing Then Err.Raise 5, , "JSON-Antwort konnte nicht geparst werden: " & Left(antwort, 200)
 
-    ' Ergebnis ins Sheet schreiben
+    schritt = "Sheet schreiben"
     ws.cells(row, COL_DATEI).Value = fso.GetFileName(msgPath)
     ws.cells(row, COL_DATUM).Value = datum
     ws.cells(row, COL_ABS_NAME).Value = absName
     ws.cells(row, COL_ABS_MAIL).Value = absMail
     ws.cells(row, COL_BETREFF).Value = betreff
     ws.cells(row, COL_ANHANG_LST).Value = alleAnhangNamen
-
-    If Not dict Is Nothing Then SchreibeGptErgebnis ws, row, dict
+    SchreibeGptErgebnis ws, row, dict
 
     AnalysiereEineDatei = True
     Exit Function
 
 FehlerLokal:
-    On Error Resume Next: it.Close 1: On Error GoTo 0
+    ' Fehler-Info VOR dem Aufraeumen sichern
+    Dim errN As Long: errN = Err.Number
+    Dim errD As String: errD = Err.Description
+    Dim errSrc As String: errSrc = Err.Source
+    On Error Resume Next
+    If Not it Is Nothing Then it.Close 1
+    Set it = Nothing
+    On Error GoTo 0
+    ' An Caller weitergeben (Caller hat On Error Resume Next aktiv -> kein Crash)
+    Err.Raise errN, "AnalysiereEineDatei[" & schritt & "]", errD
     AnalysiereEineDatei = False
 End Function
+
+' === DIAGNOSE (testet 1 Datei und gibt jeden Schritt aus) ===================
+Public Sub Vorgaenge_Diagnose()
+    On Error GoTo Fehler
+    Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
+    Dim out As String: out = ""
+
+    out = out & "=== Vorgang-Analyse Diagnose ===" & vbCrLf & vbCrLf
+    Debug.Print out
+
+    ' 1) Outlook
+    Dim olApp As Object: Set olApp = HoleOutlook()
+    If olApp Is Nothing Then
+        out = out & "[X] Outlook NICHT erreichbar" & vbCrLf
+        MsgBox out, vbCritical, "Diagnose": Exit Sub
+    End If
+    out = out & "[OK] Outlook erreichbar" & vbCrLf
+
+    ' 2) ASK_ErgoGPT existiert?
+    Dim hasASK As Boolean
+    On Error Resume Next
+    hasASK = (Not IsEmpty(Application.Run("ASK_ErgoGPT", "ping")))
+    On Error GoTo Fehler
+    If Not hasASK Then
+        out = out & "[?] ASK_ErgoGPT-Test ergebnislos (siehe Direktfenster)" & vbCrLf
+    Else
+        out = out & "[OK] ASK_ErgoGPT antwortet" & vbCrLf
+    End If
+
+    ' 3) Ordner und Files
+    Dim folderPath As String: folderPath = ThisWorkbook.Path
+    out = out & "[?] Ordner: " & folderPath & vbCrLf
+    Dim msgFiles As Collection: Set msgFiles = SammleMsgDateien(fso, folderPath)
+    out = out & "[?] MSG-Dateien gefunden: " & msgFiles.count & vbCrLf
+
+    If msgFiles.count = 0 Then
+        MsgBox out & vbCrLf & "Lege MSG-Dateien in den Ordner und versuche erneut.", vbInformation, "Diagnose"
+        Exit Sub
+    End If
+
+    ' 4) Erste MSG-Datei testen
+    Dim path1 As String: path1 = msgFiles(1)
+    out = out & vbCrLf & "Teste erste Datei: " & path1 & vbCrLf
+
+    Dim it As Object
+    On Error Resume Next: Set it = olApp.Session.OpenSharedItem(path1): On Error GoTo Fehler
+    If it Is Nothing Then
+        out = out & "[X] OpenSharedItem fehlgeschlagen: " & Err.Description & vbCrLf
+        MsgBox out, vbCritical, "Diagnose": Exit Sub
+    End If
+    out = out & "[OK] OpenSharedItem ok" & vbCrLf
+
+    Dim subj As String: subj = ""
+    Dim attC As Long: attC = 0
+    On Error Resume Next
+    subj = CStr(it.Subject)
+    attC = it.Attachments.count
+    On Error GoTo Fehler
+    out = out & "    Betreff: " & Left(subj, 60) & vbCrLf
+    out = out & "    Anhaenge: " & attC & vbCrLf
+
+    On Error Resume Next: it.Close 1: On Error GoTo Fehler
+
+    out = out & vbCrLf & "Diagnose ok - falls Vorgaenge_Analysieren immer noch fehlschlaegt," & vbCrLf
+    out = out & "Direktfenster (Strg+G) im VBA-Editor pruefen, dort wird jeder Fehler protokolliert."
+    Debug.Print out
+    MsgBox out, vbInformation, "Diagnose"
+    Exit Sub
+Fehler:
+    out = out & vbCrLf & "[X] Diagnose-Fehler: " & Err.Number & " - " & Err.Description
+    Debug.Print out
+    MsgBox out, vbCritical, "Diagnose"
+End Sub
 
 ' === DER PROMPT (Kern) ======================================================
 Private Function BuildVorgangPrompt(datum As String, absName As String, absMail As String, _
@@ -745,6 +859,11 @@ Private Sub SetupAnleitungSheet()
     ws.cells(r, 1).Value = "ZURUECKSETZEN": Bold ws, r, 12: r = r + 1
     ws.cells(r, 1).Value = "Alt+F8 -> 'Vorgaenge_Analysieren_Reset' loescht das Sheet 'Analyse'.": r = r + 2
 
+    ws.cells(r, 1).Value = "DIAGNOSE BEI FEHLERN": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "Wenn die Analyse fehlschlaegt: Alt+F8 -> 'Vorgaenge_Diagnose'.": r = r + 1
+    ws.cells(r, 1).Value = "Testet Outlook, MSG-Dateien und gibt fuer die erste Datei jeden Schritt aus.": r = r + 1
+    ws.cells(r, 1).Value = "Detail-Log: VBA-Editor (Alt+F11) -> Direktfenster (Strg+G).": r = r + 2
+
     ws.Columns("A").ColumnWidth = 110
 End Sub
 
@@ -799,15 +918,13 @@ Private Function FrageLimit(maxAnzahl As Long) As Long
     If FrageLimit < 0 Then FrageLimit = 0
 End Function
 
-Private Function SammleMsgDateien(fso As Object, folderPath As String) As Object
-    Dim col As Object: Set col = CreateObject("Scripting.Dictionary")
-    Dim i As Long: i = 0
+Private Function SammleMsgDateien(fso As Object, folderPath As String) As Collection
+    Dim col As Collection: Set col = New Collection
     Dim folder As Object: Set folder = fso.GetFolder(folderPath)
     Dim file As Object
     For Each file In folder.Files
         If LCase(fso.GetExtensionName(file.name)) = "msg" Then
-            i = i + 1
-            col.Add CStr(i), file.path
+            col.Add file.path
         End If
     Next file
     Set SammleMsgDateien = col
