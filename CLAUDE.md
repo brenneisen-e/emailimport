@@ -14,12 +14,14 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
-(aktuell **8.1**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
+(aktuell **8.3**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
 damit auf der Homepage sofort sichtbar ist, dass es eine neue Version gibt.
 Schema: Major.Minor — bei kleinen Aenderungen Minor +1, bei groesseren Major +1.
 
-Fuer das Excel-VBA-Tool `ergo-email-batch.bas` gibt es keine VERSION-Konstante im Code,
-die Versionsnummer steckt **im Dateinamen** der ZIP-Inhalte (siehe Punkt 2).
+Fuer reine VBA-Tools (`ergo-email-batch.bas`, `ergo-vorgang-analyse.bas`) gibt es
+keine VERSION-Konstante im Code; die Versionsnummer steckt **im Dateinamen** der
+ZIP-Inhalte (siehe Punkt 2). Aktuell:
+- `ergo-vorgang-analyse.bas` → ZIP-Version **1.0**
 
 ### 2. ZIP-Dateien aktualisieren — PFLICHT bei jeder Aenderung
 **Nach jeder Code-Aenderung an einer HTA-Datei oder am `.bas`-Modul MUSS die zugehoerige
@@ -35,6 +37,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `pdf-massenupload.hta` | `PDF-Massenupload.zip` | `zip -j PDF-Massenupload.zip pdf-massenupload.hta` |
 | `ergo-email-batch.hta` | `ERGO-Email-Batch-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-email-batch.bas` + `ANLEITUNG-ERGO-EXCEL.txt` | `ERGO-Excel-Tool-v<VER>.zip` | siehe unten (versionierte Inhalte) |
+| `ergo-vorgang-analyse.bas` + `ANLEITUNG-ERGO-VORGANG-ANALYSE.txt` | `ERGO-Vorgang-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 
 #### Versionierte ERGO-ZIPs bauen
 Das ERGO-Tool fuehrt die Versionsnummer **im ZIP-Dateinamen UND im Dateinamen der
@@ -59,8 +62,22 @@ zip -j "$OLDPWD/ERGO-Excel-Tool-v$VER.zip" ergo-email-batch-v$VER.bas ANLEITUNG-
 cd "$OLDPWD"
 ```
 
+Fuer das Vorgang-Analyse-Tool analog (eigene Versionsnummer):
+
+```bash
+VA_VER=1.0
+rm -f ERGO-Vorgang-Analyse-v*.zip
+mkdir -p /tmp/ergo-va-build
+cp ergo-vorgang-analyse.bas /tmp/ergo-va-build/ergo-vorgang-analyse-v$VA_VER.bas
+cp ANLEITUNG-ERGO-VORGANG-ANALYSE.txt /tmp/ergo-va-build/
+(cd /tmp/ergo-va-build && \
+   zip -j "$OLDPWD/ERGO-Vorgang-Analyse-v$VA_VER.zip" \
+       ergo-vorgang-analyse-v$VA_VER.bas ANLEITUNG-ERGO-VORGANG-ANALYSE.txt)
+```
+
 **Anschliessend in `index.html` die Download-Links auf die neue Versionsnummer anpassen**
-(zwei Stellen: `ERGO-Email-Batch-v<VER>.zip` und `ERGO-Excel-Tool-v<VER>.zip`).
+(drei Stellen: `ERGO-Email-Batch-v<VER>.zip`, `ERGO-Excel-Tool-v<VER>.zip`,
+`ERGO-Vorgang-Analyse-v<VER>.zip`).
 
 ### 3. Reihenfolge bei Aenderungen
 1. Code-Aenderung in HTA-/BAS-Datei
