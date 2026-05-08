@@ -51,15 +51,22 @@ VORAUSSETZUNGEN:
   2) Outlook ist installiert (zum Oeffnen der .msg-Dateien via
      Session.OpenSharedItem).
 
-  3) Cookie fuer gpt.ergo.com:
-       Variante A: in Sheet 'GPT' Zelle A7 eingeben
-       Variante B: im Cookie-Dialog beim Start eingeben
-                   (wird in F:\ExcelGPT-Cookie\Cookie.txt geschrieben,
-                   Verzeichnis wird ggf. erstellt)
+  3) Cookie fuer gpt.ergo.com - 4 Quellen werden unterstuetzt:
+       Variante A: Sheet 'GPT' Zelle A7 = Cookie-Text-String
+       Variante B: Sheet 'GPT' Zelle A8 = Pfad zu einer Cookie-Datei
+                   (z.B. C:\Users\me\Desktop\cookie.txt)
+       Variante C: Default-Pfad F:\ExcelGPT-Cookie\Cookie.txt
+       Variante D: Cookie-Dialog beim Start ->
+                     - JA  = Cookie-Datei waehlen (Browse-Dialog)
+                     - NEIN = Cookie als Text einfuegen
+                   Egal welche Quelle: Cookie wird IMMER nach
+                   F:\ExcelGPT-Cookie\Cookie.txt gespiegelt
+                   (wo ASK_ErgoGPT ihn liest).
 
   4) Sheet 'GPT' Konfig (wird von Vorgaenge_Setup angelegt):
         A6  = Modell-Name        (Default: 'gpt-5.1')
-        A7  = Cookie             (optional - sonst File)
+        A7  = Cookie als Text    (optional)
+        A8  = Cookie-Datei-Pfad  (optional - leer = Default)
         A9  = Temperature        (Default: 0)
         A12 = Tone               (z.B. 'Sachlich')
 

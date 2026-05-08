@@ -21,7 +21,11 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '     Mappe importiert sein (aus Test.txt im Repo - die volle Variante
 '     mit PDF-Upload-Faehigkeit!).
 '   - Outlook installiert (fuer .msg-Dateien -> OpenSharedItem).
-'   - Cookie fuer gpt.ergo.com (Sheet GPT!A7 oder File F:\ExcelGPT-Cookie\Cookie.txt)
+'   - Cookie fuer gpt.ergo.com - 4 unterstuetzte Quellen:
+'       1) Sheet GPT!A7 als Text-String
+'       2) Sheet GPT!A8 als Pfad zu einer beliebigen Cookie-Datei
+'       3) Default-Datei F:\ExcelGPT-Cookie\Cookie.txt
+'       4) Dialog beim Start: Datei waehlen ODER Text einfuegen
 '
 ' OUTPUT-SPALTEN im Sheet 'Analyse':
 '   A  Datei
@@ -52,7 +56,8 @@ Public Const SHEET_GPT As String = "GPT"
 Public Const SHEET_ANLEITUNG As String = "Anleitung"
 
 Private Const COOKIE_PATH As String = "F:\ExcelGPT-Cookie\Cookie.txt"
-Private Const COOKIE_CELL As String = "A7"           ' im Sheet GPT
+Private Const COOKIE_CELL As String = "A7"            ' im Sheet GPT: Cookie als String
+Private Const COOKIE_PATH_CELL As String = "A8"       ' im Sheet GPT: alternativer Pfad zur Cookie-Datei
 Private Const MAX_PDFS_PRO_VORGANG As Long = 3
 Private Const MAX_PDF_GROESSE_MB As Long = 20
 
@@ -482,65 +487,139 @@ Private Function ExtrahiereJsonString(json As String, key As String) As String
 End Function
 
 ' === COOKIE-DIALOG ==========================================================
+' Vier Cookie-Quellen werden unterstuetzt (in dieser Reihenfolge):
+'   1) Sheet GPT!A7 enthaelt einen Cookie-String (>50 Zeichen)
+'   2) Sheet GPT!A8 enthaelt einen Pfad zu einer Cookie-Datei
+'   3) Default-Pfad F:\ExcelGPT-Cookie\Cookie.txt
+'   4) Manuell im Dialog: Datei waehlen ODER String einfuegen
+' Egal woher der Cookie kommt: er wird IMMER nach COOKIE_PATH gespiegelt,
+' weil ASK_ErgoGPT (Test.txt) hartkodiert von dort liest.
 Private Function PruefeCookieMitDialog() As Boolean
     Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
+
+    ' (1) Cookie-String aus Sheet GPT!A7?
     Dim cookieAusSheet As String: cookieAusSheet = HoleCookieAusSheet()
-    Dim hatDatei As Boolean: hatDatei = fso.FileExists(COOKIE_PATH)
-
-    Dim altInhalt As String: altInhalt = ""
-    If hatDatei Then
-        On Error Resume Next
-        Dim ts As Object
-        Set ts = fso.OpenTextFile(COOKIE_PATH, 1, False, -2)
-        altInhalt = Trim(ts.ReadAll): ts.Close
-        On Error GoTo 0
-    End If
-
-    ' Wenn Cookie im Sheet vorhanden -> in Datei spiegeln (damit ASK_ErgoGPT ihn liest)
     If Len(cookieAusSheet) > 50 Then
         SchreibeCookieDatei cookieAusSheet, fso
         PruefeCookieMitDialog = True
         Exit Function
     End If
 
-    Dim msg As String, ans As VbMsgBoxResult
-    If hatDatei And Len(altInhalt) > 50 Then
-        Dim preview As String: preview = Left(altInhalt, 100) & IIf(Len(altInhalt) > 100, "...", "")
+    ' (2) Custom-Pfad aus Sheet GPT!A8?
+    Dim customPath As String: customPath = HoleCookiePfadAusSheet()
+    If Len(customPath) > 0 And fso.FileExists(customPath) Then
+        Dim contentCustom As String: contentCustom = LeseCookieDatei(customPath, fso)
+        If Len(contentCustom) > 50 Then
+            SchreibeCookieDatei contentCustom, fso
+            PruefeCookieMitDialog = True
+            Exit Function
+        End If
+    End If
+
+    ' (3) Default-Pfad pruefen
+    Dim hatDefault As Boolean: hatDefault = fso.FileExists(COOKIE_PATH)
+    Dim defaultInhalt As String
+    If hatDefault Then defaultInhalt = LeseCookieDatei(COOKIE_PATH, fso)
+
+    Dim ans As VbMsgBoxResult, msg As String
+    If hatDefault And Len(defaultInhalt) > 50 Then
+        Dim preview As String: preview = Left(defaultInhalt, 100) & IIf(Len(defaultInhalt) > 100, "...", "")
         msg = "Cookie-Datei gefunden:" & vbCrLf & COOKIE_PATH & vbCrLf & vbCrLf & _
               "Auszug: " & preview & vbCrLf & vbCrLf & _
-              "JA      = vorhandenen Cookie verwenden" & vbCrLf & _
-              "NEIN    = Cookie neu eingeben (nach Session-Ablauf)" & vbCrLf & _
+              "JA      = diesen Cookie verwenden" & vbCrLf & _
+              "NEIN    = anderen Cookie laden (Datei waehlen oder neu eingeben)" & vbCrLf & _
               "ABBRECH = Beenden"
         ans = MsgBox(msg, vbYesNoCancel + vbQuestion, "Cookie-Setup")
         If ans = vbCancel Then Exit Function
         If ans = vbYes Then PruefeCookieMitDialog = True: Exit Function
-    Else
-        ans = MsgBox("Es ist noch kein Cookie hinterlegt." & vbCrLf & vbCrLf & _
-                     "Pfad: " & COOKIE_PATH & vbCrLf & vbCrLf & _
-                     "JA  = Cookie jetzt eingeben (wird automatisch gespeichert)" & vbCrLf & _
-                     "NEIN = Beenden", _
-                     vbYesNo + vbQuestion, "Cookie fehlt")
-        If ans <> vbYes Then Exit Function
     End If
 
-    ' Manuelle Eingabe
+    ' (4) Quellen-Auswahl
+    Dim quelle As VbMsgBoxResult
+    quelle = MsgBox( _
+        "Wie soll der Cookie eingelesen werden?" & vbCrLf & vbCrLf & _
+        "JA      = Cookie-DATEI auswaehlen (Browse-Dialog)" & vbCrLf & _
+        "NEIN    = Cookie als TEXT einfuegen (Browser-Copy-Paste)" & vbCrLf & _
+        "ABBRECH = Beenden", _
+        vbYesNoCancel + vbQuestion, "Cookie-Quelle waehlen")
+    If quelle = vbCancel Then Exit Function
+
     Dim cookie As String
-    cookie = InputBox( _
-        "Cookie-String einfuegen." & vbCrLf & vbCrLf & _
-        "Browser -> gpt.ergo.com einloggen -> F12 (DevTools) ->" & vbCrLf & _
-        "Tab Network -> beliebigen Request -> Request Headers ->" & vbCrLf & _
-        "Wert hinter 'Cookie:' kopieren und hier einfuegen.", _
-        "Cookie eingeben")
-    cookie = Trim(cookie)
-    If Len(cookie) < 50 Then
-        MsgBox "Cookie zu kurz oder leer - Abbruch.", vbExclamation
-        Exit Function
+
+    If quelle = vbYes Then
+        ' --- Datei waehlen ---
+        Dim pfad As String: pfad = WaehleCookieDatei()
+        If Len(pfad) = 0 Then Exit Function
+        If Not fso.FileExists(pfad) Then
+            MsgBox "Datei nicht gefunden: " & pfad, vbCritical
+            Exit Function
+        End If
+        cookie = LeseCookieDatei(pfad, fso)
+        If Len(cookie) < 50 Then
+            MsgBox "Datei enthaelt keinen gueltigen Cookie (zu kurz):" & vbCrLf & pfad, vbExclamation
+            Exit Function
+        End If
+        ' Pfad fuer naechstes Mal merken
+        SetzeCookiePfadInSheet pfad
+    Else
+        ' --- Manuell eingeben ---
+        cookie = InputBox( _
+            "Cookie-String einfuegen." & vbCrLf & vbCrLf & _
+            "Browser -> gpt.ergo.com einloggen -> F12 (DevTools) ->" & vbCrLf & _
+            "Tab Network -> beliebigen Request -> Request Headers ->" & vbCrLf & _
+            "Wert hinter 'Cookie:' kopieren und hier einfuegen.", _
+            "Cookie eingeben")
+        cookie = Trim(cookie)
+        If Len(cookie) < 50 Then
+            MsgBox "Cookie zu kurz oder leer - Abbruch.", vbExclamation
+            Exit Function
+        End If
     End If
 
     SchreibeCookieDatei cookie, fso
     MsgBox "Cookie gespeichert. Analyse startet jetzt.", vbInformation
     PruefeCookieMitDialog = True
 End Function
+
+Private Function WaehleCookieDatei() As String
+    With Application.FileDialog(msoFileDialogFilePicker)
+        .Title = "Cookie-Datei waehlen"
+        .AllowMultiSelect = False
+        .Filters.Clear
+        .Filters.Add "Text-Dateien (*.txt)", "*.txt"
+        .Filters.Add "Alle Dateien (*.*)", "*.*"
+        ' Default-Folder: Workbook-Pfad
+        On Error Resume Next: .InitialFileName = ThisWorkbook.Path & "\": On Error GoTo 0
+        If .Show <> -1 Then WaehleCookieDatei = "": Exit Function
+        WaehleCookieDatei = .SelectedItems(1)
+    End With
+End Function
+
+Private Function LeseCookieDatei(pfad As String, fso As Object) As String
+    On Error Resume Next
+    Dim ts As Object
+    Set ts = fso.OpenTextFile(pfad, 1, False, -2) ' ForReading, default Codepage
+    If Not ts Is Nothing Then
+        LeseCookieDatei = Trim(ts.ReadAll)
+        ts.Close
+    End If
+    On Error GoTo 0
+End Function
+
+Private Function HoleCookiePfadAusSheet() As String
+    On Error Resume Next
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets(SHEET_GPT)
+    If ws Is Nothing Then HoleCookiePfadAusSheet = "": Exit Function
+    HoleCookiePfadAusSheet = Trim(CStr(ws.Range(COOKIE_PATH_CELL).Value))
+    On Error GoTo 0
+End Function
+
+Private Sub SetzeCookiePfadInSheet(pfad As String)
+    On Error Resume Next
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets(SHEET_GPT)
+    If Not ws Is Nothing Then ws.Range(COOKIE_PATH_CELL).Value = pfad
+    On Error GoTo 0
+End Sub
 
 Private Sub SchreibeCookieDatei(cookie As String, fso As Object)
     Dim dirPath As String: dirPath = Left(COOKIE_PATH, InStrRev(COOKIE_PATH, "\") - 1)
@@ -594,7 +673,8 @@ Private Sub SetupGptSheet()
     End If
 
     ws.Range("B6").Value = "<- Modell-Name (z.B. gpt-5.1, gpt-4o)"
-    ws.Range("B7").Value = "<- Cookie (HIER einfuegen ODER per Dialog -> wird in F:\ExcelGPT-Cookie\Cookie.txt gespiegelt)"
+    ws.Range("B7").Value = "<- Cookie als Text (langer String) - ODER leer lassen und A8/Dialog nutzen"
+    ws.Range("B8").Value = "<- Pfad zu Cookie-Datei (z.B. C:\Users\...\Desktop\cookie.txt) - leer = Default F:\ExcelGPT-Cookie\Cookie.txt"
     ws.Range("B9").Value = "<- Temperature (0 = deterministisch)"
     ws.Range("B12").Value = "<- Tone (z.B. 'Sachlich' oder leer)"
 
@@ -602,9 +682,10 @@ Private Sub SetupGptSheet()
     If Trim(CStr(ws.Range("A9").Value)) = "" Then ws.Range("A9").Value = 0
     If Trim(CStr(ws.Range("A12").Value)) = "" Then ws.Range("A12").Value = "Sachlich"
 
-    ws.Columns("A").ColumnWidth = 30
-    ws.Columns("B").ColumnWidth = 80
+    ws.Columns("A").ColumnWidth = 32
+    ws.Columns("B").ColumnWidth = 90
     ws.Range("A7").WrapText = False
+    ws.Range("A8").WrapText = False
 End Sub
 
 Private Sub SetupAnleitungSheet()
@@ -628,11 +709,15 @@ Private Sub SetupAnleitungSheet()
     ws.cells(r, 1).Value = "VORAUSSETZUNGEN": Bold ws, r, 12: r = r + 1
     ws.cells(r, 1).Value = "- Modul ASK_ErgoGPT (volle Variante mit PDF-Upload aus Test.txt) ist importiert.": r = r + 1
     ws.cells(r, 1).Value = "- Outlook installiert (zum Oeffnen der .msg-Dateien).": r = r + 1
-    ws.cells(r, 1).Value = "- Cookie fuer gpt.ergo.com (Sheet GPT!A7 ODER F:\ExcelGPT-Cookie\Cookie.txt).": r = r + 2
+    ws.cells(r, 1).Value = "- Cookie fuer gpt.ergo.com - 4 Quellen werden unterstuetzt:": r = r + 1
+    ws.cells(r, 1).Value = "    1) Sheet GPT!A7 als Text-String (lang)": r = r + 1
+    ws.cells(r, 1).Value = "    2) Sheet GPT!A8 als Pfad zu einer Cookie-Datei": r = r + 1
+    ws.cells(r, 1).Value = "    3) Default-Datei F:\ExcelGPT-Cookie\Cookie.txt": r = r + 1
+    ws.cells(r, 1).Value = "    4) Dialog: Datei waehlen (Browse) ODER Text einfuegen": r = r + 2
 
     ws.cells(r, 1).Value = "AUSFUEHRUNG VORGAENGE_ANALYSIEREN": Bold ws, r, 12: r = r + 1
-    ws.cells(r, 1).Value = "Schritt a) Cookie-Dialog erscheint:": r = r + 1
-    ws.cells(r, 1).Value = "   - vorhandenen Cookie nutzen ODER neu eingeben": r = r + 1
+    ws.cells(r, 1).Value = "Schritt a) Cookie-Dialog (falls keine Quelle vorbelegt):": r = r + 1
+    ws.cells(r, 1).Value = "   - vorhandenen Cookie nutzen ODER andere Datei waehlen ODER neu eingeben": r = r + 1
     ws.cells(r, 1).Value = "Schritt b) Ordner-Dialog (Default: dieser Workbook-Pfad)": r = r + 1
     ws.cells(r, 1).Value = "Schritt c) Anzahl-Eingabe (leer = alle .msg-Dateien)": r = r + 1
     ws.cells(r, 1).Value = "Schritt d) Bestaetigung mit geschaetzter Laufzeit": r = r + 1
