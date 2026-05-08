@@ -1,7 +1,15 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.7.1)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.7.2)
 ' ============================================================================
+' v2.7.2: Default-Modell auf 'gpt-51-reasoning' aktualisiert. Modelle_Testen-
+'         Lauf vom 11/2025 hat gezeigt: ErgoGPT akzeptiert exakt drei Namen,
+'         alle ohne Punkt:
+'           - gpt-51-reasoning  (empfohlen, denkt nach)
+'           - gpt-51-chat       (schneller, oberflaechlicher)
+'           - gpt-41            (alt, Fallback)
+'         Alle anderen Varianten (gpt-5.1, gpt-5.1-chat, gpt-4o, o3, ...)
+'         antwortet die API mit HTTP 500 GENERAL_ERROR.
 ' v2.7.1: BUGFIX - Private Const ERGO_BASE_URL stand zwischen den Funktionen,
 '         was VBA mit "Variable nicht definiert" beim Kompilieren ablehnt.
 '         Module-Level-Declarations duerfen nur am Modul-KOPF stehen, vor
@@ -39,7 +47,7 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '   2) Alt+F8 -> Vorgaenge_Setup -> Ausfuehren (einmalig)
 '        - legt Sheets 'GPT', 'Anleitung', 'Analyse' an
 '        - fragt Cookie ab (wird in Sheet GPT!A7 ODER File hinterlegt)
-'        - Default-Modell: gpt-5.1
+'        - Default-Modell: gpt-51-reasoning  (bestaetigt 11/2025)
 '   3) Alt+F8 -> Vorgaenge_Analysieren -> Ausfuehren
 '        - fragt: Welcher Ordner? (Default: dieser Workbook-Pfad)
 '        - fragt: Wie viele Vorgaenge maximal? (leer = alle)
@@ -1130,13 +1138,13 @@ Private Sub SetupGptSheet()
         ws.name = SHEET_GPT
     End If
 
-    ws.Range("B6").Value = "<- Modell-Name EXAKT wie im ErgoGPT-Browser (oben rechts ablesen). Beispiele: 'gpt-5.1', 'gpt-4o'. Aenderung sofort uebernehmen."
+    ws.Range("B6").Value = "<- Modell-Name. Bestaetigte Werte (Stand 11/2025): 'gpt-51-reasoning' (empfohlen, denkt nach), 'gpt-51-chat' (schneller), 'gpt-41' (alt). Bei Server-Fehler: Modelle_Testen ausfuehren."
     ws.Range("B7").Value = "<- Cookie als Text (langer String) - ODER leer lassen und A8/Dialog nutzen"
     ws.Range("B8").Value = "<- Pfad zu Cookie-Datei (z.B. C:\Users\...\Desktop\cookie.txt) - leer = Default F:\ExcelGPT-Cookie\Cookie.txt"
     ws.Range("B9").Value = "<- Temperature (0 = deterministisch)"
     ws.Range("B12").Value = "<- Tone (z.B. 'Sachlich' oder leer)"
 
-    If Trim(CStr(ws.Range("A6").Value)) = "" Then ws.Range("A6").Value = "gpt-5.1"
+    If Trim(CStr(ws.Range("A6").Value)) = "" Then ws.Range("A6").Value = "gpt-51-reasoning"
     If Trim(CStr(ws.Range("A9").Value)) = "" Then ws.Range("A9").Value = 0
     If Trim(CStr(ws.Range("A12").Value)) = "" Then ws.Range("A12").Value = "Sachlich"
 
@@ -1543,7 +1551,7 @@ Private Function BuildPayload(prompt As String, Optional docIdsJson As String = 
 
     raw = ThisWorkbook.Worksheets(SHEET_GPT).Range("A6").Value2
     If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
-        model = "gpt-4o"
+        model = "gpt-51-reasoning"
     Else
         model = Trim$(CStr(raw))
         model = Replace(model, vbCr, ""): model = Replace(model, vbLf, ""): model = Replace(model, vbTab, "")
