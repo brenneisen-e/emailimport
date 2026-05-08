@@ -656,14 +656,41 @@ End Function
 
 ' Baut das JSON für /conversation und /conversation/{id}
 Private Function BuildPayload(prompt As String, Optional docIdsJson As String = "[]") As String
-    Dim Model As String, t As Double, tone As String
-    Model = ThisWorkbook.Worksheets("GPT").Range("A6").Value2
-    t = ThisWorkbook.Worksheets("GPT").Range("A9").Value2
-    tone = ThisWorkbook.Worksheets("GPT").Range("A12").Value2
+    Dim Model As String, t As Double, tone As String, tempStr As String
+    Dim raw As Variant
+
+    ' Modell - getrimmt + Steuerzeichen weg (haeufige Quelle fuer 'Modell unbekannt')
+    raw = ThisWorkbook.Worksheets("GPT").Range("A6").Value2
+    If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
+        Model = "gpt-4o"
+    Else
+        Model = Trim$(CStr(raw))
+        Model = Replace(Model, vbCr, ""): Model = Replace(Model, vbLf, ""): Model = Replace(Model, vbTab, "")
+        If Len(Model) = 0 Then Model = "gpt-4o"
+    End If
+
+    ' Temperature - leer/Text -> 0
+    raw = ThisWorkbook.Worksheets("GPT").Range("A9").Value2
+    If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
+        t = 0
+    ElseIf IsNumeric(raw) Then
+        t = CDbl(raw)
+    Else
+        t = 0
+    End If
+    tempStr = Replace(CStr(t), ",", ".")
+
+    ' Tone - leer ist erlaubt
+    raw = ThisWorkbook.Worksheets("GPT").Range("A12").Value2
+    If IsError(raw) Or IsNull(raw) Or IsEmpty(raw) Then
+        tone = ""
+    Else
+        tone = Trim$(CStr(raw))
+    End If
 
     BuildPayload = "{""conversation_title"":""New conversation"",""messages"":[{" & _
                    """id"":""" & Uuid4() & """,""role"":""user"",""content"":""" & prompt & """,""date"":""" & IsoNow() & """}]," & _
-                   """model"":""" & Model & """,""temperature"":" & Replace(CStr(t), ",", ".") & ",""pinned"":false,""tone"":""" & JsonEscape(tone) & """,""document_ids"":" & docIdsJson & "}"
+                   """model"":""" & Model & """,""temperature"":" & tempStr & ",""pinned"":false,""tone"":""" & JsonEscape(tone) & """,""document_ids"":" & docIdsJson & "}"
 End Function
 
 
