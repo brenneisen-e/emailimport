@@ -1,7 +1,13 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.4)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.5)
 ' ============================================================================
+' v2.5: NEUES Triage-Feld 'vorgangstyp' (Spalte T). Bounce-NDR-Mails,
+'       ergo-Outbound, System-Mails, Werbung etc. werden NICHT mehr als
+'       'Standardvorgang / BUe einfacher Vertrag' missklassifiziert,
+'       sondern bekommen den korrekten Typ und alle anderen Felder
+'       bleiben leer. Zeilen ohne echten Makler-Vorgang werden grau
+'       hinterlegt, vorgangstyp-Zelle in Orange.
 ' v2.4: Modell-Fehler ("nicht mehr unterstuetzt") werden erkannt und brechen
 '       sofort ab, mit Hinweis auf Sheet GPT!A6. Kleine Pause zwischen den
 '       Calls (1.2s) verhindert das Rate-Limit von gpt.ergo.com (Azure-Gateway
@@ -58,6 +64,9 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 '   Q  Vollmacht_Vollstaendig      (ja / nein / teilweise / nicht_pruefbar)
 '   R  Vollmacht_Fehlt             (Liste fehlender Felder, kommagetrennt)
 '   S  Hinweis                     (kurzer GPT-Hinweis zum Vorgang)
+'   T  Vorgangstyp                 (Triage: Makler-Vorgang / Bounce-NDR /
+'                                   Ergo-Outbound / System-Mail /
+'                                   Werbung-Spam / Unklar)
 ' ============================================================================
 
 Option Explicit
@@ -92,6 +101,7 @@ Private Const COL_VM_VORHAND  As Long = 16
 Private Const COL_VM_VOLLST   As Long = 17
 Private Const COL_VM_FEHLT    As Long = 18
 Private Const COL_HINWEIS     As Long = 19
+Private Const COL_VORGANGSTYP As Long = 20    ' T: Triage - "Makler-Vorgang" / "Bounce-NDR" / "Ergo-Outbound" / "System-Mail" / "Werbung-Spam" / "Unklar"
 
 ' === HAUPTEINSTIEG ==========================================================
 Public Sub Vorgaenge_Analysieren()
@@ -584,20 +594,50 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & ">>>" & vbCrLf
     p = p & "===== ENDE EMAIL =====" & vbCrLf
     p = p & vbCrLf
-    p = p & "AUFGABE: Klassifiziere den Vorgang strikt anhand der unten" & vbCrLf
-    p = p & "definierten Felder und Wertelisten. Nutze die HOCHGELADENEN PDFs" & vbCrLf
-    p = p & "(falls vorhanden) als zusaetzliche Quelle - schau insbesondere nach" & vbCrLf
-    p = p & "einer Maklervollmacht und pruefe deren Vollstaendigkeit." & vbCrLf
+    p = p & "AUFGABE: Klassifiziere die Mail strikt anhand der unten definierten" & vbCrLf
+    p = p & "Felder und Wertelisten." & vbCrLf
+    p = p & vbCrLf
+    p = p & "WICHTIG - SCHRITT 0 (Triage): Pruefe ZUERST das Feld 'vorgangstyp'." & vbCrLf
+    p = p & "Wenn die Mail KEIN echter eingehender Makler-Vorgang ist (also Bounce-" & vbCrLf
+    p = p & "NDR, von ergo selbst rausgegangen, automatische System-Mail, Werbung)," & vbCrLf
+    p = p & "dann setze ALLE anderen 13 Felder auf '' (leerer String) - nur" & vbCrLf
+    p = p & "'vorgangstyp' und 'hinweis' werden befuellt. NICHT raten, NICHT klassi-" & vbCrLf
+    p = p & "fizieren. Hinweis erklaert in einem Satz, was die Mail wirklich ist." & vbCrLf
+    p = p & vbCrLf
+    p = p & "Nur wenn vorgangstyp == 'Makler-Vorgang': die uebrigen 13 Felder" & vbCrLf
+    p = p & "befuellen. Nutze die HOCHGELADENEN PDFs (falls vorhanden) als" & vbCrLf
+    p = p & "zusaetzliche Quelle - insbesondere fuer die Maklervollmacht-Pruefung." & vbCrLf
     p = p & vbCrLf
     p = p & "REGELN:" & vbCrLf
     p = p & "- Nutze Email-Signatur, From-Domain, Body und PDF-Inhalte als Quellen." & vbCrLf
     p = p & "- Wenn Information nicht eindeutig ablesbar ist: leerer String oder" & vbCrLf
     p = p & "  'nicht_pruefbar'. Rate NIE." & vbCrLf
     p = p & "- Antworte AUSSCHLIESSLICH mit einem einzeiligen JSON-Objekt mit GENAU" & vbCrLf
-    p = p & "  diesen 13 Schluesseln (alle Werte als String). Kein Markdown, keine" & vbCrLf
+    p = p & "  14 Schluesseln (alle Werte als String). Kein Markdown, keine" & vbCrLf
     p = p & "  Code-Fences, kein Vorwort, keine Erklaerung." & vbCrLf
     p = p & vbCrLf
     p = p & "FELDER:" & vbCrLf
+    p = p & vbCrLf
+    p = p & "0) vorgangstyp  (TRIAGE - immer ausfuellen)" & vbCrLf
+    p = p & "   - 'Makler-Vorgang': echte eingehende Mail von einem Makler/Maklerpool" & vbCrLf
+    p = p & "     an ergo (BUe, Antrag, Schaden, Aenderung, Ruecksprache)." & vbCrLf
+    p = p & "   - 'Bounce-NDR': Nichtzustellbarkeits-/Delivery-Failure-Benachrichti-" & vbCrLf
+    p = p & "     gung. Indizien: Absender enthaelt 'postmaster', 'mailer-daemon'," & vbCrLf
+    p = p & "     'ITERGO-Security', 'noreply'; Betreff 'Nachricht nicht zustellbar'," & vbCrLf
+    p = p & "     'Undelivered Mail', 'Mail Delivery Failure', 'Returned mail';" & vbCrLf
+    p = p & "     Body enthaelt 'Relay access denied', '5.7.1', 'delivery failed'," & vbCrLf
+    p = p & "     'konnte nicht zugestellt werden'." & vbCrLf
+    p = p & "   - 'Ergo-Outbound': Mail wurde von ergo selbst verschickt (Absender-" & vbCrLf
+    p = p & "     Domain @ergo.de / @itergo.com / @ergo.com), z.B. eine Antwort des" & vbCrLf
+    p = p & "     Bestandsuebertragungs-Teams. KEIN eingehender Vorgang." & vbCrLf
+    p = p & "   - 'System-Mail': automatische Lese-/Empfangsbestaetigung, Out-of-" & vbCrLf
+    p = p & "     Office, Kalender-Einladung, Newsletter, Calendar/iCal-Termin." & vbCrLf
+    p = p & "   - 'Werbung-Spam': klare Werbung, Phishing, Externer-Anbieter-Pitch." & vbCrLf
+    p = p & "   - 'Unklar': passt in keine Kategorie - dann ALLE Felder leer." & vbCrLf
+    p = p & "   ACHTUNG: Wenn die Mail eine Bounce-Benachrichtigung im Anhang die" & vbCrLf
+    p = p & "   urspruengliche ergo-Outbound-Mail enthaelt, ist DAS hier dennoch" & vbCrLf
+    p = p & "   ein Bounce-NDR und kein Vorgang - die Inhalte des Anhangs sind nur" & vbCrLf
+    p = p & "   Beweis fuer die Zustellung, nicht der Vorgang selbst." & vbCrLf
     p = p & vbCrLf
     p = p & "1) maklerpool" & vbCrLf
     p = p & "   Erlaubt: 'Fonds Finanz', 'BCA', 'JDC', 'blau direkt', 'Fondsnet'," & vbCrLf
@@ -675,12 +715,13 @@ Private Function BuildVorgangPrompt(datum As String, absName As String, absMail 
     p = p & "    ist - z.B. fehlende Unterlagen, ungewoehnliche Konstellation," & vbCrLf
     p = p & "    Eskalationspotenzial. Leer wenn nichts auffaellt." & vbCrLf
     p = p & vbCrLf
-    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 13 Schluessel):" & vbCrLf
-    p = p & "{""maklerpool"":""..."",""makler_nachname"":""..."",""makler_vorname"":""...""," & vbCrLf
-    p = p & " ""klassifikation"":""..."",""geschaefts_typ"":""..."",""unterlagen_angefragt"":""...""," & vbCrLf
-    p = p & " ""sonderfall"":""..."",""sparte"":""..."",""anhang_typen"":""...""," & vbCrLf
-    p = p & " ""enthaelt_maklervollmacht"":""..."",""maklervollmacht_vollstaendig"":""...""," & vbCrLf
-    p = p & " ""maklervollmacht_fehlt"":""..."",""hinweis"":""...""}" & vbCrLf
+    p = p & "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 14 Schluessel):" & vbCrLf
+    p = p & "{""vorgangstyp"":""..."",""maklerpool"":""..."",""makler_nachname"":""...""," & vbCrLf
+    p = p & " ""makler_vorname"":""..."",""klassifikation"":""..."",""geschaefts_typ"":""...""," & vbCrLf
+    p = p & " ""unterlagen_angefragt"":""..."",""sonderfall"":""..."",""sparte"":""...""," & vbCrLf
+    p = p & " ""anhang_typen"":""..."",""enthaelt_maklervollmacht"":""...""," & vbCrLf
+    p = p & " ""maklervollmacht_vollstaendig"":""..."",""maklervollmacht_fehlt"":""...""," & vbCrLf
+    p = p & " ""hinweis"":""...""}" & vbCrLf
     p = p & vbCrLf
     p = p & "Antworte JETZT, nur das JSON-Objekt:" & vbCrLf
     BuildVorgangPrompt = p
@@ -704,7 +745,8 @@ Private Function ParseGptJsonAntwort(antwort As String) As Object
     clean = Mid(clean, p1, p2 - p1 + 1)
 
     Dim keys As Variant
-    keys = Array("maklerpool", "makler_nachname", "makler_vorname", _
+    keys = Array("vorgangstyp", _
+                 "maklerpool", "makler_nachname", "makler_vorname", _
                  "klassifikation", "geschaefts_typ", "unterlagen_angefragt", _
                  "sonderfall", "sparte", "anhang_typen", _
                  "enthaelt_maklervollmacht", "maklervollmacht_vollstaendig", _
@@ -1131,8 +1173,9 @@ Private Sub HeaderSchreiben(ws As Worksheet)
     ws.cells(1, COL_VM_VOLLST).Value = "Vollmacht_Vollstaendig"
     ws.cells(1, COL_VM_FEHLT).Value = "Vollmacht_Fehlt"
     ws.cells(1, COL_HINWEIS).Value = "Hinweis"
+    ws.cells(1, COL_VORGANGSTYP).Value = "Vorgangstyp"
 
-    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_HINWEIS))
+    With ws.Range(ws.cells(1, 1), ws.cells(1, COL_VORGANGSTYP))
         .Font.Bold = True
         .Interior.Color = RGB(30, 64, 175) ' kraeftiges Blau
         .Font.Color = RGB(255, 255, 255)
@@ -1163,41 +1206,55 @@ Private Sub SpaltenbreitenSetzen(ws As Worksheet)
     ws.Columns(COL_VM_VOLLST).ColumnWidth = 18
     ws.Columns(COL_VM_FEHLT).ColumnWidth = 32
     ws.Columns(COL_HINWEIS).ColumnWidth = 50
+    ws.Columns(COL_VORGANGSTYP).ColumnWidth = 18
 End Sub
 
 Private Sub SchreibeGptErgebnis(ws As Worksheet, row As Long, dict As Object)
-    ws.cells(row, COL_MAKLERPOOL).Value = SafeGet(dict, "maklerpool")
-    ws.cells(row, COL_NACHNAME).Value = SafeGet(dict, "makler_nachname")
-    ws.cells(row, COL_VORNAME).Value = SafeGet(dict, "makler_vorname")
-    ws.cells(row, COL_KLASSIFIK).Value = SafeGet(dict, "klassifikation")
-    ws.cells(row, COL_GESCHTYP).Value = SafeGet(dict, "geschaefts_typ")
-    ws.cells(row, COL_UNTERLAGEN).Value = SafeGet(dict, "unterlagen_angefragt")
-    ws.cells(row, COL_SONDERFALL).Value = SafeGet(dict, "sonderfall")
-    ws.cells(row, COL_SPARTE).Value = SafeGet(dict, "sparte")
-    ws.cells(row, COL_ANH_TYPEN).Value = SafeGet(dict, "anhang_typen")
-    ws.cells(row, COL_VM_VORHAND).Value = SafeGet(dict, "enthaelt_maklervollmacht")
-    ws.cells(row, COL_VM_VOLLST).Value = SafeGet(dict, "maklervollmacht_vollstaendig")
-    ws.cells(row, COL_VM_FEHLT).Value = SafeGet(dict, "maklervollmacht_fehlt")
+    Dim vtyp As String: vtyp = SafeGet(dict, "vorgangstyp")
+    ws.cells(row, COL_VORGANGSTYP).Value = vtyp
     ws.cells(row, COL_HINWEIS).Value = SafeGet(dict, "hinweis")
 
-    ' Hervorhebungen
-    Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
-    Dim klass As String: klass = LCase(SafeGet(dict, "klassifikation"))
-    Dim vmVollst As String: vmVollst = LCase(SafeGet(dict, "maklervollmacht_vollstaendig"))
-    Dim vmEnthalten As String: vmEnthalten = LCase(SafeGet(dict, "enthaelt_maklervollmacht"))
+    Dim istMakler As Boolean: istMakler = (LCase(vtyp) = "makler-vorgang")
 
-    If InStr(sonder, "flotten") > 0 Or InStr(sonder, "sondertarif") > 0 Then
-        ws.cells(row, COL_SONDERFALL).Interior.Color = RGB(252, 165, 165)
-    End If
-    If InStr(klass, "nicht-standard") > 0 Then
-        ws.cells(row, COL_KLASSIFIK).Interior.Color = RGB(253, 230, 138)
-    End If
-    If vmEnthalten = "ja" Then
-        If vmVollst = "teilweise" Or vmVollst = "nein" Then
-            ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(252, 165, 165)
-        ElseIf vmVollst = "ja" Then
-            ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(187, 247, 208) ' hellgruen
+    If istMakler Then
+        ws.cells(row, COL_MAKLERPOOL).Value = SafeGet(dict, "maklerpool")
+        ws.cells(row, COL_NACHNAME).Value = SafeGet(dict, "makler_nachname")
+        ws.cells(row, COL_VORNAME).Value = SafeGet(dict, "makler_vorname")
+        ws.cells(row, COL_KLASSIFIK).Value = SafeGet(dict, "klassifikation")
+        ws.cells(row, COL_GESCHTYP).Value = SafeGet(dict, "geschaefts_typ")
+        ws.cells(row, COL_UNTERLAGEN).Value = SafeGet(dict, "unterlagen_angefragt")
+        ws.cells(row, COL_SONDERFALL).Value = SafeGet(dict, "sonderfall")
+        ws.cells(row, COL_SPARTE).Value = SafeGet(dict, "sparte")
+        ws.cells(row, COL_ANH_TYPEN).Value = SafeGet(dict, "anhang_typen")
+        ws.cells(row, COL_VM_VORHAND).Value = SafeGet(dict, "enthaelt_maklervollmacht")
+        ws.cells(row, COL_VM_VOLLST).Value = SafeGet(dict, "maklervollmacht_vollstaendig")
+        ws.cells(row, COL_VM_FEHLT).Value = SafeGet(dict, "maklervollmacht_fehlt")
+
+        ' Hervorhebungen NUR fuer echte Makler-Vorgaenge
+        Dim sonder As String: sonder = LCase(SafeGet(dict, "sonderfall"))
+        Dim klass As String: klass = LCase(SafeGet(dict, "klassifikation"))
+        Dim vmVollst As String: vmVollst = LCase(SafeGet(dict, "maklervollmacht_vollstaendig"))
+        Dim vmEnthalten As String: vmEnthalten = LCase(SafeGet(dict, "enthaelt_maklervollmacht"))
+
+        If InStr(sonder, "flotten") > 0 Or InStr(sonder, "sondertarif") > 0 Then
+            ws.cells(row, COL_SONDERFALL).Interior.Color = RGB(252, 165, 165)
         End If
+        If InStr(klass, "nicht-standard") > 0 Then
+            ws.cells(row, COL_KLASSIFIK).Interior.Color = RGB(253, 230, 138)
+        End If
+        If vmEnthalten = "ja" Then
+            If vmVollst = "teilweise" Or vmVollst = "nein" Then
+                ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(252, 165, 165)
+            ElseIf vmVollst = "ja" Then
+                ws.cells(row, COL_VM_VOLLST).Interior.Color = RGB(187, 247, 208)
+            End If
+        End If
+    Else
+        ' Kein Makler-Vorgang: Felder G-S leer lassen, Zeile grau einfaerben
+        Dim grau As Long: grau = RGB(229, 231, 235)
+        ws.Range(ws.cells(row, COL_MAKLERPOOL), ws.cells(row, COL_HINWEIS)).Interior.Color = grau
+        ws.cells(row, COL_VORGANGSTYP).Interior.Color = RGB(254, 215, 170) ' helles Orange
+        ws.cells(row, COL_VORGANGSTYP).Font.Bold = True
     End If
 End Sub
 
