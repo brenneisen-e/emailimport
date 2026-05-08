@@ -1,7 +1,11 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.7)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.7.1)
 ' ============================================================================
+' v2.7.1: BUGFIX - Private Const ERGO_BASE_URL stand zwischen den Funktionen,
+'         was VBA mit "Variable nicht definiert" beim Kompilieren ablehnt.
+'         Module-Level-Declarations duerfen nur am Modul-KOPF stehen, vor
+'         der ersten Sub/Function. Konstanten nach oben verschoben.
 ' v2.7: ASK_ErgoGPT + alle HTTP/Upload/JSON-Helfer sind direkt in dieses
 '       Modul integriert. Kein separater Test.txt-Import mehr noetig - die
 '       alten Module 'Agent', 'AI_Excel_Functions' und 'GPT' koennen aus
@@ -87,6 +91,10 @@ Private Const COOKIE_CELL As String = "A7"            ' im Sheet GPT: Cookie als
 Private Const COOKIE_PATH_CELL As String = "A8"       ' im Sheet GPT: alternativer Pfad zur Cookie-Datei
 Private Const MAX_PDFS_PRO_VORGANG As Long = 3
 Private Const MAX_PDF_GROESSE_MB As Long = 20
+
+' ErgoGPT-API-Konfig (siehe inlined ASK_ErgoGPT-Block am Modulende)
+Private Const ERGO_BASE_URL As String = "https://gpt.ergo.com/api"
+Private Const MAX_PARALLEL_PDF_UPLOADS As Long = 3
 
 ' Spaltenpositionen Output
 Private Const COL_DATEI       As Long = 1
@@ -1444,9 +1452,6 @@ End Sub
 ' 'GPT' koennen geloescht werden - sofern dort keine andere Funktionalitaet
 ' (XVERWEIS-AI etc.) drinsteht, die dauerhaft gebraucht wird.
 ' ============================================================================
-
-Private Const ERGO_BASE_URL As String = "https://gpt.ergo.com/api"
-Private Const MAX_PARALLEL_PDF_UPLOADS As Long = 3
 
 ' === Haupteinstieg ==========================================================
 Public Function ASK_ErgoGPT(userPrompt As String, Optional pdfs As Variant) As String
