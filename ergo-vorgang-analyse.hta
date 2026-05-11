@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.13"
+        VERSION="1.14"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.13 - Pool-XXL (.msg-Direkt-Parser ohne Outlook, 20-50x schneller fuer 1000+ Mails)</div>
+            <div class="ver">v1.14 - XXL-Fix: ADODB.Stream-Init-Reihenfolge + Canary-Log fuer Diagnose</div>
         </div>
 
         <!-- Cookie -->
@@ -3187,6 +3187,9 @@ function processNextXxlChunk() {
     var subStamp = String(new Date().getTime()) + "_" + xs.chunkIdx;
     var listPath = xs.tempDir + "\\ergo_msglist_" + subStamp + ".txt";
     var outPath = xs.tempDir + "\\ergo_msgout_" + subStamp + ".json";
+    var canaryPath = xs.tempDir + "\\ergo_canary_" + subStamp + ".log";
+    var rc = -999;
+    var resultsBeforeChunk = xs.results.length;
 
     try {
         // Path-Liste als Unicode schreiben (Umlaute in Pfaden!)
@@ -3196,13 +3199,10 @@ function processNextXxlChunk() {
         }
         listFile.Close();
 
-        var cmd = 'wscript.exe //NoLogo //B "' + xs.vbsPath + '" "' + listPath + '" "' + outPath + '"';
-        var rc = shell.Run(cmd, 0, true);
+        var cmd = 'wscript.exe //NoLogo //B "' + xs.vbsPath + '" "' + listPath + '" "' + outPath + '" "' + canaryPath + '"';
+        rc = shell.Run(cmd, 0, true);
 
         if (fso.FileExists(outPath)) {
-            // Output ist UTF-8 - via FSO als Unicode wuerde Umlaute zerstoeren.
-            // ADODB.Stream mit Charset utf-8 - das funktioniert hier weil HTA
-            // jetzt entweder local oder VBS hat schon gearbeitet, beides ok
             var content = "";
             try {
                 var stm = new ActiveXObject("ADODB.Stream");
@@ -3211,7 +3211,6 @@ function processNextXxlChunk() {
                 content = stm.ReadText();
                 stm.Close();
             } catch(e2) {
-                // Fallback: FSO Unicode read
                 content = readTextFile(outPath);
             }
             if (content && content.length > 2) {
@@ -3221,19 +3220,52 @@ function processNextXxlChunk() {
                         for (var k = 0; k < parsed.length; k++) xs.results.push(parsed[k]);
                     }
                 } catch(eP) {
-                    // Bei Parse-Fehler: trotzdem weitermachen mit naechstem Chunk
+                    // Parse-Fehler - weitermachen
                 }
             }
         }
     } catch(e) {
-        // Fehler bei diesem Chunk - alle Mails als Fehler markieren
         for (var fi = 0; fi < chunk.length; fi++) {
             xs.results.push({ file: chunk[fi].substr(chunk[fi].lastIndexOf("\\") + 1), path: chunk[fi], err: "Chunk-Fehler: " + e.message });
         }
     }
 
+    var chunkProducedResults = xs.results.length > resultsBeforeChunk;
+
+    // Wenn erster Chunk nichts liefert: Canary lesen, Diagnose merken, abbrechen
+    if (!chunkProducedResults && !xs.firstFailureDiag) {
+        var canaryContent = "(Canary-Log konnte nicht gelesen werden)";
+        try {
+            if (fso.FileExists(canaryPath)) {
+                canaryContent = readTextFile(canaryPath) || "(leer)";
+            } else {
+                canaryContent = "(Canary-Log wurde gar nicht geschrieben - VBS wurde wahrscheinlich nicht ausgefuehrt)";
+            }
+        } catch(e) { canaryContent = "Canary read error: " + e.message; }
+
+        xs.firstFailureDiag = {
+            chunkIdx: xs.chunkIdx,
+            rc: rc,
+            outputExists: fso.FileExists(outPath),
+            canaryExists: fso.FileExists(canaryPath),
+            canary: canaryContent,
+            cmd: cmd,
+            listPath: listPath,
+            outPath: outPath,
+            canaryPath: canaryPath,
+            chunkSize: chunk.length
+        };
+        // Temp-Dateien dieses Chunks NICHT loeschen - zur Inspektion behalten
+        xs.chunkIdx++;
+        // Abbrechen statt weiter zu versuchen
+        finishXxl();
+        return;
+    }
+
+    // Normaler Cleanup
     try { fso.DeleteFile(listPath, true); } catch(e) {}
     try { fso.DeleteFile(outPath, true); } catch(e) {}
+    try { fso.DeleteFile(canaryPath, true); } catch(e) {}
 
     xs.chunkIdx++;
     setTimeout(processNextXxlChunk, 10);
@@ -3242,6 +3274,35 @@ function processNextXxlChunk() {
 function finishXxl() {
     var xs = state.xxlState;
     var elapsedSec = Math.round((new Date().getTime() - xs.startTime) / 1000);
+
+    document.getElementById("progressContainer").style.display = "none";
+    state.running = false;
+    refreshStartButton();
+
+    // 0-Result-Diagnose-Pfad
+    if (xs.results.length === 0 && xs.firstFailureDiag) {
+        var d = xs.firstFailureDiag;
+        var msg = "<strong>XXL-Modus hat 0 Mails verarbeitet.</strong><br><br>" +
+                  "<strong>Diagnose:</strong><br>" +
+                  "wscript.exe Exit-Code: " + d.rc + "<br>" +
+                  "Output-Datei existiert: " + (d.outputExists ? "ja" : "<strong>NEIN</strong>") + "<br>" +
+                  "Canary-Log existiert: " + (d.canaryExists ? "ja" : "<strong>NEIN</strong>") + "<br>" +
+                  "Chunk-Groesse war: " + d.chunkSize + " Mails<br><br>" +
+                  "<strong>Canary-Log:</strong><br>" +
+                  "<pre style=\"background:#0f172a;padding:8px;border-radius:4px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;\">" +
+                  esc(d.canary).substr(0, 4000) + "</pre>" +
+                  "<strong>Debug-Dateien (NICHT geloescht):</strong><br>" +
+                  "<code style=\"font-size:10px;\">" +
+                  "VBS:&nbsp;&nbsp;&nbsp;" + esc(xs.vbsPath) + "<br>" +
+                  "Liste:&nbsp;" + esc(d.listPath) + "<br>" +
+                  "Output:&nbsp;" + esc(d.outPath) + "<br>" +
+                  "Canary:&nbsp;" + esc(d.canaryPath) + "</code><br><br>" +
+                  "<strong>Test-Befehl manuell (in CMD ausfuehren):</strong><br>" +
+                  "<code style=\"font-size:10px;background:#0f172a;padding:4px;display:block;word-break:break-all;\">" +
+                  esc(d.cmd.replace("//B", "")) + "</code>";
+        showError(msg);
+        return;
+    }
 
     // POOL_RULES-Detection lokal anwenden (JS, das geht ohne weiteres)
     var rows = [];
@@ -3291,15 +3352,13 @@ function finishXxl() {
         rows.push(row);
     }
 
-    // VBS-Skript aufraeumen
-    try {
-        var fso = new ActiveXObject("Scripting.FileSystemObject");
-        fso.DeleteFile(xs.vbsPath, true);
-    } catch(e) {}
-
-    document.getElementById("progressContainer").style.display = "none";
-    state.running = false;
-    refreshStartButton();
+    // VBS-Skript aufraeumen (nur wenn kein Debug-Modus)
+    if (!xs.firstFailureDiag) {
+        try {
+            var fso = new ActiveXObject("Scripting.FileSystemObject");
+            fso.DeleteFile(xs.vbsPath, true);
+        } catch(e) {}
+    }
 
     try {
         exportPoolOverviewToExcel(rows, poolCounts, sourceCounts);
@@ -3316,37 +3375,107 @@ function finishXxl() {
 function buildParseMsgVbs() {
     var v = [];
     v.push("Option Explicit");
-    v.push("Dim fso, inputPath, outputPath, raw, paths, i, path");
+    v.push("Dim fso, inputPath, outputPath, canaryPath, raw, paths, i, path");
     v.push("Set fso = CreateObject(\"Scripting.FileSystemObject\")");
     v.push("inputPath = WScript.Arguments(0)");
     v.push("outputPath = WScript.Arguments(1)");
+    v.push("If WScript.Arguments.Count >= 3 Then canaryPath = WScript.Arguments(2) Else canaryPath = \"\"");
     v.push("");
+    // Canary-Log - schreibt Step-by-step Status, damit JS bei Fehler sieht wo's gehakt hat
+    v.push("Dim canaryStm");
+    v.push("On Error Resume Next");
+    v.push("If Len(canaryPath) > 0 Then");
+    v.push("    Set canaryStm = fso.CreateTextFile(canaryPath, True, False)");
+    v.push("End If");
+    v.push("Err.Clear");
+    v.push("On Error GoTo 0");
+    v.push("");
+    v.push("Sub Log(msg)");
+    v.push("    On Error Resume Next");
+    v.push("    If Not canaryStm Is Nothing Then canaryStm.WriteLine msg");
+    v.push("    On Error GoTo 0");
+    v.push("End Sub");
+    v.push("");
+    v.push("Log \"VBS started at \" & Now");
+    v.push("Log \"Args: input=\" & inputPath & \" output=\" & outputPath");
+    v.push("");
+    v.push("On Error Resume Next");
     v.push("Dim tsIn");
-    v.push("Set tsIn = fso.OpenTextFile(inputPath, 1, False, -1)"); // Unicode
+    v.push("Set tsIn = fso.OpenTextFile(inputPath, 1, False, -1)");
+    v.push("If Err.Number <> 0 Then");
+    v.push("    Log \"FATAL OpenTextFile(input) Error: \" & Err.Description");
+    v.push("    Err.Clear");
+    v.push("    On Error GoTo 0");
+    v.push("    If Not canaryStm Is Nothing Then canaryStm.Close");
+    v.push("    WScript.Quit 1");
+    v.push("End If");
+    v.push("On Error GoTo 0");
+    v.push("");
     v.push("raw = tsIn.ReadAll");
     v.push("tsIn.Close");
     v.push("paths = Split(raw, vbCrLf)");
+    v.push("Log \"Path list loaded, \" & (UBound(paths) + 1) & \" entries\"");
     v.push("");
     v.push("Dim outStm");
+    v.push("On Error Resume Next");
     v.push("Set outStm = CreateObject(\"ADODB.Stream\")");
-    v.push("outStm.Type = 2 : outStm.Charset = \"utf-8\" : outStm.Open");
+    v.push("outStm.Type = 2");
+    v.push("outStm.Charset = \"utf-8\"");
+    v.push("outStm.Open");
+    v.push("If Err.Number <> 0 Then");
+    v.push("    Log \"FATAL ADODB.Stream Open Error: \" & Err.Description");
+    v.push("    Err.Clear");
+    v.push("    On Error GoTo 0");
+    v.push("    If Not canaryStm Is Nothing Then canaryStm.Close");
+    v.push("    WScript.Quit 2");
+    v.push("End If");
+    v.push("On Error GoTo 0");
+    v.push("");
     v.push("outStm.WriteText \"[\"");
-    v.push("Dim isFirst : isFirst = True");
+    v.push("Dim isFirst, processed, errored");
+    v.push("isFirst = True : processed = 0 : errored = 0");
     v.push("");
     v.push("For i = 0 To UBound(paths)");
     v.push("    path = Trim(paths(i))");
-    v.push("    If Len(path) > 0 And fso.FileExists(path) Then");
-    v.push("        Dim j");
-    v.push("        j = ParseMsg(path)");
-    v.push("        If Not isFirst Then outStm.WriteText \",\"");
-    v.push("        outStm.WriteText j");
-    v.push("        isFirst = False");
+    v.push("    If Len(path) > 0 Then");
+    v.push("        If fso.FileExists(path) Then");
+    v.push("            Dim j");
+    v.push("            On Error Resume Next");
+    v.push("            j = ParseMsg(path)");
+    v.push("            If Err.Number <> 0 Then");
+    v.push("                Log \"ParseMsg error for \" & path & \": \" & Err.Description");
+    v.push("                j = \"{\"\"file\"\":\"\"\" & JsonEsc(fso.GetFileName(path)) & \"\"\",\"\"err\"\":\"\"\" & JsonEsc(Err.Description) & \"\"\"}\"");
+    v.push("                Err.Clear");
+    v.push("                errored = errored + 1");
+    v.push("            End If");
+    v.push("            On Error GoTo 0");
+    v.push("            If Not isFirst Then outStm.WriteText \",\"");
+    v.push("            outStm.WriteText j");
+    v.push("            isFirst = False");
+    v.push("            processed = processed + 1");
+    v.push("            If processed Mod 50 = 0 Then Log \"Progress: \" & processed & \"/\" & (UBound(paths)+1)");
+    v.push("        Else");
+    v.push("            Log \"File not found (skipped): \" & path");
+    v.push("        End If");
     v.push("    End If");
     v.push("Next");
     v.push("");
     v.push("outStm.WriteText \"]\"");
+    v.push("Log \"Loop done. processed=\" & processed & \" errored=\" & errored");
+    v.push("");
+    v.push("On Error Resume Next");
     v.push("outStm.SaveToFile outputPath, 2");
+    v.push("If Err.Number <> 0 Then");
+    v.push("    Log \"FATAL SaveToFile Error: \" & Err.Description");
+    v.push("Else");
+    v.push("    Log \"Output saved to \" & outputPath");
+    v.push("End If");
+    v.push("Err.Clear");
+    v.push("On Error GoTo 0");
     v.push("outStm.Close");
+    v.push("");
+    v.push("Log \"VBS finished at \" & Now");
+    v.push("If Not canaryStm Is Nothing Then canaryStm.Close");
     v.push("WScript.Quit 0");
     v.push("");
 
@@ -3402,15 +3531,15 @@ function buildParseMsgVbs() {
     v.push("End Function");
     v.push("");
 
-    // ReadAsUtf16
+    // ReadAsUtf16 - FIXED: Type + Charset MUST be set before Open, sonst silent fail
     v.push("Function ReadAsUtf16(path)");
     v.push("    Dim s, stm");
     v.push("    Set stm = CreateObject(\"ADODB.Stream\")");
-    v.push("    stm.Type = 1 : stm.Open");
-    v.push("    stm.LoadFromFile path");
-    v.push("    stm.Position = 0");
     v.push("    stm.Type = 2");
     v.push("    stm.Charset = \"utf-16le\"");
+    v.push("    stm.Open");
+    v.push("    stm.LoadFromFile path");
+    v.push("    stm.Position = 0");
     v.push("    s = stm.ReadText");
     v.push("    stm.Close");
     v.push("    ReadAsUtf16 = s");
