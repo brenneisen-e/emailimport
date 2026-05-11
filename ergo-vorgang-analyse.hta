@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.3"
+        VERSION="1.4"
         WINDOWSTATE="normal"
     />
     <style>
@@ -195,7 +195,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.3 - Parallel-Pipeline + Resume + UNC-Fix + Cookie-Diagnose</div>
+            <div class="ver">v1.4 - FSO statt ADODB.Stream (UNC/Internet-Zone-Fix)</div>
         </div>
 
         <!-- Cookie -->
@@ -502,48 +502,49 @@ function loadCookieFromFile() {
         updateCookieStatus(false, "HTA-Pfad nicht ermittelbar");
         return;
     }
-    var fso, exists;
-    try {
-        fso = new ActiveXObject("Scripting.FileSystemObject");
-        exists = fso.FileExists(COOKIE_PATH);
-    } catch(e) {
-        updateCookieStatus(false, "FileSystemObject nicht verfuegbar: " + e.message);
-        return;
-    }
-    if (!exists) {
+    var fso;
+    try { fso = new ActiveXObject("Scripting.FileSystemObject"); }
+    catch(e) { updateCookieStatus(false, "FSO nicht verfuegbar: " + e.message); return; }
+
+    if (!fso.FileExists(COOKIE_PATH)) {
         updateCookieStatus(false, "Cookie.txt nicht gefunden");
         return;
     }
-    // Versuche zuerst UTF-8, dann UTF-16 (Notepad-Default), dann ANSI-Fallback
-    var charsets = ["utf-8", "utf-16", "windows-1252"];
+
+    // FSO.OpenTextFile statt ADODB.Stream - ADODB.Stream ist in IE-Internet-Zone
+    // (UNC-Pfade!) als 'Datenquelle' gesperrt, FSO nicht.
+    // Format: -2=System Default, -1=Unicode (UTF-16 LE), 0=ASCII
+    var attempts = [
+        { fmt: 0,  name: "ASCII" },
+        { fmt: -1, name: "Unicode (UTF-16)" },
+        { fmt: -2, name: "System-Default" }
+    ];
+    var best = "";
+    var bestName = "";
     var lastErr = "";
-    for (var i = 0; i < charsets.length; i++) {
+    for (var i = 0; i < attempts.length; i++) {
         try {
-            var stm = new ActiveXObject("ADODB.Stream");
-            stm.Type = 2;
-            stm.Charset = charsets[i];
-            stm.Open();
-            stm.LoadFromFile(COOKIE_PATH);
-            var raw = trim(stm.ReadText());
-            stm.Close();
-            // BOM stripping (manche Editoren schreiben ﻿ am Anfang)
+            var ts = fso.OpenTextFile(COOKIE_PATH, 1, false, attempts[i].fmt);
+            var raw = ts.ReadAll();
+            ts.Close();
+            raw = trim(String(raw));
             if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
-            // Plausibilitaet: Cookie hat typisch '=' und ist >50 Zeichen
+            if (raw.length > best.length) { best = raw; bestName = attempts[i].name; }
             if (raw.length >= 50 && raw.indexOf("=") >= 0) {
                 state.cookie = raw;
                 document.getElementById("cookieInput").value = raw;
-                updateCookieStatus(true, "Geladen (" + charsets[i] + ", " + raw.length + " Zeichen)");
+                updateCookieStatus(true, "Geladen via FSO/" + attempts[i].name + " (" + raw.length + " Zeichen)");
                 return;
-            } else if (raw.length > 0) {
-                lastErr = "Datei nur " + raw.length + " Zeichen / kein '='";
-            } else {
-                lastErr = "Datei leer";
             }
         } catch(e) {
-            lastErr = charsets[i] + ": " + e.message;
+            lastErr = attempts[i].name + ": " + e.message;
         }
     }
-    updateCookieStatus(false, "Cookie.txt vorhanden aber unlesbar - " + lastErr);
+    if (best.length > 0) {
+        updateCookieStatus(false, "Datei nur " + best.length + " Zeichen / kein '=' (probiert: " + bestName + ")");
+    } else {
+        updateCookieStatus(false, "Datei unlesbar - " + (lastErr || "leere oder ungueltige Datei"));
+    }
 }
 
 function saveCookie() {
@@ -553,17 +554,19 @@ function saveCookie() {
         return;
     }
     if (!COOKIE_PATH) {
-        showError("HTA-Pfad konnte nicht ermittelt werden - Cookie-Datei kann nicht gespeichert werden. Bitte die HTA von einem normalen Datei-Pfad starten (nicht aus einem ZIP heraus).");
+        showError("HTA-Pfad konnte nicht ermittelt werden - Cookie-Datei kann nicht gespeichert werden.");
         return;
     }
     try {
-        var stm = new ActiveXObject("ADODB.Stream");
-        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
-        stm.WriteText(raw);
-        stm.SaveToFile(COOKIE_PATH, 2);
-        stm.Close();
+        // FSO.CreateTextFile statt ADODB.Stream - in UNC/Internet-Zone laeuft
+        // ADODB.Stream nicht (gilt als 'Datenquelle'), FSO aber schon.
+        // Cookie-String ist ASCII-safe (Base64, Hex etc.), Unicode nicht noetig.
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var ts = fso.CreateTextFile(COOKIE_PATH, true, false); // overwrite, ASCII
+        ts.Write(raw);
+        ts.Close();
         state.cookie = raw;
-        updateCookieStatus(true);
+        updateCookieStatus(true, "Gespeichert via FSO (" + raw.length + " Zeichen)");
         showSuccess("Cookie gespeichert: " + COOKIE_PATH);
     } catch(e) {
         showError("Cookie konnte nicht gespeichert werden: " + e.message + " (Pfad: " + COOKIE_PATH + ")");
