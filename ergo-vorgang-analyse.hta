@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.8"
+        VERSION="1.10"
         WINDOWSTATE="normal"
     />
     <style>
@@ -185,37 +185,10 @@
 <body>
 <div class="container">
 
-    <!-- UNC-Warnung (nur sichtbar wenn HTA aus Netzwerk-Pfad laeuft) -->
-    <div id="uncBanner" style="display:none; background: linear-gradient(135deg, #b45309, #92400e); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1rem; color: #fef3c7; font-size: 13px;">
-        <div style="display:flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-            <div style="font-size: 24px;">&#9888;</div>
-            <div style="flex: 1; min-width: 300px;">
-                <strong>UNC-/Netzwerk-Pfad erkannt!</strong>
-                Diese HTA laeuft aus <code id="uncPath"></code>.
-                IE blockiert in dieser Zone den binaeren PDF-Upload (Fehler "Datenquelle in anderer Domaene").
-                Verschieben + MOTW entfernen + neu starten.
-            </div>
-            <button class="btn btn-warning" style="font-weight: 600;" onclick="relocateToLocal()">
-                Jetzt nach %LOCALAPPDATA% verschieben + neu starten
-            </button>
-        </div>
-    </div>
-
-    <!-- Selbst-Unblock-Banner (sichtbar wenn HTA lokal liegt, aber wir
-         sicherheitshalber MOTW entfernen wollen) -->
-    <div id="motwBanner" style="display:none; background: linear-gradient(135deg, #1e40af, #1e3a8a); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1rem; color: #dbeafe; font-size: 12px;">
-        <div style="display:flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-            <div style="font-size: 20px;">&#128274;</div>
-            <div style="flex: 1; min-width: 300px;">
-                Falls beim PDF-Upload "Datenquelle in anderer Domaene"-Fehler kommt,
-                hat die Datei moeglicherweise noch den Mark-of-the-Web vom Download.
-                Button entfernt das automatisch:
-            </div>
-            <button class="btn btn-secondary" onclick="unblockSelfAndRestart()">
-                MOTW entfernen + neu starten
-            </button>
-        </div>
-    </div>
+    <!-- UNC/MOTW-Banner sind ab v1.10 entfernt: der VBScript-Subprozess
+         loest die Zone-Restriktion ohnehin, das HTA muss nicht mehr von
+         C:\ aus laufen. Relocate/Unblock-Funktionen bleiben im Code fuer
+         manuellen Aufruf via VBA-Editor-Konsole, falls jemand sie braucht. -->
 
     <div class="card">
         <div class="header">
@@ -226,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.8 - PDF-Upload ueber PowerShell-Subprozess (umgeht IE-Zone-Sperre)</div>
+            <div class="ver">v1.10 - VBScript-Uploader (wscript.exe, freier ADODB.Stream) + Live-Progress</div>
         </div>
 
         <!-- Cookie -->
@@ -304,6 +277,7 @@
         <div class="progress-container" id="progressContainer">
             <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
             <div class="progress-text" id="progressText">Verarbeite...</div>
+            <div id="slotStatus" style="display:flex; flex-direction: column; gap: 2px; margin-top: 6px; font-size: 11px; color: #cbd5e1; font-family: 'Consolas', monospace;"></div>
         </div>
 
         <div class="status success" id="successStatus"><span id="successMsg"></span></div>
@@ -406,16 +380,8 @@ window.onload = function() {
     COOKIE_PATH = getHtaDir() + "\\Cookie.txt";
     document.getElementById("cookiePath").innerText = COOKIE_PATH || "(HTA-Pfad nicht ermittelbar)";
 
-    // UNC-Detection - prominent warnen, wenn das HTA von einem Netzwerk-Pfad
-    // laeuft (sperrt ADODB.Stream binaeren Upload).
-    if (isRunningFromUnc()) {
-        document.getElementById("uncPath").innerText = getHtaDir();
-        document.getElementById("uncBanner").style.display = "block";
-    } else {
-        // Lokal? Trotzdem MOTW-Selbst-Unblock-Button anzeigen,
-        // falls die Datei mit Mark-of-the-Web kopiert/heruntergeladen wurde.
-        document.getElementById("motwBanner").style.display = "block";
-    }
+    // Ab v1.10: keine UNC/MOTW-Banner mehr - der VBScript-Subprozess
+    // umgeht die Zone-Restriktion ohnehin. HTA kann von UNC laufen.
 
     // Load cookie
     loadCookieFromFile();
@@ -922,11 +888,15 @@ function workerTick() {
             delete state.slots[toRemove[i]];
         }
 
-        // C) Status update
+        // C) Status update - Progressbar + Slot-Liste
         var inflight = countSlots();
         var done2 = state.processed + state.errors;
-        var totalKnown = state.results.length;
-        updateProgress(done2, state.workTotal, inflight + " inflight, " + state.processed + " ok, " + state.errors + " fehler, " + (state.workTotal - state.nextIdx) + " queue");
+        updateProgress(done2, state.workTotal,
+            inflight + " parallel | " +
+            state.processed + " ok | " +
+            state.errors + " fehler | " +
+            (state.workTotal - state.nextIdx) + " warten");
+        renderSlotStatus();
 
         // D) Save cache every 3 finished
         if (toRemove.length > 0) {
@@ -978,6 +948,7 @@ function finishAnalysis(reason) {
     saveCache();
     renderTable();
     document.getElementById("progressContainer").style.display = "none";
+    document.getElementById("slotStatus").innerText = "";
     refreshStartButton();
 
     var msg = "";
@@ -1009,9 +980,11 @@ function prepareSlot(slot) {
     try {
         var fso = new ActiveXObject("Scripting.FileSystemObject");
         step = "MSG oeffnen";
+        setSlotPhase(slot, "MSG oeffnen");
         var it = outlookApp.Session.OpenSharedItem(slot.msgPath);
 
         step = "Properties lesen";
+        setSlotPhase(slot, "Properties lesen");
         slot.datum = "";
         slot.absName = "";
         slot.absMail = "";
@@ -1028,6 +1001,7 @@ function prepareSlot(slot) {
         try { slot.body = String(it.Body || ""); } catch(e) {}
 
         step = "Anhaenge extrahieren";
+        setSlotPhase(slot, "Anhaenge extrahieren");
         slot.anhangAlle = "";
         slot.pdfListe = "";
         var pdfPaths = [];
@@ -1066,24 +1040,29 @@ function prepareSlot(slot) {
         try { it.Close(1); } catch(e) {}
 
         step = "Prompt bauen";
+        setSlotPhase(slot, "Prompt bauen");
         var bodyShort = slot.body;
         if (bodyShort.length > BODY_CAP) bodyShort = bodyShort.substr(0, BODY_CAP) + " [...gekuerzt]";
         slot.prompt = buildVorgangPrompt(slot.datum, slot.absName, slot.absMail, slot.betreff, bodyShort, slot.anhangAlle, slot.pdfListe);
 
         step = "Conversation anlegen";
+        setSlotPhase(slot, "Conversation anlegen");
         slot.convId = createConversationSync(slot.prompt);
         if (!slot.convId) throw new Error("Keine conversation_id zurueck");
 
         step = "PDFs hochladen";
         var docIdsJson = "[]";
         if (pdfPaths.length > 0) {
-            docIdsJson = uploadPdfsSequential(slot.convId, pdfPaths);
+            setSlotPhase(slot, "PDF 1/" + pdfPaths.length + " hochladen...");
+            docIdsJson = uploadPdfsSequential(slot.convId, pdfPaths, function(idx, total, name) {
+                setSlotPhase(slot, "PDF " + idx + "/" + total + ": " + name);
+            });
         }
         slot.docIdsJson = docIdsJson;
 
         step = "Async Antwort-Call";
+        setSlotPhase(slot, "warte auf GPT-Antwort...");
         slot.http = startAnswerAsync(slot.convId, slot.prompt, docIdsJson);
-        slot.phase = "asking";
 
         // Cleanup temp PDFs after upload (already in ErgoGPT)
         try {
@@ -1257,7 +1236,7 @@ function stringToUtf8Bytes(s) {
     return b;
 }
 
-function uploadPdfsSequential(convId, paths) {
+function uploadPdfsSequential(convId, paths, progressCb) {
     // Strategie: PowerShell-Subprozess statt In-Process-ADODB.Stream.
     // Grund: IE/HTA-Sicherheits-Engine sperrt ADODB.Stream Binary-I/O in
     // Zonen, die nicht 'Local Computer' sind. Subprozesse umgehen das,
@@ -1267,6 +1246,9 @@ function uploadPdfsSequential(convId, paths) {
     for (var i = 0; i < paths.length; i++) {
         var path = paths[i];
         var fileName = fso.GetFileName(path);
+        if (progressCb) {
+            try { progressCb(i + 1, paths.length, fileName); } catch(e) {}
+        }
         try {
             var did = uploadPdfViaPowerShell(convId, path, fileName);
             if (did) ids.push(did);
@@ -1278,41 +1260,49 @@ function uploadPdfsSequential(convId, paths) {
     return '["' + ids.join('","') + '"]';
 }
 
-// PowerShell-Uploader: schreibt ein .ps1 nach %TEMP%, fuehrt es aus,
-// liest das Ergebnis. Bypassed komplett die IE-Zone-Restriktionen.
+// VBScript-Uploader: schreibt ein .vbs nach %TEMP%, fuehrt es ueber
+// wscript.exe aus. Im Gegensatz zu PowerShell hat WScript-Host keinen
+// ConstrainedLanguageMode und keine ExecutionPolicy-Bremse. ADODB.Stream
+// und WinHttp.WinHttpRequest sind dort frei nutzbar.
 function uploadPdfViaPowerShell(convId, pdfPath, fileName) {
+    // Funktionsname bleibt aus Refactor-Gruenden, intern jetzt VBS.
     var shell = new ActiveXObject("WScript.Shell");
     var fso = new ActiveXObject("Scripting.FileSystemObject");
     var tempDir = shell.ExpandEnvironmentStrings("%TEMP%");
     var stamp = String(new Date().getTime()) + "_" + Math.floor(Math.random() * 1000000);
-    var psPath = tempDir + "\\ergo_upload_" + stamp + ".ps1";
+    var vbsPath = tempDir + "\\ergo_upload_" + stamp + ".vbs";
     var resultPath = tempDir + "\\ergo_result_" + stamp + ".txt";
     var cookiePath = tempDir + "\\ergo_cookie_" + stamp + ".txt";
 
     try {
-        // Cookie + CSRF in temp-Datei (statt als Cmd-Argument - sicherer + laenge-unbegrenzt)
+        // Cookie in temp-Datei (statt als Cmd-Argument: keine Quoting-Falle, keine Laengenbegrenzung)
         var cookieFile = fso.CreateTextFile(cookiePath, true, false);
         cookieFile.Write(state.cookie);
         cookieFile.Close();
 
-        // PS1-Skript schreiben
-        var ps1 = buildUploadPs1();
-        var ps1File = fso.CreateTextFile(psPath, true, false);
-        ps1File.Write(ps1);
-        ps1File.Close();
+        // VBS-Skript schreiben
+        var vbs = buildUploadVbs();
+        var vbsFile = fso.CreateTextFile(vbsPath, true, false);
+        vbsFile.Write(vbs);
+        vbsFile.Close();
 
-        // Ausfuehren - hidden window, wait for exit
-        var cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + psPath + '" ' +
-                  '-CookieFile "' + cookiePath + '" ' +
-                  '-ConvId "' + convId + '" ' +
-                  '-PdfPath "' + pdfPath + '" ' +
-                  '-FileName "' + fileName.replace(/"/g, '\\"') + '" ' +
-                  '-ResultPath "' + resultPath + '"';
+        // FileName-Argument: doppelte Anfuehrungszeichen als "" escapen
+        var fnArg = fileName.replace(/"/g, '""');
+        // pdfPath-Argument: gleiches Spiel
+        var pdfArg = pdfPath.replace(/"/g, '""');
+
+        // wscript.exe mit den 5 Argumenten
+        var cmd = 'wscript.exe //NoLogo //B "' + vbsPath + '" ' +
+                  '"' + cookiePath + '" ' +
+                  '"' + convId + '" ' +
+                  '"' + pdfArg + '" ' +
+                  '"' + fnArg + '" ' +
+                  '"' + resultPath + '"';
         var rc = shell.Run(cmd, 0, true);
 
         // Result lesen
         if (!fso.FileExists(resultPath)) {
-            throw new Error("PowerShell hat keine Result-Datei geschrieben (Exit-Code " + rc + ")");
+            throw new Error("VBScript hat keine Result-Datei geschrieben (Exit " + rc + "). Pfad: " + vbsPath);
         }
         var rf = fso.OpenTextFile(resultPath, 1, false, -2);
         var content = rf.ReadAll();
@@ -1331,16 +1321,145 @@ function uploadPdfViaPowerShell(convId, pdfPath, fileName) {
         if (!did) throw new Error("Keine document_id in: " + (data.body || "").substr(0, 200));
         return did;
     } finally {
-        // Cleanup
-        try { fso.DeleteFile(psPath, true); } catch(e) {}
+        try { fso.DeleteFile(vbsPath, true); } catch(e) {}
         try { fso.DeleteFile(resultPath, true); } catch(e) {}
         try { fso.DeleteFile(cookiePath, true); } catch(e) {}
     }
 }
 
-// PowerShell-Skript fuer den PDF-Multipart-Upload. Liest Cookie aus Datei,
-// PDF als Binary, baut Multipart-Body, sendet via Invoke-WebRequest, gibt
-// {status, body} als JSON in -ResultPath aus.
+// VBScript-Uploader: liest Cookie aus Datei, PDF als Binary via
+// ADODB.Stream, baut Multipart-Body, sendet via WinHttp.WinHttpRequest,
+// schreibt {status, body} als JSON in resultPath. Laeuft in wscript.exe
+// ohne IE-Zone-Restriktionen.
+function buildUploadVbs() {
+    var v = [];
+    v.push("Option Explicit");
+    v.push("Dim cookieFile, convId, pdfPath, fileName, resultPath");
+    v.push("cookieFile = WScript.Arguments(0)");
+    v.push("convId = WScript.Arguments(1)");
+    v.push("pdfPath = WScript.Arguments(2)");
+    v.push("fileName = WScript.Arguments(3)");
+    v.push("resultPath = WScript.Arguments(4)");
+    v.push("");
+    v.push("Sub WriteResult(status, body)");
+    v.push("    Dim esc, json, fso, f");
+    v.push("    esc = body");
+    v.push("    esc = Replace(esc, \"\\\", \"\\\\\")");
+    v.push("    esc = Replace(esc, \"\"\"\", \"\\\"\"\")");
+    v.push("    esc = Replace(esc, vbCrLf, \"\\n\")");
+    v.push("    esc = Replace(esc, vbCr, \"\\n\")");
+    v.push("    esc = Replace(esc, vbLf, \"\\n\")");
+    v.push("    esc = Replace(esc, vbTab, \" \")");
+    v.push("    json = \"{\"\"status\"\":\" & status & \",\"\"body\"\":\"\"\" & esc & \"\"\"}\"");
+    v.push("    Set fso = CreateObject(\"Scripting.FileSystemObject\")");
+    v.push("    Set f = fso.CreateTextFile(resultPath, True, False)");
+    v.push("    f.Write json");
+    v.push("    f.Close");
+    v.push("End Sub");
+    v.push("");
+    v.push("On Error Resume Next");
+    v.push("WriteResult -1, \"Started\"");
+    v.push("Err.Clear");
+    v.push("");
+    v.push("Dim fsoMain, ts, cookie");
+    v.push("Set fsoMain = CreateObject(\"Scripting.FileSystemObject\")");
+    v.push("Set ts = fsoMain.OpenTextFile(cookieFile, 1, False, 0)");
+    v.push("cookie = ts.ReadAll");
+    v.push("ts.Close");
+    v.push("cookie = Trim(cookie)");
+    v.push("");
+    v.push("Dim re, xsrf");
+    v.push("xsrf = \"\"");
+    v.push("Set re = CreateObject(\"VBScript.RegExp\")");
+    v.push("re.Pattern = \"(?:XSRF-TOKEN|CSRF-TOKEN|csrfToken|_csrf)=([^;]+)\"");
+    v.push("re.IgnoreCase = True");
+    v.push("If re.Test(cookie) Then xsrf = re.Execute(cookie)(0).SubMatches(0)");
+    v.push("");
+    v.push("Dim stmFile, fileBytes");
+    v.push("Set stmFile = CreateObject(\"ADODB.Stream\")");
+    v.push("stmFile.Type = 1");
+    v.push("stmFile.Open");
+    v.push("stmFile.LoadFromFile pdfPath");
+    v.push("fileBytes = stmFile.Read");
+    v.push("stmFile.Close");
+    v.push("If Err.Number <> 0 Then");
+    v.push("    WriteResult 0, \"PDF read error: \" & Err.Description");
+    v.push("    WScript.Quit 0");
+    v.push("End If");
+    v.push("");
+    v.push("Dim guid, boundary");
+    v.push("guid = CreateObject(\"Scriptlet.TypeLib\").Guid");
+    v.push("guid = Replace(Replace(Replace(guid, \"{\", \"\"), \"}\", \"\"), \"-\", \"\")");
+    v.push("boundary = \"----WebKitFormBoundary\" & Left(guid, 16)");
+    v.push("");
+    v.push("Dim pre, post");
+    v.push("pre = \"--\" & boundary & vbCrLf");
+    v.push("pre = pre & \"Content-Disposition: form-data; name=\"\"file_content\"\"; filename=\"\"\" & fileName & \"\"\"\" & vbCrLf");
+    v.push("pre = pre & \"Content-Type: application/pdf\" & vbCrLf & vbCrLf");
+    v.push("post = vbCrLf & \"--\" & boundary & vbCrLf");
+    v.push("post = post & \"Content-Disposition: form-data; name=\"\"filename\"\"\" & vbCrLf & vbCrLf");
+    v.push("post = post & fileName & vbCrLf");
+    v.push("post = post & \"--\" & boundary & vbCrLf");
+    v.push("post = post & \"Content-Disposition: form-data; name=\"\"conversation_id\"\"\" & vbCrLf & vbCrLf");
+    v.push("post = post & convId & vbCrLf");
+    v.push("post = post & \"--\" & boundary & \"--\" & vbCrLf");
+    v.push("");
+    v.push("Function Utf8Bytes(s)");
+    v.push("    Dim st");
+    v.push("    Set st = CreateObject(\"ADODB.Stream\")");
+    v.push("    st.Type = 2 : st.Charset = \"utf-8\" : st.Open");
+    v.push("    st.WriteText s");
+    v.push("    st.Position = 0");
+    v.push("    st.Type = 1");
+    v.push("    If st.Size >= 3 Then st.Read 3");
+    v.push("    Utf8Bytes = st.Read");
+    v.push("    st.Close");
+    v.push("End Function");
+    v.push("");
+    v.push("Dim stmBody, body");
+    v.push("Set stmBody = CreateObject(\"ADODB.Stream\")");
+    v.push("stmBody.Type = 1");
+    v.push("stmBody.Open");
+    v.push("stmBody.Write Utf8Bytes(pre)");
+    v.push("stmBody.Write fileBytes");
+    v.push("stmBody.Write Utf8Bytes(post)");
+    v.push("stmBody.Position = 0");
+    v.push("body = stmBody.Read");
+    v.push("stmBody.Close");
+    v.push("");
+    v.push("Dim http");
+    v.push("Set http = CreateObject(\"WinHttp.WinHttpRequest.5.1\")");
+    v.push("http.SetTimeouts 30000, 30000, 60000, 180000");
+    v.push("http.Open \"POST\", \"https://gpt.ergo.com/api/document\", False");
+    v.push("http.SetProxy 0");
+    v.push("http.SetRequestHeader \"User-Agent\", \"Mozilla/5.0\"");
+    v.push("http.SetRequestHeader \"Accept\", \"*/*\"");
+    v.push("http.SetRequestHeader \"Cookie\", cookie");
+    v.push("If Len(xsrf) > 0 Then");
+    v.push("    http.SetRequestHeader \"X-XSRF-TOKEN\", xsrf");
+    v.push("    http.SetRequestHeader \"X-CSRF-TOKEN\", xsrf");
+    v.push("End If");
+    v.push("http.SetRequestHeader \"Origin\", \"https://gpt.ergo.com\"");
+    v.push("http.SetRequestHeader \"Referer\", \"https://gpt.ergo.com/\"");
+    v.push("http.SetRequestHeader \"X-Requested-With\", \"XMLHttpRequest\"");
+    v.push("http.SetRequestHeader \"Content-Type\", \"multipart/form-data; boundary=\" & boundary");
+    v.push("http.Send body");
+    v.push("");
+    v.push("Dim status, respBody");
+    v.push("status = http.Status");
+    v.push("respBody = http.ResponseText");
+    v.push("If Err.Number <> 0 Then");
+    v.push("    WriteResult 0, \"HTTP error: \" & Err.Description");
+    v.push("    WScript.Quit 0");
+    v.push("End If");
+    v.push("");
+    v.push("WriteResult status, respBody");
+    v.push("WScript.Quit 0");
+    return v.join("\r\n");
+}
+
+// Alte PowerShell-Variante - bleibt im Code als historische Referenz,
+// wird aber nicht mehr aufgerufen (in v1.10 durch buildUploadVbs ersetzt).
 function buildUploadPs1() {
     var ps = [];
     ps.push("param(");
@@ -2227,11 +2346,57 @@ function uuid4() {
 function updateProgress(cur, total, label) {
     var pct = total > 0 ? Math.round((cur / total) * 100) : 0;
     document.getElementById("progressFill").style.width = pct + "%";
-    document.getElementById("progressText").innerText = (label || "") + " (" + cur + "/" + total + ")";
+    document.getElementById("progressText").innerText =
+        pct + "%  -  " + cur + "/" + total + " erledigt" + (label ? "  -  " + label : "");
+    forceRepaint();
 }
 
 function updateProgressText(t) {
     document.getElementById("progressText").innerText = t;
+    forceRepaint();
+}
+
+// In HTAs blockiert ein synchroner Aufruf (z.B. WScript.Shell.Run mit
+// wait=true fuer PowerShell-Upload) den UI-Thread. Diese Funktion erzwingt
+// einen Layout+Paint-Tick, damit zwischendurch der aktuelle Status sichtbar
+// wird, bevor der naechste Sync-Call die UI wieder einfriert.
+function forceRepaint() {
+    try {
+        // Layout-Reflow erzwingen
+        var dummy = document.body.offsetHeight;
+        // window.refresh ist IE-spezifisch, ignorieren wenn nicht da
+        if (window.refresh) window.refresh();
+    } catch(e) {}
+}
+
+// Setzt die aktuelle Phase fuer einen Slot und aktualisiert die Live-Anzeige.
+function setSlotPhase(slot, phase) {
+    if (!slot) return;
+    slot.phase = phase;
+    slot.phaseAt = new Date().getTime();
+    renderSlotStatus();
+}
+
+function renderSlotStatus() {
+    var lines = [];
+    var slotIds = [];
+    for (var k in state.slots) if (state.slots.hasOwnProperty(k)) slotIds.push(k);
+    slotIds.sort();
+    for (var i = 0; i < slotIds.length; i++) {
+        var s = state.slots[slotIds[i]];
+        var age = "";
+        if (s.phaseAt) {
+            var secs = Math.max(0, Math.round((new Date().getTime() - s.phaseAt) / 1000));
+            age = " (" + secs + "s)";
+        }
+        var fileName = s.msgPath ? s.msgPath.substr(s.msgPath.lastIndexOf("\\")+1) : "";
+        // Kappung lange Dateinamen
+        if (fileName.length > 60) fileName = fileName.substr(0, 57) + "...";
+        lines.push("[" + s.id + "] " + (s.phase || "init") + age + " - " + fileName);
+    }
+    var el = document.getElementById("slotStatus");
+    if (el) el.innerText = lines.join("\n");
+    forceRepaint();
 }
 
 function showSuccess(m) {
