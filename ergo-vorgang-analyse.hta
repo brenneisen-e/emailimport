@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.10"
+        VERSION="1.11"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.10 - VBScript-Uploader (wscript.exe, freier ADODB.Stream) + Live-Progress</div>
+            <div class="ver">v1.11 - Excel Auswertung-Sheet (Klassifikations- + Pool-Statistik fuer BU-Vorgaenge)</div>
         </div>
 
         <!-- Cookie -->
@@ -1948,11 +1948,174 @@ function exportToExcel() {
             excel.ActiveWindow.FreezePanes = true;
         } catch(e) {}
 
+        // Zweites Sheet: Auswertung (Maklerpool-Statistik + BU-Detail)
+        try { buildAuswertungSheet(wb, excel); } catch(e) {
+            Debug && Debug.write && Debug.write("Auswertung-Sheet-Fehler: " + e.message);
+        }
+
         excel.DisplayAlerts = true;
-        showSuccess("Excel mit " + state.results.length + " Vorgaengen geoeffnet (mit Farb-Highlights). Bitte manuell speichern.");
+        showSuccess("Excel mit " + state.results.length + " Vorgaengen + Auswertung-Sheet geoeffnet. Bitte manuell speichern.");
     } catch(e) {
         showError("Excel-Export fehlgeschlagen: " + e.message);
     }
+}
+
+// Zweites Excel-Sheet "Auswertung": Maklerpool-Statistik + BU-Detail-Stats.
+// Zaehlt nur echte Makler-Vorgaenge (vorgangstyp=Makler-Vorgang).
+function buildAuswertungSheet(wb, excel) {
+    // Stats sammeln
+    var totalMaklerVorgang = 0;
+    var classifCounts = {};
+    var bueResults = [];
+    var poolCountsBue = {};
+    var reminderInBue = 0;
+    var einfacherVertragBue = 0;
+    var kundenverbindungBue = 0;
+    var bueTypUnklar = 0;
+
+    for (var i = 0; i < state.results.length; i++) {
+        var r = state.results[i];
+        if (!r.ok || !r.data) continue;
+        var vt = sg(r.data, "vorgangstyp");
+        if (vt !== "Makler-Vorgang") continue;
+        totalMaklerVorgang++;
+        var klass = sg(r.data, "klassifikation") || "(leer)";
+        classifCounts[klass] = (classifCounts[klass] || 0) + 1;
+        if (klass === "BUe-Vorgang") {
+            bueResults.push(r);
+            var pool = sg(r.data, "maklerpool") || "(kein Pool angegeben)";
+            poolCountsBue[pool] = (poolCountsBue[pool] || 0) + 1;
+            if (sg(r.data, "ist_reminder") === "ja") reminderInBue++;
+            var gt = sg(r.data, "geschaefts_typ") || "";
+            if (gt.indexOf("einfacher") >= 0 || gt.indexOf("einzeln") >= 0) einfacherVertragBue++;
+            else if (gt.indexOf("Kundenverbindung") >= 0 || gt.indexOf("kundenverbindung") >= 0) kundenverbindungBue++;
+            else bueTypUnklar++;
+        }
+    }
+
+    // Neues Sheet hinten anhaengen
+    var aus = wb.Worksheets.Add();
+    try {
+        aus.Move(null, wb.Sheets(wb.Sheets.Count));
+        aus.Name = "Auswertung";
+    } catch(e) {}
+
+    var row = 1;
+    function pct(part, total) {
+        if (!total || total === 0) return "-";
+        return (Math.round((part / total) * 1000) / 10) + "%";
+    }
+    function header(text, bgColor) {
+        aus.Cells(row, 1).Value = text;
+        var rng = aus.Range(aus.Cells(row, 1), aus.Cells(row, 3));
+        try { rng.Merge(); } catch(e) {}
+        rng.Font.Bold = true;
+        rng.Font.Size = 13;
+        rng.Font.Color = rgb(255, 255, 255);
+        rng.Interior.Color = bgColor || rgb(30, 64, 175);
+        rng.HorizontalAlignment = -4131; // xlLeft
+        aus.Rows(row).RowHeight = 22;
+        row++;
+    }
+    function dataRow(label, value, share, indent, bold) {
+        aus.Cells(row, 1).Value = (indent ? "    " : "") + label;
+        aus.Cells(row, 2).Value = value;
+        aus.Cells(row, 3).Value = share || "";
+        if (bold) {
+            aus.Range(aus.Cells(row,1), aus.Cells(row,3)).Font.Bold = true;
+        }
+        row++;
+    }
+
+    // BLOCK 1: Uebersicht aller Klassifikationen
+    header("UEBERSICHT (echte Makler-Vorgaenge)", rgb(30, 64, 175));
+    dataRow("Vorgaenge gesamt", totalMaklerVorgang, "100%", false, true);
+    row++;
+    var classifOrder = ["BUe-Vorgang", "Mahnung-Reminder", "Schadenmeldung", "Antrag-Aenderung", "Anfrage-Ruecksprache", "Nicht-Standard"];
+    for (var k = 0; k < classifOrder.length; k++) {
+        var c = classifCounts[classifOrder[k]] || 0;
+        dataRow(classifOrder[k], c, pct(c, totalMaklerVorgang), true);
+    }
+    for (var ck in classifCounts) {
+        if (!classifCounts.hasOwnProperty(ck)) continue;
+        var inList = false;
+        for (var j = 0; j < classifOrder.length; j++) if (classifOrder[j] === ck) { inList = true; break; }
+        if (inList) continue;
+        dataRow(ck, classifCounts[ck], pct(classifCounts[ck], totalMaklerVorgang), true);
+    }
+    row++;
+
+    // BLOCK 2: BU-Detail (nur wenn BUs vorhanden)
+    if (bueResults.length > 0) {
+        header("BU-VORGAENGE im Detail (n=" + bueResults.length + ")", rgb(22, 101, 52));
+        dataRow("BUs gesamt", bueResults.length, "100%", false, true);
+        row++;
+        // Reminder vs. Erstvorgang
+        var erst = bueResults.length - reminderInBue;
+        dataRow("Erstvorgang", erst, pct(erst, bueResults.length), true);
+        dataRow("Reminder / Wiedervorlage", reminderInBue, pct(reminderInBue, bueResults.length), true);
+        row++;
+        // Einfacher Vertrag vs. Kundenverbindung
+        dataRow("einfacher Vertrag", einfacherVertragBue, pct(einfacherVertragBue, bueResults.length), true);
+        dataRow("ganze Kundenverbindung", kundenverbindungBue, pct(kundenverbindungBue, bueResults.length), true);
+        if (bueTypUnklar > 0) dataRow("BU-Typ unklar", bueTypUnklar, pct(bueTypUnklar, bueResults.length), true);
+        row++;
+
+        // BLOCK 3: Maklerpool-Aufstellung (nur BU-Vorgaenge)
+        header("MAKLERPOOLS (nur BU-Vorgaenge, sortiert nach Haeufigkeit)", rgb(14, 116, 144));
+        var pools = [];
+        for (var p in poolCountsBue) if (poolCountsBue.hasOwnProperty(p)) pools.push({ name: p, count: poolCountsBue[p] });
+        pools.sort(function(a, b) { return b.count - a.count; });
+
+        // Grossmakler (>=5 Vorgaenge oder >=10%), Kleinmakler signifikant (>=2),
+        // Einzelfaelle aggregiert
+        var einzelfallSum = 0;
+        var einzelfallNames = [];
+        var grossThreshold = 5;
+        var sigThreshold = 2;
+        // Wenn nur sehr wenige BUs: Schwellen senken
+        if (bueResults.length < 10) { grossThreshold = 2; sigThreshold = 2; }
+
+        var listedGross = 0, listedKlein = 0;
+        for (var pi = 0; pi < pools.length; pi++) {
+            var pp = pools[pi];
+            if (pp.count >= grossThreshold) {
+                dataRow(pp.name, pp.count, pct(pp.count, bueResults.length));
+                listedGross++;
+            } else if (pp.count >= sigThreshold) {
+                dataRow(pp.name, pp.count, pct(pp.count, bueResults.length));
+                listedKlein++;
+            } else {
+                einzelfallSum++;
+                einzelfallNames.push(pp.name);
+            }
+        }
+        if (einzelfallSum > 0) {
+            dataRow("Sonstige (je 1 Vorgang)", einzelfallSum, pct(einzelfallSum, bueResults.length), false, true);
+            // Pool-Namen in Spalte B/C zur Doku
+            var startNameRow = row;
+            for (var ni = 0; ni < einzelfallNames.length; ni++) {
+                aus.Cells(row, 1).Value = "      - " + einzelfallNames[ni];
+                row++;
+            }
+        }
+    } else {
+        header("BU-VORGAENGE im Detail", rgb(22, 101, 52));
+        dataRow("Keine BU-Vorgaenge gefunden", 0, "");
+    }
+
+    // Format
+    try {
+        aus.Columns("A:A").ColumnWidth = 42;
+        aus.Columns("B:B").ColumnWidth = 12;
+        aus.Columns("C:C").ColumnWidth = 12;
+        aus.Cells.Font.Name = "Open Sans";
+        aus.Range("B:B").HorizontalAlignment = -4108; // xlCenter
+        aus.Range("C:C").HorizontalAlignment = -4108;
+    } catch(e) {}
+
+    // Analyse-Sheet als aktives Tab lassen
+    try { wb.Sheets("Analyse").Activate(); } catch(e) {}
 }
 
 function exportToJson() {
