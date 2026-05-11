@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.11"
+        VERSION="1.12"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.11 - Excel Auswertung-Sheet (Klassifikations- + Pool-Statistik fuer BU-Vorgaenge)</div>
+            <div class="ver">v1.12 - Pool-Schnelluebersicht ohne KI (Domain/Subject/Signatur-Heuristik, ~1s pro Mail)</div>
         </div>
 
         <!-- Cookie -->
@@ -260,7 +260,12 @@
     <div class="card">
         <div class="action-bar">
             <button class="btn btn-primary" id="btnStart" onclick="startAnalysis()" disabled>
-                &#9658; Analyse starten
+                &#9658; Analyse starten (mit KI)
+            </button>
+            <button class="btn" id="btnQuickPool" onclick="runQuickPoolOverview()" disabled
+                    style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white;"
+                    title="Schnelle Pool-Uebersicht ohne KI - reine Heuristik aus Domain/Subject/Signatur">
+                &#9889; Pool-Schnelluebersicht (ohne KI)
             </button>
             <button class="btn btn-warning" id="btnCancel" onclick="cancelAnalysis()" disabled>
                 &#9632; Abbrechen
@@ -754,7 +759,12 @@ function refreshStartButton() {
                    state.folderPath.length > 0 &&
                    state.msgFiles.length > 0 &&
                    outlookApp !== null;
+    var canQuick = !state.running &&
+                   state.folderPath.length > 0 &&
+                   state.msgFiles.length > 0 &&
+                   outlookApp !== null;
     document.getElementById("btnStart").disabled = !canStart;
+    document.getElementById("btnQuickPool").disabled = !canQuick;
     document.getElementById("btnCancel").disabled = !state.running;
     document.getElementById("btnExcel").disabled = state.results.length === 0;
     document.getElementById("btnJson").disabled = state.results.length === 0;
@@ -2262,6 +2272,43 @@ function getSenderEmail(mailItem) {
     } catch(e) { return ""; }
 }
 
+// Sammelt alle To-Empfaenger (olTo=1). Bei Exchange-Empfaengern wird die
+// Primary SMTP Address ueber AddressEntry.GetExchangeUser geholt, sonst
+// fallback auf Display-Name. DN-Pfade (/o=...) werden weggefiltert.
+function getRecipientsTo(mailItem) {
+    var out = [];
+    try {
+        var rc = mailItem.Recipients.Count;
+        for (var i = 1; i <= rc; i++) {
+            try {
+                var rcp = mailItem.Recipients.Item(i);
+                if (rcp.Type !== 1) continue; // olTo only
+                var name = "";
+                var smtp = "";
+                try { name = String(rcp.Name || ""); } catch(e) {}
+                try {
+                    var ae = rcp.AddressEntry;
+                    if (ae) {
+                        var eu = ae.GetExchangeUser();
+                        if (eu && eu.PrimarySmtpAddress) smtp = eu.PrimarySmtpAddress;
+                    }
+                } catch(e) {}
+                if (!smtp) {
+                    try { smtp = String(rcp.Address || ""); } catch(e) {}
+                    // DN-String unterdruecken
+                    if (smtp.charAt(0) === "/") smtp = "";
+                }
+                var entry = name;
+                if (smtp && smtp !== name && smtp.indexOf("@") > 0) {
+                    entry = name ? (name + " <" + smtp + ">") : smtp;
+                }
+                if (entry) out.push(entry);
+            } catch(e) {}
+        }
+    } catch(e) {}
+    return out.join("; ");
+}
+
 function getEnv(name) {
     try {
         var shell = new ActiveXObject("WScript.Shell");
@@ -2585,6 +2632,466 @@ function hideStatus() {
     document.getElementById("successStatus").style.display = "none";
     document.getElementById("errorStatus").style.display = "none";
     document.getElementById("infoStatus").style.display = "none";
+}
+
+// ============================================================================
+// POOL-SCHNELLUEBERSICHT (ohne KI)
+// ============================================================================
+// Reine Heuristik-basierte Pool-Identifikation aus Absender-Domain, Subject,
+// Signatur-Block. Kein Cookie, kein GPT, kein PDF-Upload - laeuft komplett
+// lokal in ~1 Sekunde pro Mail.
+
+var POOL_RULES = [
+    {
+        name: "Fonds Finanz Maklerservice GmbH",
+        domains: ["fondsfinanz.de", "ff-maklerservice.de", "fonds-finanz.de", "fondsfinanz.com"],
+        sigPatterns: [/Fonds[\s-]*Finanz/i],
+        subjectPatterns: []
+    },
+    {
+        name: "BCA AG",
+        domains: ["bca.de", "bca-ag.de"],
+        sigPatterns: [/\bBCA\s*AG\b/, /\bBCA\b.{0,40}\bMaklerservice/i],
+        subjectPatterns: [/\bBCA[\s-]*ID\b/i]
+    },
+    {
+        name: "DEMA Deutsche Versicherungsmakler AG",
+        domains: ["dema-ag.de", "dema.de"],
+        sigPatterns: [/DEMA[\s-]*Deutsche[\s-]*Versicherungsmakler/i, /DEMA\s*AG/i, /DEMA\s*Maklerabteilung/i],
+        subjectPatterns: [/Dokumente\s+von\s+der\s+DEMA/i, /DEMA[\s-]*Maklerabteilung/i, /DEMMAK/i]
+    },
+    {
+        name: "JDC Group AG / Jung DMS",
+        domains: ["jdc.de", "jungdms.de", "jung-dms.de", "jdcgroup.de"],
+        sigPatterns: [/JDC[\s-]*Group/i, /Jung[\s-]*DMS/i, /Jung,\s*DMS\s*&\s*Cie/i],
+        subjectPatterns: []
+    },
+    {
+        name: "Maxpool Maklerkooperation GmbH",
+        domains: ["maxpool.de"],
+        sigPatterns: [/Maxpool[\s-]*Maklerkooperation/i, /\bMaxpool\b.{0,40}GmbH/i],
+        subjectPatterns: []
+    },
+    {
+        name: "blau direkt GmbH & Co. KG",
+        domains: ["blau-direkt.de", "blaudirekt.de"],
+        sigPatterns: [/blau[\s-]*direkt/i],
+        subjectPatterns: []
+    },
+    {
+        name: "CHECK24 Vergleichsportal Versicherungen",
+        domains: ["check24.de", "check24-versicherungen.de"],
+        sigPatterns: [/CHECK24/, /Check24/],
+        subjectPatterns: []
+    },
+    {
+        name: "Apella AG",
+        domains: ["apella.de", "apella-ag.de"],
+        sigPatterns: [/Apella[\s-]*AG/i],
+        subjectPatterns: []
+    },
+    {
+        name: "Hypoport AG",
+        domains: ["hypoport.de", "hypoport-systeme.de"],
+        sigPatterns: [/Hypoport[\s-]*AG/i],
+        subjectPatterns: []
+    },
+    {
+        name: "Verifox GmbH",
+        domains: ["verifox.de", "verifox.com"],
+        sigPatterns: [/Verifox/i],
+        subjectPatterns: []
+    },
+    {
+        name: "Impuls Finanzmanagement AG",
+        domains: ["impuls-finanzmanagement.de", "impuls-fm.de"],
+        sigPatterns: [/Impuls[\s-]*Finanzmanagement/i],
+        subjectPatterns: []
+    },
+    {
+        name: "ROLAND Versicherungsmakler",
+        domains: ["roland-versicherungsmakler.de"],
+        sigPatterns: [/ROLAND[\s-]*Versicherungsmakler/i],
+        subjectPatterns: []
+    },
+    {
+        name: "WIFO Wirtschafts- und Finanzkontor",
+        domains: ["wifo.de", "wifo-makler.de"],
+        sigPatterns: [/WIFO[\s-]*Wirtschafts/i, /\bWIFO\b.{0,40}Finanzkontor/i],
+        subjectPatterns: []
+    },
+    {
+        name: "Aruna GmbH",
+        domains: ["aruna.de"],
+        sigPatterns: [/\bAruna\s*GmbH\b/i],
+        subjectPatterns: []
+    },
+    {
+        name: "Phoenix Maklergesellschaft",
+        domains: ["phoenix-mg.de", "phoenix-maklergesellschaft.de"],
+        sigPatterns: [/Ph(o|oe|ö)nix[\s-]*Maklergesellschaft/i],
+        subjectPatterns: []
+    },
+    {
+        name: "24-Vorsorge GmbH",
+        domains: ["24-vorsorge.de"],
+        sigPatterns: [/24[\s-]*Vorsorge/i],
+        subjectPatterns: []
+    },
+    {
+        name: "ERGO (intern, kein Maklerpool)",
+        domains: ["ergo.de", "itergo.com", "ergo.com", "ergo-direkt.de"],
+        sigPatterns: [],
+        subjectPatterns: []
+    }
+];
+
+// Extrahiert den Signatur-Block: die letzten 15 nicht-leeren Zeilen des Body,
+// gefiltert auf typische Signatur-Marker (Tel/Fax/USt/Sitz/E-Mail/Web).
+function extractSignature(body) {
+    if (!body) return "";
+    var lines = String(body).split(/\r?\n/);
+    // Entferne leere Zeilen am Anfang/Ende
+    while (lines.length > 0 && trim(lines[lines.length-1]) === "") lines.pop();
+    // Nimm letzte 20 Zeilen (signatur + footer)
+    var sig = lines.slice(Math.max(0, lines.length - 20)).join("\n");
+    return sig;
+}
+
+// Identifiziert den Maklerpool. Reihenfolge: Domain > Subject > Signatur.
+// Returns { name, source, detail } oder null.
+function detectPool(senderEmail, senderName, subject, body) {
+    var email = (senderEmail || "").toLowerCase();
+    var atPos = email.indexOf("@");
+    var emailDomain = atPos >= 0 ? email.substr(atPos + 1) : "";
+
+    // 1. Domain-Match
+    for (var i = 0; i < POOL_RULES.length; i++) {
+        var rule = POOL_RULES[i];
+        for (var d = 0; d < rule.domains.length; d++) {
+            var dom = rule.domains[d];
+            if (emailDomain === dom || emailDomain.length > dom.length + 1 &&
+                emailDomain.substr(emailDomain.length - dom.length - 1) === "." + dom) {
+                return { name: rule.name, source: "Domain", detail: emailDomain };
+            }
+        }
+    }
+
+    // 2. Subject-Match
+    var subj = String(subject || "");
+    for (var i2 = 0; i2 < POOL_RULES.length; i2++) {
+        var r2 = POOL_RULES[i2];
+        for (var s = 0; s < r2.subjectPatterns.length; s++) {
+            if (r2.subjectPatterns[s].test(subj)) {
+                return { name: r2.name, source: "Subject", detail: r2.subjectPatterns[s].source };
+            }
+        }
+    }
+
+    // 3. Signatur-Match
+    var sig = extractSignature(body);
+    for (var i3 = 0; i3 < POOL_RULES.length; i3++) {
+        var r3 = POOL_RULES[i3];
+        for (var p = 0; p < r3.sigPatterns.length; p++) {
+            if (r3.sigPatterns[p].test(sig)) {
+                return { name: r3.name, source: "Signatur", detail: r3.sigPatterns[p].source };
+            }
+        }
+    }
+
+    return null;
+}
+
+// Hauptfunktion: scannt alle MSG-Dateien im aktuellen Ordner, identifiziert
+// den Pool pro Mail, schreibt Excel mit Detail + Aggregation.
+function runQuickPoolOverview() {
+    if (state.running) return;
+    if (!outlookApp) { showError("Outlook nicht verbunden."); return; }
+    if (state.msgFiles.length === 0) { showError("Keine .msg-Dateien im Ordner."); return; }
+
+    state.running = true;
+    document.getElementById("progressContainer").style.display = "block";
+    document.getElementById("slotStatus").innerText = "";
+    refreshStartButton();
+    hideStatus();
+
+    var rows = [];
+    var poolCounts = {};
+    var sourceCounts = {};
+    var total = state.msgFiles.length;
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+    setTimeout(function() { doPoolScan(rows, poolCounts, sourceCounts, fso, total, 0); }, 50);
+}
+
+function doPoolScan(rows, poolCounts, sourceCounts, fso, total, idx) {
+    if (idx >= total) {
+        // Fertig - Excel exportieren
+        document.getElementById("progressContainer").style.display = "none";
+        state.running = false;
+        refreshStartButton();
+        try {
+            exportPoolOverviewToExcel(rows, poolCounts, sourceCounts);
+            showSuccess(total + " Mails ausgewertet, " + Object.keysCount(poolCounts) + " unterschiedliche Pools erkannt.");
+        } catch(e) {
+            showError("Excel-Export fehlgeschlagen: " + e.message);
+        }
+        return;
+    }
+
+    var msgPath = state.msgFiles[idx];
+    updateProgress(idx, total, "Pool-Erkennung: " + getFileName(msgPath));
+
+    var row = {
+        idx: idx + 1,
+        msgFile: getFileName(msgPath),
+        datum: "",
+        absName: "",
+        absMail: "",
+        absDomain: "",
+        empfaenger: "",
+        betreff: "",
+        pool: "",
+        source: "",
+        sourceDetail: "",
+        attCount: 0,
+        attNames: ""
+    };
+
+    try {
+        var it = outlookApp.Session.OpenSharedItem(msgPath);
+        try {
+            var d = new Date(it.ReceivedTime);
+            row.datum = pad(d.getDate()) + "." + pad(d.getMonth()+1) + "." + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+        } catch(e) {}
+        try { row.absName = String(it.SenderName || ""); } catch(e) {}
+        try { row.absMail = getSenderEmail(it); } catch(e) {}
+        try { row.empfaenger = getRecipientsTo(it); } catch(e) {}
+        try { row.betreff = String(it.Subject || ""); } catch(e) {}
+        var body = "";
+        try { body = String(it.Body || ""); } catch(e) {}
+
+        var atPos = row.absMail.indexOf("@");
+        if (atPos >= 0) row.absDomain = row.absMail.substr(atPos + 1).toLowerCase();
+
+        try {
+            var ac = it.Attachments.Count;
+            row.attCount = ac;
+            var names = [];
+            for (var a = 1; a <= Math.min(ac, 5); a++) {
+                try { names.push(String(it.Attachments.Item(a).FileName)); } catch(e) {}
+            }
+            row.attNames = names.join("; ");
+        } catch(e) {}
+
+        try { it.Close(1); } catch(e) {}
+
+        var detection = detectPool(row.absMail, row.absName, row.betreff, body);
+        if (detection) {
+            row.pool = detection.name;
+            row.source = detection.source;
+            row.sourceDetail = detection.detail || "";
+        } else {
+            row.pool = "(unbekannt)";
+            row.source = "-";
+        }
+
+        poolCounts[row.pool] = (poolCounts[row.pool] || 0) + 1;
+        var srcKey = row.pool + "||" + row.source;
+        sourceCounts[srcKey] = (sourceCounts[srcKey] || 0) + 1;
+
+    } catch(e) {
+        row.pool = "(Fehler)";
+        row.source = e.message;
+    }
+
+    rows.push(row);
+
+    // Nicht-blockierend weiter - setTimeout(0) gibt UI Luft
+    setTimeout(function() { doPoolScan(rows, poolCounts, sourceCounts, fso, total, idx + 1); }, 5);
+}
+
+// Helper: Anzahl Keys in einem Plain-Object
+Object.keysCount = function(obj) {
+    var n = 0;
+    for (var k in obj) if (obj.hasOwnProperty(k)) n++;
+    return n;
+};
+
+function exportPoolOverviewToExcel(rows, poolCounts, sourceCounts) {
+    var excel = new ActiveXObject("Excel.Application");
+    excel.Visible = true;
+    excel.DisplayAlerts = false;
+    var wb = excel.Workbooks.Add();
+
+    // ========== SHEET 1: Alle Mails ==========
+    var sheet1 = wb.ActiveSheet;
+    try { sheet1.Name = "Alle Mails"; } catch(e) {}
+    var headers1 = ["#", "Datei", "Datum", "Absender Name", "Absender Email", "Domain", "Empfaenger (bei uns)", "Betreff", "Erkannter Pool", "Quelle", "Quelle-Detail", "Anhang-Anzahl", "Anhang-Namen"];
+    for (var c = 0; c < headers1.length; c++) {
+        sheet1.Cells(1, c + 1).Value = headers1[c];
+    }
+    try {
+        var h1 = sheet1.Range(sheet1.Cells(1,1), sheet1.Cells(1, headers1.length));
+        h1.Font.Bold = true;
+        h1.Font.Color = rgb(255, 255, 255);
+        h1.Interior.Color = rgb(124, 58, 237); // lila wie der Button
+        h1.HorizontalAlignment = -4108;
+        sheet1.Rows(1).RowHeight = 22;
+    } catch(e) {}
+
+    for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var row = i + 2;
+        sheet1.Cells(row, 1).Value = r.idx;
+        sheet1.Cells(row, 2).Value = r.msgFile;
+        sheet1.Cells(row, 3).Value = r.datum;
+        sheet1.Cells(row, 4).Value = r.absName;
+        sheet1.Cells(row, 5).Value = r.absMail;
+        sheet1.Cells(row, 6).Value = r.absDomain;
+        sheet1.Cells(row, 7).Value = r.empfaenger;
+        sheet1.Cells(row, 8).Value = r.betreff;
+        sheet1.Cells(row, 9).Value = r.pool;
+        sheet1.Cells(row, 10).Value = r.source;
+        sheet1.Cells(row, 11).Value = r.sourceDetail;
+        sheet1.Cells(row, 12).Value = r.attCount;
+        sheet1.Cells(row, 13).Value = r.attNames;
+        // Highlight unbekannte / Fehler in Pool-Spalte (jetzt Spalte 9)
+        if (r.pool === "(unbekannt)") {
+            try { sheet1.Cells(row, 9).Interior.Color = rgb(254, 240, 138); } catch(e) {}
+        } else if (r.pool === "(Fehler)") {
+            try { sheet1.Cells(row, 9).Interior.Color = rgb(252, 165, 165); } catch(e) {}
+        }
+    }
+    try {
+        sheet1.Columns("A:A").ColumnWidth = 5;
+        sheet1.Columns("B:B").ColumnWidth = 35;
+        sheet1.Columns("C:C").ColumnWidth = 16;
+        sheet1.Columns("D:E").ColumnWidth = 28;
+        sheet1.Columns("F:F").ColumnWidth = 22;
+        sheet1.Columns("G:G").ColumnWidth = 30;
+        sheet1.Columns("H:H").ColumnWidth = 50;
+        sheet1.Columns("I:I").ColumnWidth = 35;
+        sheet1.Columns("J:K").ColumnWidth = 14;
+        sheet1.Columns("L:L").ColumnWidth = 8;
+        sheet1.Columns("M:M").ColumnWidth = 40;
+        sheet1.Cells.Font.Name = "Open Sans";
+        sheet1.Range(sheet1.Cells(1,1), sheet1.Cells(rows.length + 1, headers1.length)).AutoFilter();
+        sheet1.Range("A2").Select();
+        excel.ActiveWindow.FreezePanes = true;
+    } catch(e) {}
+
+    // ========== SHEET 2: Pool-Übersicht ==========
+    var sheet2 = wb.Worksheets.Add();
+    try {
+        sheet2.Move(null, wb.Sheets(wb.Sheets.Count));
+        sheet2.Name = "Pool-Uebersicht";
+    } catch(e) {}
+    var headers2 = ["Pool", "Anzahl", "Anteil", "Erkennungs-Methoden"];
+    for (var c2 = 0; c2 < headers2.length; c2++) {
+        sheet2.Cells(1, c2 + 1).Value = headers2[c2];
+    }
+    try {
+        var h2 = sheet2.Range(sheet2.Cells(1,1), sheet2.Cells(1, headers2.length));
+        h2.Font.Bold = true;
+        h2.Font.Color = rgb(255, 255, 255);
+        h2.Interior.Color = rgb(14, 116, 144); // petrol
+        h2.HorizontalAlignment = -4108;
+        sheet2.Rows(1).RowHeight = 22;
+    } catch(e) {}
+
+    // Pools nach Anzahl sortieren
+    var poolArr = [];
+    for (var p in poolCounts) if (poolCounts.hasOwnProperty(p)) {
+        poolArr.push({ name: p, count: poolCounts[p] });
+    }
+    poolArr.sort(function(a, b) { return b.count - a.count; });
+
+    var totalMails = rows.length;
+    for (var pi = 0; pi < poolArr.length; pi++) {
+        var pp = poolArr[pi];
+        var row2 = pi + 2;
+        sheet2.Cells(row2, 1).Value = pp.name;
+        sheet2.Cells(row2, 2).Value = pp.count;
+        sheet2.Cells(row2, 3).Value = totalMails > 0 ? (Math.round((pp.count / totalMails) * 1000) / 10) + "%" : "-";
+        // Erkennungs-Methoden zusammenstellen
+        var methods = [];
+        for (var sk in sourceCounts) {
+            if (!sourceCounts.hasOwnProperty(sk)) continue;
+            var sp = sk.split("||");
+            if (sp[0] === pp.name) methods.push(sp[1] + " (" + sourceCounts[sk] + ")");
+        }
+        sheet2.Cells(row2, 4).Value = methods.join(", ");
+        // Highlight: unbekannt = gelb, Fehler = rot, Top-Pool = grün
+        if (pp.name === "(unbekannt)") {
+            try { sheet2.Range(sheet2.Cells(row2,1), sheet2.Cells(row2, headers2.length)).Interior.Color = rgb(254, 240, 138); } catch(e) {}
+        } else if (pp.name === "(Fehler)") {
+            try { sheet2.Range(sheet2.Cells(row2,1), sheet2.Cells(row2, headers2.length)).Interior.Color = rgb(252, 165, 165); } catch(e) {}
+        } else if (pi === 0 && pp.count >= 2) {
+            try { sheet2.Cells(row2, 2).Interior.Color = rgb(187, 247, 208); } catch(e) {}
+        }
+    }
+    try {
+        sheet2.Columns("A:A").ColumnWidth = 45;
+        sheet2.Columns("B:B").ColumnWidth = 10;
+        sheet2.Columns("C:C").ColumnWidth = 10;
+        sheet2.Columns("D:D").ColumnWidth = 50;
+        sheet2.Cells.Font.Name = "Open Sans";
+        sheet2.Range("B:C").HorizontalAlignment = -4108;
+    } catch(e) {}
+
+    // ========== SHEET 3: Unbekannte Pools (nur wenn vorhanden) ==========
+    var unknownRows = [];
+    for (var ui = 0; ui < rows.length; ui++) {
+        if (rows[ui].pool === "(unbekannt)") unknownRows.push(rows[ui]);
+    }
+    if (unknownRows.length > 0) {
+        var sheet3 = wb.Worksheets.Add();
+        try {
+            sheet3.Move(null, wb.Sheets(wb.Sheets.Count));
+            sheet3.Name = "Unbekannte Pools";
+        } catch(e) {}
+        var headers3 = ["#", "Datei", "Absender Name", "Absender Email", "Domain", "Empfaenger (bei uns)", "Betreff", "Anhang-Namen"];
+        for (var c3 = 0; c3 < headers3.length; c3++) {
+            sheet3.Cells(1, c3 + 1).Value = headers3[c3];
+        }
+        try {
+            var h3 = sheet3.Range(sheet3.Cells(1,1), sheet3.Cells(1, headers3.length));
+            h3.Font.Bold = true;
+            h3.Font.Color = rgb(255, 255, 255);
+            h3.Interior.Color = rgb(180, 83, 9); // amber
+            h3.HorizontalAlignment = -4108;
+            sheet3.Rows(1).RowHeight = 22;
+        } catch(e) {}
+        for (var ui2 = 0; ui2 < unknownRows.length; ui2++) {
+            var ur = unknownRows[ui2];
+            sheet3.Cells(ui2 + 2, 1).Value = ur.idx;
+            sheet3.Cells(ui2 + 2, 2).Value = ur.msgFile;
+            sheet3.Cells(ui2 + 2, 3).Value = ur.absName;
+            sheet3.Cells(ui2 + 2, 4).Value = ur.absMail;
+            sheet3.Cells(ui2 + 2, 5).Value = ur.absDomain;
+            sheet3.Cells(ui2 + 2, 6).Value = ur.empfaenger;
+            sheet3.Cells(ui2 + 2, 7).Value = ur.betreff;
+            sheet3.Cells(ui2 + 2, 8).Value = ur.attNames;
+        }
+        try {
+            sheet3.Columns("A:A").ColumnWidth = 5;
+            sheet3.Columns("B:B").ColumnWidth = 35;
+            sheet3.Columns("C:D").ColumnWidth = 28;
+            sheet3.Columns("E:E").ColumnWidth = 22;
+            sheet3.Columns("F:F").ColumnWidth = 30;
+            sheet3.Columns("G:G").ColumnWidth = 50;
+            sheet3.Columns("H:H").ColumnWidth = 40;
+            sheet3.Cells.Font.Name = "Open Sans";
+            sheet3.Range(sheet3.Cells(1,1), sheet3.Cells(unknownRows.length + 1, headers3.length)).AutoFilter();
+            sheet3.Range("A2").Select();
+            excel.ActiveWindow.FreezePanes = true;
+        } catch(e) {}
+    }
+
+    // Pool-Uebersicht aktivieren (wichtigster Tab)
+    try { wb.Sheets("Pool-Uebersicht").Activate(); } catch(e) {}
+    excel.DisplayAlerts = true;
 }
 </script>
 </body>
