@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.0"
+        VERSION="1.1"
         WINDOWSTATE="normal"
     />
     <style>
@@ -209,7 +209,7 @@
                     <span id="cookieStatus" class="cookie-status missing">Cookie fehlt</span>
                 </div>
                 <div class="info-box" style="margin-top: 0.4rem;">
-                    Cookie wird gespeichert nach <code id="cookiePath">F:\ExcelGPT-Cookie\Cookie.txt</code> (gleiche Datei wie das Excel-Tool). Beim Start automatisch geladen.
+                    Cookie wird als <code>Cookie.txt</code> <strong>neben der HTA-Datei</strong> gespeichert: <code id="cookiePath">...</code>. Vorteil: gleicher Ordner = gleiche Security-Zone, keine Cross-Domain-Pruefung, funktioniert auch ohne "Zulassen"-Haekchen.
                 </div>
             </div>
         </details>
@@ -394,7 +394,7 @@ End Function
 // ============================================================================
 var outlookApp = null;
 var outlookNS = null;
-var COOKIE_PATH = "F:\\ExcelGPT-Cookie\\Cookie.txt";
+var COOKIE_PATH = "";  // computed at startup -> Cookie.txt next to this HTA
 var ERGO_BASE = "https://gpt.ergo.com/api";
 var MAX_PDFS = 3;
 var MAX_PDF_MB = 20;
@@ -430,9 +430,12 @@ window.onload = function() {
         showError("Outlook konnte nicht verbunden werden. Bitte Outlook oeffnen und HTA neu starten. (" + e.message + ")");
     }
 
+    // Cookie-Pfad: Cookie.txt neben der HTA-Datei (gleiche Security-Zone)
+    COOKIE_PATH = getHtaDir() + "\\Cookie.txt";
+    document.getElementById("cookiePath").innerText = COOKIE_PATH || "(HTA-Pfad nicht ermittelbar)";
+
     // Load cookie
     loadCookieFromFile();
-    document.getElementById("cookiePath").innerText = COOKIE_PATH;
 
     // Load saved settings from localStorage
     try {
@@ -494,6 +497,7 @@ function setupDragDrop() {
 // COOKIE
 // ============================================================================
 function loadCookieFromFile() {
+    if (!COOKIE_PATH) { updateCookieStatus(false); return; }
     try {
         var fso = new ActiveXObject("Scripting.FileSystemObject");
         if (fso.FileExists(COOKIE_PATH)) {
@@ -518,12 +522,11 @@ function saveCookie() {
         showError("Cookie sieht zu kurz aus (min. 50 Zeichen). Bitte den vollen Cookie-String aus dem Browser einfuegen.");
         return;
     }
+    if (!COOKIE_PATH) {
+        showError("HTA-Pfad konnte nicht ermittelt werden - Cookie-Datei kann nicht gespeichert werden. Bitte die HTA von einem normalen Datei-Pfad starten (nicht aus einem ZIP heraus).");
+        return;
+    }
     try {
-        var fso = new ActiveXObject("Scripting.FileSystemObject");
-        var parent = fso.GetParentFolderName(COOKIE_PATH);
-        if (!fso.FolderExists(parent)) {
-            try { fso.CreateFolder(parent); } catch(e) {}
-        }
         var stm = new ActiveXObject("ADODB.Stream");
         stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
         stm.WriteText(raw);
@@ -531,9 +534,9 @@ function saveCookie() {
         stm.Close();
         state.cookie = raw;
         updateCookieStatus(true);
-        showSuccess("Cookie gespeichert in " + COOKIE_PATH);
+        showSuccess("Cookie gespeichert: " + COOKIE_PATH);
     } catch(e) {
-        showError("Cookie konnte nicht gespeichert werden: " + e.message);
+        showError("Cookie konnte nicht gespeichert werden: " + e.message + " (Pfad: " + COOKIE_PATH + ")");
     }
 }
 
@@ -1679,6 +1682,23 @@ function getEnv(name) {
         var shell = new ActiveXObject("WScript.Shell");
         return shell.ExpandEnvironmentStrings("%" + name + "%");
     } catch(e) { return ""; }
+}
+
+// Verzeichnis, in dem die HTA-Datei liegt - via location.href parsen
+function getHtaDir() {
+    try {
+        var href = decodeURIComponent(String(location.href));
+        // typische Form: "file:///C:/path/to/file.hta"
+        href = href.replace(/^file:\/+/, "").replace(/\//g, "\\");
+        // Querystring/Hash abschneiden
+        var qPos = href.indexOf("?"); if (qPos >= 0) href = href.substr(0, qPos);
+        var hPos = href.indexOf("#"); if (hPos >= 0) href = href.substr(0, hPos);
+        var slash = href.lastIndexOf("\\");
+        if (slash < 0) return "";
+        return href.substr(0, slash);
+    } catch(e) {
+        return "";
+    }
 }
 
 function getFileName(path) {
