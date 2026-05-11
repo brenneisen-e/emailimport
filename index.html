@@ -1578,13 +1578,13 @@
                             <div class="tool-body">
                                 <p><strong>Standalone-Tool</strong> mit derselben Klassifikations-Logik wie das Excel-Makro - aber als <strong>HTA</strong>, kein .xlsm-Import, keine Makro-Aktivierung. Doppelklick auf <code>.hta</code> &rarr; Cookie einfuegen &rarr; Ordner waehlen &rarr; Analyse starten. <strong>Resume-faehig:</strong> bei Abbruch oder Neustart wird automatisch ein Cache pro Ordner gespeichert (<code>_KI-Analyse/cache.json</code>) - schon analysierte Mails werden uebersprungen. <strong>Abbrechen-Button</strong> stoppt sauber und sichert alle bisher gesammelten Ergebnisse. Parallel-Pipeline (Default 3, max 6) wie im Excel-Tool. Excel-/JSON-Export am Ende.</p>
                                 <div class="tool-actions">
-                                    <a href="ergo-vorgang-analyse-v1.10.hta.txt" download class="btn-download">
+                                    <a href="ergo-vorgang-analyse-v1.11.hta.txt" download class="btn-download">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        ergo-vorgang-analyse-v1.10.hta.txt
+                                        ergo-vorgang-analyse-v1.11.hta.txt
                                     </a>
                                 </div>
                                 <div style="font-size: 11px; color: #fbbf24; margin-top: 6px;">Nach Download Endung von <code>.hta.txt</code> auf <code>.hta</code> umbenennen. <strong>Wichtig:</strong> in lokalen Ordner kopieren (<code>C:\...</code>), nicht direkt von einem Netzlaufwerk starten.</div>
-                                <div class="tool-meta">ergo-vorgang-analyse.hta v1.10 (eine Datei, ~95 KB) | Voraussetzung: Outlook + gueltiger ErgoGPT-Cookie. <strong>v1.10:</strong> PowerShell-Uploader durch <strong>VBScript</strong>-Uploader (wscript.exe) ersetzt - WScript-Host hat keinen ConstrainedLanguageMode und keine ExecutionPolicy, ADODB.Stream + WinHttp sind dort frei. UNC-/MOTW-Banner entfernt, da der Subprozess die IE-Zone-Sperre eh umgeht. Aus v1.9: %-Progress mit "X/Y erledigt | N parallel | M ok | K fehler", Live-Slot-Status pro laufendem Vorgang inkl. Sub-Step und Sekunden.<br><strong>Download:</strong> die <code>.hta.txt</code>-Variante laden, Endung von <code>.hta.txt</code> auf <code>.hta</code> umbenennen.</div>
+                                <div class="tool-meta">ergo-vorgang-analyse.hta v1.11 (eine Datei, ~100 KB) | Voraussetzung: Outlook + gueltiger ErgoGPT-Cookie. <strong>v1.11-Neu:</strong> Excel-Export erzeugt jetzt 2 Sheets - "Analyse" mit allen Vorgaengen + "Auswertung" mit Statistik-Blocks: (1) Klassifikations-Verteilung (BUe/Mahnung/Schaden/Antrag/...), (2) BU-Detail (Erstvorgang vs. Reminder, einfacher Vertrag vs. ganze Kundenverbindung), (3) Maklerpool-Aufstellung nur fuer BUs (Grossmakler alle gelistet, Kleinmakler mit >=2 Vorgaengen, Rest als "Sonstige" aggregiert mit Namensliste).<br>Aus v1.10: VBScript-Uploader, Live-Progress, keine UNC-Banner.<br><strong>Download:</strong> die <code>.hta.txt</code>-Variante laden, Endung von <code>.hta.txt</code> auf <code>.hta</code> umbenennen.</div>
                             </div>
                         </details>
 
@@ -1593,7 +1593,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 10.10
+                Version 10.11
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
