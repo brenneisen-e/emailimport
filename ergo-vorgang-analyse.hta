@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.5"
+        VERSION="1.6"
         WINDOWSTATE="normal"
     />
     <style>
@@ -185,7 +185,22 @@
 <body>
 <div class="container">
 
-    <!-- Header -->
+    <!-- Header + UNC-Warnung (nur sichtbar wenn relevant) -->
+    <div id="uncBanner" style="display:none; background: linear-gradient(135deg, #b45309, #92400e); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1rem; color: #fef3c7; font-size: 13px;">
+        <div style="display:flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div style="font-size: 24px;">&#9888;</div>
+            <div style="flex: 1; min-width: 300px;">
+                <strong>UNC-/Netzwerk-Pfad erkannt!</strong>
+                Diese HTA laeuft aus dem Pfad <code id="uncPath"></code>.
+                IE blockiert in dieser Zone den binaeren PDF-Upload (Fehler "Datenquelle in anderer Domaene").
+                Empfehlung: HTA in einen lokalen Ordner unter C:\ verschieben.
+            </div>
+            <button class="btn btn-warning" style="font-weight: 600;" onclick="relocateToLocal()">
+                Jetzt nach %LOCALAPPDATA% verschieben + neu starten
+            </button>
+        </div>
+    </div>
+
     <div class="card">
         <div class="header">
             <div class="header-left">
@@ -195,7 +210,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.5 - Pure-JS Multipart + UTF-8 + Excel-Farben + Cache via FSO</div>
+            <div class="ver">v1.6 - Auto-Relocate bei UNC (Internet-Zone-Bypass)</div>
         </div>
 
         <!-- Cookie -->
@@ -374,6 +389,13 @@ window.onload = function() {
     // Cookie-Pfad: Cookie.txt neben der HTA-Datei (gleiche Security-Zone)
     COOKIE_PATH = getHtaDir() + "\\Cookie.txt";
     document.getElementById("cookiePath").innerText = COOKIE_PATH || "(HTA-Pfad nicht ermittelbar)";
+
+    // UNC-Detection - prominent warnen, wenn das HTA von einem Netzwerk-Pfad
+    // laeuft (sperrt ADODB.Stream binaeren Upload).
+    if (isRunningFromUnc()) {
+        document.getElementById("uncPath").innerText = getHtaDir();
+        document.getElementById("uncBanner").style.display = "block";
+    }
 
     // Load cookie
     loadCookieFromFile();
@@ -1820,6 +1842,69 @@ function getEnv(name) {
         var shell = new ActiveXObject("WScript.Shell");
         return shell.ExpandEnvironmentStrings("%" + name + "%");
     } catch(e) { return ""; }
+}
+
+// Vollstaendiger Pfad zur HTA-Datei (inkl. Dateiname)
+function getHtaPath() {
+    var dir = getHtaDir();
+    var name = getHtaFileName();
+    if (!dir || !name) return "";
+    return dir + "\\" + name;
+}
+
+function getHtaFileName() {
+    try {
+        var href = decodeURIComponent(String(location.href));
+        if (href.toLowerCase().substr(0, 5) === "file:") href = href.substr(5);
+        href = href.replace(/^\/+/, "").replace(/\//g, "\\");
+        var qPos = href.indexOf("?"); if (qPos >= 0) href = href.substr(0, qPos);
+        var slash = href.lastIndexOf("\\");
+        return slash >= 0 ? href.substr(slash + 1) : href;
+    } catch(e) { return ""; }
+}
+
+// True, wenn das HTA von einem UNC-Pfad (\\server\share\...) laeuft.
+// IE klassifiziert das als Internet-Zone -> ADODB.Stream wird gesperrt.
+function isRunningFromUnc() {
+    var dir = getHtaDir();
+    return dir && dir.substr(0, 2) === "\\\\";
+}
+
+// Kopiert HTA + Cookie.txt nach %LOCALAPPDATA%\ergo-vorgang-analyse\,
+// startet die neue Instanz, schliesst die aktuelle. Ein-Klick-Loesung
+// fuer das ADODB.Stream-Cross-Domain-Problem.
+function relocateToLocal() {
+    var htaDir = getHtaDir();
+    var htaPath = getHtaPath();
+    if (!htaDir || !htaPath) {
+        showError("HTA-Pfad konnte nicht ermittelt werden.");
+        return;
+    }
+    try {
+        var shell = new ActiveXObject("WScript.Shell");
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var localBase = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") + "\\ergo-vorgang-analyse";
+        if (!fso.FolderExists(localBase)) fso.CreateFolder(localBase);
+
+        // Ziel-Dateinamen
+        var htaName = getHtaFileName() || "ergo-vorgang-analyse.hta";
+        var dstHta = localBase + "\\" + htaName;
+        fso.CopyFile(htaPath, dstHta, true);
+
+        // Cookie.txt mitkopieren falls vorhanden
+        var srcCookie = htaDir + "\\Cookie.txt";
+        if (fso.FileExists(srcCookie)) {
+            try { fso.CopyFile(srcCookie, localBase + "\\Cookie.txt", true); } catch(e) {}
+        }
+
+        // Neue Instanz starten + diese schliessen
+        shell.Run('mshta "' + dstHta + '"', 1, false);
+        window.setTimeout(function() {
+            try { window.close(); } catch(e) {}
+        }, 300);
+    } catch(e) {
+        showError("Verschieben fehlgeschlagen: " + e.message + "\n\nManueller Workaround:\n1. Diese HTA-Datei und Cookie.txt in einen Ordner unter C:\\ kopieren\n2. Von dort doppelklicken");
+    }
 }
 
 // Verzeichnis, in dem die HTA-Datei liegt - via location.href parsen.
