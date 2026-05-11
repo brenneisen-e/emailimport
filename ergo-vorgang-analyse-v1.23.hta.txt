@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.22"
+        VERSION="1.23"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.22 - Datei-Umbenennen mit Datums-Praefix (fuer Zeitraum-Filter ohne Outlook)</div>
+            <div class="ver">v1.23 - Mails aus Zeitraum sammeln: rekursiv aus Oberordner in neuen Ordner kopieren</div>
         </div>
 
         <!-- Cookie -->
@@ -264,6 +264,16 @@
                 </div>
                 <div id="dateRangeStatus" style="font-size:11px; color: #94a3b8; margin-top:6px;">
                     Filtert nach Datum im Dateinamen (Muster <code>YYYY-MM-DD_HHMM_...</code>). Mails ohne erkennbares Datum im Dateinamen werden eingeschlossen.
+                </div>
+                <div style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px solid #334155;">
+                    <button class="btn" id="btnCollectByDate" onclick="copyZeitraumToNewFolder()" disabled
+                            style="background: linear-gradient(135deg, #0891b2, #155e75); color: white; font-size: 12px; padding: 8px 14px;"
+                            title="Kopiert alle Mails im gewaehlten Zeitraum aus dem Ordner (rekursiv durch Unterordner) in einen neuen Ziel-Ordner. Der neue Ordner wird automatisch zum Analyse-Ordner.">
+                        &#128193; Mails aus Zeitraum in neuen Ordner sammeln
+                    </button>
+                    <div style="font-size:11px; color: #94a3b8; margin-top:4px;">
+                        Quelle wird rekursiv durchsucht (z.B. Ober-Ordner mit zwei Postfach-Subfoldern). Originale bleiben erhalten - Kopie in neuen Ordner.
+                    </div>
                 </div>
             </div>
         </details>
@@ -820,6 +830,9 @@ function refreshStartButton() {
     // Rename-Button: braucht nur Ordner + Mails
     var btnRn = document.getElementById("btnRenameWithDate");
     if (btnRn) btnRn.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0;
+    // Collect-Button: braucht Ordner + Mails + min. 1 Datum
+    var btnCl = document.getElementById("btnCollectByDate");
+    if (btnCl) btnCl.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0 || (!state.dateFrom && !state.dateTo);
 }
 
 function startAnalysis() {
@@ -2596,6 +2609,7 @@ function onDateChange() {
     state.dateTo = toStr ? new Date(toStr) : null;
     refreshFolderStats();
     refreshDateRangeStatus();
+    refreshStartButton();
     saveSettings();
 }
 
@@ -4891,6 +4905,143 @@ function renameMsgFilesWithDate() {
         }
     }
     setTimeout(step, 50);
+}
+
+// ============================================================================
+// SAMMELN: Mails aus Zeitraum in neuen Ordner kopieren
+// ============================================================================
+// User-Case: Oberordner enthaelt mehrere Postfach-Unterordner (z.B.
+// 'BU-Postfach' und 'Maklerservice'). Tool durchsucht rekursiv, filtert
+// per Zeitraum, kopiert Treffer in einen neuen Ordner mit erhaltener
+// Unterordner-Struktur, schaltet danach auf den neuen Ordner um.
+
+function copyZeitraumToNewFolder() {
+    if (state.running) return;
+    if (!state.folderPath) { showError("Erst Ordner waehlen."); return; }
+    if (!state.dateFrom && !state.dateTo) {
+        showError("Bitte zuerst Zeitraum setzen (mind. Von oder Bis).");
+        return;
+    }
+    var filtered = getFilteredMsgFiles();
+    if (filtered.length === 0) {
+        showError("Keine Mails im Zeitraum gefunden.");
+        return;
+    }
+
+    var fromStr = state.dateFrom ? isoDateInput(state.dateFrom) : "alles";
+    var toStr = state.dateTo ? isoDateInput(state.dateTo) : "heute";
+    var folderSuffix = "_Zeitraum_" + fromStr + "_bis_" + toStr;
+    var targetParent = state.folderPath + "\\" + folderSuffix;
+
+    var srcParent = state.folderPath;
+    if (!confirm(
+        "Mails aus Zeitraum sammeln\n\n" +
+        "Quelle (rekursiv):\n  " + srcParent + "\n\n" +
+        "Zeitraum: " + fromStr + " bis " + toStr + "\n" +
+        "Mails im Filter: " + filtered.length + "\n\n" +
+        "Ziel-Ordner (wird erstellt):\n  " + targetParent + "\n\n" +
+        "- Originale bleiben erhalten (kopiert, nicht verschoben)\n" +
+        "- Unterordner-Struktur wird beibehalten\n" +
+        "- Danach wird der neue Ordner als Analyse-Ordner aktiviert\n\n" +
+        "Fortfahren?"
+    )) return;
+
+    state.running = true;
+    refreshStartButton();
+    document.getElementById("progressContainer").style.display = "block";
+    hideStatus();
+
+    var fso;
+    try { fso = new ActiveXObject("Scripting.FileSystemObject"); }
+    catch(e) {
+        showError("FSO nicht verfuegbar: " + e.message);
+        state.running = false;
+        refreshStartButton();
+        document.getElementById("progressContainer").style.display = "none";
+        return;
+    }
+
+    try {
+        ensureFolderPath(fso, targetParent);
+    } catch(e) {
+        showError("Ziel-Ordner konnte nicht erstellt werden: " + e.message);
+        state.running = false;
+        refreshStartButton();
+        document.getElementById("progressContainer").style.display = "none";
+        return;
+    }
+
+    var copied = 0, errors = 0, total = filtered.length;
+    var srcLower = srcParent.toLowerCase();
+    var i = 0;
+    function step() {
+        var end = Math.min(i + 50, total);
+        for (; i < end; i++) {
+            var src = filtered[i];
+            // Relativer Pfad zur Quelle
+            var rel = "";
+            if (src.toLowerCase().indexOf(srcLower) === 0) {
+                rel = src.substr(srcParent.length);
+                if (rel.charAt(0) === "\\") rel = rel.substr(1);
+            } else {
+                rel = getFileName(src);
+            }
+            // Wenn die Quelle SELBST im Target liegt (z.B. Re-Run im gleichen Parent):
+            // skip dass wir nicht in unsere eigene Target-Hierarchie kopieren
+            if (rel.indexOf(folderSuffix) === 0) continue;
+
+            var dest = targetParent + "\\" + rel;
+            try {
+                var destDir = dest.substr(0, dest.lastIndexOf("\\"));
+                ensureFolderPath(fso, destDir);
+                if (fso.FileExists(dest)) {
+                    var dotPos = dest.lastIndexOf(".");
+                    var n = 2;
+                    while (n < 1000) {
+                        var altDest = (dotPos > 0)
+                            ? dest.substr(0, dotPos) + "_" + n + dest.substr(dotPos)
+                            : dest + "_" + n;
+                        if (!fso.FileExists(altDest)) { dest = altDest; break; }
+                        n++;
+                    }
+                }
+                fso.CopyFile(src, dest, false);
+                copied++;
+            } catch(eC) {
+                errors++;
+            }
+        }
+        updateProgress(i, total, "Kopiere: " + i + "/" + total + " (ok: " + copied + ", fehler: " + errors + ")");
+        if (i < total) {
+            setTimeout(step, 5);
+        } else {
+            document.getElementById("progressContainer").style.display = "none";
+            state.running = false;
+
+            if (copied === 0) {
+                refreshStartButton();
+                showError("Keine Mails kopiert (" + errors + " Fehler). Ziel-Ordner: " + targetParent);
+                return;
+            }
+
+            // Active folder switch + reset date filter (alles im neuen Ordner ist schon im Zeitraum)
+            state.xxlResults = []; // alte XXL-Daten verwerfen
+            state.results = [];
+            state.pendingMap = {};
+            resetDateRange();
+            useFolder(targetParent);
+            showSuccess(copied + " von " + total + " Mails nach\n" + targetParent + "\nkopiert (" + errors + " Fehler). Ordner ist jetzt aktiv.");
+        }
+    }
+    setTimeout(step, 50);
+}
+
+function ensureFolderPath(fso, path) {
+    if (!path) return;
+    if (fso.FolderExists(path)) return;
+    var parent = path.substr(0, path.lastIndexOf("\\"));
+    if (parent && !fso.FolderExists(parent)) ensureFolderPath(fso, parent);
+    if (!fso.FolderExists(path)) fso.CreateFolder(path);
 }
 
 function countRenameCandidates() {
