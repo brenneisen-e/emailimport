@@ -1,5 +1,38 @@
 ============================================================
-ERGO Vorgang-Analyse - Excel-Tool (v2.0)
+ERGO Vorgang-Analyse - Excel-Tool (v2.13)
+============================================================
+
+NEU IN v2.13 - PARALLEL-MODUS:
+
+  Neue Routine 'Vorgaenge_Analysieren_Parallel' fuehrt bis zu
+  6 ErgoGPT-Antwort-Calls gleichzeitig in der Pipeline aus.
+
+  Wie es funktioniert:
+    - Pro Vorgang bleibt: 1 Mail -> 1 Antwort vom Modell
+    - Aber waehrend Antwort 1 noch laeuft, wird Mail 2 vorbereitet
+      (Outlook oeffnen, Conversation anlegen, PDFs hochladen) und
+      deren Antwort-Call parallel gestartet
+    - Default 3 Calls gleichzeitig (einstellbar 1-6)
+
+  Speedup:
+    -  N=2 -> ca. 1.5x schneller
+    -  N=3 -> ca. 2.5x schneller (Default, empfohlen)
+    -  N=4 -> ca. 3x schneller (gelegentliche 403/429 moeglich)
+    -  N>=5 -> nur bei stabilen Tagen, viele Fehler bei zu hoher Last
+
+  Bei 30 Vorgaengen: ~10 min seriell -> ~3-4 min parallel mit N=3.
+
+  Wichtig:
+    - Vorbereitungs-Phase (Outlook + Conv + PDF-Upload) bleibt
+      sequentiell (Outlook ist COM, nicht thread-safe). Nur der
+      langsame Antwort-Call (typisch 15-25s) laeuft parallel.
+    - Inter-Call-Pause von 1.2s (Serial-Modus, gegen Rate-Limit)
+      entfaellt im Parallel-Modus. Stattdessen Default N=3 als
+      konservativer Wert.
+    - Bei MODELL- oder AUTH-Fehler: Abbruch wie im Serial-Modus.
+    - Bei Hard-Hanger (kein Slot reagiert in 240s): Abort + Fehler-
+      Eintrag.
+
 ============================================================
 
 NEU IN v2.0:
