@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.20"
+        VERSION="1.21"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.20 - Stats-Sheet: BUe-Funnel mit Detail-Breakdowns (Pool x Geschaeftstyp x MV-Status)</div>
+            <div class="ver">v1.21 - Zeitraum-Filter (Von/Bis + Quick-Buttons, filtert vor jedem Modus)</div>
         </div>
 
         <!-- Cookie -->
@@ -232,6 +232,32 @@
                 </div>
                 <div id="folderPath" class="folder-path"></div>
                 <div id="folderStats" class="stats"></div>
+            </div>
+        </details>
+
+        <details>
+            <summary>2b. Zeitraum-Filter (optional)</summary>
+            <div style="margin-top: 0.5rem;">
+                <div class="row">
+                    <div>
+                        <label>Von</label>
+                        <input type="date" id="dateFrom" onchange="onDateChange()">
+                    </div>
+                    <div>
+                        <label>Bis</label>
+                        <input type="date" id="dateTo" onchange="onDateChange()">
+                    </div>
+                </div>
+                <div class="compact" style="margin-top: 0.4rem;">
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="setDateRangeQuick(7)">Letzte 7 Tage</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="setDateRangeQuick(14)">Letzte 14 Tage</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="setDateRangeQuick(30)">Letzte 30 Tage</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="setDateRangeQuick(90)">Letzte 90 Tage</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="resetDateRange()">Reset (alle)</button>
+                </div>
+                <div id="dateRangeStatus" style="font-size:11px; color: #94a3b8; margin-top:6px;">
+                    Filtert nach Datum im Dateinamen (Muster <code>YYYY-MM-DD_HHMM_...</code>). Mails ohne erkennbares Datum im Dateinamen werden eingeschlossen.
+                </div>
             </div>
         </details>
 
@@ -374,7 +400,9 @@ var state = {
     slotCounter: 0,
     nextIdx: 0,
     parallelN: 3,
-    txtFolderEnabled: false
+    txtFolderEnabled: false,
+    dateFrom: null,       // Date object oder null
+    dateTo: null          // Date object oder null
 };
 
 // ============================================================================
@@ -598,16 +626,9 @@ function scanFolder() {
         collectMsgFiles(fso, fso.GetFolder(state.folderPath));
         loadCache();
         renderTable();
-        var cached = state.results.length;
-        var total = state.msgFiles.length;
-        var html = '<div class="stat">.msg-Dateien gefunden: <strong>' + total + '</strong></div>';
-        if (cached > 0) {
-            html += '<div class="stat ok">Aus Cache geladen: <strong>' + cached + '</strong></div>';
-            var todo = Math.max(0, total - cached);
-            html += '<div class="stat">Noch zu analysieren: <strong>' + todo + '</strong></div>';
-        }
-        document.getElementById("folderStats").innerHTML = html;
-        if (total === 0) showInfo("Keine .msg-Dateien gefunden.");
+        refreshFolderStats();
+        refreshDateRangeStatus();
+        if (state.msgFiles.length === 0) showInfo("Keine .msg-Dateien gefunden.");
         else hideStatus();
     } catch(e) {
         showError("Ordner-Scan fehlgeschlagen: " + e.message);
@@ -809,17 +830,18 @@ function startAnalysis() {
         state.pendingMap = {};
     }
 
-    // Determine work list: msgFiles minus already-cached
+    // Determine work list: nur Mails im Zeitraum, minus already-cached
+    var filtered = getFilteredMsgFiles();
     var work = [];
-    for (var i = 0; i < state.msgFiles.length; i++) {
-        var p = state.msgFiles[i];
+    for (var i = 0; i < filtered.length; i++) {
+        var p = filtered[i];
         if (!state.pendingMap[p.toLowerCase()]) {
             work.push(p);
         }
     }
 
     if (work.length === 0) {
-        showInfo("Alle " + state.msgFiles.length + " Vorgaenge sind bereits im Cache. (Haken setzen bei 'Alle neu analysieren' um zu erzwingen.)");
+        showInfo("Alle " + filtered.length + " Vorgaenge im Zeitraum sind bereits im Cache. (Haken setzen bei 'Alle neu analysieren' um zu erzwingen.)");
         return;
     }
 
@@ -2502,6 +2524,112 @@ function getFileName(path) {
     return i >= 0 ? path.substr(i+1) : path;
 }
 
+// ============================================================================
+// DATE RANGE FILTER (v1.21)
+// ============================================================================
+// Liest Datum aus Dateinamen-Praefix (Muster YYYY-MM-DD oder YYYY-MM-DD_HHMM).
+// Wenn kein Datum im Namen erkennbar: Mail wird eingeschlossen (Default-Strict).
+function isInDateRange(filePath) {
+    if (!state.dateFrom && !state.dateTo) return true;
+    var fname = getFileName(filePath);
+    var m = fname.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return true; // kein Datum im Namen -> default einschliessen
+    var y = parseInt(m[1], 10);
+    var mo = parseInt(m[2], 10) - 1;
+    var d = parseInt(m[3], 10);
+    if (isNaN(y) || isNaN(mo) || isNaN(d)) return true;
+    var fileDate = new Date(y, mo, d);
+    if (state.dateFrom && fileDate < state.dateFrom) return false;
+    if (state.dateTo) {
+        // dateTo gilt als end-of-day
+        var endOfDay = new Date(state.dateTo.getFullYear(), state.dateTo.getMonth(), state.dateTo.getDate(), 23, 59, 59);
+        if (fileDate > endOfDay) return false;
+    }
+    return true;
+}
+
+// Liefert die durch Datum gefilterten msgFiles. Default: state.msgFiles
+// (unfiltriert), wenn beide Datum-Felder leer.
+function getFilteredMsgFiles() {
+    if (!state.dateFrom && !state.dateTo) return state.msgFiles;
+    var out = [];
+    for (var i = 0; i < state.msgFiles.length; i++) {
+        if (isInDateRange(state.msgFiles[i])) out.push(state.msgFiles[i]);
+    }
+    return out;
+}
+
+function setDateRangeQuick(days) {
+    var now = new Date();
+    var to = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - days + 1);
+    document.getElementById("dateFrom").value = isoDateInput(from);
+    document.getElementById("dateTo").value = isoDateInput(to);
+    onDateChange();
+}
+
+function resetDateRange() {
+    document.getElementById("dateFrom").value = "";
+    document.getElementById("dateTo").value = "";
+    onDateChange();
+}
+
+function isoDateInput(d) {
+    var pad2 = function(n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+
+function onDateChange() {
+    var fromStr = document.getElementById("dateFrom").value;
+    var toStr = document.getElementById("dateTo").value;
+    state.dateFrom = fromStr ? new Date(fromStr) : null;
+    state.dateTo = toStr ? new Date(toStr) : null;
+    refreshFolderStats();
+    refreshDateRangeStatus();
+    saveSettings();
+}
+
+function refreshDateRangeStatus() {
+    var el = document.getElementById("dateRangeStatus");
+    if (!el) return;
+    if (!state.dateFrom && !state.dateTo) {
+        el.innerText = "Filtert nach Datum im Dateinamen (Muster YYYY-MM-DD_HHMM_...). Aktuell: kein Filter aktiv - alle Mails werden analysiert.";
+        return;
+    }
+    var fStr = state.dateFrom ? isoDateInput(state.dateFrom) : "(offen)";
+    var tStr = state.dateTo ? isoDateInput(state.dateTo) : "(offen)";
+    var inRange = 0, noDate = 0;
+    for (var i = 0; i < state.msgFiles.length; i++) {
+        if (isInDateRange(state.msgFiles[i])) inRange++;
+        var fn = getFileName(state.msgFiles[i]);
+        if (!fn.match(/^(\d{4})-(\d{2})-(\d{2})/)) noDate++;
+    }
+    var msg = "Zeitraum: " + fStr + " bis " + tStr + " - " + inRange + " von " + state.msgFiles.length + " Mails im Filter.";
+    if (noDate > 0) {
+        msg += " (" + noDate + " ohne Datum im Dateinamen werden eingeschlossen.)";
+    }
+    el.innerText = msg;
+}
+
+function refreshFolderStats() {
+    var el = document.getElementById("folderStats");
+    if (!el) return;
+    var total = state.msgFiles.length;
+    if (total === 0) { el.innerHTML = ""; return; }
+    var inRange = (state.dateFrom || state.dateTo) ? getFilteredMsgFiles().length : total;
+    var cached = state.results.length;
+    var html = '<div class="stat">.msg-Dateien gefunden: <strong>' + total + '</strong></div>';
+    if (state.dateFrom || state.dateTo) {
+        html += '<div class="stat">Im Zeitraum: <strong>' + inRange + '</strong></div>';
+    }
+    if (cached > 0) {
+        html += '<div class="stat ok">Aus Cache geladen: <strong>' + cached + '</strong></div>';
+        var todo = Math.max(0, inRange - cached);
+        html += '<div class="stat">Noch zu analysieren: <strong>' + todo + '</strong></div>';
+    }
+    el.innerHTML = html;
+}
+
 function sanitizeFilename(s) {
     if (!s) return "anhang";
     return String(s).replace(/[\\\/:*?"<>|\r\n\t]/g, "_").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
@@ -2842,7 +2970,11 @@ function detectPool(senderEmail, senderName, subject, body) {
 function runQuickPoolOverview() {
     if (state.running) return;
     if (!outlookApp) { showError("Outlook nicht verbunden."); return; }
-    if (state.msgFiles.length === 0) { showError("Keine .msg-Dateien im Ordner."); return; }
+    var filtered = getFilteredMsgFiles();
+    if (filtered.length === 0) {
+        showError("Keine .msg-Dateien im Ordner oder Zeitraum.");
+        return;
+    }
 
     state.running = true;
     document.getElementById("progressContainer").style.display = "block";
@@ -2853,13 +2985,12 @@ function runQuickPoolOverview() {
     var rows = [];
     var poolCounts = {};
     var sourceCounts = {};
-    var total = state.msgFiles.length;
     var fso = new ActiveXObject("Scripting.FileSystemObject");
 
-    setTimeout(function() { doPoolScan(rows, poolCounts, sourceCounts, fso, total, 0); }, 50);
+    setTimeout(function() { doPoolScan(rows, poolCounts, sourceCounts, fso, filtered, filtered.length, 0); }, 50);
 }
 
-function doPoolScan(rows, poolCounts, sourceCounts, fso, total, idx) {
+function doPoolScan(rows, poolCounts, sourceCounts, fso, files, total, idx) {
     if (idx >= total) {
         // Fertig - Excel exportieren
         document.getElementById("progressContainer").style.display = "none";
@@ -2874,7 +3005,7 @@ function doPoolScan(rows, poolCounts, sourceCounts, fso, total, idx) {
         return;
     }
 
-    var msgPath = state.msgFiles[idx];
+    var msgPath = files[idx];
     updateProgress(idx, total, "Pool-Erkennung: " + getFileName(msgPath));
 
     var row = {
@@ -2943,7 +3074,7 @@ function doPoolScan(rows, poolCounts, sourceCounts, fso, total, idx) {
     rows.push(row);
 
     // Nicht-blockierend weiter - setTimeout(0) gibt UI Luft
-    setTimeout(function() { doPoolScan(rows, poolCounts, sourceCounts, fso, total, idx + 1); }, 5);
+    setTimeout(function() { doPoolScan(rows, poolCounts, sourceCounts, fso, files, total, idx + 1); }, 5);
 }
 
 // Helper: Anzahl Keys in einem Plain-Object
@@ -3138,7 +3269,8 @@ function exportPoolOverviewToExcel(rows, poolCounts, sourceCounts) {
 
 function runQuickPoolOverviewXxl() {
     if (state.running) return;
-    if (state.msgFiles.length === 0) { showError("Keine .msg-Dateien."); return; }
+    var filtered = getFilteredMsgFiles();
+    if (filtered.length === 0) { showError("Keine .msg-Dateien im Ordner oder Zeitraum."); return; }
 
     state.running = true;
     document.getElementById("progressContainer").style.display = "block";
@@ -3165,11 +3297,11 @@ function runQuickPoolOverviewXxl() {
         return;
     }
 
-    // Chunking
+    // Chunking - nur Mails im Zeitraum
     var chunks = [];
     var chunkSize = 500;
-    for (var i = 0; i < state.msgFiles.length; i += chunkSize) {
-        chunks.push(state.msgFiles.slice(i, i + chunkSize));
+    for (var i = 0; i < filtered.length; i += chunkSize) {
+        chunks.push(filtered.slice(i, i + chunkSize));
     }
 
     state.xxlState = {
@@ -3179,10 +3311,10 @@ function runQuickPoolOverviewXxl() {
         startTime: new Date().getTime(),
         vbsPath: vbsPath,
         tempDir: tempDir,
-        totalMails: state.msgFiles.length
+        totalMails: filtered.length
     };
 
-    updateProgress(0, state.msgFiles.length, "XXL-Parser startet, " + chunks.length + " Chunks a 500 Mails...");
+    updateProgress(0, filtered.length, "XXL-Parser startet, " + chunks.length + " Chunks a " + chunkSize + " Mails...");
     setTimeout(processNextXxlChunk, 50);
 }
 
@@ -3833,7 +3965,7 @@ function runBulkTriage() {
             "Bulk-Triage braucht Mail-Inhalte (Subject + Body), die Pool-XXL " +
             "vorab eingesammelt hat.\n\n" +
             "Aktuell sind keine XXL-Daten im Speicher.\n\n" +
-            "Soll ich Pool-XXL jetzt schnell ausfuehren (~3 min fuer " + state.msgFiles.length + " Mails) " +
+            "Soll ich Pool-XXL jetzt schnell ausfuehren (~3 min fuer " + getFilteredMsgFiles().length + " Mails im Zeitraum) " +
             "und danach automatisch Bulk-Triage starten?\n\n" +
             "OK = ja, beides nacheinander.\n" +
             "Abbrechen = nichts tun (du kannst Pool-XXL separat klicken)."
