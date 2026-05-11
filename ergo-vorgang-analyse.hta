@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.7"
+        VERSION="1.8"
         WINDOWSTATE="normal"
     />
     <style>
@@ -226,7 +226,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.7 - Relocate + Mark-of-the-Web entfernen (PowerShell Unblock-File)</div>
+            <div class="ver">v1.8 - PDF-Upload ueber PowerShell-Subprozess (umgeht IE-Zone-Sperre)</div>
         </div>
 
         <!-- Cookie -->
@@ -1258,47 +1258,170 @@ function stringToUtf8Bytes(s) {
 }
 
 function uploadPdfsSequential(convId, paths) {
-    // Sequential within slot (parallel across slots gives the main speedup)
+    // Strategie: PowerShell-Subprozess statt In-Process-ADODB.Stream.
+    // Grund: IE/HTA-Sicherheits-Engine sperrt ADODB.Stream Binary-I/O in
+    // Zonen, die nicht 'Local Computer' sind. Subprozesse umgehen das,
+    // weil sie in einem separaten Sicherheitskontext laufen.
     var ids = [];
-    var xsrf = extractCsrf(state.cookie);
     var fso = new ActiveXObject("Scripting.FileSystemObject");
     for (var i = 0; i < paths.length; i++) {
         var path = paths[i];
+        var fileName = fso.GetFileName(path);
         try {
-            var fileName = fso.GetFileName(path);
-            var boundary = "----WebKitFormBoundary" + uuid4().replace(/-/g, "").substr(0, 16);
-            var pre = "--" + boundary + "\r\n" +
-                      'Content-Disposition: form-data; name="file_content"; filename="' + fileName + '"\r\n' +
-                      "Content-Type: application/pdf\r\n\r\n";
-            var post = "\r\n" +
-                       "--" + boundary + "\r\n" +
-                       'Content-Disposition: form-data; name="filename"\r\n\r\n' +
-                       fileName + "\r\n" +
-                       "--" + boundary + "\r\n" +
-                       'Content-Disposition: form-data; name="conversation_id"\r\n\r\n' +
-                       convId + "\r\n" +
-                       "--" + boundary + "--\r\n";
-            var body = buildMultipartBody(pre, path, post);
-
-            var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
-            http.Open("POST", "https://gpt.ergo.com/api/document", false);
-            try { http.SetProxy(0); } catch(e) {}
-            setWinHttpHeaders(http);
-            http.SetRequestHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
-            http.Send(body);
-
-            if (http.Status === 200) {
-                var did = parseJsonStr(http.ResponseText, "document_id");
-                if (did) ids.push(did);
-            } else {
-                throw new Error("PDF-Upload " + http.Status + ": " + http.ResponseText.substr(0, 200));
-            }
+            var did = uploadPdfViaPowerShell(convId, path, fileName);
+            if (did) ids.push(did);
         } catch(e) {
             throw new Error("Upload " + fileName + ": " + e.message);
         }
     }
     if (ids.length === 0) return "[]";
     return '["' + ids.join('","') + '"]';
+}
+
+// PowerShell-Uploader: schreibt ein .ps1 nach %TEMP%, fuehrt es aus,
+// liest das Ergebnis. Bypassed komplett die IE-Zone-Restriktionen.
+function uploadPdfViaPowerShell(convId, pdfPath, fileName) {
+    var shell = new ActiveXObject("WScript.Shell");
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var tempDir = shell.ExpandEnvironmentStrings("%TEMP%");
+    var stamp = String(new Date().getTime()) + "_" + Math.floor(Math.random() * 1000000);
+    var psPath = tempDir + "\\ergo_upload_" + stamp + ".ps1";
+    var resultPath = tempDir + "\\ergo_result_" + stamp + ".txt";
+    var cookiePath = tempDir + "\\ergo_cookie_" + stamp + ".txt";
+
+    try {
+        // Cookie + CSRF in temp-Datei (statt als Cmd-Argument - sicherer + laenge-unbegrenzt)
+        var cookieFile = fso.CreateTextFile(cookiePath, true, false);
+        cookieFile.Write(state.cookie);
+        cookieFile.Close();
+
+        // PS1-Skript schreiben
+        var ps1 = buildUploadPs1();
+        var ps1File = fso.CreateTextFile(psPath, true, false);
+        ps1File.Write(ps1);
+        ps1File.Close();
+
+        // Ausfuehren - hidden window, wait for exit
+        var cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + psPath + '" ' +
+                  '-CookieFile "' + cookiePath + '" ' +
+                  '-ConvId "' + convId + '" ' +
+                  '-PdfPath "' + pdfPath + '" ' +
+                  '-FileName "' + fileName.replace(/"/g, '\\"') + '" ' +
+                  '-ResultPath "' + resultPath + '"';
+        var rc = shell.Run(cmd, 0, true);
+
+        // Result lesen
+        if (!fso.FileExists(resultPath)) {
+            throw new Error("PowerShell hat keine Result-Datei geschrieben (Exit-Code " + rc + ")");
+        }
+        var rf = fso.OpenTextFile(resultPath, 1, false, -2);
+        var content = rf.ReadAll();
+        rf.Close();
+        var data = null;
+        try { data = eval("(" + content + ")"); } catch(eP) {
+            throw new Error("Result-Datei nicht parsebar: " + content.substr(0, 200));
+        }
+        if (!data || data.status === undefined) {
+            throw new Error("Result-Datei ohne 'status': " + content.substr(0, 200));
+        }
+        if (data.status !== 200) {
+            throw new Error("HTTP " + data.status + ": " + (data.body || "").substr(0, 200));
+        }
+        var did = parseJsonStr(data.body || "", "document_id");
+        if (!did) throw new Error("Keine document_id in: " + (data.body || "").substr(0, 200));
+        return did;
+    } finally {
+        // Cleanup
+        try { fso.DeleteFile(psPath, true); } catch(e) {}
+        try { fso.DeleteFile(resultPath, true); } catch(e) {}
+        try { fso.DeleteFile(cookiePath, true); } catch(e) {}
+    }
+}
+
+// PowerShell-Skript fuer den PDF-Multipart-Upload. Liest Cookie aus Datei,
+// PDF als Binary, baut Multipart-Body, sendet via Invoke-WebRequest, gibt
+// {status, body} als JSON in -ResultPath aus.
+function buildUploadPs1() {
+    var ps = [];
+    ps.push("param(");
+    ps.push("    [string]$CookieFile,");
+    ps.push("    [string]$ConvId,");
+    ps.push("    [string]$PdfPath,");
+    ps.push("    [string]$FileName,");
+    ps.push("    [string]$ResultPath");
+    ps.push(")");
+    ps.push("");
+    ps.push("$ErrorActionPreference = 'Stop'");
+    ps.push("");
+    ps.push("function Write-Result($status, $body) {");
+    ps.push("    $bodyEsc = ($body -replace '\\\\','\\\\\\\\' -replace '\"','\\\"' -replace \"`r\",'\\r' -replace \"`n\",'\\n' -replace \"`t\",'\\t')");
+    ps.push("    $json = '{\"status\":' + $status + ',\"body\":\"' + $bodyEsc + '\"}'");
+    ps.push("    [System.IO.File]::WriteAllText($ResultPath, $json, [System.Text.Encoding]::UTF8)");
+    ps.push("}");
+    ps.push("");
+    ps.push("try {");
+    ps.push("    $cookie = [System.IO.File]::ReadAllText($CookieFile)");
+    ps.push("    $cookie = $cookie.Trim()");
+    ps.push("    $xsrf = ''");
+    ps.push("    if ($cookie -match '(?i)(?:XSRF-TOKEN|CSRF-TOKEN|csrfToken|_csrf)=([^;]+)') {");
+    ps.push("        $xsrf = [System.Uri]::UnescapeDataString($matches[1])");
+    ps.push("    }");
+    ps.push("");
+    ps.push("    $fileBytes = [System.IO.File]::ReadAllBytes($PdfPath)");
+    ps.push("");
+    ps.push("    $boundary = '----WebKitFormBoundary' + ([guid]::NewGuid().ToString('N').Substring(0,16))");
+    ps.push("    $enc = [System.Text.Encoding]::UTF8");
+    ps.push("");
+    ps.push("    $pre = \"--$boundary`r`nContent-Disposition: form-data; name=`\"file_content`\"; filename=`\"$FileName`\"`r`nContent-Type: application/pdf`r`n`r`n\"");
+    ps.push("    $post = \"`r`n--$boundary`r`nContent-Disposition: form-data; name=`\"filename`\"`r`n`r`n$FileName`r`n--$boundary`r`nContent-Disposition: form-data; name=`\"conversation_id`\"`r`n`r`n$ConvId`r`n--$boundary--`r`n\"");
+    ps.push("");
+    ps.push("    $preBytes = $enc.GetBytes($pre)");
+    ps.push("    $postBytes = $enc.GetBytes($post)");
+    ps.push("");
+    ps.push("    $ms = New-Object System.IO.MemoryStream");
+    ps.push("    $ms.Write($preBytes, 0, $preBytes.Length)");
+    ps.push("    $ms.Write($fileBytes, 0, $fileBytes.Length)");
+    ps.push("    $ms.Write($postBytes, 0, $postBytes.Length)");
+    ps.push("    $body = $ms.ToArray()");
+    ps.push("    $ms.Close()");
+    ps.push("");
+    ps.push("    $headers = @{");
+    ps.push("        'Cookie' = $cookie");
+    ps.push("        'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'");
+    ps.push("        'Accept' = '*/*'");
+    ps.push("        'Accept-Language' = 'de-DE,de;q=0.9,en;q=0.8'");
+    ps.push("        'Origin' = 'https://gpt.ergo.com'");
+    ps.push("        'Referer' = 'https://gpt.ergo.com/'");
+    ps.push("        'X-Requested-With' = 'XMLHttpRequest'");
+    ps.push("    }");
+    ps.push("    if ($xsrf) {");
+    ps.push("        $headers['X-XSRF-TOKEN'] = $xsrf");
+    ps.push("        $headers['X-CSRF-TOKEN'] = $xsrf");
+    ps.push("    }");
+    ps.push("");
+    ps.push("    # TLS 1.2 + ignore proxy detection for speed");
+    ps.push("    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12");
+    ps.push("");
+    ps.push("    try {");
+    ps.push("        $resp = Invoke-WebRequest -Uri 'https://gpt.ergo.com/api/document' -Method Post -Body $body -ContentType (\"multipart/form-data; boundary=$boundary\") -Headers $headers -UseBasicParsing -TimeoutSec 180");
+    ps.push("        Write-Result $resp.StatusCode $resp.Content");
+    ps.push("    } catch [System.Net.WebException] {");
+    ps.push("        $status = 0; $body = $_.Exception.Message");
+    ps.push("        if ($_.Exception.Response) {");
+    ps.push("            $status = [int]$_.Exception.Response.StatusCode");
+    ps.push("            try {");
+    ps.push("                $sr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())");
+    ps.push("                $body = $sr.ReadToEnd(); $sr.Close()");
+    ps.push("            } catch {}");
+    ps.push("        }");
+    ps.push("        Write-Result $status $body");
+    ps.push("    } catch {");
+    ps.push("        Write-Result 0 $_.Exception.Message");
+    ps.push("    }");
+    ps.push("} catch {");
+    ps.push("    Write-Result 0 ('SCRIPT-ERROR: ' + $_.Exception.Message)");
+    ps.push("}");
+    return ps.join("\r\n");
 }
 
 function setCommonHeaders(http) {
