@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>ERGO Vorgang-Analyse</title>
+    <HTA:APPLICATION
+        ID="ERGO_Vorgang_Analyse"
+        APPLICATIONNAME="ERGO Vorgang-Analyse"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1rem 1.5rem;
+        }
+        .container { max-width: 1500px; margin: 0 auto; }
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 14px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            margin-bottom: 1rem;
+        }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .header-left { display: flex; align-items: center; gap: 0.75rem; }
+        .logo { font-size: 32px; }
+        h1 { font-size: 20px; }
+        .subtitle { color: #94a3b8; font-size: 12px; margin-top: 2px; }
+        .ver { color: #64748b; font-size: 11px; }
+
+        label {
+            display: block; margin-bottom: 0.3rem;
+            color: #cbd5e1; font-size: 12px; font-weight: 500;
+        }
+        input[type="text"], input[type="number"], input[type="password"], textarea, select {
+            width: 100%; padding: 8px 10px;
+            border: 1px solid #475569; border-radius: 6px;
+            background: #1e293b; color: #f1f5f9; font-size: 13px;
+            font-family: inherit;
+        }
+        textarea { resize: vertical; font-family: 'Consolas', monospace; font-size: 11px; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #ef4444; }
+
+        .grid { display: grid; gap: 0.75rem; }
+        .grid-2 { grid-template-columns: 1fr 1fr; }
+        .grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+        .grid-cookie { grid-template-columns: 1fr auto; align-items: end; }
+
+        .btn {
+            padding: 9px 16px; border: none; border-radius: 6px;
+            cursor: pointer; font-size: 13px; font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn-success:hover:not(:disabled) { background: linear-gradient(135deg, #34d399 0%, #10b981 100%); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .btn-warning:hover:not(:disabled) { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); }
+        .btn-secondary { background: #475569; color: #f1f5f9; }
+        .btn-secondary:hover:not(:disabled) { background: #64748b; }
+        .btn-danger { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; }
+        .btn-danger:hover:not(:disabled) { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); }
+
+        .cookie-bar { display: flex; gap: 0.5rem; align-items: center; }
+        .cookie-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; }
+        .cookie-status.ok { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+        .cookie-status.missing { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+
+        .drop-area {
+            border: 2px dashed #475569; border-radius: 10px;
+            padding: 1.25rem; text-align: center; cursor: pointer;
+            background: rgba(0,0,0,0.2); transition: all 0.2s;
+            margin-bottom: 0.75rem;
+        }
+        .drop-area:hover, .drop-area.dragover {
+            border-color: #ef4444; background: rgba(239, 68, 68, 0.05);
+        }
+        .drop-area .big { font-size: 28px; margin-bottom: 0.25rem; }
+        .drop-area .hint { color: #94a3b8; font-size: 12px; margin-top: 0.25rem; }
+        .folder-path { font-family: 'Consolas', monospace; font-size: 12px; color: #cbd5e1; margin-top: 0.5rem; word-break: break-all; }
+
+        .stats { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0.5rem 0 0.75rem; }
+        .stat { background: rgba(0,0,0,0.25); padding: 6px 12px; border-radius: 6px; font-size: 12px; }
+        .stat strong { color: #ef4444; }
+        .stat.ok strong { color: #10b981; }
+        .stat.err strong { color: #fca5a5; }
+
+        .action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+        .progress-container { display: none; margin: 0.75rem 0; }
+        .progress-bar { height: 6px; background: #374151; border-radius: 3px; overflow: hidden; }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, #ef4444, #f97316);
+            width: 0%; transition: width 0.3s;
+        }
+        .progress-text { font-size: 11px; color: #94a3b8; margin-top: 0.4rem; }
+        .status { display: none; padding: 0.6rem 0.85rem; border-radius: 6px; margin: 0.5rem 0; font-size: 12px; }
+        .status.success { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; }
+        .status.error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+        .status.info { background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #93c5fd; }
+
+        .results-table-wrap {
+            display: none; max-height: 540px; overflow: auto;
+            background: rgba(0,0,0,0.25); border-radius: 8px;
+            border: 1px solid #334155; margin-top: 0.5rem;
+        }
+        table.results { width: 100%; border-collapse: collapse; font-size: 11px; }
+        table.results th {
+            position: sticky; top: 0; background: #0f172a; color: #cbd5e1;
+            text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155;
+            font-weight: 600; font-size: 10px; text-transform: uppercase;
+            white-space: nowrap;
+        }
+        table.results td {
+            padding: 5px 8px; border-bottom: 1px solid #1e293b;
+            color: #e2e8f0; vertical-align: top;
+        }
+        table.results tr:hover td { background: rgba(239, 68, 68, 0.08); cursor: pointer; }
+        td.col-date { white-space: nowrap; color: #94a3b8; }
+        td.col-betr { font-weight: 500; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        td.col-status { font-weight: 600; white-space: nowrap; }
+        td.col-status.s-pending { color: #94a3b8; }
+        td.col-status.s-running { color: #fbbf24; }
+        td.col-status.s-ok { color: #10b981; }
+        td.col-status.s-err { color: #ef4444; }
+        td.col-status.s-cancel { color: #94a3b8; }
+        td.col-status.s-cache { color: #60a5fa; }
+        td.col-klass { font-weight: 500; }
+        td.col-vt-makler { color: #6ee7b7; }
+        td.col-vt-bounce { color: #94a3b8; }
+        td.col-vt-other { color: #fbbf24; }
+
+        .modal-backdrop {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); z-index: 100;
+            align-items: center; justify-content: center; padding: 2rem;
+        }
+        .modal-backdrop.active { display: flex; }
+        .modal {
+            background: #1e293b; border-radius: 10px; padding: 1.25rem;
+            max-width: 900px; width: 100%; max-height: 90vh; overflow: auto;
+            border: 1px solid #475569;
+        }
+        .modal h3 { margin-bottom: 0.5rem; }
+        .modal .kv { display: grid; grid-template-columns: 180px 1fr; gap: 4px 12px; font-size: 12px; margin-top: 0.75rem; }
+        .modal .kv .k { color: #94a3b8; font-weight: 500; }
+        .modal .kv .v { color: #e2e8f0; word-break: break-word; }
+        .modal pre {
+            background: #0f172a; padding: 0.75rem; border-radius: 6px;
+            color: #e2e8f0; font-size: 11px; white-space: pre-wrap;
+            word-wrap: break-word; max-height: 40vh; overflow: auto;
+            font-family: 'Consolas', monospace; margin-top: 0.5rem;
+        }
+
+        .info-box {
+            background: rgba(59, 130, 246, 0.08); border: 1px solid #1e40af;
+            border-radius: 6px; padding: 0.5rem 0.75rem;
+            font-size: 11px; color: #cbd5e1; margin-bottom: 0.5rem;
+        }
+        .compact { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .compact > * { margin: 0; }
+        .checkbox-row { display: flex; align-items: center; gap: 0.4rem; font-size: 12px; color: #cbd5e1; cursor: pointer; }
+        .checkbox-row input { width: auto; margin: 0; }
+
+        details summary { cursor: pointer; padding: 6px 0; font-weight: 500; color: #cbd5e1; font-size: 13px; }
+        details[open] summary { color: #f1f5f9; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Header -->
+    <div class="card">
+        <div class="header">
+            <div class="header-left">
+                <div class="logo">&#129302;</div>
+                <div>
+                    <h1>ERGO Vorgang-Analyse</h1>
+                    <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
+                </div>
+            </div>
+            <div class="ver">v1.0 - Parallel-Pipeline mit Resume</div>
+        </div>
+
+        <!-- Cookie -->
+        <details open>
+            <summary>1. Cookie fuer gpt.ergo.com</summary>
+            <div style="margin-top: 0.5rem;">
+                <div class="cookie-bar">
+                    <input type="password" id="cookieInput" placeholder="Cookie hier einfuegen (langer String mit XSRF-TOKEN, ai_session, ...)">
+                    <button class="btn btn-secondary" onclick="toggleCookieVis()">&#128065;</button>
+                    <button class="btn btn-success" onclick="saveCookie()">Speichern</button>
+                    <span id="cookieStatus" class="cookie-status missing">Cookie fehlt</span>
+                </div>
+                <div class="info-box" style="margin-top: 0.4rem;">
+                    Cookie wird gespeichert nach <code id="cookiePath">F:\ExcelGPT-Cookie\Cookie.txt</code> (gleiche Datei wie das Excel-Tool). Beim Start automatisch geladen.
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <!-- Folder + Settings -->
+    <div class="card">
+        <details open>
+            <summary>2. Ordner mit .msg-Dateien</summary>
+            <div style="margin-top: 0.5rem;">
+                <div class="drop-area" id="dropArea" onclick="pickFolder()">
+                    <div class="big">&#128194;</div>
+                    <div><strong>Ordner waehlen</strong> (oder Ordner hier hereinziehen)</div>
+                    <div class="hint">Tool scannt rekursiv nach .msg-Dateien</div>
+                </div>
+                <div id="folderPath" class="folder-path"></div>
+                <div id="folderStats" class="stats"></div>
+            </div>
+        </details>
+
+        <details>
+            <summary>3. Einstellungen</summary>
+            <div style="margin-top: 0.5rem;" class="grid grid-4">
+                <div>
+                    <label>Modell</label>
+                    <input type="text" id="modelInput" value="gpt-51-chat">
+                </div>
+                <div>
+                    <label>Parallel-Slots (1-6)</label>
+                    <input type="number" id="parallelInput" value="3" min="1" max="6">
+                </div>
+                <div>
+                    <label>Temperature</label>
+                    <input type="number" id="tempInput" value="0" min="0" max="2" step="0.1">
+                </div>
+                <div>
+                    <label>Tone</label>
+                    <input type="text" id="toneInput" value="Sachlich">
+                </div>
+            </div>
+            <div style="margin-top: 0.5rem;" class="compact">
+                <label class="checkbox-row">
+                    <input type="checkbox" id="reanalyzeAll"> Alle Vorgaenge neu analysieren (Cache ignorieren)
+                </label>
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="clearCache()">Cache fuer diesen Ordner loeschen</button>
+            </div>
+        </details>
+    </div>
+
+    <!-- Action -->
+    <div class="card">
+        <div class="action-bar">
+            <button class="btn btn-primary" id="btnStart" onclick="startAnalysis()" disabled>
+                &#9658; Analyse starten
+            </button>
+            <button class="btn btn-warning" id="btnCancel" onclick="cancelAnalysis()" disabled>
+                &#9632; Abbrechen
+            </button>
+            <div style="flex:1;"></div>
+            <button class="btn btn-success" id="btnExcel" onclick="exportToExcel()" disabled>
+                &#128202; Excel-Export
+            </button>
+            <button class="btn btn-secondary" id="btnJson" onclick="exportToJson()" disabled>
+                &#128190; JSON-Export
+            </button>
+        </div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text" id="progressText">Verarbeite...</div>
+        </div>
+
+        <div class="status success" id="successStatus"><span id="successMsg"></span></div>
+        <div class="status error" id="errorStatus"><span id="errorMsg"></span></div>
+        <div class="status info" id="infoStatus"><span id="infoMsg"></span></div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" style="padding: 0.75rem 1rem;">
+        <div class="compact" style="margin-bottom: 0.5rem;">
+            <strong style="font-size: 13px;">Ergebnisse</strong>
+            <span id="resultsCount" style="color: #94a3b8; font-size: 12px;">0 Vorgaenge</span>
+        </div>
+        <div class="results-table-wrap" id="resultsTableWrap">
+            <table class="results">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Status</th>
+                        <th>Datei</th>
+                        <th>Datum</th>
+                        <th>Absender</th>
+                        <th>Betreff</th>
+                        <th>Triage</th>
+                        <th>Klassifikation</th>
+                        <th>Pool</th>
+                        <th>Kunde</th>
+                        <th>MV vollst.</th>
+                        <th>Hinweis</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-backdrop" id="detailModal" onclick="closeDetail(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h3 id="detailTitle"></h3>
+            <div id="detailKv" class="kv"></div>
+            <pre id="detailRaw"></pre>
+            <div style="margin-top: 0.75rem; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeDetail()">Schliessen</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- VBScript helper: binary multipart upload (JS can't easily build byte arrays for COM) -->
+<script language="VBScript">
+' Build a binary body: pre-bytes + file-bytes + post-bytes, return as byte array
+Function BuildMultipartBody(pre, filePath, post)
+    Dim stm, stmFile
+    Set stm = CreateObject("ADODB.Stream")
+    stm.Type = 1 ' binary
+    stm.Open
+
+    ' write pre (UTF-8, no BOM)
+    Dim preBytes
+    preBytes = StringToUtf8Bytes(pre)
+    If Not IsEmpty(preBytes) Then stm.Write preBytes
+
+    ' write file
+    Set stmFile = CreateObject("ADODB.Stream")
+    stmFile.Type = 1
+    stmFile.Open
+    stmFile.LoadFromFile filePath
+    stm.Write stmFile.Read
+    stmFile.Close
+
+    ' write post
+    Dim postBytes
+    postBytes = StringToUtf8Bytes(post)
+    If Not IsEmpty(postBytes) Then stm.Write postBytes
+
+    stm.Position = 0
+    BuildMultipartBody = stm.Read
+    stm.Close
+End Function
+
+Function StringToUtf8Bytes(s)
+    Dim st, b
+    Set st = CreateObject("ADODB.Stream")
+    st.Type = 2 ' text
+    st.Charset = "utf-8"
+    st.Open
+    st.WriteText s
+    st.Position = 0
+    st.Type = 1 ' binary
+    ' skip 3-byte BOM
+    If st.Size >= 3 Then
+        st.Read 3
+    End If
+    StringToUtf8Bytes = st.Read
+    st.Close
+End Function
+
+' Send a WinHttp request with a binary body. Returns the http object so JS can poll.
+Function SendBinaryAsync(http, body)
+    http.Send body
+    SendBinaryAsync = True
+End Function
+</script>
+
+<script language="JavaScript">
+'use strict';
+
+// ============================================================================
+// GLOBAL STATE
+// ============================================================================
+var outlookApp = null;
+var outlookNS = null;
+var COOKIE_PATH = "F:\\ExcelGPT-Cookie\\Cookie.txt";
+var ERGO_BASE = "https://gpt.ergo.com/api";
+var MAX_PDFS = 3;
+var MAX_PDF_MB = 20;
+var BODY_CAP = 6000;
+var DRAIN_TIMEOUT_MS = 240000;
+
+var state = {
+    cookie: "",
+    folderPath: "",
+    msgFiles: [],         // array of full paths
+    results: [],          // array of result objects (cache-compatible)
+    pendingMap: {},       // msgPath -> true if already in results
+    running: false,
+    cancelled: false,
+    slots: {},            // active slot map
+    slotCounter: 0,
+    nextIdx: 0,
+    parallelN: 3,
+    txtFolderEnabled: false
+};
+
+// ============================================================================
+// INIT
+// ============================================================================
+window.onload = function() {
+    try { window.resizeTo(1480, 920); } catch(e) {}
+
+    // Outlook
+    try {
+        outlookApp = new ActiveXObject("Outlook.Application");
+        outlookNS = outlookApp.GetNamespace("MAPI");
+    } catch(e) {
+        showError("Outlook konnte nicht verbunden werden. Bitte Outlook oeffnen und HTA neu starten. (" + e.message + ")");
+    }
+
+    // Load cookie
+    loadCookieFromFile();
+    document.getElementById("cookiePath").innerText = COOKIE_PATH;
+
+    // Load saved settings from localStorage
+    try {
+        var saved = window.localStorage ? window.localStorage.getItem("ergo_va_settings") : null;
+        if (saved) {
+            var s = eval("(" + saved + ")");
+            if (s.model) document.getElementById("modelInput").value = s.model;
+            if (s.parallel) document.getElementById("parallelInput").value = s.parallel;
+            if (s.temp !== undefined) document.getElementById("tempInput").value = s.temp;
+            if (s.tone) document.getElementById("toneInput").value = s.tone;
+            if (s.lastFolder) {
+                // Don't auto-load - require explicit user action - but pre-fill
+                state.folderPath = s.lastFolder;
+                document.getElementById("folderPath").innerText = "Zuletzt verwendet: " + s.lastFolder + " (Ordner waehlen zum Laden)";
+            }
+        }
+    } catch(e) {}
+
+    // Drag-drop
+    setupDragDrop();
+};
+
+function setupDragDrop() {
+    var area = document.getElementById("dropArea");
+    area.ondragenter = function(e) { e.preventDefault(); area.className = "drop-area dragover"; return false; };
+    area.ondragover = function(e) { e.preventDefault(); area.className = "drop-area dragover"; return false; };
+    area.ondragleave = function(e) { area.className = "drop-area"; };
+    area.ondrop = function(e) {
+        e.preventDefault();
+        area.className = "drop-area";
+        try {
+            var dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                // HTA-Hack: in IE11 mode the File object often has .path
+                var first = dt.files[0];
+                var p = first.path;
+                if (p) {
+                    var fso = new ActiveXObject("Scripting.FileSystemObject");
+                    if (fso.FolderExists(p)) {
+                        useFolder(p);
+                        return false;
+                    } else if (fso.FileExists(p)) {
+                        // dropped a file - use its parent folder
+                        var parent = fso.GetParentFolderName(p);
+                        useFolder(parent);
+                        return false;
+                    }
+                }
+                showError("Pfad konnte nicht aus dem Drop-Event extrahiert werden. Bitte 'Ordner waehlen' nutzen.");
+            }
+        } catch(ex) {
+            showError("Drop-Verarbeitung fehlgeschlagen: " + ex.message + " - bitte 'Ordner waehlen' nutzen.");
+        }
+        return false;
+    };
+}
+
+// ============================================================================
+// COOKIE
+// ============================================================================
+function loadCookieFromFile() {
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        if (fso.FileExists(COOKIE_PATH)) {
+            var stm = new ActiveXObject("ADODB.Stream");
+            stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+            stm.LoadFromFile(COOKIE_PATH);
+            state.cookie = trim(stm.ReadText());
+            stm.Close();
+            if (state.cookie.length > 0) {
+                document.getElementById("cookieInput").value = state.cookie;
+                updateCookieStatus(true);
+                return;
+            }
+        }
+    } catch(e) {}
+    updateCookieStatus(false);
+}
+
+function saveCookie() {
+    var raw = trim(document.getElementById("cookieInput").value);
+    if (raw.length < 50) {
+        showError("Cookie sieht zu kurz aus (min. 50 Zeichen). Bitte den vollen Cookie-String aus dem Browser einfuegen.");
+        return;
+    }
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var parent = fso.GetParentFolderName(COOKIE_PATH);
+        if (!fso.FolderExists(parent)) {
+            try { fso.CreateFolder(parent); } catch(e) {}
+        }
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+        stm.WriteText(raw);
+        stm.SaveToFile(COOKIE_PATH, 2);
+        stm.Close();
+        state.cookie = raw;
+        updateCookieStatus(true);
+        showSuccess("Cookie gespeichert in " + COOKIE_PATH);
+    } catch(e) {
+        showError("Cookie konnte nicht gespeichert werden: " + e.message);
+    }
+}
+
+function toggleCookieVis() {
+    var i = document.getElementById("cookieInput");
+    i.type = (i.type === "password") ? "text" : "password";
+}
+
+function updateCookieStatus(ok) {
+    var s = document.getElementById("cookieStatus");
+    if (ok) {
+        s.className = "cookie-status ok";
+        s.innerText = "Cookie OK (Laenge " + state.cookie.length + ")";
+    } else {
+        s.className = "cookie-status missing";
+        s.innerText = "Cookie fehlt";
+    }
+    refreshStartButton();
+}
+
+function extractCsrf(cookie) {
+    if (!cookie) return "";
+    var m = cookie.match(/(?:XSRF-TOKEN|CSRF-TOKEN|csrfToken|_csrf)=([^;]+)/i);
+    if (!m) return "";
+    try { return decodeURIComponent(m[1].replace(/\+/g, " ")); } catch(e) { return m[1]; }
+}
+
+// ============================================================================
+// FOLDER
+// ============================================================================
+function pickFolder() {
+    try {
+        var shell = new ActiveXObject("Shell.Application");
+        var f = shell.BrowseForFolder(0, "Ordner mit .msg-Dateien waehlen", 0);
+        if (f && f.Self && f.Self.Path) {
+            useFolder(f.Self.Path);
+        }
+    } catch(e) {
+        var p = prompt("Ordner-Pfad eingeben:", state.folderPath || "C:\\");
+        if (p) useFolder(p);
+    }
+}
+
+function useFolder(path) {
+    state.folderPath = path;
+    document.getElementById("folderPath").innerText = path;
+    saveSettings();
+    scanFolder();
+    refreshStartButton();
+}
+
+function scanFolder() {
+    state.msgFiles = [];
+    state.results = [];
+    state.pendingMap = {};
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        if (!fso.FolderExists(state.folderPath)) {
+            showError("Ordner nicht gefunden: " + state.folderPath);
+            renderTable();
+            return;
+        }
+        collectMsgFiles(fso, fso.GetFolder(state.folderPath));
+        loadCache();
+        renderTable();
+        var cached = state.results.length;
+        var total = state.msgFiles.length;
+        var html = '<div class="stat">.msg-Dateien gefunden: <strong>' + total + '</strong></div>';
+        if (cached > 0) {
+            html += '<div class="stat ok">Aus Cache geladen: <strong>' + cached + '</strong></div>';
+            var todo = Math.max(0, total - cached);
+            html += '<div class="stat">Noch zu analysieren: <strong>' + todo + '</strong></div>';
+        }
+        document.getElementById("folderStats").innerHTML = html;
+        if (total === 0) showInfo("Keine .msg-Dateien gefunden.");
+        else hideStatus();
+    } catch(e) {
+        showError("Ordner-Scan fehlgeschlagen: " + e.message);
+    }
+}
+
+function collectMsgFiles(fso, folder) {
+    try {
+        var files = new Enumerator(folder.Files);
+        for (; !files.atEnd(); files.moveNext()) {
+            var f = files.item();
+            if (String(f.Name).toLowerCase().substr(-4) === ".msg") {
+                state.msgFiles.push(f.Path);
+            }
+        }
+        var subs = new Enumerator(folder.SubFolders);
+        for (; !subs.atEnd(); subs.moveNext()) {
+            var sub = subs.item();
+            // Don't recurse into _KI-Analyse cache folder
+            if (String(sub.Name) !== "_KI-Analyse") {
+                collectMsgFiles(fso, sub);
+            }
+        }
+    } catch(e) {}
+}
+
+// ============================================================================
+// CACHE
+// ============================================================================
+function cachePath() {
+    if (!state.folderPath) return "";
+    return state.folderPath + "\\_KI-Analyse\\cache.json";
+}
+
+function ensureCacheFolder() {
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var dir = state.folderPath + "\\_KI-Analyse";
+        if (!fso.FolderExists(dir)) fso.CreateFolder(dir);
+    } catch(e) {}
+}
+
+function loadCache() {
+    var p = cachePath();
+    if (!p) return;
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        if (!fso.FileExists(p)) return;
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+        stm.LoadFromFile(p);
+        var raw = stm.ReadText();
+        stm.Close();
+        var data = eval("(" + raw + ")");
+        if (data && data.results && data.results.length > 0) {
+            state.results = data.results;
+            state.pendingMap = {};
+            for (var i = 0; i < state.results.length; i++) {
+                state.pendingMap[String(state.results[i].msgPath).toLowerCase()] = true;
+            }
+        }
+    } catch(e) {
+        // ignore bad cache
+    }
+}
+
+function saveCache() {
+    var p = cachePath();
+    if (!p || state.results.length === 0) return;
+    try {
+        ensureCacheFolder();
+        var data = {
+            version: 1,
+            folder: state.folderPath,
+            updatedAt: isoNow(),
+            results: state.results
+        };
+        var json = jsonStringify(data);
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+        stm.WriteText(json);
+        stm.SaveToFile(p, 2);
+        stm.Close();
+    } catch(e) {
+        // Don't crash on cache write fail
+    }
+}
+
+function clearCache() {
+    if (!state.folderPath) { showError("Erst Ordner waehlen."); return; }
+    if (!confirm("Cache fuer\n" + state.folderPath + "\nwirklich loeschen?\n(Die .msg-Dateien selbst bleiben unangetastet)")) return;
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var p = cachePath();
+        if (fso.FileExists(p)) fso.DeleteFile(p, true);
+        state.results = [];
+        state.pendingMap = {};
+        renderTable();
+        scanFolder();
+        showSuccess("Cache geloescht.");
+    } catch(e) {
+        showError("Cache konnte nicht geloescht werden: " + e.message);
+    }
+}
+
+// ============================================================================
+// ANALYSIS - MAIN
+// ============================================================================
+function refreshStartButton() {
+    var canStart = !state.running &&
+                   state.cookie.length > 50 &&
+                   state.folderPath.length > 0 &&
+                   state.msgFiles.length > 0 &&
+                   outlookApp !== null;
+    document.getElementById("btnStart").disabled = !canStart;
+    document.getElementById("btnCancel").disabled = !state.running;
+    document.getElementById("btnExcel").disabled = state.results.length === 0;
+    document.getElementById("btnJson").disabled = state.results.length === 0;
+}
+
+function startAnalysis() {
+    if (state.running) return;
+    if (!outlookApp) { showError("Outlook nicht verbunden."); return; }
+    if (state.cookie.length < 50) { showError("Cookie fehlt oder ungueltig."); return; }
+
+    saveSettings();
+    hideStatus();
+
+    state.parallelN = parseInt(document.getElementById("parallelInput").value) || 3;
+    if (state.parallelN < 1) state.parallelN = 1;
+    if (state.parallelN > 6) state.parallelN = 6;
+
+    var reanalyze = document.getElementById("reanalyzeAll").checked;
+    if (reanalyze) {
+        state.results = [];
+        state.pendingMap = {};
+    }
+
+    // Determine work list: msgFiles minus already-cached
+    var work = [];
+    for (var i = 0; i < state.msgFiles.length; i++) {
+        var p = state.msgFiles[i];
+        if (!state.pendingMap[p.toLowerCase()]) {
+            work.push(p);
+        }
+    }
+
+    if (work.length === 0) {
+        showInfo("Alle " + state.msgFiles.length + " Vorgaenge sind bereits im Cache. (Haken setzen bei 'Alle neu analysieren' um zu erzwingen.)");
+        return;
+    }
+
+    state.running = true;
+    state.cancelled = false;
+    state.slots = {};
+    state.slotCounter = 0;
+    state.nextIdx = 0;
+    state.workQueue = work;
+    state.workTotal = work.length;
+    state.processed = 0;
+    state.errors = 0;
+    state.abortReason = "";
+
+    document.getElementById("progressContainer").style.display = "block";
+    refreshStartButton();
+    renderTable();
+
+    // Kick off main loop
+    setTimeout(workerTick, 10);
+}
+
+function cancelAnalysis() {
+    if (!state.running) return;
+    state.cancelled = true;
+    showInfo("Abbruch angefordert - laufende Calls werden gestoppt...");
+    // Abort all inflight slots
+    for (var k in state.slots) {
+        if (state.slots.hasOwnProperty(k)) {
+            try { state.slots[k].http.Abort(); } catch(e) {}
+            state.slots[k].cancelled = true;
+        }
+    }
+}
+
+function workerTick() {
+    if (!state.running) return;
+
+    try {
+        // A) Fill free slots (sequential prep)
+        while (countSlots() < state.parallelN && state.nextIdx < state.workQueue.length && !state.cancelled && !state.abortReason) {
+            var msgPath = state.workQueue[state.nextIdx];
+            state.nextIdx++;
+
+            var slot = {
+                id: ++state.slotCounter,
+                msgPath: msgPath,
+                cancelled: false,
+                phase: "prep"
+            };
+            updateProgressText("Vorbereiten: " + getFileName(msgPath));
+
+            // Synchronous prep: open MSG, props, PDFs upload, conv create, async start
+            var prepOk = prepareSlot(slot);
+            if (prepOk) {
+                state.slots["s" + slot.id] = slot;
+            } else {
+                // Prep error - write result, continue
+                var r = makeResult(slot, false, slot.errMsg || "Vorbereitung fehlgeschlagen");
+                addResult(r);
+                state.errors++;
+                if (isAuthError(r.errMsg)) state.abortReason = "AUTH";
+                if (isModelError(r.errMsg)) state.abortReason = "MODELL";
+            }
+        }
+
+        // B) Poll all slots
+        var toRemove = [];
+        for (var key in state.slots) {
+            if (!state.slots.hasOwnProperty(key)) continue;
+            var s = state.slots[key];
+            var done = false;
+            var winErr = null;
+            try {
+                done = s.http.WaitForResponse(0);
+            } catch(e) {
+                winErr = e;
+            }
+
+            if (winErr) {
+                var r2 = makeResult(s, false, "[ASYNC] " + winErr.message);
+                addResult(r2);
+                state.errors++;
+                fireDelete(s.convId);
+                toRemove.push(key);
+            } else if (done) {
+                var r3 = finalizeSlot(s);
+                addResult(r3);
+                if (r3.ok) state.processed++; else state.errors++;
+                if (isAuthError(r3.errMsg)) state.abortReason = "AUTH";
+                if (isModelError(r3.errMsg)) state.abortReason = "MODELL";
+                fireDelete(s.convId);
+                toRemove.push(key);
+            }
+        }
+        for (var i = 0; i < toRemove.length; i++) {
+            delete state.slots[toRemove[i]];
+        }
+
+        // C) Status update
+        var inflight = countSlots();
+        var done2 = state.processed + state.errors;
+        var totalKnown = state.results.length;
+        updateProgress(done2, state.workTotal, inflight + " inflight, " + state.processed + " ok, " + state.errors + " fehler, " + (state.workTotal - state.nextIdx) + " queue");
+
+        // D) Save cache every 3 finished
+        if (toRemove.length > 0) {
+            saveCache();
+            renderTable();
+        }
+
+        // E) Continue or finish?
+        if (state.cancelled) {
+            // Wait for inflight to abort (which should be quick), then finish
+            if (countSlots() === 0) {
+                finishAnalysis("Abgebrochen");
+                return;
+            }
+        } else if (state.abortReason) {
+            // Abort - cancel inflight
+            for (var k2 in state.slots) {
+                if (state.slots.hasOwnProperty(k2)) {
+                    try { state.slots[k2].http.Abort(); } catch(e) {}
+                }
+            }
+            if (countSlots() === 0) {
+                finishAnalysis(state.abortReason);
+                return;
+            }
+        } else if (state.nextIdx >= state.workQueue.length && countSlots() === 0) {
+            finishAnalysis("OK");
+            return;
+        }
+    } catch(e) {
+        showError("Pipeline-Fehler: " + e.message);
+        finishAnalysis("ERROR");
+        return;
+    }
+
+    // Schedule next tick - faster when queue not full, slower when idle
+    var delay = (countSlots() >= state.parallelN || state.nextIdx >= state.workQueue.length) ? 200 : 50;
+    setTimeout(workerTick, delay);
+}
+
+function countSlots() {
+    var n = 0;
+    for (var k in state.slots) if (state.slots.hasOwnProperty(k)) n++;
+    return n;
+}
+
+function finishAnalysis(reason) {
+    state.running = false;
+    saveCache();
+    renderTable();
+    document.getElementById("progressContainer").style.display = "none";
+    refreshStartButton();
+
+    var msg = "";
+    switch (reason) {
+        case "OK":
+            msg = "Analyse fertig: " + state.processed + " erfolgreich, " + state.errors + " Fehler.";
+            showSuccess(msg);
+            break;
+        case "Abgebrochen":
+            msg = "Abgebrochen. Bisher: " + state.processed + " ok, " + state.errors + " fehler. Ergebnisse sind im Cache - 'Excel-Export' nutzbar.";
+            showInfo(msg);
+            break;
+        case "AUTH":
+            showError("Cookie abgelaufen (HTTP 403). Bitte oben neuen Cookie einfuegen + speichern, dann erneut starten. Bisher: " + state.processed + " ok, " + state.errors + " fehler.");
+            break;
+        case "MODELL":
+            showError("Modell wird nicht unterstuetzt. Anderen Modell-Namen in Einstellungen probieren (z.B. gpt-51-chat). Bisher: " + state.processed + " ok, " + state.errors + " fehler.");
+            break;
+        default:
+            showError("Pipeline-Fehler. Bisher: " + state.processed + " ok, " + state.errors + " fehler.");
+    }
+}
+
+// ============================================================================
+// SLOT LIFECYCLE
+// ============================================================================
+function prepareSlot(slot) {
+    var step = "init";
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        step = "MSG oeffnen";
+        var it = outlookApp.Session.OpenSharedItem(slot.msgPath);
+
+        step = "Properties lesen";
+        slot.datum = "";
+        slot.absName = "";
+        slot.absMail = "";
+        slot.betreff = "";
+        slot.body = "";
+        try {
+            var d = new Date(it.ReceivedTime);
+            slot.datum = pad(d.getDate()) + "." + pad(d.getMonth()+1) + "." + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+            slot.dateIso = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":00";
+        } catch(e) {}
+        try { slot.absName = String(it.SenderName || ""); } catch(e) {}
+        try { slot.absMail = getSenderEmail(it); } catch(e) {}
+        try { slot.betreff = String(it.Subject || ""); } catch(e) {}
+        try { slot.body = String(it.Body || ""); } catch(e) {}
+
+        step = "Anhaenge extrahieren";
+        slot.anhangAlle = "";
+        slot.pdfListe = "";
+        var pdfPaths = [];
+        var tempDir = getEnv("TEMP") + "\\ergo_va_hta_" + slot.id;
+        try { if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir); } catch(e) {}
+
+        var attCount = 0;
+        try { attCount = it.Attachments.Count; } catch(e) {}
+        for (var a = 1; a <= attCount; a++) {
+            try {
+                var att = it.Attachments.Item(a);
+                var fname = String(att.FileName || "");
+                if (fname.length > 0) {
+                    if (slot.anhangAlle) slot.anhangAlle += "; ";
+                    slot.anhangAlle += fname;
+                    if (fname.toLowerCase().substr(-4) === ".pdf" && pdfPaths.length < MAX_PDFS) {
+                        var safe = sanitizeFilename(fname);
+                        var outPath = tempDir + "\\" + safe;
+                        att.SaveAsFile(outPath);
+                        if (fso.FileExists(outPath)) {
+                            var sizeMb = fso.GetFile(outPath).Size / 1048576;
+                            if (sizeMb <= MAX_PDF_MB) {
+                                pdfPaths.push(outPath);
+                                if (slot.pdfListe) slot.pdfListe += "; ";
+                                slot.pdfListe += fname;
+                            } else {
+                                try { fso.DeleteFile(outPath, true); } catch(e) {}
+                            }
+                        }
+                    }
+                }
+            } catch(e) {}
+        }
+
+        step = "MSG schliessen";
+        try { it.Close(1); } catch(e) {}
+
+        step = "Prompt bauen";
+        var bodyShort = slot.body;
+        if (bodyShort.length > BODY_CAP) bodyShort = bodyShort.substr(0, BODY_CAP) + " [...gekuerzt]";
+        slot.prompt = buildVorgangPrompt(slot.datum, slot.absName, slot.absMail, slot.betreff, bodyShort, slot.anhangAlle, slot.pdfListe);
+
+        step = "Conversation anlegen";
+        slot.convId = createConversationSync(slot.prompt);
+        if (!slot.convId) throw new Error("Keine conversation_id zurueck");
+
+        step = "PDFs hochladen";
+        var docIdsJson = "[]";
+        if (pdfPaths.length > 0) {
+            docIdsJson = uploadPdfsSequential(slot.convId, pdfPaths);
+        }
+        slot.docIdsJson = docIdsJson;
+
+        step = "Async Antwort-Call";
+        slot.http = startAnswerAsync(slot.convId, slot.prompt, docIdsJson);
+        slot.phase = "asking";
+
+        // Cleanup temp PDFs after upload (already in ErgoGPT)
+        try {
+            for (var pi = 0; pi < pdfPaths.length; pi++) {
+                try { fso.DeleteFile(pdfPaths[pi], true); } catch(e) {}
+            }
+            if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true);
+        } catch(e) {}
+
+        return true;
+    } catch(e) {
+        slot.errMsg = "[" + step + "] " + e.message;
+        return false;
+    }
+}
+
+function finalizeSlot(slot) {
+    try {
+        var status = 0;
+        try { status = slot.http.Status; } catch(e) {}
+        var resp = "";
+        try { resp = slot.http.ResponseText; } catch(e) {}
+
+        if (slot.cancelled) {
+            return makeResult(slot, false, "[ABGEBROCHEN]");
+        }
+
+        var answer = extractAssistantFromNdjson(resp);
+        if (!answer || answer.length === 0) {
+            var hint = extractServerHint(resp);
+            var msg = (status !== 200) ? ("HTTP " + status + ". " + hint) : ("Keine Assistant-Nachricht. " + hint);
+            return makeResult(slot, false, "[ANTWORT] " + msg);
+        }
+
+        var antwort = jsonUnescape(answer).replace(/\\n/g, "\n");
+        var dict = parseGptJson(antwort);
+        if (!dict) {
+            return makeResult(slot, false, "[PARSE] JSON-Antwort nicht lesbar: " + antwort.substr(0, 200));
+        }
+
+        var r = makeResult(slot, true, "");
+        r.data = dict;
+        return r;
+    } catch(e) {
+        return makeResult(slot, false, "[FINAL] " + e.message);
+    }
+}
+
+function makeResult(slot, ok, errMsg) {
+    return {
+        msgPath: slot.msgPath,
+        msgFile: getFileName(slot.msgPath),
+        datum: slot.datum || "",
+        dateIso: slot.dateIso || "",
+        absName: slot.absName || "",
+        absMail: slot.absMail || "",
+        betreff: slot.betreff || "",
+        anhangAlle: slot.anhangAlle || "",
+        pdfListe: slot.pdfListe || "",
+        ok: ok,
+        errMsg: errMsg || "",
+        data: null,
+        analyzedAt: isoNow()
+    };
+}
+
+function addResult(r) {
+    // Replace existing entry for same path, or append
+    var key = String(r.msgPath).toLowerCase();
+    for (var i = 0; i < state.results.length; i++) {
+        if (String(state.results[i].msgPath).toLowerCase() === key) {
+            state.results[i] = r;
+            state.pendingMap[key] = true;
+            return;
+        }
+    }
+    state.results.push(r);
+    state.pendingMap[key] = true;
+}
+
+// ============================================================================
+// ERGO GPT API
+// ============================================================================
+function createConversationSync(prompt) {
+    var http = new ActiveXObject("MSXML2.ServerXMLHTTP.6.0");
+    http.open("PUT", ERGO_BASE + "/conversation", false);
+    setCommonHeaders(http);
+    http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    var payload = buildPayload(cleanForJson(prompt), "[]");
+    http.send(payload);
+    if (http.status !== 200) {
+        throw new Error("Create failed: " + http.status + " - " + (http.responseText || "").substr(0, 200));
+    }
+    return parseJsonStr(http.responseText, "id");
+}
+
+function startAnswerAsync(convId, prompt, docIdsJson) {
+    var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+    var payload = buildPayload(cleanForJson(prompt), docIdsJson);
+    try { http.SetTimeouts(30000, 30000, 60000, 180000); } catch(e) {}
+    http.Open("PUT", ERGO_BASE + "/conversation/" + convId, true);
+    try { http.SetProxy(0); } catch(e) {}
+    setWinHttpHeaders(http);
+    http.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    http.SetRequestHeader("Accept", "*/*");
+    http.Send(payload);
+    return http;
+}
+
+function fireDelete(convId) {
+    if (!convId) return;
+    try {
+        var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+        http.Open("DELETE", ERGO_BASE + "/conversation", true);
+        try { http.SetProxy(0); } catch(e) {}
+        setWinHttpHeaders(http);
+        http.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        http.SetRequestHeader("Accept", "*/*");
+        http.Send('{"conversation_ids":["' + convId + '"]}');
+        // fire and forget
+    } catch(e) {}
+}
+
+function uploadPdfsSequential(convId, paths) {
+    // Sequential within slot (parallel across slots gives the main speedup)
+    var ids = [];
+    var xsrf = extractCsrf(state.cookie);
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    for (var i = 0; i < paths.length; i++) {
+        var path = paths[i];
+        try {
+            var fileName = fso.GetFileName(path);
+            var boundary = "----WebKitFormBoundary" + uuid4().replace(/-/g, "").substr(0, 16);
+            var pre = "--" + boundary + "\r\n" +
+                      'Content-Disposition: form-data; name="file_content"; filename="' + fileName + '"\r\n' +
+                      "Content-Type: application/pdf\r\n\r\n";
+            var post = "\r\n" +
+                       "--" + boundary + "\r\n" +
+                       'Content-Disposition: form-data; name="filename"\r\n\r\n' +
+                       fileName + "\r\n" +
+                       "--" + boundary + "\r\n" +
+                       'Content-Disposition: form-data; name="conversation_id"\r\n\r\n' +
+                       convId + "\r\n" +
+                       "--" + boundary + "--\r\n";
+            var body = BuildMultipartBody(pre, path, post);
+
+            var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+            http.Open("POST", "https://gpt.ergo.com/api/document", false);
+            try { http.SetProxy(0); } catch(e) {}
+            setWinHttpHeaders(http);
+            http.SetRequestHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+            http.Send(body);
+
+            if (http.Status === 200) {
+                var did = parseJsonStr(http.ResponseText, "document_id");
+                if (did) ids.push(did);
+            } else {
+                throw new Error("PDF-Upload " + http.Status + ": " + http.ResponseText.substr(0, 200));
+            }
+        } catch(e) {
+            throw new Error("Upload " + fileName + ": " + e.message);
+        }
+    }
+    if (ids.length === 0) return "[]";
+    return '["' + ids.join('","') + '"]';
+}
+
+function setCommonHeaders(http) {
+    http.setRequestHeader("Cookie", state.cookie);
+    var xsrf = extractCsrf(state.cookie);
+    if (xsrf) {
+        http.setRequestHeader("X-XSRF-TOKEN", xsrf);
+        http.setRequestHeader("X-CSRF-TOKEN", xsrf);
+    }
+    http.setRequestHeader("User-Agent", "Mozilla/5.0");
+    http.setRequestHeader("Accept-Language", "de-DE,de;q=0.9,en;q=0.8");
+    http.setRequestHeader("Origin", "https://gpt.ergo.com");
+    http.setRequestHeader("Referer", "https://gpt.ergo.com/");
+    http.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+}
+
+function setWinHttpHeaders(http) {
+    http.SetRequestHeader("Cookie", state.cookie);
+    var xsrf = extractCsrf(state.cookie);
+    if (xsrf) {
+        http.SetRequestHeader("X-XSRF-TOKEN", xsrf);
+        http.SetRequestHeader("X-CSRF-TOKEN", xsrf);
+    }
+    http.SetRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/129 Safari/537.36");
+    http.SetRequestHeader("Accept-Language", "de-DE,de;q=0.9,en;q=0.8");
+    http.SetRequestHeader("Origin", "https://gpt.ergo.com");
+    http.SetRequestHeader("Referer", "https://gpt.ergo.com/");
+    http.SetRequestHeader("X-Requested-With", "XMLHttpRequest");
+}
+
+function buildPayload(promptEsc, docIdsJson) {
+    var model = trim(document.getElementById("modelInput").value) || "gpt-51-chat";
+    var temp = parseFloat(document.getElementById("tempInput").value);
+    if (isNaN(temp)) temp = 0;
+    var tone = trim(document.getElementById("toneInput").value);
+
+    return '{"conversation_title":"New conversation","messages":[{' +
+           '"id":"' + uuid4() + '","role":"user","content":"' + promptEsc +
+           '","date":"' + isoNow() + '"}],' +
+           '"model":"' + model + '","temperature":' + temp +
+           ',"pinned":false,"tone":"' + jsonEscape(tone) + '","document_ids":' + docIdsJson + '}';
+}
+
+// ============================================================================
+// NDJSON / RESPONSE PARSING
+// ============================================================================
+function extractAssistantFromNdjson(raw) {
+    if (!raw) return "";
+    raw = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    var lines = raw.split("\n");
+    var last = "";
+    for (var i = 0; i < lines.length; i++) {
+        var ln = trim(lines[i]);
+        if (!ln) continue;
+        if (ln.toLowerCase().substr(0, 5) === "data:") ln = trim(ln.substr(5));
+        if (ln.charAt(0) === "{" && ln.charAt(ln.length - 1) === "}") {
+            var t = extractAssistantFromChunk(ln);
+            if (t) last = t;
+        }
+    }
+    return last;
+}
+
+function extractAssistantFromChunk(json) {
+    var re = /"choices"\s*:\s*\[\s*\{[\s\S]*?"messages"\s*:\s*\[\s*\{[\s\S]*?"role"\s*:\s*"assistant"[\s\S]*?"content"\s*:\s*"((?:\\.|[^"])*)"/;
+    var m = json.match(re);
+    if (m) return m[1];
+    var re2 = /"choices"\s*:\s*\[[\s\S]*?"delta"[\s\S]*?"content"\s*:\s*"((?:\\.|[^"])*)"/;
+    var m2 = json.match(re2);
+    if (m2) return m2[1];
+    return "";
+}
+
+function extractServerHint(raw) {
+    if (!raw) return "(leere Antwort)";
+    var keys = ["message", "error", "detail", "error_description"];
+    for (var i = 0; i < keys.length; i++) {
+        var re = new RegExp('"' + keys[i] + '"\\s*:\\s*"((?:\\\\.|[^"]){0,500})"', "i");
+        var m = raw.match(re);
+        if (m && m[1]) return "Server: " + m[1].substr(0, 240);
+    }
+    var lc = raw.toLowerCase();
+    if (lc.indexOf("nicht mehr unterst") >= 0 || lc.indexOf("not supported") >= 0 ||
+        lc.indexOf("deprecated") >= 0 || lc.indexOf("unknown model") >= 0) {
+        return "Modell nicht (mehr) unterstuetzt - Modell-Name in Einstellungen anpassen.";
+    }
+    var plain = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    return "Antwort: " + plain.substr(0, 200);
+}
+
+function parseGptJson(answer) {
+    var t = trim(answer);
+    // Strip code fences
+    if (t.substr(0, 7) === "```json") t = t.substr(7);
+    if (t.substr(0, 3) === "```") t = t.substr(3);
+    if (t.substr(t.length - 3) === "```") t = t.substr(0, t.length - 3);
+    t = trim(t);
+    // Find {...}
+    var s = t.indexOf("{");
+    var e = t.lastIndexOf("}");
+    if (s < 0 || e <= s) return null;
+    t = t.substr(s, e - s + 1);
+    try {
+        // IE11 has JSON.parse but be defensive
+        if (typeof JSON !== "undefined" && JSON.parse) return JSON.parse(t);
+        return eval("(" + t + ")");
+    } catch(ex) {
+        // Try line by line key extraction as fallback
+        return extractKeysHeuristic(t);
+    }
+}
+
+function extractKeysHeuristic(t) {
+    var keys = ["vorgangstyp","auftrag_datum","maklerpool","makler_nachname","makler_vorname",
+                "makler_nummer","kunde_nachname","kunde_vorname","kunde_nummer","versicherungsnummer",
+                "klassifikation","klassifikation_grund","geschaefts_typ","unterlagen_angefragt",
+                "unterlagen_liste","sonderfall","sparte","anhang_typen","pdf_qualitaet",
+                "enthaelt_maklervollmacht","mv_vollumfaenglich","mv_einschraenkungen",
+                "unterschrift_kunde","unterschrift_makler","auf_vn_ausgestellt",
+                "makler_namentlich_genannt","ist_reminder","hinweis"];
+    var d = {};
+    var found = 0;
+    for (var i = 0; i < keys.length; i++) {
+        var re = new RegExp('"' + keys[i] + '"\\s*:\\s*"((?:\\\\.|[^"]){0,500})"');
+        var m = t.match(re);
+        if (m) { d[keys[i]] = m[1]; found++; }
+    }
+    return (found >= 3) ? d : null;
+}
+
+function parseJsonStr(json, key) {
+    if (!json) return "";
+    var re = new RegExp('"' + key + '"\\s*:\\s*"([^"]*)"', "i");
+    var m = json.match(re);
+    return m ? m[1] : "";
+}
+
+function isAuthError(desc) {
+    if (!desc) return false;
+    var s = desc.toLowerCase();
+    return (s.indexOf("403") >= 0 && (s.indexOf("forbidden") >= 0 || s.indexOf("create failed") >= 0)) ||
+           s.indexOf("azure-application-gateway") >= 0 ||
+           (s.indexOf("401") >= 0 && s.indexOf("unauthor") >= 0);
+}
+
+function isModelError(desc) {
+    if (!desc) return false;
+    var s = desc.toLowerCase();
+    return s.indexOf("nicht mehr unterst") >= 0 ||
+           (s.indexOf("modell") >= 0 && s.indexOf("unterstuetzt") >= 0) ||
+           s.indexOf("unknown model") >= 0 ||
+           s.indexOf("not supported") >= 0;
+}
+
+// ============================================================================
+// PROMPT BUILDER (ported from VBA BuildVorgangPrompt)
+// ============================================================================
+function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, anhangPdfsHochgeladen) {
+    var p = "";
+    p += "Du bist ein erfahrener Sachbearbeiter im Innendienst eines deutschen\n";
+    p += "Komposit-Versicherers (SHUK: Sach/Haftpflicht/Unfall/Kfz).\n";
+    p += "Du analysierst eingehende Makler-Emails inklusive Anhaengen.\n\n";
+    p += "===== EMAIL =====\n";
+    p += "Datum: " + datum + "\n";
+    p += "Absender: " + absName + " <" + absMail + ">\n";
+    p += "Betreff: " + betreff + "\n";
+    p += "Anhaenge (alle): " + (anhangAlle ? anhangAlle : "(keine)") + "\n";
+    p += "Anhaenge HOCHGELADEN als PDF: " + (anhangPdfsHochgeladen ? anhangPdfsHochgeladen : "(keine)") + "\n\n";
+    p += "Body:\n<<<\n" + text + "\n>>>\n===== ENDE EMAIL =====\n\n";
+
+    p += "AUFGABE: Klassifiziere die Mail strikt anhand der unten definierten Felder und Wertelisten.\n\n";
+    p += "WICHTIG - SCHRITT 0 (Triage): Pruefe ZUERST das Feld 'vorgangstyp'. Wenn die Mail KEIN echter eingehender Makler-Vorgang ist (Bounce-NDR, von ergo selbst rausgegangen, automatische System-Mail, Werbung), dann setze ALLE anderen Felder auf '' (leerer String) - nur 'vorgangstyp' und 'hinweis' werden befuellt. NICHT raten.\n\n";
+    p += "Nur wenn vorgangstyp == 'Makler-Vorgang': die uebrigen Felder befuellen. Nutze die HOCHGELADENEN PDFs (falls vorhanden) als zusaetzliche Quelle - insbesondere fuer die Maklervollmacht-Pruefung.\n\n";
+
+    p += "REGELN:\n";
+    p += "- Nutze Email-Signatur, From-Domain, Body und PDF-Inhalte als Quellen.\n";
+    p += "- Wenn Information nicht eindeutig: leerer String oder 'nicht_pruefbar'. Rate NIE.\n";
+    p += "- Antworte AUSSCHLIESSLICH mit einem einzeiligen JSON-Objekt mit GENAU 28 Schluesseln (alle Werte als String). Kein Markdown, keine Code-Fences.\n\n";
+
+    p += "FELDER:\n\n";
+    p += "0) vorgangstyp (TRIAGE - immer ausfuellen)\n";
+    p += "   'Makler-Vorgang' / 'Bounce-NDR' / 'Ergo-Outbound' / 'System-Mail' / 'Werbung-Spam' / 'Unklar'\n";
+    p += "   Bounce-Indizien: 'postmaster','mailer-daemon','noreply','Mail Delivery Failure','5.7.1','Relay access denied'.\n";
+    p += "   Ergo-Outbound: Absender @ergo.de / @itergo.com / @ergo.com.\n\n";
+
+    p += "1) maklerpool - ergebnisoffen extrahiert. Pool/Maklergesellschaft so wie in Signatur, Briefkopf, From-Domain (z.B. 'Fonds Finanz Maklerservice GmbH', 'BCA AG', 'Mueller & Partner OHG').\n\n";
+    p += "1z) auftrag_datum - Datum aus Maklerauftrag / Pool-Anschreiben (z.B. 'Grossaitingen, 28.11.2025'). NICHT das Mail-Eingangsdatum.\n\n";
+    p += "2) makler_nachname / 3) makler_vorname - HANDELNDE Person beim Makler, NICHT der Kunde.\n\n";
+    p += "3a) makler_nummer - Identifikator BEIM VERSICHERER. STRENGE Priorisierung:\n";
+    p += "    1. 'Agentur-Nr.' / 'Vermittler-Nr.' im Briefkopf-Block (das ist die Wunsch-Nummer).\n";
+    p += "    2. 'BD-Nummer' / 'Bestandsnummer' / 'Beraterzeichen'.\n";
+    p += "    3. NUR Fallback: Pool-IDs wie 'MAKID','DEMMAK','BCA-ID' (sind pool-intern, NICHT beim Versicherer).\n\n";
+    p += "3b) kunde_nachname / 3c) kunde_vorname - VN / Vollmachtgeber. Quellen: MV-PDF -> Body -> Betreff.\n\n";
+    p += "3d) kunde_nummer - Person-Nr / Partnernummer (NICHT Versicherungs- oder Maklernummer).\n";
+    p += "3e) versicherungsnummer - VNR / Vertragsnummer (z.B. 'LF060237653').\n\n";
+
+    p += "4) klassifikation - GENAU EINER von:\n";
+    p += "   - 'BUe-Vorgang' (Bestandsuebertragung)\n";
+    p += "   - 'Mahnung-Reminder' (Erinnerung/Mahnung/WV - Routine, KEINE Eskalation!)\n";
+    p += "   - 'Schadenmeldung'\n";
+    p += "   - 'Antrag-Aenderung' (Neuantrag, Tarifwechsel, Adresswechsel, Bankverbindung)\n";
+    p += "   - 'Anfrage-Ruecksprache'\n";
+    p += "   - 'Nicht-Standard' (echte Eskalation: Beschwerde, Klage, BaFin, Vorstand, Konsortium)\n";
+    p += "   - 'Kein-Makler-Vorgang' (nur wenn vorgangstyp != 'Makler-Vorgang')\n";
+    p += "4a) klassifikation_grund - kurze Begruendung (max 200 Z.), konkrete Indizien nennen.\n\n";
+
+    p += "5) geschaefts_typ - 'BUe einfacher Vertrag' / 'BUe Kundenverbindung' / 'Keine BUe'\n";
+    p += "   BUe-Indizien: 'Bestandsuebertragung','Maklerwechsel','BUe','Courtagezession', beigefuegte MV.\n";
+    p += "   'Kundenverbindung' wenn: 'gesamte Kundenverbindung','alle Vertraege','Kunde komplett'.\n\n";
+    p += "6) unterlagen_angefragt - 'ja' wenn Unterlagen fehlen / nachreichen / unvollstaendig. Sonst 'nein'.\n";
+    p += "6a) unterlagen_liste - kommagetrennte Liste der fehlenden Unterlagen.\n\n";
+    p += "7) sonderfall - 'Flottengeschaeft' / 'Sondertarif' / 'Kein Sonderfall'.\n";
+    p += "8) sparte - 'Komposit' (SHUK) / 'Leben' / 'KV' / 'Mehrere' / 'Unbekannt'.\n\n";
+    p += "9) anhang_typen - kommagetrennt: 'Maklervollmacht','Police','Antrag','Schadenmeldung','Beitragsrechnung','Anschreiben','Kuendigung','Datenblatt','Sonstiges'.\n";
+    p += "9a) pdf_qualitaet - 'Text-PDF' / 'Scan' / 'Mixed' / 'Keine_PDFs' / 'nicht_pruefbar'.\n\n";
+
+    p += "10) enthaelt_maklervollmacht - 'ja' / 'nein'.\n\n";
+    p += "11) mv_vollumfaenglich - Schlagwort-basiert:\n";
+    p += "    (a) 'abschliessen, aendern und kuendigen'\n";
+    p += "    (b) 'Willenserklaerungen abgeben und entgegen[nehmen]' / 'aktiv und passiv vertreten'\n";
+    p += "    (c) 'bevollmaechtigt zu vertreten' (uneingeschraenkt)\n";
+    p += "    (d) 'Abgabe und Entgegennahme von Willenserklaerungen' + Aenderung/Kuendigung/Abschluss\n";
+    p += "    (e) 'uneingeschraenkte aktive und passive Vertretung' (Minimalstandard PVC2D)\n";
+    p += "    Werte: 'ja' (Schlagwort erkennbar) / 'teilweise' (Schlagwort ABER Einschraenkung) / 'nein' / 'nicht_pruefbar' (keine MV oder PDF nicht ausgewertet).\n";
+    p += "    WICHTIG: 'vollumfaenglich' meint INHALT der Bevollmaechtigung, nicht Form.\n\n";
+    p += "12) mv_einschraenkungen - Klartext: 'KV ausgeschlossen','schriftliche Zustimmung VN','kein Schlagwort gefunden' etc. Leer wenn 'ja' oder nicht pruefbar.\n\n";
+
+    p += "13) unterschrift_kunde - 'ja' / 'nein' / 'nicht_pruefbar' (Unterschrift VN sichtbar?).\n";
+    p += "14) unterschrift_makler - 'ja' / 'nein' / 'nicht_pruefbar' (Makler-Unterschrift, optional).\n";
+    p += "15) auf_vn_ausgestellt - 'ja' / 'nein' / 'nicht_pruefbar'.\n";
+    p += "16) makler_namentlich_genannt - 'ja' / 'nein' / 'nicht_pruefbar'.\n\n";
+
+    p += "17) ist_reminder - 'ja' / 'nein' / 'nicht_pruefbar'.\n";
+    p += "    Indikatoren (case-insensitiv): Betreff 'Erinnerung','Reminder','WV','Mahnung','2. Mahnung','Sachstandsanfrage'; Body 'wir warten noch','haben wir noch nichts erhalten','bitten um Rueckmeldung'; Anhang-Dateinamen mit 'Mahnung','Reminder','Erinnerung'.\n\n";
+
+    p += "18) hinweis - EIN kurzer Satz (max 200 Z.) was an dem Vorgang auffaellig ist.\n\n";
+
+    p += "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 28 Schluessel):\n";
+    p += '{"vorgangstyp":"...","auftrag_datum":"...",';
+    p += '"maklerpool":"...","makler_nachname":"...","makler_vorname":"...","makler_nummer":"...",';
+    p += '"kunde_nachname":"...","kunde_vorname":"...","kunde_nummer":"...","versicherungsnummer":"...",';
+    p += '"klassifikation":"...","klassifikation_grund":"...","geschaefts_typ":"...","unterlagen_angefragt":"...",';
+    p += '"unterlagen_liste":"...","sonderfall":"...","sparte":"...","anhang_typen":"...","pdf_qualitaet":"...",';
+    p += '"enthaelt_maklervollmacht":"...","mv_vollumfaenglich":"...","mv_einschraenkungen":"...",';
+    p += '"unterschrift_kunde":"...","unterschrift_makler":"...","auf_vn_ausgestellt":"...","makler_namentlich_genannt":"...",';
+    p += '"ist_reminder":"...","hinweis":"..."}\n\n';
+    p += "Antworte JETZT, nur das JSON-Objekt:\n";
+
+    return p;
+}
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+function exportToExcel() {
+    if (state.results.length === 0) { showError("Keine Ergebnisse zum Exportieren."); return; }
+    hideStatus();
+    try {
+        var excel = new ActiveXObject("Excel.Application");
+        excel.Visible = true;
+        excel.DisplayAlerts = false;
+        var wb = excel.Workbooks.Add();
+        var sheet = wb.ActiveSheet;
+        try { sheet.Name = "Analyse"; } catch(e) {}
+
+        var headers = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absender Email","Betreff","Anhaenge",
+                       "Maklerpool","Makler_Nachname","Makler_Vorname","Maklernummer",
+                       "Kunde_Nachname","Kunde_Vorname","Kundennummer","Versicherungsnummer",
+                       "Vorgangstyp","Ist_Reminder","Klassifikation","Klassifikation_Grund",
+                       "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
+                       "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen",
+                       "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler"];
+        for (var c = 0; c < headers.length; c++) {
+            sheet.Cells(1, c+1).Value = headers[c];
+        }
+        try {
+            var hr = sheet.Range(sheet.Cells(1,1), sheet.Cells(1, headers.length));
+            hr.Font.Bold = true;
+            hr.Interior.Color = 0xB91C1C;
+            hr.Font.Color = 0xFFFFFF;
+        } catch(e) {}
+
+        for (var i = 0; i < state.results.length; i++) {
+            var r = state.results[i];
+            var d = r.data || {};
+            var row = i + 2;
+            sheet.Cells(row,1).Value = i+1;
+            sheet.Cells(row,2).Value = r.msgFile || "";
+            sheet.Cells(row,3).Value = r.datum || "";
+            sheet.Cells(row,4).Value = sg(d, "auftrag_datum");
+            sheet.Cells(row,5).Value = r.absName || "";
+            sheet.Cells(row,6).Value = r.absMail || "";
+            sheet.Cells(row,7).Value = r.betreff || "";
+            sheet.Cells(row,8).Value = r.anhangAlle || "";
+            sheet.Cells(row,9).Value = sg(d, "maklerpool");
+            sheet.Cells(row,10).Value = sg(d, "makler_nachname");
+            sheet.Cells(row,11).Value = sg(d, "makler_vorname");
+            sheet.Cells(row,12).Value = sg(d, "makler_nummer");
+            sheet.Cells(row,13).Value = sg(d, "kunde_nachname");
+            sheet.Cells(row,14).Value = sg(d, "kunde_vorname");
+            sheet.Cells(row,15).Value = sg(d, "kunde_nummer");
+            sheet.Cells(row,16).Value = sg(d, "versicherungsnummer");
+            sheet.Cells(row,17).Value = sg(d, "vorgangstyp");
+            sheet.Cells(row,18).Value = sg(d, "ist_reminder");
+            sheet.Cells(row,19).Value = sg(d, "klassifikation");
+            sheet.Cells(row,20).Value = sg(d, "klassifikation_grund");
+            sheet.Cells(row,21).Value = sg(d, "geschaefts_typ");
+            sheet.Cells(row,22).Value = sg(d, "unterlagen_angefragt");
+            sheet.Cells(row,23).Value = sg(d, "unterlagen_liste");
+            sheet.Cells(row,24).Value = sg(d, "sonderfall");
+            sheet.Cells(row,25).Value = sg(d, "sparte");
+            sheet.Cells(row,26).Value = sg(d, "anhang_typen");
+            sheet.Cells(row,27).Value = sg(d, "pdf_qualitaet");
+            sheet.Cells(row,28).Value = sg(d, "enthaelt_maklervollmacht");
+            sheet.Cells(row,29).Value = sg(d, "mv_vollumfaenglich");
+            sheet.Cells(row,30).Value = sg(d, "mv_einschraenkungen");
+            sheet.Cells(row,31).Value = sg(d, "unterschrift_kunde");
+            sheet.Cells(row,32).Value = sg(d, "unterschrift_makler");
+            sheet.Cells(row,33).Value = sg(d, "auf_vn_ausgestellt");
+            sheet.Cells(row,34).Value = sg(d, "makler_namentlich_genannt");
+            sheet.Cells(row,35).Value = sg(d, "hinweis");
+            sheet.Cells(row,36).Value = r.ok ? "" : r.errMsg;
+        }
+
+        try {
+            sheet.Columns("A:A").ColumnWidth = 5;
+            sheet.Columns("B:B").ColumnWidth = 40;
+            sheet.Columns("C:H").ColumnWidth = 18;
+            sheet.Range("A2").Select();
+            excel.ActiveWindow.FreezePanes = true;
+            sheet.Columns(headers.length).AutoFit();
+        } catch(e) {}
+
+        excel.DisplayAlerts = true;
+        showSuccess("Excel mit " + state.results.length + " Vorgaengen geoeffnet. Bitte manuell speichern.");
+    } catch(e) {
+        showError("Excel-Export fehlgeschlagen: " + e.message);
+    }
+}
+
+function exportToJson() {
+    if (state.results.length === 0) { showError("Keine Ergebnisse zum Exportieren."); return; }
+    hideStatus();
+    try {
+        var shell = new ActiveXObject("WScript.Shell");
+        var shellApp = new ActiveXObject("Shell.Application");
+        var dl;
+        try { dl = shellApp.NameSpace("shell:Downloads").Self.Path; }
+        catch(e) { dl = shell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads"; }
+        var now = new Date();
+        var ts = now.getFullYear() + "-" + pad(now.getMonth()+1) + "-" + pad(now.getDate()) + "_" + pad(now.getHours()) + "-" + pad(now.getMinutes());
+        var path = dl + "\\ergo_vorgang_analyse_" + ts + ".json";
+        var json = jsonStringify({ folder: state.folderPath, exportedAt: isoNow(), results: state.results });
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+        stm.WriteText(json);
+        stm.SaveToFile(path, 2);
+        stm.Close();
+        showSuccess("JSON gespeichert: " + path);
+    } catch(e) {
+        showError("JSON-Export fehlgeschlagen: " + e.message);
+    }
+}
+
+function sg(d, k) {
+    if (!d) return "";
+    var v = d[k];
+    if (v === undefined || v === null) return "";
+    return String(v);
+}
+
+// ============================================================================
+// RENDER TABLE
+// ============================================================================
+function renderTable() {
+    var tbody = document.getElementById("resultsBody");
+    var html = "";
+    for (var i = 0; i < state.results.length; i++) {
+        var r = state.results[i];
+        var d = r.data || {};
+        var vt = sg(d, "vorgangstyp");
+        var vtCls = "col-vt-other";
+        if (vt === "Makler-Vorgang") vtCls = "col-vt-makler";
+        else if (vt === "Bounce-NDR" || vt === "Ergo-Outbound" || vt === "System-Mail") vtCls = "col-vt-bounce";
+
+        var sCls = "s-ok";
+        var sTxt = "OK";
+        if (!r.ok) {
+            if (r.errMsg && r.errMsg.indexOf("ABGEBROCHEN") >= 0) { sCls = "s-cancel"; sTxt = "Abbruch"; }
+            else { sCls = "s-err"; sTxt = "Fehler"; }
+        }
+
+        html += '<tr onclick="showDetail(' + i + ')">';
+        html += '<td>' + (i+1) + '</td>';
+        html += '<td class="col-status ' + sCls + '">' + sTxt + '</td>';
+        html += '<td>' + esc(r.msgFile) + '</td>';
+        html += '<td class="col-date">' + esc(r.datum) + '</td>';
+        html += '<td>' + esc(r.absName || r.absMail) + '</td>';
+        html += '<td class="col-betr">' + esc(r.betreff) + '</td>';
+        html += '<td class="' + vtCls + '">' + esc(vt) + '</td>';
+        html += '<td class="col-klass">' + esc(sg(d, "klassifikation")) + '</td>';
+        html += '<td>' + esc(sg(d, "maklerpool")) + '</td>';
+        html += '<td>' + esc(((sg(d,"kunde_nachname")||"") + " " + (sg(d,"kunde_vorname")||"")).replace(/^\s+|\s+$/g,"")) + '</td>';
+        html += '<td>' + esc(sg(d, "mv_vollumfaenglich")) + '</td>';
+        html += '<td>' + esc(r.ok ? sg(d, "hinweis") : r.errMsg) + '</td>';
+        html += '</tr>';
+    }
+
+    // Plus inflight slots as "running" rows
+    for (var k in state.slots) {
+        if (!state.slots.hasOwnProperty(k)) continue;
+        var s = state.slots[k];
+        html += '<tr>';
+        html += '<td>...</td>';
+        html += '<td class="col-status s-running">laeuft</td>';
+        html += '<td>' + esc(getFileName(s.msgPath)) + '</td>';
+        html += '<td class="col-date">' + esc(s.datum || "") + '</td>';
+        html += '<td>' + esc(s.absName || "") + '</td>';
+        html += '<td class="col-betr">' + esc(s.betreff || "") + '</td>';
+        html += '<td colspan="6"><em>warte auf ErgoGPT...</em></td>';
+        html += '</tr>';
+    }
+
+    tbody.innerHTML = html;
+    document.getElementById("resultsCount").innerText = state.results.length + " Vorgaenge" + (countSlots() > 0 ? " (+" + countSlots() + " laufen)" : "");
+    document.getElementById("resultsTableWrap").style.display = (state.results.length + countSlots() > 0) ? "block" : "none";
+    refreshStartButton();
+}
+
+function showDetail(idx) {
+    var r = state.results[idx];
+    if (!r) return;
+    document.getElementById("detailTitle").innerText = (r.betreff || "(kein Betreff)");
+    var kv = "";
+    kv += '<div class="k">Datei</div><div class="v">' + esc(r.msgPath) + '</div>';
+    kv += '<div class="k">Datum</div><div class="v">' + esc(r.datum) + '</div>';
+    kv += '<div class="k">Absender</div><div class="v">' + esc(r.absName) + " &lt;" + esc(r.absMail) + "&gt;</div>";
+    kv += '<div class="k">Anhaenge</div><div class="v">' + esc(r.anhangAlle || "(keine)") + '</div>';
+    kv += '<div class="k">PDFs hochgeladen</div><div class="v">' + esc(r.pdfListe || "(keine)") + '</div>';
+    kv += '<div class="k">Status</div><div class="v">' + (r.ok ? '<span style="color:#10b981">OK</span>' : '<span style="color:#ef4444">' + esc(r.errMsg) + '</span>') + '</div>';
+    if (r.data) {
+        var keys = ["vorgangstyp","ist_reminder","klassifikation","klassifikation_grund","maklerpool","makler_nachname","makler_vorname","makler_nummer","kunde_nachname","kunde_vorname","kunde_nummer","versicherungsnummer","geschaefts_typ","unterlagen_angefragt","unterlagen_liste","sonderfall","sparte","anhang_typen","pdf_qualitaet","enthaelt_maklervollmacht","mv_vollumfaenglich","mv_einschraenkungen","unterschrift_kunde","unterschrift_makler","auf_vn_ausgestellt","makler_namentlich_genannt","auftrag_datum","hinweis"];
+        for (var i = 0; i < keys.length; i++) {
+            var v = r.data[keys[i]];
+            if (v) kv += '<div class="k">' + keys[i] + '</div><div class="v">' + esc(v) + '</div>';
+        }
+    }
+    document.getElementById("detailKv").innerHTML = kv;
+    document.getElementById("detailRaw").innerText = r.ok ? "" : (r.errMsg || "");
+    document.getElementById("detailModal").className = "modal-backdrop active";
+}
+
+function closeDetail(ev) {
+    if (ev && ev.target && String(ev.target.className).indexOf("modal-backdrop") === -1) return;
+    document.getElementById("detailModal").className = "modal-backdrop";
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+function saveSettings() {
+    try {
+        if (!window.localStorage) return;
+        var s = {
+            model: document.getElementById("modelInput").value,
+            parallel: document.getElementById("parallelInput").value,
+            temp: document.getElementById("tempInput").value,
+            tone: document.getElementById("toneInput").value,
+            lastFolder: state.folderPath
+        };
+        window.localStorage.setItem("ergo_va_settings", jsonStringify(s));
+    } catch(e) {}
+}
+
+function getSenderEmail(mailItem) {
+    try {
+        var typ = mailItem.SenderEmailType;
+        if (typ === "EX") {
+            try {
+                var s = mailItem.Sender;
+                if (s) {
+                    var eu = s.GetExchangeUser();
+                    if (eu && eu.PrimarySmtpAddress) return eu.PrimarySmtpAddress;
+                }
+            } catch(e) {}
+        }
+        return mailItem.SenderEmailAddress || "";
+    } catch(e) { return ""; }
+}
+
+function getEnv(name) {
+    try {
+        var shell = new ActiveXObject("WScript.Shell");
+        return shell.ExpandEnvironmentStrings("%" + name + "%");
+    } catch(e) { return ""; }
+}
+
+function getFileName(path) {
+    if (!path) return "";
+    var i = String(path).lastIndexOf("\\");
+    return i >= 0 ? path.substr(i+1) : path;
+}
+
+function sanitizeFilename(s) {
+    if (!s) return "anhang";
+    return String(s).replace(/[\\\/:*?"<>|\r\n\t]/g, "_").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+}
+
+function pad(n) { return n < 10 ? "0" + n : "" + n; }
+function trim(s) { return s == null ? "" : String(s).replace(/^\s+|\s+$/g, ""); }
+function esc(s) {
+    if (s == null) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function jsonEscape(s) {
+    return String(s == null ? "" : s)
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\r\n/g, "\\n").replace(/\r/g, "\\n").replace(/\n/g, "\\n")
+        .replace(/\t/g, " ");
+}
+
+function cleanForJson(s) {
+    return jsonEscape(String(s == null ? "" : s));
+}
+
+function jsonUnescape(s) {
+    // Reverse what extractAssistantFromChunk regex left in - it's still JSON-encoded
+    if (!s) return "";
+    var r = s;
+    r = r.replace(/\\u([0-9a-fA-F]{4})/g, function(_, h) { return String.fromCharCode(parseInt(h, 16)); });
+    r = r.replace(/\\"/g, '"');
+    r = r.replace(/\\\//g, "/");
+    r = r.replace(/\\\\/g, "\\");
+    r = r.replace(/\\r/g, "");
+    r = r.replace(/\\t/g, "\t");
+    return r;
+}
+
+function jsonStringify(obj) {
+    if (typeof JSON !== "undefined" && JSON.stringify) {
+        try { return JSON.stringify(obj, null, 2); } catch(e) {}
+    }
+    return jsonStringifyFallback(obj);
+}
+
+function jsonStringifyFallback(obj) {
+    var t = typeof obj;
+    if (obj === null) return "null";
+    if (t === "string") return '"' + obj.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t") + '"';
+    if (t === "number" || t === "boolean") return String(obj);
+    if (t === "undefined") return "null";
+    if (Object.prototype.toString.call(obj) === "[object Array]") {
+        var parts = [];
+        for (var i = 0; i < obj.length; i++) parts.push(jsonStringifyFallback(obj[i]));
+        return "[" + parts.join(",") + "]";
+    }
+    if (t === "object") {
+        var parts2 = [];
+        for (var k in obj) {
+            if (obj.hasOwnProperty(k)) parts2.push('"' + k + '":' + jsonStringifyFallback(obj[k]));
+        }
+        return "{" + parts2.join(",") + "}";
+    }
+    return "null";
+}
+
+function isoNow() {
+    var n = new Date();
+    return n.getFullYear() + "-" + pad(n.getMonth()+1) + "-" + pad(n.getDate()) +
+           "T" + pad(n.getHours()) + ":" + pad(n.getMinutes()) + ":" + pad(n.getSeconds());
+}
+
+function uuid4() {
+    var s = "";
+    var parts = [8, 4, 4, 4, 12];
+    for (var i = 0; i < parts.length; i++) {
+        for (var j = 0; j < parts[i]; j++) {
+            s += Math.floor(Math.random() * 16).toString(16);
+        }
+        if (i < parts.length - 1) s += "-";
+    }
+    return s;
+}
+
+// ============================================================================
+// STATUS
+// ============================================================================
+function updateProgress(cur, total, label) {
+    var pct = total > 0 ? Math.round((cur / total) * 100) : 0;
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("progressText").innerText = (label || "") + " (" + cur + "/" + total + ")";
+}
+
+function updateProgressText(t) {
+    document.getElementById("progressText").innerText = t;
+}
+
+function showSuccess(m) {
+    var e = document.getElementById("successStatus");
+    e.style.display = "block";
+    document.getElementById("successMsg").innerHTML = m;
+    document.getElementById("errorStatus").style.display = "none";
+    document.getElementById("infoStatus").style.display = "none";
+}
+function showError(m) {
+    document.getElementById("errorStatus").style.display = "block";
+    document.getElementById("errorMsg").innerHTML = m;
+    document.getElementById("successStatus").style.display = "none";
+    document.getElementById("infoStatus").style.display = "none";
+}
+function showInfo(m) {
+    document.getElementById("infoStatus").style.display = "block";
+    document.getElementById("infoMsg").innerHTML = m;
+    document.getElementById("successStatus").style.display = "none";
+    document.getElementById("errorStatus").style.display = "none";
+}
+function hideStatus() {
+    document.getElementById("successStatus").style.display = "none";
+    document.getElementById("errorStatus").style.display = "none";
+    document.getElementById("infoStatus").style.display = "none";
+}
+</script>
+</body>
+</html>

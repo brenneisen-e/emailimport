@@ -1569,12 +1569,30 @@
                             </div>
                         </details>
 
+                        <!-- ERGO Vorgang-Analyse HTA (standalone, no Excel needed) -->
+                        <details open>
+                            <summary>
+                                ERGO Vorgang-Analyse HTA (standalone, ohne Excel)
+                                <span class="tool-tag">HTA / ErgoGPT</span>
+                            </summary>
+                            <div class="tool-body">
+                                <p><strong>Standalone-Tool</strong> mit derselben Klassifikations-Logik wie das Excel-Makro - aber als <strong>HTA</strong>, kein .xlsm-Import, keine Makro-Aktivierung. Doppelklick auf <code>.hta</code> &rarr; Cookie einfuegen &rarr; Ordner waehlen &rarr; Analyse starten. <strong>Resume-faehig:</strong> bei Abbruch oder Neustart wird automatisch ein Cache pro Ordner gespeichert (<code>_KI-Analyse/cache.json</code>) - schon analysierte Mails werden uebersprungen. <strong>Abbrechen-Button</strong> stoppt sauber und sichert alle bisher gesammelten Ergebnisse. Parallel-Pipeline (Default 3, max 6) wie im Excel-Tool. Excel-/JSON-Export am Ende.</p>
+                                <div class="tool-actions">
+                                    <a href="ERGO-Vorgang-Analyse-HTA-v1.0.zip" download class="btn-download">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        ERGO-Vorgang-Analyse-HTA-v1.0.zip
+                                    </a>
+                                </div>
+                                <div class="tool-meta">ergo-vorgang-analyse.hta (eine Datei, ~50 KB) | Voraussetzung: Outlook + gueltiger ErgoGPT-Cookie. Cookie wird in <code>F:\ExcelGPT-Cookie\Cookie.txt</code> hinterlegt (gleicher Pfad wie das Excel-Tool).</div>
+                            </div>
+                        </details>
+
                     </div><!-- /tool-category-body ERGO -->
                 </div><!-- /tool-category ERGO -->
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 9.9
+                Version 10.0
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
