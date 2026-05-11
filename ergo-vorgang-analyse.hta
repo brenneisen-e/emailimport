@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.19"
+        VERSION="1.20"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.19 - Stufe 1: Bulk-KI-Triage (40 Mails/Call ohne PDF, ~30x schneller als Einzel-KI)</div>
+            <div class="ver">v1.20 - Stats-Sheet: BUe-Funnel mit Detail-Breakdowns (Pool x Geschaeftstyp x MV-Status)</div>
         </div>
 
         <!-- Cookie -->
@@ -4307,71 +4307,290 @@ function buildBulkTriageStats(wb, rows, elapsedSec) {
         st.Rows(row).RowHeight = 22;
         row++;
     }
-    function r(label, val, share, indent) {
+    function r(label, val, share, indent, bold) {
         st.Cells(row, 1).Value = (indent ? "    " : "") + label;
         st.Cells(row, 2).Value = val;
         st.Cells(row, 3).Value = share || "";
+        if (bold) {
+            st.Range(st.Cells(row,1), st.Cells(row,3)).Font.Bold = true;
+        }
         row++;
     }
     function pct(part, total) {
         return total > 0 ? (Math.round(part / total * 1000) / 10) + "%" : "-";
     }
 
-    // Counts
+    // ================================================================
+    // BUCKETIZE
+    // ================================================================
     var total = rows.length;
-    var processed = 0, errors = 0, classifCounts = {}, vorgangstypCounts = {}, konfidenzCounts = {}, mvNeededCount = 0;
+    var totalErrors = 0;
+    var bucketNotMakler = 0;             // vorgangstyp != Makler-Vorgang
+    var notMaklerByType = {};
+    var maklerNotBue = 0;                 // Makler-Vorgang, aber klassifikation != BUe
+    var maklerNotBueByClass = {};
+    var verdachtBueAberNicht = 0;         // Makler-Vorgang + klassifikation != BUe + MV vorhanden
+    var verdachtByClass = {};
+    var echteBue = [];                    // klassifikation = BUe-Vorgang
+
     for (var i = 0; i < rows.length; i++) {
         var r0 = rows[i];
         var t = r0.triage || {};
-        if (t.error) { errors++; continue; }
-        processed++;
+        if (t.error) { totalErrors++; continue; }
         var vt = t.vorgangstyp || "(leer)";
-        vorgangstypCounts[vt] = (vorgangstypCounts[vt] || 0) + 1;
-        if (vt === "Makler-Vorgang") {
-            var k = t.klassifikation || "(leer)";
-            classifCounts[k] = (classifCounts[k] || 0) + 1;
-            if (t.mv_pruefung_noetig === "ja") mvNeededCount++;
+        var kl = t.klassifikation || "(leer)";
+        var mv = t.enthaelt_maklervollmacht || "";
+
+        if (vt !== "Makler-Vorgang") {
+            bucketNotMakler++;
+            notMaklerByType[vt] = (notMaklerByType[vt] || 0) + 1;
+            continue;
         }
-        var c = t.konfidenz || "(leer)";
-        konfidenzCounts[c] = (konfidenzCounts[c] || 0) + 1;
+
+        if (kl === "BUe-Vorgang") {
+            echteBue.push({ r: r0, t: t });
+            continue;
+        }
+
+        // Makler-Vorgang aber kein BUe
+        maklerNotBue++;
+        maklerNotBueByClass[kl] = (maklerNotBueByClass[kl] || 0) + 1;
+        if (mv === "ja") {
+            verdachtBueAberNicht++;
+            verdachtByClass[kl] = (verdachtByClass[kl] || 0) + 1;
+        }
     }
 
-    header("BULK-TRIAGE LAUF-STATS", rgb(217, 119, 6));
-    r("Mails gesamt", total, "100%", false);
-    r("Erfolgreich KI-klassifiziert", processed, pct(processed, total), true);
-    r("Fehler", errors, pct(errors, total), true);
-    r("Laufzeit", elapsedSec + " sec", "");
+    // ================================================================
+    // BLOCK 1 - GESAMT-ZUSAMMENFASSUNG
+    // ================================================================
+    header("ZUSAMMENFASSUNG", rgb(30, 64, 175));
+    r("Mails gesamt", total, "100%", false, true);
+    r("davon Fehler bei KI-Triage", totalErrors, pct(totalErrors, total), true);
+    var processedCount = total - totalErrors;
+    r("erfolgreich klassifiziert", processedCount, pct(processedCount, total), true);
+    r("Laufzeit", elapsedSec + " sec", "", false);
     row++;
 
-    header("VORGANGSTYP (KI-Triage)", rgb(76, 29, 149));
-    var vtOrder = ["Makler-Vorgang", "Bounce-NDR", "Ergo-Outbound", "System-Mail", "Werbung-Spam", "Unklar"];
-    for (var vi = 0; vi < vtOrder.length; vi++) {
-        r(vtOrder[vi], vorgangstypCounts[vtOrder[vi]] || 0, pct(vorgangstypCounts[vtOrder[vi]] || 0, processed), true);
+    // ================================================================
+    // BLOCK 2 - DER FUNNEL (das, was der User wirklich braucht)
+    // ================================================================
+    header("BUe-FUNNEL", rgb(159, 18, 57));
+    r("Mails (ohne Fehler)", processedCount, "100%", false, true);
+    row++;
+
+    // 2a: Nicht-Makler-Vorgang (Bounces / System / Outbound / etc.)
+    r("Nicht-Makler-Vorgang (raus)", bucketNotMakler, pct(bucketNotMakler, processedCount), false, true);
+    var notMaklerOrder = ["Bounce-NDR", "Ergo-Outbound", "System-Mail", "Werbung-Spam", "Unklar"];
+    for (var ni = 0; ni < notMaklerOrder.length; ni++) {
+        if (notMaklerByType[notMaklerOrder[ni]]) {
+            r(notMaklerOrder[ni], notMaklerByType[notMaklerOrder[ni]],
+                pct(notMaklerByType[notMaklerOrder[ni]], bucketNotMakler), true);
+        }
+    }
+    for (var nk in notMaklerByType) {
+        var inList = false;
+        for (var nj = 0; nj < notMaklerOrder.length; nj++) if (notMaklerOrder[nj] === nk) { inList = true; break; }
+        if (!inList && notMaklerByType.hasOwnProperty(nk)) {
+            r(nk, notMaklerByType[nk], pct(notMaklerByType[nk], bucketNotMakler), true);
+        }
     }
     row++;
 
-    var maklerCount = vorgangstypCounts["Makler-Vorgang"] || 0;
-    header("KLASSIFIKATION (nur Makler-Vorgaenge, n=" + maklerCount + ")", rgb(15, 118, 110));
-    var clOrder = ["BUe-Vorgang", "Mahnung-Reminder", "Schadenmeldung", "Antrag-Aenderung", "Anfrage-Ruecksprache", "Nicht-Standard"];
-    for (var ci = 0; ci < clOrder.length; ci++) {
-        r(clOrder[ci], classifCounts[clOrder[ci]] || 0, pct(classifCounts[clOrder[ci]] || 0, maklerCount), true);
+    // 2b: Makler-Vorgang aber kein BUe
+    r("Makler-Vorgang aber KEIN BUe", maklerNotBue, pct(maklerNotBue, processedCount), false, true);
+    var clOrderNotBue = ["Mahnung-Reminder", "Schadenmeldung", "Antrag-Aenderung", "Anfrage-Ruecksprache", "Nicht-Standard", "Kein-Makler-Vorgang"];
+    for (var co = 0; co < clOrderNotBue.length; co++) {
+        if (maklerNotBueByClass[clOrderNotBue[co]]) {
+            r(clOrderNotBue[co], maklerNotBueByClass[clOrderNotBue[co]],
+                pct(maklerNotBueByClass[clOrderNotBue[co]], maklerNotBue), true);
+        }
+    }
+    for (var mk in maklerNotBueByClass) {
+        var inListB = false;
+        for (var mj = 0; mj < clOrderNotBue.length; mj++) if (clOrderNotBue[mj] === mk) { inListB = true; break; }
+        if (!inListB && maklerNotBueByClass.hasOwnProperty(mk)) {
+            r(mk, maklerNotBueByClass[mk], pct(maklerNotBueByClass[mk], maklerNotBue), true);
+        }
     }
     row++;
 
-    header("KONFIDENZ-VERTEILUNG", rgb(22, 101, 52));
-    r("hoch", konfidenzCounts["hoch"] || 0, pct(konfidenzCounts["hoch"] || 0, processed), true);
-    r("mittel", konfidenzCounts["mittel"] || 0, pct(konfidenzCounts["mittel"] || 0, processed), true);
-    r("niedrig", konfidenzCounts["niedrig"] || 0, pct(konfidenzCounts["niedrig"] || 0, processed), true);
+    // 2c: BUe-Verdacht aber doch nicht (MV beigefuegt aber klass != BUe)
+    if (verdachtBueAberNicht > 0) {
+        r("davon BUe-Verdacht (mit MV aber doch nicht BUe)", verdachtBueAberNicht,
+            pct(verdachtBueAberNicht, maklerNotBue), false, true);
+        for (var vk in verdachtByClass) {
+            if (verdachtByClass.hasOwnProperty(vk)) {
+                r(vk + " (mit MV)", verdachtByClass[vk], pct(verdachtByClass[vk], verdachtBueAberNicht), true);
+            }
+        }
+        row++;
+    }
+
+    // 2d: ECHTE BUes
+    r("ECHTE BUe-Vorgaenge", echteBue.length, pct(echteBue.length, processedCount), false, true);
     row++;
 
-    header("STUFE 2 (PDF-Analyse) ERFORDERLICH", rgb(159, 18, 57));
-    r("MV-Pruefung noetig (laut Stufe 1)", mvNeededCount, pct(mvNeededCount, maklerCount), false, true);
-    r("(Bei Grossmaklern kann diese Pruefung in Stufe 2b uebersprungen werden)", "", "", true);
+    // ================================================================
+    // BLOCK 3 - ECHTE BUes DETAIL
+    // ================================================================
+    if (echteBue.length > 0) {
+        // 3a: Geschaefts_Typ
+        header("BUe-DETAIL (n=" + echteBue.length + "): Geschaefts-Typ", rgb(15, 118, 110));
+        var gtCounts = {};
+        for (var bi = 0; bi < echteBue.length; bi++) {
+            var gt = (echteBue[bi].t.geschaefts_typ || "(leer)");
+            gtCounts[gt] = (gtCounts[gt] || 0) + 1;
+        }
+        var gtOrder = ["BUe einfacher Vertrag", "BUe Kundenverbindung", "Keine BUe", "(leer)"];
+        for (var go = 0; go < gtOrder.length; go++) {
+            if (gtCounts[gtOrder[go]]) {
+                r(gtOrder[go], gtCounts[gtOrder[go]], pct(gtCounts[gtOrder[go]], echteBue.length), true);
+            }
+        }
+        for (var gk in gtCounts) {
+            var inListG = false;
+            for (var gj = 0; gj < gtOrder.length; gj++) if (gtOrder[gj] === gk) { inListG = true; break; }
+            if (!inListG && gtCounts.hasOwnProperty(gk)) {
+                r(gk, gtCounts[gk], pct(gtCounts[gk], echteBue.length), true);
+            }
+        }
+        row++;
+
+        // 3b: MV-Status (mit/ohne Dokument)
+        header("BUe-DETAIL: Maklervollmacht im Anhang", rgb(159, 18, 57));
+        var mvCounts = { ja: 0, nein: 0, nicht_pruefbar: 0, "(leer)": 0 };
+        for (var bm = 0; bm < echteBue.length; bm++) {
+            var mvv = echteBue[bm].t.enthaelt_maklervollmacht || "(leer)";
+            mvCounts[mvv] = (mvCounts[mvv] || 0) + 1;
+        }
+        r("Mit MV (Dokument vorhanden)", mvCounts["ja"] || 0, pct(mvCounts["ja"] || 0, echteBue.length), true);
+        r("Ohne MV (kein Dokument)", mvCounts["nein"] || 0, pct(mvCounts["nein"] || 0, echteBue.length), true);
+        if (mvCounts["nicht_pruefbar"]) r("Nicht pruefbar", mvCounts["nicht_pruefbar"], pct(mvCounts["nicht_pruefbar"], echteBue.length), true);
+        if (mvCounts["(leer)"]) r("Keine KI-Angabe", mvCounts["(leer)"], pct(mvCounts["(leer)"], echteBue.length), true);
+        row++;
+
+        // 3c: Reminder vs. Erstvorgang
+        header("BUe-DETAIL: Erstvorgang vs. Reminder", rgb(76, 29, 149));
+        var reminder = 0, erstvorgang = 0, reminderUnklar = 0;
+        for (var br = 0; br < echteBue.length; br++) {
+            var ir = echteBue[br].t.ist_reminder || "";
+            if (ir === "ja") reminder++;
+            else if (ir === "nein") erstvorgang++;
+            else reminderUnklar++;
+        }
+        r("Erstvorgang", erstvorgang, pct(erstvorgang, echteBue.length), true);
+        r("Reminder / Wiedervorlage", reminder, pct(reminder, echteBue.length), true);
+        if (reminderUnklar) r("Reminder-Status unklar", reminderUnklar, pct(reminderUnklar, echteBue.length), true);
+        row++;
+
+        // 3d: Pool-Aufstellung
+        header("BUe-DETAIL: Maklerpool-Aufstellung (sortiert nach Haeufigkeit)", rgb(14, 116, 144));
+        var poolCounts = {};
+        for (var bp = 0; bp < echteBue.length; bp++) {
+            var pool = echteBue[bp].r.pool || "(kein Pool erkannt)";
+            poolCounts[pool] = (poolCounts[pool] || 0) + 1;
+        }
+        var poolArr = [];
+        for (var pk in poolCounts) if (poolCounts.hasOwnProperty(pk)) poolArr.push({ name: pk, count: poolCounts[pk] });
+        poolArr.sort(function(a, b) { return b.count - a.count; });
+
+        var grossThreshold = 5;
+        var sigThreshold = 2;
+        if (echteBue.length < 20) { grossThreshold = 2; sigThreshold = 2; }
+
+        var einzelfallSum = 0;
+        var einzelfallNames = [];
+        for (var pi = 0; pi < poolArr.length; pi++) {
+            var pp = poolArr[pi];
+            if (pp.count >= sigThreshold) {
+                r(pp.name, pp.count, pct(pp.count, echteBue.length), true);
+            } else {
+                einzelfallSum++;
+                einzelfallNames.push(pp.name);
+            }
+        }
+        if (einzelfallSum > 0) {
+            r("Sonstige (je 1 Vorgang)", einzelfallSum, pct(einzelfallSum, echteBue.length), false, true);
+            for (var en = 0; en < einzelfallNames.length; en++) {
+                st.Cells(row, 1).Value = "        - " + einzelfallNames[en];
+                row++;
+            }
+        }
+        row++;
+
+        // 3e: Pool x Geschaefts_Typ Cross-Tabelle (nur Top-Pools mit >=sigThreshold)
+        header("BUe-DETAIL: Pool x Geschaefts-Typ", rgb(154, 52, 18));
+        // Header-Zeile
+        st.Cells(row, 1).Value = "Pool";
+        st.Cells(row, 2).Value = "einfacher Vertrag";
+        st.Cells(row, 3).Value = "ganze Kundenverbindung";
+        st.Range(st.Cells(row,1), st.Cells(row,3)).Font.Bold = true;
+        row++;
+        for (var pj = 0; pj < poolArr.length; pj++) {
+            var ppName = poolArr[pj].name;
+            if (poolArr[pj].count < sigThreshold) continue;
+            var einf = 0, kund = 0;
+            for (var bk = 0; bk < echteBue.length; bk++) {
+                if (echteBue[bk].r.pool !== ppName) continue;
+                var ggt = echteBue[bk].t.geschaefts_typ || "";
+                if (ggt.indexOf("einfacher") >= 0 || ggt.indexOf("einzeln") >= 0) einf++;
+                else if (ggt.indexOf("Kundenverbindung") >= 0 || ggt.indexOf("kundenverbindung") >= 0) kund++;
+            }
+            st.Cells(row, 1).Value = ppName;
+            st.Cells(row, 2).Value = einf;
+            st.Cells(row, 3).Value = kund;
+            row++;
+        }
+        row++;
+
+        // 3f: BUe mit/ohne MV pro Pool
+        header("BUe-DETAIL: Pool x MV-Status", rgb(154, 52, 18));
+        st.Cells(row, 1).Value = "Pool";
+        st.Cells(row, 2).Value = "mit MV";
+        st.Cells(row, 3).Value = "ohne MV / unklar";
+        st.Range(st.Cells(row,1), st.Cells(row,3)).Font.Bold = true;
+        row++;
+        for (var pk2 = 0; pk2 < poolArr.length; pk2++) {
+            var pkName = poolArr[pk2].name;
+            if (poolArr[pk2].count < sigThreshold) continue;
+            var mitMv = 0, ohneMv = 0;
+            for (var bk2 = 0; bk2 < echteBue.length; bk2++) {
+                if (echteBue[bk2].r.pool !== pkName) continue;
+                var mvv2 = echteBue[bk2].t.enthaelt_maklervollmacht || "";
+                if (mvv2 === "ja") mitMv++; else ohneMv++;
+            }
+            st.Cells(row, 1).Value = pkName;
+            st.Cells(row, 2).Value = mitMv;
+            st.Cells(row, 3).Value = ohneMv;
+            row++;
+        }
+        row++;
+    }
+
+    // ================================================================
+    // BLOCK 4 - KONFIDENZ
+    // ================================================================
+    header("KONFIDENZ-VERTEILUNG (Qualitaet der KI-Klassifikation)", rgb(22, 101, 52));
+    var konf = { hoch: 0, mittel: 0, niedrig: 0, leer: 0 };
+    for (var ki = 0; ki < rows.length; ki++) {
+        var tk = rows[ki].triage || {};
+        if (tk.error) continue;
+        var ck = tk.konfidenz || "";
+        if (ck === "hoch") konf.hoch++;
+        else if (ck === "mittel") konf.mittel++;
+        else if (ck === "niedrig") konf.niedrig++;
+        else konf.leer++;
+    }
+    r("hoch", konf.hoch, pct(konf.hoch, processedCount), true);
+    r("mittel", konf.mittel, pct(konf.mittel, processedCount), true);
+    r("niedrig", konf.niedrig, pct(konf.niedrig, processedCount), true);
+    if (konf.leer) r("(ohne Angabe)", konf.leer, pct(konf.leer, processedCount), true);
 
     try {
-        st.Columns("A").ColumnWidth = 50;
-        st.Columns("B").ColumnWidth = 14;
-        st.Columns("C").ColumnWidth = 14;
+        st.Columns("A").ColumnWidth = 52;
+        st.Columns("B").ColumnWidth = 18;
+        st.Columns("C").ColumnWidth = 18;
         st.Cells.Font.Name = "Open Sans";
         st.Range("B:C").HorizontalAlignment = -4108;
         wb.Sheets("Triage").Activate();
