@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.1"
+        VERSION="1.2"
         WINDOWSTATE="normal"
     />
     <style>
@@ -1684,15 +1684,34 @@ function getEnv(name) {
     } catch(e) { return ""; }
 }
 
-// Verzeichnis, in dem die HTA-Datei liegt - via location.href parsen
+// Verzeichnis, in dem die HTA-Datei liegt - via location.href parsen.
+// Behandelt sowohl lokale Pfade (file:///C:/...) als auch UNC-Pfade
+// (file:////server/share/... oder file://server/share/...).
 function getHtaDir() {
     try {
         var href = decodeURIComponent(String(location.href));
-        // typische Form: "file:///C:/path/to/file.hta"
-        href = href.replace(/^file:\/+/, "").replace(/\//g, "\\");
+        if (href.toLowerCase().substr(0, 5) === "file:") {
+            href = href.substr(5);
+        }
+        // Anzahl fuehrender Slashes zaehlen
+        var leadSlashes = 0;
+        while (leadSlashes < href.length && href.charAt(leadSlashes) === "/") {
+            leadSlashes++;
+        }
+        href = href.substr(leadSlashes);
+        // Backslashes statt Slashes
+        href = href.replace(/\//g, "\\");
         // Querystring/Hash abschneiden
         var qPos = href.indexOf("?"); if (qPos >= 0) href = href.substr(0, qPos);
         var hPos = href.indexOf("#"); if (hPos >= 0) href = href.substr(0, hPos);
+        // UNC-Erkennung:
+        //   - 4+ Slashes nach 'file:' (leeres authority, z.B. file:////server/share)
+        //   - oder erstes Segment ist kein Laufwerksbuchstabe (X:)
+        var firstSeg = href.split("\\")[0];
+        var isDriveLetter = /^[a-zA-Z]:$/.test(firstSeg);
+        if (leadSlashes >= 4 || !isDriveLetter) {
+            href = "\\\\" + href;
+        }
         var slash = href.lastIndexOf("\\");
         if (slash < 0) return "";
         return href.substr(0, slash);
