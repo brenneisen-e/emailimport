@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.2"
+        VERSION="1.3"
         WINDOWSTATE="normal"
     />
     <style>
@@ -195,7 +195,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.0 - Parallel-Pipeline mit Resume</div>
+            <div class="ver">v1.3 - Parallel-Pipeline + Resume + UNC-Fix + Cookie-Diagnose</div>
         </div>
 
         <!-- Cookie -->
@@ -204,8 +204,9 @@
             <div style="margin-top: 0.5rem;">
                 <div class="cookie-bar">
                     <input type="password" id="cookieInput" placeholder="Cookie hier einfuegen (langer String mit XSRF-TOKEN, ai_session, ...)">
-                    <button class="btn btn-secondary" onclick="toggleCookieVis()">&#128065;</button>
+                    <button class="btn btn-secondary" onclick="toggleCookieVis()" title="Sichtbarkeit umschalten">&#128065;</button>
                     <button class="btn btn-success" onclick="saveCookie()">Speichern</button>
+                    <button class="btn btn-secondary" onclick="loadCookieFromFile()" title="Cookie.txt erneut von der Platte laden">&#128260; Neu laden</button>
                     <span id="cookieStatus" class="cookie-status missing">Cookie fehlt</span>
                 </div>
                 <div class="info-box" style="margin-top: 0.4rem;">
@@ -497,23 +498,52 @@ function setupDragDrop() {
 // COOKIE
 // ============================================================================
 function loadCookieFromFile() {
-    if (!COOKIE_PATH) { updateCookieStatus(false); return; }
+    if (!COOKIE_PATH) {
+        updateCookieStatus(false, "HTA-Pfad nicht ermittelbar");
+        return;
+    }
+    var fso, exists;
     try {
-        var fso = new ActiveXObject("Scripting.FileSystemObject");
-        if (fso.FileExists(COOKIE_PATH)) {
+        fso = new ActiveXObject("Scripting.FileSystemObject");
+        exists = fso.FileExists(COOKIE_PATH);
+    } catch(e) {
+        updateCookieStatus(false, "FileSystemObject nicht verfuegbar: " + e.message);
+        return;
+    }
+    if (!exists) {
+        updateCookieStatus(false, "Cookie.txt nicht gefunden");
+        return;
+    }
+    // Versuche zuerst UTF-8, dann UTF-16 (Notepad-Default), dann ANSI-Fallback
+    var charsets = ["utf-8", "utf-16", "windows-1252"];
+    var lastErr = "";
+    for (var i = 0; i < charsets.length; i++) {
+        try {
             var stm = new ActiveXObject("ADODB.Stream");
-            stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+            stm.Type = 2;
+            stm.Charset = charsets[i];
+            stm.Open();
             stm.LoadFromFile(COOKIE_PATH);
-            state.cookie = trim(stm.ReadText());
+            var raw = trim(stm.ReadText());
             stm.Close();
-            if (state.cookie.length > 0) {
-                document.getElementById("cookieInput").value = state.cookie;
-                updateCookieStatus(true);
+            // BOM stripping (manche Editoren schreiben ﻿ am Anfang)
+            if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
+            // Plausibilitaet: Cookie hat typisch '=' und ist >50 Zeichen
+            if (raw.length >= 50 && raw.indexOf("=") >= 0) {
+                state.cookie = raw;
+                document.getElementById("cookieInput").value = raw;
+                updateCookieStatus(true, "Geladen (" + charsets[i] + ", " + raw.length + " Zeichen)");
                 return;
+            } else if (raw.length > 0) {
+                lastErr = "Datei nur " + raw.length + " Zeichen / kein '='";
+            } else {
+                lastErr = "Datei leer";
             }
+        } catch(e) {
+            lastErr = charsets[i] + ": " + e.message;
         }
-    } catch(e) {}
-    updateCookieStatus(false);
+    }
+    updateCookieStatus(false, "Cookie.txt vorhanden aber unlesbar - " + lastErr);
 }
 
 function saveCookie() {
@@ -545,14 +575,16 @@ function toggleCookieVis() {
     i.type = (i.type === "password") ? "text" : "password";
 }
 
-function updateCookieStatus(ok) {
+function updateCookieStatus(ok, detail) {
     var s = document.getElementById("cookieStatus");
     if (ok) {
         s.className = "cookie-status ok";
-        s.innerText = "Cookie OK (Laenge " + state.cookie.length + ")";
+        s.innerText = "Cookie OK: " + (detail || ("Laenge " + state.cookie.length));
+        s.title = "Cookie-Datei: " + COOKIE_PATH;
     } else {
         s.className = "cookie-status missing";
-        s.innerText = "Cookie fehlt";
+        s.innerText = "Cookie fehlt" + (detail ? " - " + detail : "");
+        s.title = "Pfad geprueft: " + COOKIE_PATH;
     }
     refreshStartButton();
 }
