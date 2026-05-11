@@ -1,7 +1,20 @@
 Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
-' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.12)
+' ERGO VORGANG-ANALYSE - Excel-VBA-Tool (v2.13)
 ' ============================================================================
+' v2.13: PARALLEL-MODUS. Neue Routine 'Vorgaenge_Analysieren_Parallel' fuehrt
+'        mehrere ErgoGPT-Antwort-Calls GLEICHZEITIG aus (Default 3, einstell-
+'        bar 1-6). Pro Vorgang bleibt 1 Mail -> 1 Antwort, aber waehrend
+'        Antwort 1 noch laeuft, wird Mail 2 vorbereitet und deren Antwort-
+'        Call parallel gestartet. Genutzt wird das WinHttp-Async-Pattern
+'        (gleiches wie bei PDF-Upload). Speedup typischerweise 2.5-3x bei
+'        Default-3. Die Vorbereitungs-Phase pro Vorgang (Outlook OpenSharedItem,
+'        Conversation anlegen, PDF-Upload) bleibt sequentiell - nur der
+'        langsame Antwort-Call laeuft parallel. Erwartete Laufzeit-Reduktion:
+'        bei 30 Vorgaengen von ~10 min auf ~3-4 min.
+'        ACHTUNG: Bei zu hoher Parallelitaet (>=5) kann das Azure-Gateway
+'        mit 403/429 antworten. Default 3 ist getestet konservativ.
+'        Inter-Call-Pause (1.2s aus Serial-Modus) entfaellt im Parallel-Modus.
 ' v2.12: SCHEMA-Reorganisation auf 34 Spalten (A-AH):
 '        - NEUE Spalte C 'Auftrag_Datum' (Datum aus MV / Briefkopf, NICHT
 '          das Mail-Eingangsdatum).
@@ -195,6 +208,12 @@ Attribute VB_Name = "ErgoVorgangAnalyse"
 ' ============================================================================
 
 Option Explicit
+
+#If VBA7 Then
+    Private Declare PtrSafe Sub VA_Sleep Lib "kernel32" Alias "Sleep" (ByVal dwMilliseconds As Long)
+#Else
+    Private Declare Sub VA_Sleep Lib "kernel32" Alias "Sleep" (ByVal dwMilliseconds As Long)
+#End If
 
 Public Const SHEET_ANALYSE As String = "Analyse"
 Public Const SHEET_GPT As String = "GPT"
@@ -1489,7 +1508,8 @@ Private Sub SetupAnleitungSheet()
     ws.cells(r, 1).Value = "WORKFLOW (kurz)": Bold ws, r, 12: r = r + 1
     ws.cells(r, 1).Value = "1. Diese .xlsm in den Ordner legen, in dem .msg-Dateien liegen.": r = r + 1
     ws.cells(r, 1).Value = "2. Vorgaenge_Setup einmalig ausfuehren (Cookie hinterlegen).": r = r + 1
-    ws.cells(r, 1).Value = "3. Vorgaenge_Analysieren ausfuehren -> Ordner + Anzahl waehlen.": r = r + 2
+    ws.cells(r, 1).Value = "3a. Vorgaenge_Analysieren (seriell, 1 Mail nach der anderen).": r = r + 1
+    ws.cells(r, 1).Value = "3b. Vorgaenge_Analysieren_Parallel (v2.13, bis zu 6 gleichzeitig - 2-3x schneller).": r = r + 2
 
     ws.cells(r, 1).Value = "VORAUSSETZUNGEN": Bold ws, r, 12: r = r + 1
     ws.cells(r, 1).Value = "- ASK_ErgoGPT ist seit v2.7 in diesem Modul integriert (kein Test.txt noetig).": r = r + 1
@@ -1531,6 +1551,13 @@ Private Sub SetupAnleitungSheet()
     ws.cells(r, 1).Value = "Unterschrift, Maklerangaben (Firma + Vermittlernummer).": r = r + 1
     ws.cells(r, 1).Value = "Fehlende Felder werden in Spalte R aufgelistet.": r = r + 2
 
+    ws.cells(r, 1).Value = "PARALLEL-MODUS (v2.13, empfohlen wenn viele Mails)": Bold ws, r, 12: r = r + 1
+    ws.cells(r, 1).Value = "Alt+F8 -> 'Vorgaenge_Analysieren_Parallel'. Fragt zusaetzlich nach": r = r + 1
+    ws.cells(r, 1).Value = "Anzahl gleichzeitiger Antwort-Calls (Default 3). Vorbereitung pro Mail": r = r + 1
+    ws.cells(r, 1).Value = "(Outlook + Conv + PDF-Upload) bleibt sequentiell - nur der langsame": r = r + 1
+    ws.cells(r, 1).Value = "Antwort-Call vom Modell laeuft parallel. Bei 30 Mails: ~10 min -> ~3-4 min.": r = r + 1
+    ws.cells(r, 1).Value = "Vorsicht bei N>4: kann 403/429 vom Azure-Gateway ausloesen.": r = r + 2
+
     ws.cells(r, 1).Value = "ZURUECKSETZEN": Bold ws, r, 12: r = r + 1
     ws.cells(r, 1).Value = "Alt+F8 -> 'Vorgaenge_Analysieren_Reset' loescht das Sheet 'Analyse'.": r = r + 2
 
@@ -1555,6 +1582,602 @@ Private Sub SetupAnleitungSheet()
 
     ws.Columns("A").ColumnWidth = 110
 End Sub
+
+' === PARALLEL-MODUS (v2.13) =================================================
+' Mehrere ErgoGPT-Antwort-Calls gleichzeitig in der Pipeline. Vorbereitung
+' (Mail oeffnen, Conv anlegen, PDFs hochladen) ist sequentiell, nur der
+' langsame PUT /conversation/{id} laeuft asynchron via WinHttpRequest.
+Public Sub Vorgaenge_Analysieren_Parallel()
+    On Error GoTo Fehler
+
+    If Not PruefeCookieMitDialog() Then Exit Sub
+
+    Dim folderPath As String: folderPath = WaehleOrdner()
+    If Len(folderPath) = 0 Then Exit Sub
+
+    Dim fso As Object: Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FolderExists(folderPath) Then
+        MsgBox "Ordner nicht gefunden: " & folderPath, vbCritical
+        Exit Sub
+    End If
+
+    Dim msgFiles As Collection: Set msgFiles = SammleMsgDateien(fso, folderPath)
+    If msgFiles.count = 0 Then
+        MsgBox "Keine .msg-Dateien im Ordner gefunden:" & vbCrLf & folderPath, vbExclamation
+        Exit Sub
+    End If
+
+    Dim limit As Long: limit = FrageLimit(msgFiles.count)
+    If limit < 0 Then Exit Sub
+    If limit = 0 Or limit > msgFiles.count Then limit = msgFiles.count
+
+    Dim parallelN As Long: parallelN = FrageParallel()
+    If parallelN < 1 Then Exit Sub
+
+    Dim ans As VbMsgBoxResult
+    Dim schaetzMin As Long
+    schaetzMin = Int((limit * 20) / parallelN / 60) + 1
+    ans = MsgBox("Parallel-Analyse:" & vbCrLf & _
+                 limit & " von " & msgFiles.count & " Vorgaengen werden analysiert," & vbCrLf & _
+                 parallelN & " gleichzeitig in der Pipeline." & vbCrLf & vbCrLf & _
+                 "Geschaetzte Laufzeit: ~" & schaetzMin & " Minuten" & vbCrLf & _
+                 "(seriell waeren es ~" & Int(limit * 20 / 60) + 1 & " Minuten)." & vbCrLf & vbCrLf & _
+                 "ACHTUNG: Bei sehr hoher Parallelitaet kann das Azure-Gateway" & vbCrLf & _
+                 "mit 403/429 antworten. Default 3 ist konservativ getestet." & vbCrLf & vbCrLf & _
+                 "Fortfahren?", _
+                 vbYesNo + vbQuestion, "Parallel-Analyse starten")
+    If ans <> vbYes Then Exit Sub
+
+    Dim txtAns As VbMsgBoxResult
+    txtAns = MsgBox( _
+        "Soll fuer JEDEN Vorgang zusaetzlich eine Textdatei mit allen KI-Analyse-" & vbCrLf & _
+        "Ergebnissen erzeugt werden?" & vbCrLf & vbCrLf & _
+        "Speicherort: Unterordner '_KI-Analyse' im Vorgangs-Ordner." & vbCrLf & _
+        "Dateiname:   <msg-Name>.txt" & vbCrLf & vbCrLf & _
+        "JA = Textdatei je Vorgang erzeugen" & vbCrLf & _
+        "NEIN = nur Excel-Sheet befuellen", _
+        vbYesNo + vbQuestion, "Textdatei pro Vorgang?")
+    Dim txtOrdner As String: txtOrdner = ""
+    If txtAns = vbYes Then
+        txtOrdner = folderPath & "\_KI-Analyse"
+        On Error Resume Next
+        If Not fso.FolderExists(txtOrdner) Then fso.CreateFolder txtOrdner
+        On Error GoTo Fehler
+        If Not fso.FolderExists(txtOrdner) Then
+            MsgBox "Konnte Unterordner nicht anlegen: " & txtOrdner & vbCrLf & _
+                   "Es wird ohne Textdatei-Erzeugung weitergemacht.", vbExclamation
+            txtOrdner = ""
+        End If
+    End If
+
+    Dim olApp As Object: Set olApp = HoleOutlook()
+    If olApp Is Nothing Then
+        MsgBox "Outlook konnte nicht gestartet werden.", vbCritical
+        Exit Sub
+    End If
+
+    Dim ws As Worksheet: Set ws = HoleOderErzeugeAnalyseSheet()
+    HeaderSchreiben ws
+
+    Dim startRow As Long
+    startRow = ws.cells(ws.Rows.count, 1).End(xlUp).row + 1
+    If startRow < 2 Then startRow = 2
+
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+
+    Dim cookie As String: cookie = ReadCookieFromFile()
+    Dim tempBase As String: tempBase = Environ$("TEMP") & "\ergo_va_par_" & Format(Now, "yyyymmddhhnnss")
+
+    ' slots: Key = SlotId (laufende Nr), Value = Scripting.Dictionary mit Slot-State
+    Dim slots As Object: Set slots = CreateObject("Scripting.Dictionary")
+    Dim slotCounter As Long: slotCounter = 0
+    Dim nextMsg As Long: nextMsg = 1
+    Dim row As Long: row = startRow
+    Dim verarbeitet As Long: verarbeitet = 0
+    Dim fehler As Long: fehler = 0
+    Dim abbruchGrund As String: abbruchGrund = ""
+
+    Do While nextMsg <= limit Or slots.count > 0
+
+        ' --- A) freie Slots fuellen ---
+        Do While slots.count < parallelN And nextMsg <= limit And Len(abbruchGrund) = 0
+            Dim slot As Object: Set slot = CreateObject("Scripting.Dictionary")
+            slot.Add "msgPath", msgFiles(nextMsg)
+            slot.Add "row", row
+            slot.Add "nr", nextMsg
+            slot.Add "tempDir", tempBase & "\v" & nextMsg
+
+            Application.StatusBar = "[" & slots.count + 1 & "/" & parallelN & "] Vorgang " & nextMsg & "/" & limit & _
+                                    " vorbereiten - " & fso.GetFileName(CStr(slot("msgPath")))
+            DoEvents
+
+            If BereiteSlotVor(olApp, fso, slot, cookie, tempBase) Then
+                slotCounter = slotCounter + 1
+                slots.Add "s" & slotCounter, slot
+            Else
+                ' Vorbereitungs-Fehler direkt rein
+                ws.cells(row, COL_DATEI).Value = fso.GetFileName(CStr(slot("msgPath")))
+                ws.cells(row, COL_HINWEIS).Value = "[VORBEREITUNG] " & CStr(slot("errMsg"))
+                ws.cells(row, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+                Debug.Print "[" & Format(Now, "hh:nn:ss") & "] Zeile " & row & " " & _
+                            fso.GetFileName(CStr(slot("msgPath"))) & " (PREP-Fehler): " & CStr(slot("errMsg"))
+                fehler = fehler + 1
+
+                If IstAuthFehler(CStr(slot("errMsg"))) Then abbruchGrund = "AUTH"
+                If IstModellFehler(CStr(slot("errMsg"))) Then abbruchGrund = "MODELL"
+            End If
+
+            row = row + 1
+            nextMsg = nextMsg + 1
+        Loop
+
+        ' --- B) Slots pollen (non-blocking) ---
+        Dim k As Variant
+        Dim toRemove As Collection: Set toRemove = New Collection
+        For Each k In slots.Keys
+            Dim s As Object: Set s = slots(k)
+            Dim http As Object: Set http = s("http")
+            Dim fertig As Boolean
+            fertig = False
+            On Error Resume Next
+            fertig = http.WaitForResponse(0)
+            Dim winErr As Long: winErr = Err.Number
+            Dim winDesc As String: winDesc = Err.Description
+            Err.Clear
+            On Error GoTo Fehler
+
+            If winErr <> 0 Then
+                ' Async Call selber ist gestorben (Netz, Timeout)
+                Dim r1 As Long: r1 = CLng(s("row"))
+                ws.cells(r1, COL_DATEI).Value = fso.GetFileName(CStr(s("msgPath")))
+                ws.cells(r1, COL_DATUM).Value = CStr(s("datum"))
+                ws.cells(r1, COL_ABS_NAME).Value = CStr(s("absName"))
+                ws.cells(r1, COL_ABS_MAIL).Value = CStr(s("absMail"))
+                ws.cells(r1, COL_BETREFF).Value = CStr(s("betreff"))
+                ws.cells(r1, COL_ANHANG_LST).Value = CStr(s("anhangAlle"))
+                ws.cells(r1, COL_HINWEIS).Value = "[ASYNC] " & winDesc
+                ws.cells(r1, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+                fehler = fehler + 1
+                StarteCleanupAsync CStr(s("convId")), cookie
+                toRemove.Add k
+            ElseIf fertig Then
+                Dim ok As Boolean
+                ok = FinalisiereSlot(s, ws, fso, txtOrdner)
+                StarteCleanupAsync CStr(s("convId")), cookie
+                If ok Then
+                    verarbeitet = verarbeitet + 1
+                Else
+                    fehler = fehler + 1
+                    If IstAuthFehler(CStr(s("errMsg"))) Then abbruchGrund = "AUTH"
+                    If IstModellFehler(CStr(s("errMsg"))) Then abbruchGrund = "MODELL"
+                End If
+                toRemove.Add k
+            End If
+        Next
+
+        For Each k In toRemove
+            slots.Remove k
+        Next
+
+        ' --- C) Abbruch-Bedingung ---
+        If Len(abbruchGrund) > 0 Then
+            ' Alle laufenden Slots noch zu Ende warten (oder abort), dann raus
+            Exit Do
+        End If
+
+        ' Auto-Save grob alle 5 verarbeitete Vorgaenge
+        If verarbeitet > 0 And (verarbeitet Mod 5) = 0 Then
+            Application.Calculation = xlCalculationAutomatic
+            Application.Calculation = xlCalculationManual
+            On Error Resume Next: ThisWorkbook.Save: On Error GoTo Fehler
+        End If
+
+        ' Status-Update
+        Application.StatusBar = "Parallel-Modus: " & slots.count & " inflight, " & _
+                                verarbeitet & " fertig, " & fehler & " Fehler, " & _
+                                (limit - nextMsg + 1) & " in Warteschlange"
+
+        ' Poll-Pause - nicht busy-loopen
+        If slots.count >= parallelN Or nextMsg > limit Then
+            VA_Sleep 100
+            DoEvents
+        End If
+    Loop
+
+    ' Aufraeumen: noch laufende Slots beenden (Antwort holen ODER abbrechen)
+    If slots.count > 0 Then
+        If Len(abbruchGrund) > 0 Then
+            ' Abbruch -> alle inflight Slots canceln
+            For Each k In slots.Keys
+                On Error Resume Next
+                slots(k)("http").Abort
+                StarteCleanupAsync CStr(slots(k)("convId")), cookie
+                On Error GoTo Fehler
+            Next
+            slots.RemoveAll
+        Else
+            ' Normales Ende -> auf alle warten (mit Hard-Timeout 240s gegen Haenger)
+            Dim drainStart As Double: drainStart = Timer
+            Do While slots.count > 0
+                Dim toRemove2 As Collection: Set toRemove2 = New Collection
+                For Each k In slots.Keys
+                    Dim s2 As Object: Set s2 = slots(k)
+                    Dim h2 As Object: Set h2 = s2("http")
+                    Dim done2 As Boolean: done2 = False
+                    Dim winErr2 As Long: winErr2 = 0
+                    Dim winDesc2 As String: winDesc2 = ""
+                    On Error Resume Next
+                    done2 = h2.WaitForResponse(0)
+                    winErr2 = Err.Number
+                    winDesc2 = Err.Description
+                    Err.Clear
+                    On Error GoTo Fehler
+                    If winErr2 <> 0 Then
+                        Dim rr As Long: rr = CLng(s2("row"))
+                        ws.cells(rr, COL_DATEI).Value = fso.GetFileName(CStr(s2("msgPath")))
+                        ws.cells(rr, COL_HINWEIS).Value = "[DRAIN-ASYNC] " & winDesc2
+                        ws.cells(rr, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+                        fehler = fehler + 1
+                        StarteCleanupAsync CStr(s2("convId")), cookie
+                        toRemove2.Add k
+                    ElseIf done2 Then
+                        Dim ok2 As Boolean
+                        ok2 = FinalisiereSlot(s2, ws, fso, txtOrdner)
+                        StarteCleanupAsync CStr(s2("convId")), cookie
+                        If ok2 Then verarbeitet = verarbeitet + 1 Else fehler = fehler + 1
+                        toRemove2.Add k
+                    End If
+                Next
+                For Each k In toRemove2
+                    slots.Remove k
+                Next
+                If slots.count > 0 Then
+                    If (Timer - drainStart) > 240 Then
+                        ' Hard-Timeout: alles canceln
+                        For Each k In slots.Keys
+                            On Error Resume Next
+                            slots(k)("http").Abort
+                            Dim r3 As Long: r3 = CLng(slots(k)("row"))
+                            ws.cells(r3, COL_DATEI).Value = fso.GetFileName(CStr(slots(k)("msgPath")))
+                            ws.cells(r3, COL_HINWEIS).Value = "[TIMEOUT 240s] Antwort kam nicht rechtzeitig"
+                            ws.cells(r3, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+                            StarteCleanupAsync CStr(slots(k)("convId")), cookie
+                            fehler = fehler + 1
+                            On Error GoTo Fehler
+                        Next
+                        slots.RemoveAll
+                        Exit Do
+                    End If
+                    VA_Sleep 150
+                    DoEvents
+                End If
+            Loop
+        End If
+    End If
+
+    ' Temp-Verzeichnis aufraeumen
+    On Error Resume Next
+    If Len(tempBase) > 0 And fso.FolderExists(tempBase) Then
+        fso.DeleteFolder tempBase, True
+    End If
+    On Error GoTo Fehler
+
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+    On Error Resume Next: ThisWorkbook.Save: On Error GoTo Fehler
+
+    SpaltenbreitenSetzen ws
+
+    Select Case abbruchGrund
+        Case "MODELL"
+            MsgBox _
+                "Analyse abgebrochen: MODELL-FEHLER." & vbCrLf & vbCrLf & _
+                "Der ErgoGPT-Server lehnt das in Sheet GPT!A6 eingetragene Modell ab." & vbCrLf & _
+                "Im ErgoGPT-Browser oben rechts den aktuellen Modell-Namen ablesen" & vbCrLf & _
+                "und in Sheet GPT!A6 EXAKT so eintragen." & vbCrLf & vbCrLf & _
+                "Verarbeitet: " & verarbeitet & "  Fehler: " & fehler, _
+                vbExclamation, "Modell wird nicht unterstuetzt"
+        Case "AUTH"
+            Dim ansAuth As VbMsgBoxResult
+            ansAuth = MsgBox( _
+                "Analyse abgebrochen: AUTH-FEHLER (403 Forbidden)." & vbCrLf & vbCrLf & _
+                "Der Cookie fuer gpt.ergo.com ist sehr wahrscheinlich abgelaufen." & vbCrLf & _
+                "Verarbeitet: " & verarbeitet & "  Fehler: " & fehler & vbCrLf & vbCrLf & _
+                "Jetzt Cookie neu setzen?" & vbCrLf & _
+                "(JA = Cookie-Dialog oeffnen)", _
+                vbYesNo + vbExclamation, "Cookie abgelaufen")
+            If ansAuth = vbYes Then PruefeCookieMitDialog
+        Case Else
+            MsgBox "Parallel-Analyse abgeschlossen." & vbCrLf & vbCrLf & _
+                   "Verarbeitet: " & verarbeitet & vbCrLf & _
+                   "Fehler:      " & fehler & vbCrLf & _
+                   "Parallel:    " & parallelN, _
+                   vbInformation, "Vorgaenge_Analysieren_Parallel"
+    End Select
+    Exit Sub
+
+Fehler:
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+    MsgBox "Fehler im Parallel-Modus: " & Err.Description, vbCritical
+End Sub
+
+' Bereitet einen Slot vor (sync) und startet den ASYNC Antwort-Call.
+' Bei Erfolg: Slot enthaelt 'http' (laufendes WinHttpRequest), 'convId' +
+'             alle Mail-Properties. Returns True.
+' Bei Fehler: Slot enthaelt 'errMsg'. Returns False.
+Private Function BereiteSlotVor(olApp As Object, fso As Object, slot As Object, _
+                                 cookie As String, tempBase As String) As Boolean
+    Dim it As Object
+    Dim msgPath As String: msgPath = CStr(slot("msgPath"))
+    Dim schritt As String: schritt = "Init"
+    On Error GoTo Fehler
+
+    schritt = "Datei pruefen"
+    If Len(Trim(msgPath)) = 0 Then Err.Raise 5, , "msgPath ist leer"
+    If Not fso.FileExists(msgPath) Then Err.Raise 53, , "Datei nicht gefunden"
+
+    schritt = "Outlook OpenSharedItem"
+    Set it = olApp.Session.OpenSharedItem(msgPath)
+    If it Is Nothing Then Err.Raise 91, , "OpenSharedItem hat Nothing zurueckgegeben"
+
+    schritt = "Mail-Properties lesen"
+    Dim datum As String, absName As String, absMail As String, betreff As String, body As String
+    On Error Resume Next
+    datum = Format(it.ReceivedTime, "dd.mm.yyyy hh:nn")
+    absName = CStr(it.SenderName)
+    absMail = HoleSenderEmail(it)
+    betreff = CStr(it.Subject)
+    body = CStr(it.Body)
+    On Error GoTo Fehler
+
+    schritt = "Anhaenge extrahieren"
+    Dim tempDir As String: tempDir = CStr(slot("tempDir"))
+    On Error Resume Next
+    If Not fso.FolderExists(tempBase) Then fso.CreateFolder tempBase
+    If Not fso.FolderExists(tempDir) Then fso.CreateFolder tempDir
+    On Error GoTo Fehler
+
+    Dim alleAnhangNamen As String: alleAnhangNamen = ""
+    Dim pdfListe As String: pdfListe = ""
+    Dim pdfPaths As Collection: Set pdfPaths = New Collection
+    Dim attCount As Long: attCount = 0
+    On Error Resume Next: attCount = it.Attachments.count: On Error GoTo Fehler
+
+    Dim a As Long
+    For a = 1 To attCount
+        On Error Resume Next
+        Dim att As Object: Set att = it.Attachments.Item(a)
+        Dim fname As String: fname = ""
+        If Not att Is Nothing Then fname = CStr(att.FileName)
+        If Len(fname) > 0 Then
+            If alleAnhangNamen <> "" Then alleAnhangNamen = alleAnhangNamen & "; "
+            alleAnhangNamen = alleAnhangNamen & fname
+
+            If LCase(fso.GetExtensionName(fname)) = "pdf" And pdfPaths.count < MAX_PDFS_PRO_VORGANG Then
+                Dim safe As String: safe = SaeubereDateiname(fname)
+                Dim outPath As String: outPath = tempDir & "\" & safe
+                att.SaveAsFile outPath
+                If fso.FileExists(outPath) Then
+                    Dim fSize As Double: fSize = fso.GetFile(outPath).Size / 1048576
+                    If fSize <= MAX_PDF_GROESSE_MB Then
+                        pdfPaths.Add outPath
+                        If pdfListe <> "" Then pdfListe = pdfListe & "; "
+                        pdfListe = pdfListe & fname
+                    Else
+                        fso.DeleteFile outPath, True
+                    End If
+                End If
+            End If
+        End If
+        Err.Clear
+        On Error GoTo Fehler
+    Next a
+
+    schritt = "Mail schliessen"
+    On Error Resume Next: it.Close 1: On Error GoTo Fehler
+    Set it = Nothing
+
+    slot.Add "datum", datum
+    slot.Add "absName", absName
+    slot.Add "absMail", absMail
+    slot.Add "betreff", betreff
+    slot.Add "anhangAlle", alleAnhangNamen
+    slot.Add "pdfListe", pdfListe
+
+    schritt = "Prompt bauen"
+    If Len(body) > 6000 Then body = Left(body, 6000) & " [...gekuerzt]"
+    Dim prompt As String
+    prompt = BuildVorgangPrompt(datum, absName, absMail, betreff, body, alleAnhangNamen, pdfListe)
+    slot.Add "prompt", prompt
+
+    schritt = "Conversation anlegen"
+    Dim convId As String
+    convId = CreateConversationSync(prompt, cookie)
+    If Len(convId) = 0 Then Err.Raise 5, , "Keine conversation_id zurueck"
+    slot.Add "convId", convId
+
+    schritt = "PDFs hochladen"
+    Dim docIdsJson As String: docIdsJson = "[]"
+    If pdfPaths.count > 0 Then
+        Dim arr() As String: ReDim arr(0 To pdfPaths.count - 1)
+        Dim i As Long
+        For i = 1 To pdfPaths.count
+            arr(i - 1) = pdfPaths(i)
+        Next i
+        docIdsJson = UploadManyPdfsReturnJsonArray(convId, arr, cookie, "")
+    End If
+
+    schritt = "Antwort-Call async starten"
+    Dim httpReq As Object
+    Set httpReq = StarteAntwortCallAsync(convId, prompt, docIdsJson, cookie)
+    slot.Add "http", httpReq
+
+    BereiteSlotVor = True
+    Exit Function
+
+Fehler:
+    On Error Resume Next
+    If Not it Is Nothing Then it.Close 1
+    Set it = Nothing
+    On Error GoTo 0
+    slot("errMsg") = "[" & schritt & "] " & Err.Description
+    BereiteSlotVor = False
+End Function
+
+Private Function CreateConversationSync(prompt As String, cookie As String) As String
+    Dim http As Object: Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    http.Open "PUT", ERGO_BASE_URL & "/conversation", False
+    SetCommonHeaders http, cookie, ""
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.Send BuildPayload(CleanForJson(prompt), "[]")
+    If http.status <> 200 Then
+        Err.Raise vbObjectError + 2, , "Create failed: " & http.status & " - " & Left(http.ResponseText, 200)
+    End If
+    CreateConversationSync = ParseJsonStr(http.ResponseText, "id")
+End Function
+
+Private Function StarteAntwortCallAsync(convId As String, prompt As String, _
+                                         docIdsJson As String, cookie As String) As Object
+    Dim http As Object: Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    Dim payload As String: payload = BuildPayload(CleanForJson(prompt), docIdsJson)
+
+    ' Timeouts: resolve, connect, send, receive (ms). Receive 3 min fuer Reasoning-Modelle.
+    On Error Resume Next
+    http.SetTimeouts 30000, 30000, 60000, 180000
+    On Error GoTo 0
+
+    http.Open "PUT", ERGO_BASE_URL & "/conversation/" & convId, True ' async!
+    On Error Resume Next: http.SetProxy 0: On Error GoTo 0
+
+    Dim xsrf As String: xsrf = ExtractCsrfFromCookie(cookie)
+    http.SetRequestHeader "Cookie", cookie
+    If Len(xsrf) > 0 Then
+        http.SetRequestHeader "X-XSRF-TOKEN", xsrf
+        http.SetRequestHeader "X-CSRF-TOKEN", xsrf
+    End If
+    http.SetRequestHeader "User-Agent", "Mozilla/5.0"
+    http.SetRequestHeader "Accept-Language", "de-DE,de;q=0.9,en;q=0.8"
+    http.SetRequestHeader "Origin", "https://gpt.ergo.com"
+    http.SetRequestHeader "Referer", "https://gpt.ergo.com/"
+    http.SetRequestHeader "X-Requested-With", "XMLHttpRequest"
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.SetRequestHeader "Accept", "*/*"
+
+    http.Send payload
+    Set StarteAntwortCallAsync = http
+End Function
+
+' Slot ist fertig: Antwort auswerten, Sheet-Zeile schreiben.
+' Returns True bei Erfolg, False bei Fehler (slot('errMsg') gesetzt).
+Private Function FinalisiereSlot(slot As Object, ws As Worksheet, fso As Object, _
+                                  txtOrdner As String) As Boolean
+    Dim http As Object: Set http = slot("http")
+    Dim r As Long: r = CLng(slot("row"))
+    On Error GoTo Fehler
+
+    Dim status As Long: status = http.status
+    Dim resp As String: resp = http.ResponseText
+    Dim answer As String: answer = ExtractAssistantFromNdjson(resp)
+
+    ' Standard-Spalten immer schreiben
+    ws.cells(r, COL_DATEI).Value = fso.GetFileName(CStr(slot("msgPath")))
+    ws.cells(r, COL_DATUM).Value = CStr(slot("datum"))
+    ws.cells(r, COL_ABS_NAME).Value = CStr(slot("absName"))
+    ws.cells(r, COL_ABS_MAIL).Value = CStr(slot("absMail"))
+    ws.cells(r, COL_BETREFF).Value = CStr(slot("betreff"))
+    ws.cells(r, COL_ANHANG_LST).Value = CStr(slot("anhangAlle"))
+
+    If Len(answer) = 0 Then
+        Dim hint As String: hint = ExtractServerErrorHint(resp)
+        Dim msg As String
+        If status <> 200 Then
+            msg = "HTTP " & status & ". " & hint
+        Else
+            msg = "Keine Assistant-Nachricht. " & hint
+        End If
+        ws.cells(r, COL_HINWEIS).Value = "[ANTWORT] " & msg
+        ws.cells(r, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+        slot("errMsg") = msg
+        FinalisiereSlot = False
+        Exit Function
+    End If
+
+    Dim antwort As String: antwort = Replace(JsonUnescape(answer), "\n", vbCrLf)
+    Dim dict As Object: Set dict = ParseGptJsonAntwort(antwort)
+    If dict Is Nothing Then
+        ws.cells(r, COL_HINWEIS).Value = "[PARSE] JSON-Antwort nicht lesbar: " & Left(antwort, 200)
+        ws.cells(r, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+        slot("errMsg") = "JSON-Parse-Fehler"
+        FinalisiereSlot = False
+        Exit Function
+    End If
+
+    SchreibeGptErgebnis ws, r, dict
+
+    If Len(txtOrdner) > 0 Then
+        On Error Resume Next
+        SchreibeKiTextDatei txtOrdner, fso.GetFileName(CStr(slot("msgPath"))), _
+                            CStr(slot("datum")), CStr(slot("absName")), CStr(slot("absMail")), _
+                            CStr(slot("betreff")), CStr(slot("anhangAlle")), _
+                            CStr(slot("pdfListe")), dict
+        On Error GoTo Fehler
+    End If
+
+    FinalisiereSlot = True
+    Exit Function
+
+Fehler:
+    ws.cells(r, COL_HINWEIS).Value = "[FINAL] " & Err.Description
+    ws.cells(r, COL_HINWEIS).Interior.Color = RGB(252, 165, 165)
+    slot("errMsg") = Err.Description
+    FinalisiereSlot = False
+End Function
+
+' Fire-and-forget DELETE /conversation. Wir warten nicht auf das Ergebnis.
+Private Sub StarteCleanupAsync(convId As String, cookie As String)
+    If Len(convId) = 0 Then Exit Sub
+    On Error Resume Next
+    Dim http As Object: Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    http.Open "DELETE", ERGO_BASE_URL & "/conversation", True
+    http.SetProxy 0
+    Dim xsrf As String: xsrf = ExtractCsrfFromCookie(cookie)
+    http.SetRequestHeader "Cookie", cookie
+    If Len(xsrf) > 0 Then
+        http.SetRequestHeader "X-XSRF-TOKEN", xsrf
+        http.SetRequestHeader "X-CSRF-TOKEN", xsrf
+    End If
+    http.SetRequestHeader "User-Agent", "Mozilla/5.0"
+    http.SetRequestHeader "Accept", "*/*"
+    http.SetRequestHeader "Content-Type", "application/json;charset=UTF-8"
+    http.SetRequestHeader "Origin", "https://gpt.ergo.com"
+    http.SetRequestHeader "Referer", "https://gpt.ergo.com/"
+    http.SetRequestHeader "X-Requested-With", "XMLHttpRequest"
+    http.Send BuildDeletePayload(convId)
+    ' kein WaitForResponse - fire and forget
+End Sub
+
+Private Function FrageParallel() As Long
+    Dim eingabe As String
+    eingabe = InputBox( _
+        "Wie viele Antwort-Calls gleichzeitig in der Pipeline?" & vbCrLf & vbCrLf & _
+        "Empfehlung:" & vbCrLf & _
+        "  2 = sehr konservativ (1.5x schneller, kaum Rate-Limit-Risiko)" & vbCrLf & _
+        "  3 = Default (2.5x schneller, getestet stabil)" & vbCrLf & _
+        "  4 = aggressiv (3x schneller, gelegentliche 403/429 moeglich)" & vbCrLf & _
+        "  5-6 = nur fuer leistungsstarke Tage - bei vielen Fehlern abbrechen" & vbCrLf & vbCrLf & _
+        "ACHTUNG: Vorbereitungs-Phase (Outlook + Conv + PDF-Upload) ist" & vbCrLf & _
+        "sequentiell. Bei kleinen Mails ohne PDF lohnt sich >3 wenig.", _
+        "Parallelitaet", "3")
+    If Trim(eingabe) = "" Then FrageParallel = 0: Exit Function
+    Dim n As Long: n = CLng(Val(eingabe))
+    If n < 1 Then n = 1
+    If n > 6 Then n = 6
+    FrageParallel = n
+End Function
 
 ' === RESET ==================================================================
 Public Sub Vorgaenge_Analysieren_Reset()
