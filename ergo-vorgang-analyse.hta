@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.14"
+        VERSION="1.15"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.14 - XXL-Fix: ADODB.Stream-Init-Reihenfolge + Canary-Log fuer Diagnose</div>
+            <div class="ver">v1.15 - XXL-Fix: VBS-Output als UTF-16 LE (FSO statt ADODB.Stream)</div>
         </div>
 
         <!-- Cookie -->
@@ -3203,16 +3203,9 @@ function processNextXxlChunk() {
         rc = shell.Run(cmd, 0, true);
 
         if (fso.FileExists(outPath)) {
-            var content = "";
-            try {
-                var stm = new ActiveXObject("ADODB.Stream");
-                stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
-                stm.LoadFromFile(outPath);
-                content = stm.ReadText();
-                stm.Close();
-            } catch(e2) {
-                content = readTextFile(outPath);
-            }
+            // VBS schreibt ab v1.15 als UTF-16 LE BOM via FSO -> readTextFile
+            // (FSO mit Format -1) liest es nativ.
+            var content = readTextFile(outPath);
             if (content && content.length > 2) {
                 try {
                     var parsed = eval("(" + content + ")");
@@ -3220,7 +3213,7 @@ function processNextXxlChunk() {
                         for (var k = 0; k < parsed.length; k++) xs.results.push(parsed[k]);
                     }
                 } catch(eP) {
-                    // Parse-Fehler - weitermachen
+                    // Parse-Fehler - Diagnose im Canary
                 }
             }
         }
@@ -3416,14 +3409,13 @@ function buildParseMsgVbs() {
     v.push("paths = Split(raw, vbCrLf)");
     v.push("Log \"Path list loaded, \" & (UBound(paths) + 1) & \" entries\"");
     v.push("");
-    v.push("Dim outStm");
+    // Output via FSO Unicode (UTF-16 LE + BOM) - das kann FSO auf JS-Seite
+    // sauber wieder lesen. ADODB.Stream-UTF-8 hingegen kann FSO nicht parsen.
+    v.push("Dim outFile");
     v.push("On Error Resume Next");
-    v.push("Set outStm = CreateObject(\"ADODB.Stream\")");
-    v.push("outStm.Type = 2");
-    v.push("outStm.Charset = \"utf-8\"");
-    v.push("outStm.Open");
+    v.push("Set outFile = fso.CreateTextFile(outputPath, True, True)");
     v.push("If Err.Number <> 0 Then");
-    v.push("    Log \"FATAL ADODB.Stream Open Error: \" & Err.Description");
+    v.push("    Log \"FATAL CreateTextFile Error: \" & Err.Description");
     v.push("    Err.Clear");
     v.push("    On Error GoTo 0");
     v.push("    If Not canaryStm Is Nothing Then canaryStm.Close");
@@ -3431,7 +3423,7 @@ function buildParseMsgVbs() {
     v.push("End If");
     v.push("On Error GoTo 0");
     v.push("");
-    v.push("outStm.WriteText \"[\"");
+    v.push("outFile.Write \"[\"");
     v.push("Dim isFirst, processed, errored");
     v.push("isFirst = True : processed = 0 : errored = 0");
     v.push("");
@@ -3449,8 +3441,8 @@ function buildParseMsgVbs() {
     v.push("                errored = errored + 1");
     v.push("            End If");
     v.push("            On Error GoTo 0");
-    v.push("            If Not isFirst Then outStm.WriteText \",\"");
-    v.push("            outStm.WriteText j");
+    v.push("            If Not isFirst Then outFile.Write \",\"");
+    v.push("            outFile.Write j");
     v.push("            isFirst = False");
     v.push("            processed = processed + 1");
     v.push("            If processed Mod 50 = 0 Then Log \"Progress: \" & processed & \"/\" & (UBound(paths)+1)");
@@ -3460,19 +3452,10 @@ function buildParseMsgVbs() {
     v.push("    End If");
     v.push("Next");
     v.push("");
-    v.push("outStm.WriteText \"]\"");
+    v.push("outFile.Write \"]\"");
+    v.push("outFile.Close");
     v.push("Log \"Loop done. processed=\" & processed & \" errored=\" & errored");
-    v.push("");
-    v.push("On Error Resume Next");
-    v.push("outStm.SaveToFile outputPath, 2");
-    v.push("If Err.Number <> 0 Then");
-    v.push("    Log \"FATAL SaveToFile Error: \" & Err.Description");
-    v.push("Else");
-    v.push("    Log \"Output saved to \" & outputPath");
-    v.push("End If");
-    v.push("Err.Clear");
-    v.push("On Error GoTo 0");
-    v.push("outStm.Close");
+    v.push("Log \"Output saved to \" & outputPath");
     v.push("");
     v.push("Log \"VBS finished at \" & Now");
     v.push("If Not canaryStm Is Nothing Then canaryStm.Close");
