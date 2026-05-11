@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.21"
+        VERSION="1.22"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.21 - Zeitraum-Filter (Von/Bis + Quick-Buttons, filtert vor jedem Modus)</div>
+            <div class="ver">v1.22 - Datei-Umbenennen mit Datums-Praefix (fuer Zeitraum-Filter ohne Outlook)</div>
         </div>
 
         <!-- Cookie -->
@@ -232,6 +232,13 @@
                 </div>
                 <div id="folderPath" class="folder-path"></div>
                 <div id="folderStats" class="stats"></div>
+                <div style="margin-top: 0.5rem;">
+                    <button class="btn btn-secondary" id="btnRenameWithDate" onclick="renameMsgFilesWithDate()" disabled
+                            style="padding: 6px 12px; font-size: 12px;"
+                            title="Benennt alle .msg-Dateien im Ordner um zu YYYY-MM-DD_HHMM_<Originalname>.msg. Datum wird aus dem Mail-Header gelesen (kein Outlook noetig).">
+                        &#128221; Datei-Datum als Praefix hinzufuegen (fuer Zeitraum-Filter)
+                    </button>
+                </div>
             </div>
         </details>
 
@@ -810,6 +817,9 @@ function refreshStartButton() {
     document.getElementById("btnCancel").disabled = !state.running;
     document.getElementById("btnExcel").disabled = state.results.length === 0;
     document.getElementById("btnJson").disabled = state.results.length === 0;
+    // Rename-Button: braucht nur Ordner + Mails
+    var btnRn = document.getElementById("btnRenameWithDate");
+    if (btnRn) btnRn.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0;
 }
 
 function startAnalysis() {
@@ -4736,6 +4746,164 @@ function maybeAutoStartBulkAfterXxl() {
         state.bulkAutoChain = false;
         setTimeout(runBulkTriage, 300);
     }
+    if (state.renameChainAfterXxl) {
+        state.renameChainAfterXxl = false;
+        setTimeout(renameMsgFilesWithDate, 300);
+    }
+}
+
+// ============================================================================
+// RENAME: Datums-Praefix in Dateinamen einfuegen (fuer Zeitraum-Filter)
+// ============================================================================
+// Liest das Datum aus den von XXL geparsten Headers (RFC822 Date) und
+// benennt jede .msg um zu "YYYY-MM-DD_HHMM_<Originalname>.msg".
+// Dateien, die bereits ein Datums-Praefix haben, werden uebersprungen.
+
+function parseRfc822Date(s) {
+    if (!s) return null;
+    var t = String(s);
+    // Muster: "Wed, 05 May 2026 09:44:00 +0200" oder "5 May 2026 09:44:00 +0200"
+    var m = t.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return null;
+    var months = {"Jan":0,"Feb":1,"Mar":2,"Apr":3,"May":4,"Jun":5,
+                  "Jul":6,"Aug":7,"Sep":8,"Oct":9,"Nov":10,"Dec":11,
+                  "Mai":4,"Okt":9,"Dez":11};
+    var mon = months[m[2]];
+    if (mon === undefined) return null;
+    var d = new Date(parseInt(m[3], 10), mon, parseInt(m[1], 10), parseInt(m[4], 10), parseInt(m[5], 10));
+    if (isNaN(d.getTime())) return null;
+    return d;
+}
+
+function dateToPrefix(d) {
+    var pad2 = function(n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + "_" + pad2(d.getHours()) + pad2(d.getMinutes());
+}
+
+function renameMsgFilesWithDate() {
+    if (state.running) return;
+    if (state.msgFiles.length === 0) { showError("Keine Mails im Ordner."); return; }
+
+    // Voraussetzung: state.xxlResults (mit datum-Feld) muss vorhanden sein
+    if (!state.xxlResults || state.xxlResults.length === 0) {
+        var doXxl = confirm(
+            "Zum Umbenennen brauche ich das Mail-Datum aus jeder .msg.\n" +
+            "Pool-XXL wurde noch nicht ausgefuehrt - das liest die Daten in ~1-3 min.\n\n" +
+            "Soll ich Pool-XXL jetzt ausfuehren und danach automatisch umbenennen?\n\n" +
+            "OK = ja\nAbbrechen = nichts tun"
+        );
+        if (!doXxl) return;
+        state.renameChainAfterXxl = true;
+        runQuickPoolOverviewXxl();
+        return;
+    }
+
+    var preview = countRenameCandidates();
+    var doRename = confirm(
+        "Datei-Umbenennen mit Datums-Praefix\n\n" +
+        "Mails mit XXL-Daten: " + state.xxlResults.length + "\n" +
+        "Davon umzubenennen: " + preview.toRename + "\n" +
+        "Bereits umbenannt (Praefix vorhanden): " + preview.alreadyOk + "\n" +
+        "Kein Datum parsbar: " + preview.noDate + "\n\n" +
+        "Format: 'YYYY-MM-DD_HHMM_<Originalname>.msg'\n" +
+        "Dateien mit bereits vorhandenem Datums-Praefix werden NICHT geaendert.\n\n" +
+        "Fortfahren?"
+    );
+    if (!doRename) return;
+
+    state.running = true;
+    refreshStartButton();
+    hideStatus();
+    document.getElementById("progressContainer").style.display = "block";
+
+    var fso;
+    try { fso = new ActiveXObject("Scripting.FileSystemObject"); }
+    catch(e) { showError("FSO nicht verfuegbar: " + e.message); state.running = false; refreshStartButton(); return; }
+
+    var renamed = 0, skipped = 0, errors = 0, noDate = 0;
+    var total = state.xxlResults.length;
+
+    // Batch-weise mit setTimeout fuer UI-Updates
+    var i = 0;
+    function step() {
+        var batchEnd = Math.min(i + 50, total);
+        for (; i < batchEnd; i++) {
+            var r = state.xxlResults[i];
+            var oldPath = r.path || "";
+            var oldName = r.msgFile || "";
+            if (!oldPath || !oldName) { errors++; continue; }
+
+            // Bereits umbenannt?
+            if (oldName.match(/^\d{4}-\d{2}-\d{2}_/)) { skipped++; continue; }
+
+            var d = parseRfc822Date(r.datum);
+            if (!d) {
+                // Fallback: nimm aktuelles Datum NICHT - Datei ueberspringen
+                noDate++;
+                continue;
+            }
+
+            var newName = dateToPrefix(d) + "_" + oldName;
+            var dirEnd = oldPath.lastIndexOf("\\");
+            if (dirEnd < 0) { errors++; continue; }
+            var newPath = oldPath.substr(0, dirEnd) + "\\" + newName;
+
+            // Wenn die Ziel-Datei schon existiert -> Conflict, Suffix anhaengen
+            if (fso.FileExists(newPath)) {
+                var counter = 2;
+                while (counter < 100) {
+                    var attemptName = dateToPrefix(d) + "_" + counter + "_" + oldName;
+                    var attemptPath = oldPath.substr(0, dirEnd) + "\\" + attemptName;
+                    if (!fso.FileExists(attemptPath)) { newPath = attemptPath; newName = attemptName; break; }
+                    counter++;
+                }
+            }
+
+            try {
+                fso.MoveFile(oldPath, newPath);
+                // State updaten - falls User danach weiterarbeitet
+                r.path = newPath;
+                r.msgFile = newName;
+                renamed++;
+            } catch(eM) {
+                errors++;
+            }
+        }
+
+        updateProgress(i, total, "Umbenennen: " + i + " / " + total + " (umbenannt: " + renamed + ", uebersprungen: " + skipped + ")");
+
+        if (i < total) {
+            setTimeout(step, 5);
+        } else {
+            document.getElementById("progressContainer").style.display = "none";
+            state.running = false;
+
+            // Folder neu scannen damit msgFiles aktuell ist
+            scanFolder();
+            // xxlResults bleibt erhalten (Pfade wurden inline aktualisiert)
+            refreshStartButton();
+
+            showSuccess("Umbenannt: " + renamed +
+                        " | bereits OK: " + skipped +
+                        " | kein Datum: " + noDate +
+                        " | Fehler: " + errors +
+                        ". Zeitraum-Filter funktioniert jetzt.");
+        }
+    }
+    setTimeout(step, 50);
+}
+
+function countRenameCandidates() {
+    var toRename = 0, alreadyOk = 0, noDate = 0;
+    for (var i = 0; i < state.xxlResults.length; i++) {
+        var r = state.xxlResults[i];
+        if (!r.msgFile) continue;
+        if (r.msgFile.match(/^\d{4}-\d{2}-\d{2}_/)) { alreadyOk++; continue; }
+        var d = parseRfc822Date(r.datum);
+        if (!d) { noDate++; continue; }
+        toRename++;
+    }
+    return { toRename: toRename, alreadyOk: alreadyOk, noDate: noDate };
 }
 </script>
 </body>
