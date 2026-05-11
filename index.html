@@ -1578,16 +1578,16 @@
                             <div class="tool-body">
                                 <p><strong>Standalone-Tool</strong> mit derselben Klassifikations-Logik wie das Excel-Makro - aber als <strong>HTA</strong>, kein .xlsm-Import, keine Makro-Aktivierung. Doppelklick auf <code>.hta</code> &rarr; Cookie einfuegen &rarr; Ordner waehlen &rarr; Analyse starten. <strong>Resume-faehig:</strong> bei Abbruch oder Neustart wird automatisch ein Cache pro Ordner gespeichert (<code>_KI-Analyse/cache.json</code>) - schon analysierte Mails werden uebersprungen. <strong>Abbrechen-Button</strong> stoppt sauber und sichert alle bisher gesammelten Ergebnisse. Parallel-Pipeline (Default 3, max 6) wie im Excel-Tool. Excel-/JSON-Export am Ende.</p>
                                 <div class="tool-actions">
-                                    <a href="ERGO-Vorgang-Analyse-HTA-v1.0.zip" download class="btn-download">
+                                    <a href="ERGO-Vorgang-Analyse-HTA-v1.1.zip" download class="btn-download">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        ERGO-Vorgang-Analyse-HTA-v1.0.zip
+                                        ERGO-Vorgang-Analyse-HTA-v1.1.zip
                                     </a>
                                     <a href="ergo-vorgang-analyse.hta.txt" download class="btn-download" style="background: #475569;">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                         ergo-vorgang-analyse.hta.txt (Endung umbenennen)
                                     </a>
                                 </div>
-                                <div class="tool-meta">ergo-vorgang-analyse.hta (eine Datei, ~75 KB) | Voraussetzung: Outlook + gueltiger ErgoGPT-Cookie. Cookie wird in <code>F:\ExcelGPT-Cookie\Cookie.txt</code> hinterlegt (gleicher Pfad wie das Excel-Tool).<br><strong>Falls .hta-Download blockiert:</strong> die <code>.hta.txt</code>-Variante laden und nach dem Download die Endung manuell von <code>.hta.txt</code> auf <code>.hta</code> umbenennen.</div>
+                                <div class="tool-meta">ergo-vorgang-analyse.hta v1.1 (eine Datei, ~75 KB) | Voraussetzung: Outlook + gueltiger ErgoGPT-Cookie. <strong>NEU v1.1:</strong> Cookie wird als <code>Cookie.txt</code> direkt <strong>neben der HTA-Datei</strong> gespeichert (gleicher Ordner = gleiche Security-Zone, keine Cross-Domain-Pruefung mehr).<br><strong>Falls .hta-Download blockiert:</strong> die <code>.hta.txt</code>-Variante laden und nach dem Download die Endung manuell von <code>.hta.txt</code> auf <code>.hta</code> umbenennen.</div>
                             </div>
                         </details>
 
@@ -1596,7 +1596,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 10.1
+                Version 10.2
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
