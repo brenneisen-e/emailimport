@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.15"
+        VERSION="1.16"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.15 - XXL-Fix: VBS-Output als UTF-16 LE (FSO statt ADODB.Stream)</div>
+            <div class="ver">v1.16 - XXL: JsonEsc strict + JSON.parse + Read-Diagnostik (Content-Preview im Fehler)</div>
         </div>
 
         <!-- Cookie -->
@@ -3203,19 +3203,69 @@ function processNextXxlChunk() {
         rc = shell.Run(cmd, 0, true);
 
         if (fso.FileExists(outPath)) {
-            // VBS schreibt ab v1.15 als UTF-16 LE BOM via FSO -> readTextFile
-            // (FSO mit Format -1) liest es nativ.
-            var content = readTextFile(outPath);
+            // Versuche mehrere Lese-Strategien, sammle Diagnose pro Versuch
+            var fileSize = 0;
+            try { fileSize = fso.GetFile(outPath).Size; } catch(eS) {}
+            var readDiag = { fileSize: fileSize, attempts: [] };
+
+            var readVariants = [
+                { name: "FSO Unicode (-1)", fmt: -1 },
+                { name: "FSO SystemDefault (-2)", fmt: -2 },
+                { name: "FSO ASCII (0)", fmt: 0 }
+            ];
+            var bestContent = "";
+            var bestVariant = "";
+            for (var rv = 0; rv < readVariants.length; rv++) {
+                var attempt = { name: readVariants[rv].name };
+                try {
+                    var f = fso.OpenTextFile(outPath, 1, false, readVariants[rv].fmt);
+                    var t = String(f.ReadAll());
+                    f.Close();
+                    attempt.length = t.length;
+                    attempt.preview = t.substr(0, 150);
+                    if (t.length > bestContent.length) {
+                        bestContent = t;
+                        bestVariant = readVariants[rv].name;
+                    }
+                } catch(eRf) {
+                    attempt.error = eRf.message;
+                }
+                readDiag.attempts.push(attempt);
+            }
+
+            // BOM strippen + trimmen
+            var content = bestContent;
+            if (content.charCodeAt(0) === 0xFEFF) content = content.substr(1);
+            content = content.replace(/^\s+|\s+$/g, "");
+            readDiag.bestVariant = bestVariant;
+            readDiag.contentLength = content.length;
+            readDiag.contentPreview = content.substr(0, 200);
+            readDiag.contentTail = content.length > 200 ? content.substr(content.length - 100) : "";
+
             if (content && content.length > 2) {
                 try {
-                    var parsed = eval("(" + content + ")");
+                    var parsed;
+                    if (typeof JSON !== "undefined" && JSON.parse) {
+                        parsed = JSON.parse(content);
+                    } else {
+                        parsed = eval("(" + content + ")");
+                    }
                     if (parsed && parsed.length) {
                         for (var k = 0; k < parsed.length; k++) xs.results.push(parsed[k]);
+                        readDiag.parseOk = true;
+                        readDiag.parsedCount = parsed.length;
+                    } else {
+                        readDiag.parseOk = true;
+                        readDiag.parsedCount = 0;
+                        readDiag.note = "parsed but empty or no length";
                     }
                 } catch(eP) {
-                    // Parse-Fehler - Diagnose im Canary
+                    readDiag.parseError = eP.message || String(eP);
                 }
+            } else {
+                readDiag.note = "content zu kurz oder leer";
             }
+            xs._lastReadDiag = readDiag;
         }
     } catch(e) {
         for (var fi = 0; fi < chunk.length; fi++) {
@@ -3275,24 +3325,53 @@ function finishXxl() {
     // 0-Result-Diagnose-Pfad
     if (xs.results.length === 0 && xs.firstFailureDiag) {
         var d = xs.firstFailureDiag;
+        var readDiag = xs._lastReadDiag || {};
+        var attemptsHtml = "";
+        if (readDiag.attempts) {
+            for (var ai = 0; ai < readDiag.attempts.length; ai++) {
+                var at = readDiag.attempts[ai];
+                attemptsHtml += "<b>" + esc(at.name) + ":</b> ";
+                if (at.error) {
+                    attemptsHtml += "<span style='color:#fca5a5'>ERROR " + esc(at.error) + "</span>";
+                } else {
+                    attemptsHtml += "len=" + at.length + " preview=<code style='font-size:10px'>" + esc((at.preview || "").substr(0, 100)) + "</code>";
+                }
+                attemptsHtml += "<br>";
+            }
+        }
+        var parseInfo = "";
+        if (readDiag.parseError) {
+            parseInfo = "<span style='color:#fca5a5'>JSON-Parse-Error: " + esc(readDiag.parseError) + "</span>";
+        } else if (readDiag.parseOk) {
+            parseInfo = "Parsed OK, count=" + readDiag.parsedCount + " (" + (readDiag.note || "") + ")";
+        } else {
+            parseInfo = readDiag.note || "(kein Parse-Versuch)";
+        }
+
         var msg = "<strong>XXL-Modus hat 0 Mails verarbeitet.</strong><br><br>" +
                   "<strong>Diagnose:</strong><br>" +
                   "wscript.exe Exit-Code: " + d.rc + "<br>" +
-                  "Output-Datei existiert: " + (d.outputExists ? "ja" : "<strong>NEIN</strong>") + "<br>" +
+                  "Output-Datei existiert: " + (d.outputExists ? "ja (" + (readDiag.fileSize || 0) + " bytes)" : "<strong>NEIN</strong>") + "<br>" +
                   "Canary-Log existiert: " + (d.canaryExists ? "ja" : "<strong>NEIN</strong>") + "<br>" +
                   "Chunk-Groesse war: " + d.chunkSize + " Mails<br><br>" +
-                  "<strong>Canary-Log:</strong><br>" +
+
+                  "<strong>Lese-Versuche (FSO):</strong><br>" +
+                  "<div style=\"font-size:11px;background:#0f172a;padding:6px;border-radius:4px;\">" + attemptsHtml + "</div>" +
+
+                  "<br><strong>Best variant:</strong> " + esc(readDiag.bestVariant || "(keine)") +
+                  " &mdash; Content-Length nach BOM-Strip: " + (readDiag.contentLength || 0) + "<br>" +
+                  "<strong>Content Preview:</strong><br>" +
+                  "<pre style=\"background:#0f172a;padding:6px;border-radius:4px;font-size:11px;max-height:120px;overflow:auto;white-space:pre-wrap;\">" +
+                  esc(readDiag.contentPreview || "(leer)") + "</pre>" +
+                  "<strong>Parse-Result:</strong> " + parseInfo + "<br><br>" +
+
+                  "<strong>Canary-Log (VBS-Seite):</strong><br>" +
                   "<pre style=\"background:#0f172a;padding:8px;border-radius:4px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;\">" +
                   esc(d.canary).substr(0, 4000) + "</pre>" +
+
                   "<strong>Debug-Dateien (NICHT geloescht):</strong><br>" +
                   "<code style=\"font-size:10px;\">" +
-                  "VBS:&nbsp;&nbsp;&nbsp;" + esc(xs.vbsPath) + "<br>" +
-                  "Liste:&nbsp;" + esc(d.listPath) + "<br>" +
-                  "Output:&nbsp;" + esc(d.outPath) + "<br>" +
-                  "Canary:&nbsp;" + esc(d.canaryPath) + "</code><br><br>" +
-                  "<strong>Test-Befehl manuell (in CMD ausfuehren):</strong><br>" +
-                  "<code style=\"font-size:10px;background:#0f172a;padding:4px;display:block;word-break:break-all;\">" +
-                  esc(d.cmd.replace("//B", "")) + "</code>";
+                  "Output:&nbsp;" + esc(d.outPath) + "</code>";
         showError(msg);
         return;
     }
@@ -3686,7 +3765,7 @@ function buildParseMsgVbs() {
     v.push("End Function");
     v.push("");
 
-    // JsonEsc - schluck Non-Printable + Standard-Escape
+    // JsonEsc - schluck Non-Printable + Standard-Escape (v1.16 strict)
     v.push("Function JsonEsc(s)");
     v.push("    Dim r, re");
     v.push("    r = CStr(s)");
@@ -3696,8 +3775,9 @@ function buildParseMsgVbs() {
     v.push("    r = Replace(r, vbLf, \"\\n\")");
     v.push("    r = Replace(r, vbTab, \" \")");
     v.push("    Set re = CreateObject(\"VBScript.RegExp\")");
-    v.push("    re.Pattern = \"[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]\"");
     v.push("    re.Global = True");
+    // Strip ALL control chars (C0 + DEL + C1 + surrogates) - JSON.parse haukt sonst
+    v.push("    re.Pattern = \"[\\x00-\\x1F\\x7F-\\x9F\\uD800-\\uDFFF]\"");
     v.push("    r = re.Replace(r, \"\")");
     v.push("    JsonEsc = r");
     v.push("End Function");
