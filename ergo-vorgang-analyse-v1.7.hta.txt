@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.6"
+        VERSION="1.7"
         WINDOWSTATE="normal"
     />
     <style>
@@ -185,18 +185,34 @@
 <body>
 <div class="container">
 
-    <!-- Header + UNC-Warnung (nur sichtbar wenn relevant) -->
+    <!-- UNC-Warnung (nur sichtbar wenn HTA aus Netzwerk-Pfad laeuft) -->
     <div id="uncBanner" style="display:none; background: linear-gradient(135deg, #b45309, #92400e); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1rem; color: #fef3c7; font-size: 13px;">
         <div style="display:flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
             <div style="font-size: 24px;">&#9888;</div>
             <div style="flex: 1; min-width: 300px;">
                 <strong>UNC-/Netzwerk-Pfad erkannt!</strong>
-                Diese HTA laeuft aus dem Pfad <code id="uncPath"></code>.
+                Diese HTA laeuft aus <code id="uncPath"></code>.
                 IE blockiert in dieser Zone den binaeren PDF-Upload (Fehler "Datenquelle in anderer Domaene").
-                Empfehlung: HTA in einen lokalen Ordner unter C:\ verschieben.
+                Verschieben + MOTW entfernen + neu starten.
             </div>
             <button class="btn btn-warning" style="font-weight: 600;" onclick="relocateToLocal()">
                 Jetzt nach %LOCALAPPDATA% verschieben + neu starten
+            </button>
+        </div>
+    </div>
+
+    <!-- Selbst-Unblock-Banner (sichtbar wenn HTA lokal liegt, aber wir
+         sicherheitshalber MOTW entfernen wollen) -->
+    <div id="motwBanner" style="display:none; background: linear-gradient(135deg, #1e40af, #1e3a8a); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1rem; color: #dbeafe; font-size: 12px;">
+        <div style="display:flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div style="font-size: 20px;">&#128274;</div>
+            <div style="flex: 1; min-width: 300px;">
+                Falls beim PDF-Upload "Datenquelle in anderer Domaene"-Fehler kommt,
+                hat die Datei moeglicherweise noch den Mark-of-the-Web vom Download.
+                Button entfernt das automatisch:
+            </div>
+            <button class="btn btn-secondary" onclick="unblockSelfAndRestart()">
+                MOTW entfernen + neu starten
             </button>
         </div>
     </div>
@@ -210,7 +226,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.6 - Auto-Relocate bei UNC (Internet-Zone-Bypass)</div>
+            <div class="ver">v1.7 - Relocate + Mark-of-the-Web entfernen (PowerShell Unblock-File)</div>
         </div>
 
         <!-- Cookie -->
@@ -395,6 +411,10 @@ window.onload = function() {
     if (isRunningFromUnc()) {
         document.getElementById("uncPath").innerText = getHtaDir();
         document.getElementById("uncBanner").style.display = "block";
+    } else {
+        // Lokal? Trotzdem MOTW-Selbst-Unblock-Button anzeigen,
+        // falls die Datei mit Mark-of-the-Web kopiert/heruntergeladen wurde.
+        document.getElementById("motwBanner").style.display = "block";
     }
 
     // Load cookie
@@ -1871,8 +1891,8 @@ function isRunningFromUnc() {
 }
 
 // Kopiert HTA + Cookie.txt nach %LOCALAPPDATA%\ergo-vorgang-analyse\,
-// startet die neue Instanz, schliesst die aktuelle. Ein-Klick-Loesung
-// fuer das ADODB.Stream-Cross-Domain-Problem.
+// ENTFERNT Mark-of-the-Web (sonst bleibt die Kopie weiter in Internet-
+// Zone), startet die neue Instanz, schliesst die aktuelle.
 function relocateToLocal() {
     var htaDir = getHtaDir();
     var htaPath = getHtaPath();
@@ -1890,11 +1910,14 @@ function relocateToLocal() {
         var htaName = getHtaFileName() || "ergo-vorgang-analyse.hta";
         var dstHta = localBase + "\\" + htaName;
         fso.CopyFile(htaPath, dstHta, true);
+        unblockFile(dstHta);
 
-        // Cookie.txt mitkopieren falls vorhanden
+        // Cookie.txt mitkopieren + entsperren falls vorhanden
         var srcCookie = htaDir + "\\Cookie.txt";
+        var dstCookie = localBase + "\\Cookie.txt";
         if (fso.FileExists(srcCookie)) {
-            try { fso.CopyFile(srcCookie, localBase + "\\Cookie.txt", true); } catch(e) {}
+            try { fso.CopyFile(srcCookie, dstCookie, true); } catch(e) {}
+            unblockFile(dstCookie);
         }
 
         // Neue Instanz starten + diese schliessen
@@ -1903,8 +1926,51 @@ function relocateToLocal() {
             try { window.close(); } catch(e) {}
         }, 300);
     } catch(e) {
-        showError("Verschieben fehlgeschlagen: " + e.message + "\n\nManueller Workaround:\n1. Diese HTA-Datei und Cookie.txt in einen Ordner unter C:\\ kopieren\n2. Von dort doppelklicken");
+        showError("Verschieben fehlgeschlagen: " + e.message + "\n\nManueller Workaround:\n1. HTA + Cookie.txt nach C:\\ kopieren\n2. Rechtsklick auf die kopierte HTA -> Eigenschaften -> Zulassen-Haken setzen\n3. HTA doppelklicken");
     }
+}
+
+// Entfernt MOTW von der laufenden HTA + Cookie.txt + startet neu.
+// Fuer den Fall, dass das HTA lokal liegt, aber den Mark-of-the-Web noch
+// vom urspruenglichen Download mitschleppt.
+function unblockSelfAndRestart() {
+    var htaPath = getHtaPath();
+    if (!htaPath) { showError("HTA-Pfad nicht ermittelbar."); return; }
+    try {
+        unblockFile(htaPath);
+        if (COOKIE_PATH) unblockFile(COOKIE_PATH);
+        var shell = new ActiveXObject("WScript.Shell");
+        shell.Run('mshta "' + htaPath + '"', 1, false);
+        window.setTimeout(function() { try { window.close(); } catch(e) {} }, 300);
+    } catch(e) {
+        showError("Entsperren fehlgeschlagen: " + e.message + "\n\nManueller Workaround:\nRechtsklick auf die HTA -> Eigenschaften -> ganz unten 'Zulassen' anklicken -> OK -> HTA neu starten.");
+    }
+}
+
+// Entfernt das Mark-of-the-Web ('Zone.Identifier'-ADS) von einer Datei.
+// Ohne diesen Schritt bleibt eine kopierte/heruntergeladene Datei in der
+// Internet-Zone, auch wenn sie auf C:\ liegt - und ADODB.Stream wird
+// weiter gesperrt.
+function unblockFile(path) {
+    if (!path) return;
+    // Variante 1: ADS direkt loeschen via FSO (geht bei manchen Rechtekonfigs)
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        fso.DeleteFile(path + ":Zone.Identifier", true);
+        return;
+    } catch(e1) {}
+    // Variante 2: PowerShell Unblock-File (Standard-Weg)
+    try {
+        var shell = new ActiveXObject("WScript.Shell");
+        var ps = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "Unblock-File -LiteralPath \'' + path + '\'"';
+        shell.Run(ps, 0, true); // hidden window, wait for exit
+        return;
+    } catch(e2) {}
+    // Variante 3: cmd-DEL der ADS (legacy)
+    try {
+        var shell2 = new ActiveXObject("WScript.Shell");
+        shell2.Run('cmd.exe /c del "' + path + ':Zone.Identifier" 2>nul', 0, true);
+    } catch(e3) {}
 }
 
 // Verzeichnis, in dem die HTA-Datei liegt - via location.href parsen.
