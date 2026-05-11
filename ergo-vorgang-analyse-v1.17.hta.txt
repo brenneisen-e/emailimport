@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.16"
+        VERSION="1.17"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.16 - XXL: JsonEsc strict + JSON.parse + Read-Diagnostik (Content-Preview im Fehler)</div>
+            <div class="ver">v1.17 - XXL-Endfix: Output direkt als UTF-16 lesen (kein Multi-Variant-Vergleich mehr)</div>
         </div>
 
         <!-- Cookie -->
@@ -3203,44 +3203,39 @@ function processNextXxlChunk() {
         rc = shell.Run(cmd, 0, true);
 
         if (fso.FileExists(outPath)) {
-            // Versuche mehrere Lese-Strategien, sammle Diagnose pro Versuch
+            // VBS schreibt als UTF-16 LE + BOM via FSO.CreateTextFile -> wir lesen
+            // direkt mit Format -1 (Unicode). KEIN Laengen-Vergleich mit anderen
+            // Varianten - der lieferte faelschlich ASCII-Read (2x Bytes durch
+            // Null-Byte-Interleaving) und brach den JSON-Parse.
             var fileSize = 0;
             try { fileSize = fso.GetFile(outPath).Size; } catch(eS) {}
             var readDiag = { fileSize: fileSize, attempts: [] };
 
-            var readVariants = [
-                { name: "FSO Unicode (-1)", fmt: -1 },
-                { name: "FSO SystemDefault (-2)", fmt: -2 },
-                { name: "FSO ASCII (0)", fmt: 0 }
-            ];
-            var bestContent = "";
-            var bestVariant = "";
-            for (var rv = 0; rv < readVariants.length; rv++) {
-                var attempt = { name: readVariants[rv].name };
+            var content = "";
+            try {
+                var fU = fso.OpenTextFile(outPath, 1, false, -1);
+                content = String(fU.ReadAll());
+                fU.Close();
+                readDiag.attempts.push({ name: "FSO Unicode (-1)", length: content.length, preview: content.substr(0, 150) });
+            } catch(eR) {
+                readDiag.attempts.push({ name: "FSO Unicode (-1)", error: eR.message });
+                // Fallback: probier SystemDefault
                 try {
-                    var f = fso.OpenTextFile(outPath, 1, false, readVariants[rv].fmt);
-                    var t = String(f.ReadAll());
-                    f.Close();
-                    attempt.length = t.length;
-                    attempt.preview = t.substr(0, 150);
-                    if (t.length > bestContent.length) {
-                        bestContent = t;
-                        bestVariant = readVariants[rv].name;
-                    }
-                } catch(eRf) {
-                    attempt.error = eRf.message;
+                    var fD = fso.OpenTextFile(outPath, 1, false, -2);
+                    content = String(fD.ReadAll());
+                    fD.Close();
+                    readDiag.attempts.push({ name: "FSO SystemDefault (-2)", length: content.length, preview: content.substr(0, 150) });
+                } catch(eR2) {
+                    readDiag.attempts.push({ name: "FSO SystemDefault (-2)", error: eR2.message });
                 }
-                readDiag.attempts.push(attempt);
             }
 
-            // BOM strippen + trimmen
-            var content = bestContent;
+            // BOM + Whitespace strippen
             if (content.charCodeAt(0) === 0xFEFF) content = content.substr(1);
             content = content.replace(/^\s+|\s+$/g, "");
-            readDiag.bestVariant = bestVariant;
+            readDiag.bestVariant = "FSO Unicode (-1)";
             readDiag.contentLength = content.length;
             readDiag.contentPreview = content.substr(0, 200);
-            readDiag.contentTail = content.length > 200 ? content.substr(content.length - 100) : "";
 
             if (content && content.length > 2) {
                 try {
@@ -3257,7 +3252,7 @@ function processNextXxlChunk() {
                     } else {
                         readDiag.parseOk = true;
                         readDiag.parsedCount = 0;
-                        readDiag.note = "parsed but empty or no length";
+                        readDiag.note = "parsed but empty";
                     }
                 } catch(eP) {
                     readDiag.parseError = eP.message || String(eP);
