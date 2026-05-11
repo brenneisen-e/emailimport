@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.4"
+        VERSION="1.5"
         WINDOWSTATE="normal"
     />
     <style>
@@ -195,7 +195,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.4 - FSO statt ADODB.Stream (UNC/Internet-Zone-Fix)</div>
+            <div class="ver">v1.5 - Pure-JS Multipart + UTF-8 + Excel-Farben + Cache via FSO</div>
         </div>
 
         <!-- Cookie -->
@@ -233,7 +233,7 @@
 
         <details>
             <summary>3. Einstellungen</summary>
-            <div style="margin-top: 0.5rem;" class="grid grid-4">
+            <div style="margin-top: 0.5rem;" class="grid grid-2">
                 <div>
                     <label>Modell</label>
                     <input type="text" id="modelInput" value="gpt-51-chat">
@@ -241,14 +241,6 @@
                 <div>
                     <label>Parallel-Slots (1-6)</label>
                     <input type="number" id="parallelInput" value="3" min="1" max="6">
-                </div>
-                <div>
-                    <label>Temperature</label>
-                    <input type="number" id="tempInput" value="0" min="0" max="2" step="0.1">
-                </div>
-                <div>
-                    <label>Tone</label>
-                    <input type="text" id="toneInput" value="Sachlich">
                 </div>
             </div>
             <div style="margin-top: 0.5rem;" class="compact">
@@ -331,61 +323,9 @@
 
 </div>
 
-<!-- VBScript helper: binary multipart upload (JS can't easily build byte arrays for COM) -->
-<script language="VBScript">
-' Build a binary body: pre-bytes + file-bytes + post-bytes, return as byte array
-Function BuildMultipartBody(pre, filePath, post)
-    Dim stm, stmFile
-    Set stm = CreateObject("ADODB.Stream")
-    stm.Type = 1 ' binary
-    stm.Open
+<!-- v1.5: VBScript-Helper komplett entfernt. Pure JS Multipart, da VBScript-
+     Funktionen in HTAs aus UNC/Internet-Zone fuer JS nicht zugaenglich sind. -->
 
-    ' write pre (UTF-8, no BOM)
-    Dim preBytes
-    preBytes = StringToUtf8Bytes(pre)
-    If Not IsEmpty(preBytes) Then stm.Write preBytes
-
-    ' write file
-    Set stmFile = CreateObject("ADODB.Stream")
-    stmFile.Type = 1
-    stmFile.Open
-    stmFile.LoadFromFile filePath
-    stm.Write stmFile.Read
-    stmFile.Close
-
-    ' write post
-    Dim postBytes
-    postBytes = StringToUtf8Bytes(post)
-    If Not IsEmpty(postBytes) Then stm.Write postBytes
-
-    stm.Position = 0
-    BuildMultipartBody = stm.Read
-    stm.Close
-End Function
-
-Function StringToUtf8Bytes(s)
-    Dim st, b
-    Set st = CreateObject("ADODB.Stream")
-    st.Type = 2 ' text
-    st.Charset = "utf-8"
-    st.Open
-    st.WriteText s
-    st.Position = 0
-    st.Type = 1 ' binary
-    ' skip 3-byte BOM
-    If st.Size >= 3 Then
-        st.Read 3
-    End If
-    StringToUtf8Bytes = st.Read
-    st.Close
-End Function
-
-' Send a WinHttp request with a binary body. Returns the http object so JS can poll.
-Function SendBinaryAsync(http, body)
-    http.Send body
-    SendBinaryAsync = True
-End Function
-</script>
 
 <script language="JavaScript">
 'use strict';
@@ -445,8 +385,6 @@ window.onload = function() {
             var s = eval("(" + saved + ")");
             if (s.model) document.getElementById("modelInput").value = s.model;
             if (s.parallel) document.getElementById("parallelInput").value = s.parallel;
-            if (s.temp !== undefined) document.getElementById("tempInput").value = s.temp;
-            if (s.tone) document.getElementById("toneInput").value = s.tone;
             if (s.lastFolder) {
                 // Don't auto-load - require explicit user action - but pre-fill
                 state.folderPath = s.lastFolder;
@@ -693,13 +631,8 @@ function loadCache() {
     var p = cachePath();
     if (!p) return;
     try {
-        var fso = new ActiveXObject("Scripting.FileSystemObject");
-        if (!fso.FileExists(p)) return;
-        var stm = new ActiveXObject("ADODB.Stream");
-        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
-        stm.LoadFromFile(p);
-        var raw = stm.ReadText();
-        stm.Close();
+        var raw = readTextFile(p);
+        if (!raw) return;
         var data = eval("(" + raw + ")");
         if (data && data.results && data.results.length > 0) {
             state.results = data.results;
@@ -724,14 +657,66 @@ function saveCache() {
             updatedAt: isoNow(),
             results: state.results
         };
-        var json = jsonStringify(data);
-        var stm = new ActiveXObject("ADODB.Stream");
-        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
-        stm.WriteText(json);
-        stm.SaveToFile(p, 2);
-        stm.Close();
+        writeTextFile(p, jsonStringify(data));
     } catch(e) {
         // Don't crash on cache write fail
+    }
+}
+
+// FSO-first, ADODB.Stream-Fallback Pattern (von BGAV-HTA abgeleitet).
+// Notwendig fuer UNC/Internet-Zone: ADODB.Stream blockiert mit
+// "Datenquelle in anderer Domaene", FSO nicht.
+function writeTextFile(path, content) {
+    var fsoErr = "", adbErr = "";
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var f = fso.CreateTextFile(path, true, true); // overwrite=true, unicode=true (UTF-16 LE)
+        f.Write(content);
+        f.Close();
+        return;
+    } catch(e) { fsoErr = e.message; }
+    try {
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+        stm.WriteText(content);
+        stm.SaveToFile(path, 2);
+        stm.Close();
+        return;
+    } catch(e) { adbErr = e.message; }
+    throw new Error("Schreiben fehlgeschlagen (FSO: " + fsoErr + " / ADODB: " + adbErr + ")");
+}
+
+function readTextFile(path) {
+    var fso;
+    try { fso = new ActiveXObject("Scripting.FileSystemObject"); }
+    catch(e) { throw new Error("FSO nicht verfuegbar: " + e.message); }
+    if (!fso.FileExists(path)) return "";
+
+    // FSO mit Format-Fallback (Unicode -> SystemDefault -> ASCII).
+    // Wir nehmen die laengste plausible Variante.
+    var fmts = [-1, -2, 0];
+    var best = "";
+    for (var i = 0; i < fmts.length; i++) {
+        try {
+            var f = fso.OpenTextFile(path, 1, false, fmts[i]);
+            var t = String(f.ReadAll());
+            f.Close();
+            if (t.length > best.length) best = t;
+        } catch(e) {}
+    }
+    if (best.charCodeAt(0) === 0xFEFF) best = best.substr(1);
+    if (best.length > 0) return best;
+
+    // Letzter Versuch: ADODB.Stream UTF-8 (geht in lokaler Zone)
+    try {
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+        stm.LoadFromFile(path);
+        var t2 = stm.ReadText();
+        stm.Close();
+        return String(t2 || "");
+    } catch(e) {
+        throw new Error("Lesen fehlgeschlagen: " + e.message);
     }
 }
 
@@ -1141,16 +1126,20 @@ function addResult(r) {
 // ERGO GPT API
 // ============================================================================
 function createConversationSync(prompt) {
-    var http = new ActiveXObject("MSXML2.ServerXMLHTTP.6.0");
-    http.open("PUT", ERGO_BASE + "/conversation", false);
-    setCommonHeaders(http);
-    http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    // WinHttp statt MSXML2 fuer konsistenteres UTF-8-Verhalten
+    var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+    http.Open("PUT", ERGO_BASE + "/conversation", false);
+    try { http.SetProxy(0); } catch(e) {}
+    setWinHttpHeaders(http);
+    http.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
     var payload = buildPayload(cleanForJson(prompt), "[]");
-    http.send(payload);
-    if (http.status !== 200) {
-        throw new Error("Create failed: " + http.status + " - " + (http.responseText || "").substr(0, 200));
+    // Als UTF-8-Bytes senden -> Umlaute landen korrekt auf der Leitung
+    var bodyBytes = stringToUtf8Bytes(payload);
+    if (bodyBytes) http.Send(bodyBytes); else http.Send(payload);
+    if (http.Status !== 200) {
+        throw new Error("Create failed: " + http.Status + " - " + (http.ResponseText || "").substr(0, 200));
     }
-    return parseJsonStr(http.responseText, "id");
+    return parseJsonStr(http.ResponseText, "id");
 }
 
 function startAnswerAsync(convId, prompt, docIdsJson) {
@@ -1162,7 +1151,9 @@ function startAnswerAsync(convId, prompt, docIdsJson) {
     setWinHttpHeaders(http);
     http.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
     http.SetRequestHeader("Accept", "*/*");
-    http.Send(payload);
+    // UTF-8-Bytes statt String -> Umlaute korrekt
+    var bodyBytes = stringToUtf8Bytes(payload);
+    if (bodyBytes) http.Send(bodyBytes); else http.Send(payload);
     return http;
 }
 
@@ -1178,6 +1169,50 @@ function fireDelete(convId) {
         http.Send('{"conversation_ids":["' + convId + '"]}');
         // fire and forget
     } catch(e) {}
+}
+
+// Pure-JS Multipart-Builder (Ersatz fuer den ehemaligen VBScript-Helper,
+// der in HTAs aus UNC/Internet-Zone fuer JS unzugaenglich war).
+// Setzt voraus, dass ADODB.Stream Binary-I/O auf %TEMP%-Pfade darf -
+// das geht auch in Internet-Zone, weil die Source-Datei lokal ist.
+function buildMultipartBody(pre, filePath, post) {
+    var stm = new ActiveXObject("ADODB.Stream");
+    stm.Type = 1; // binary
+    stm.Open();
+
+    // Pre (UTF-8 ohne BOM)
+    var preBytes = stringToUtf8Bytes(pre);
+    if (preBytes) stm.Write(preBytes);
+
+    // File
+    var fileStm = new ActiveXObject("ADODB.Stream");
+    fileStm.Type = 1;
+    fileStm.Open();
+    fileStm.LoadFromFile(filePath);
+    stm.Write(fileStm.Read());
+    fileStm.Close();
+
+    // Post (UTF-8 ohne BOM)
+    var postBytes = stringToUtf8Bytes(post);
+    if (postBytes) stm.Write(postBytes);
+
+    stm.Position = 0;
+    var bytes = stm.Read();
+    stm.Close();
+    return bytes;
+}
+
+function stringToUtf8Bytes(s) {
+    if (!s || s.length === 0) return null;
+    var stm = new ActiveXObject("ADODB.Stream");
+    stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+    stm.WriteText(s);
+    stm.Position = 0;
+    stm.Type = 1;
+    if (stm.Size >= 3) stm.Read(3); // skip BOM
+    var b = stm.Read();
+    stm.Close();
+    return b;
 }
 
 function uploadPdfsSequential(convId, paths) {
@@ -1201,7 +1236,7 @@ function uploadPdfsSequential(convId, paths) {
                        'Content-Disposition: form-data; name="conversation_id"\r\n\r\n' +
                        convId + "\r\n" +
                        "--" + boundary + "--\r\n";
-            var body = BuildMultipartBody(pre, path, post);
+            var body = buildMultipartBody(pre, path, post);
 
             var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
             http.Open("POST", "https://gpt.ergo.com/api/document", false);
@@ -1254,15 +1289,13 @@ function setWinHttpHeaders(http) {
 
 function buildPayload(promptEsc, docIdsJson) {
     var model = trim(document.getElementById("modelInput").value) || "gpt-51-chat";
-    var temp = parseFloat(document.getElementById("tempInput").value);
-    if (isNaN(temp)) temp = 0;
-    var tone = trim(document.getElementById("toneInput").value);
-
+    // Temperature und Tone hardgecodet (Default: deterministisch, sachlich) -
+    // diese Felder gibt es in der UI nicht mehr.
     return '{"conversation_title":"New conversation","messages":[{' +
            '"id":"' + uuid4() + '","role":"user","content":"' + promptEsc +
            '","date":"' + isoNow() + '"}],' +
-           '"model":"' + model + '","temperature":' + temp +
-           ',"pinned":false,"tone":"' + jsonEscape(tone) + '","document_ids":' + docIdsJson + '}';
+           '"model":"' + model + '","temperature":0' +
+           ',"pinned":false,"tone":"Sachlich","document_ids":' + docIdsJson + '}';
 }
 
 // ============================================================================
@@ -1476,6 +1509,10 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
 // ============================================================================
 // EXPORT
 // ============================================================================
+// Excel.Interior.Color erwartet BGR-codierte Long. Wir bauen den Wert wie
+// VBAs RGB(r,g,b) = r + g*256 + b*65536. So funktionieren die VBA-Farben.
+function rgb(r, g, b) { return r + g * 256 + b * 65536; }
+
 function exportToExcel() {
     if (state.results.length === 0) { showError("Keine Ergebnisse zum Exportieren."); return; }
     hideStatus();
@@ -1494,15 +1531,55 @@ function exportToExcel() {
                        "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
                        "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen",
                        "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler"];
+        // Spalten-Konstanten (1-basiert)
+        var COL_DATEI = 2, COL_HINWEIS = 35, COL_FEHLER = 36;
+        var COL_MAKLERPOOL = 9, COL_MAKLER_NR = 12;
+        var COL_KUNDE_NACH = 13, COL_VERS_NR = 16;
+        var COL_VORGANGSTYP = 17, COL_REMINDER = 18;
+        var COL_KLASSIFIK = 19, COL_GESCHTYP = 21, COL_UNTERLAGEN = 22, COL_SONDERFALL = 24, COL_SPARTE = 25;
+        var COL_ANH_TYPEN = 26, COL_PDF_QUAL = 27;
+        var COL_VM_VORHAND = 28, COL_VM_VOLLST = 29, COL_VM_FEHLT = 30, COL_UNTERSCHR_K = 31, COL_UNTERSCHR_M = 32, COL_AUF_VN = 33, COL_MAKL_NAM = 34;
+
         for (var c = 0; c < headers.length; c++) {
             sheet.Cells(1, c+1).Value = headers[c];
         }
+
+        // Farb-Schema fuer Header-Gruppen (VBA-Original)
+        var F_STAMM  = rgb(30,  64, 175); // Indigo  - Mail-Stammdaten
+        var F_MAKLER = rgb(22, 101,  52); // Gruen   - Makler
+        var F_KUNDE  = rgb(14, 116, 144); // Petrol  - Kunde
+        var F_TRIAGE = rgb(76,  29, 149); // Lila    - Triage / Reminder / Hinweis
+        var F_KLASS  = rgb(15, 118, 110); // Teal    - Klassifikation
+        var F_ANHANG = rgb(154, 52,  18); // Bronze  - Anhang
+        var F_MV     = rgb(159, 18,  57); // Bordeaux- Maklervollmacht
+        var WHITE    = rgb(255, 255, 255);
+
         try {
             var hr = sheet.Range(sheet.Cells(1,1), sheet.Cells(1, headers.length));
             hr.Font.Bold = true;
-            hr.Interior.Color = 0xB91C1C;
-            hr.Font.Color = 0xFFFFFF;
+            hr.Font.Color = WHITE;
+            hr.HorizontalAlignment = -4108; // xlCenter
+            hr.WrapText = true;
+            sheet.Rows(1).RowHeight = 30;
+            // Pro Gruppe einfaerben
+            sheet.Range(sheet.Cells(1,1), sheet.Cells(1, 8)).Interior.Color = F_STAMM;
+            sheet.Range(sheet.Cells(1, COL_MAKLERPOOL), sheet.Cells(1, COL_MAKLER_NR)).Interior.Color = F_MAKLER;
+            sheet.Range(sheet.Cells(1, COL_KUNDE_NACH), sheet.Cells(1, COL_VERS_NR)).Interior.Color = F_KUNDE;
+            sheet.Range(sheet.Cells(1, COL_VORGANGSTYP), sheet.Cells(1, COL_REMINDER)).Interior.Color = F_TRIAGE;
+            sheet.Range(sheet.Cells(1, COL_KLASSIFIK), sheet.Cells(1, COL_SPARTE)).Interior.Color = F_KLASS;
+            sheet.Range(sheet.Cells(1, COL_ANH_TYPEN), sheet.Cells(1, COL_PDF_QUAL)).Interior.Color = F_ANHANG;
+            sheet.Range(sheet.Cells(1, COL_VM_VORHAND), sheet.Cells(1, COL_MAKL_NAM)).Interior.Color = F_MV;
+            sheet.Cells(1, COL_HINWEIS).Interior.Color = F_TRIAGE;
+            sheet.Cells(1, COL_FEHLER).Interior.Color = rgb(127, 29, 29); // dunkles Rot
         } catch(e) {}
+
+        // Highlight-Farben fuer Daten-Zeilen
+        var H_ROT   = rgb(252, 165, 165); // Fehler/Achtung
+        var H_GRUEN = rgb(187, 247, 208); // OK/positiv
+        var H_GELB  = rgb(254, 240, 138); // Achtung
+        var H_ORANGE= rgb(254, 215, 170); // Reminder/Warnung
+        var H_BERN  = rgb(253, 230, 138); // Klassifikation auffaellig
+        var H_GRAU  = rgb(229, 231, 235); // Kein-Makler-Vorgang
 
         for (var i = 0; i < state.results.length; i++) {
             var r = state.results[i];
@@ -1544,19 +1621,51 @@ function exportToExcel() {
             sheet.Cells(row,34).Value = sg(d, "makler_namentlich_genannt");
             sheet.Cells(row,35).Value = sg(d, "hinweis");
             sheet.Cells(row,36).Value = r.ok ? "" : r.errMsg;
+
+            // Highlights pro Zelle (VBA-Logik)
+            try {
+                if (!r.ok || r.errMsg) {
+                    sheet.Cells(row, COL_FEHLER).Interior.Color = H_ROT;
+                }
+                var vt = sg(d, "vorgangstyp");
+                if (vt && vt !== "Makler-Vorgang" && vt !== "") {
+                    sheet.Range(sheet.Cells(row, COL_MAKLERPOOL), sheet.Cells(row, COL_HINWEIS)).Interior.Color = H_GRAU;
+                    sheet.Cells(row, COL_VORGANGSTYP).Interior.Color = H_ORANGE;
+                }
+                if (sg(d, "ist_reminder") === "ja") sheet.Cells(row, COL_REMINDER).Interior.Color = H_ORANGE;
+                var sond = sg(d, "sonderfall");
+                if (sond === "Flottengeschaeft" || sond === "Sondertarif") sheet.Cells(row, COL_SONDERFALL).Interior.Color = H_ROT;
+                var kl = sg(d, "klassifikation");
+                if (kl === "Nicht-Standard") sheet.Cells(row, COL_KLASSIFIK).Interior.Color = H_BERN;
+                var pq = sg(d, "pdf_qualitaet");
+                if (pq === "Scan") sheet.Cells(row, COL_PDF_QUAL).Interior.Color = H_BERN;
+                else if (pq === "Mixed") sheet.Cells(row, COL_PDF_QUAL).Interior.Color = H_GELB;
+                var mvv = sg(d, "mv_vollumfaenglich");
+                if (mvv === "teilweise" || mvv === "nein") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_ROT;
+                else if (mvv === "ja") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_GRUEN;
+                var uk = sg(d, "unterschrift_kunde");
+                if (uk === "nein") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_ROT;
+                else if (uk === "ja") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_GRUEN;
+                var um = sg(d, "unterschrift_makler");
+                if (um === "nein") sheet.Cells(row, COL_UNTERSCHR_M).Interior.Color = H_ROT;
+                else if (um === "ja") sheet.Cells(row, COL_UNTERSCHR_M).Interior.Color = H_GRUEN;
+            } catch(e) {}
         }
 
         try {
             sheet.Columns("A:A").ColumnWidth = 5;
             sheet.Columns("B:B").ColumnWidth = 40;
             sheet.Columns("C:H").ColumnWidth = 18;
+            sheet.Cells.Font.Name = "Open Sans";
+            sheet.Cells.WrapText = false;
+            // Autofilter
+            sheet.Range(sheet.Cells(1,1), sheet.Cells(state.results.length + 1, headers.length)).AutoFilter();
             sheet.Range("A2").Select();
             excel.ActiveWindow.FreezePanes = true;
-            sheet.Columns(headers.length).AutoFit();
         } catch(e) {}
 
         excel.DisplayAlerts = true;
-        showSuccess("Excel mit " + state.results.length + " Vorgaengen geoeffnet. Bitte manuell speichern.");
+        showSuccess("Excel mit " + state.results.length + " Vorgaengen geoeffnet (mit Farb-Highlights). Bitte manuell speichern.");
     } catch(e) {
         showError("Excel-Export fehlgeschlagen: " + e.message);
     }
@@ -1575,11 +1684,7 @@ function exportToJson() {
         var ts = now.getFullYear() + "-" + pad(now.getMonth()+1) + "-" + pad(now.getDate()) + "_" + pad(now.getHours()) + "-" + pad(now.getMinutes());
         var path = dl + "\\ergo_vorgang_analyse_" + ts + ".json";
         var json = jsonStringify({ folder: state.folderPath, exportedAt: isoNow(), results: state.results });
-        var stm = new ActiveXObject("ADODB.Stream");
-        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
-        stm.WriteText(json);
-        stm.SaveToFile(path, 2);
-        stm.Close();
+        writeTextFile(path, json);
         showSuccess("JSON gespeichert: " + path);
     } catch(e) {
         showError("JSON-Export fehlgeschlagen: " + e.message);
@@ -1688,8 +1793,6 @@ function saveSettings() {
         var s = {
             model: document.getElementById("modelInput").value,
             parallel: document.getElementById("parallelInput").value,
-            temp: document.getElementById("tempInput").value,
-            tone: document.getElementById("toneInput").value,
             lastFolder: state.folderPath
         };
         window.localStorage.setItem("ergo_va_settings", jsonStringify(s));
