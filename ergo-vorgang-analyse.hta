@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.18"
+        VERSION="1.19"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.18 - Excel cellSafe: =/+/-/@-Strings escapen (sonst Formel-Parser-Crash)</div>
+            <div class="ver">v1.19 - Stufe 1: Bulk-KI-Triage (40 Mails/Call ohne PDF, ~30x schneller als Einzel-KI)</div>
         </div>
 
         <!-- Cookie -->
@@ -271,6 +271,11 @@
                     style="background: linear-gradient(135deg, #0d9488, #064e3b); color: white;"
                     title="XXL: parsed .msg-Dateien direkt ohne Outlook, fuer grosse Sets (1000+ Mails). ~20-50x schneller.">
                 &#128640; Pool-XXL (ohne Outlook)
+            </button>
+            <button class="btn" id="btnBulkTriage" onclick="runBulkTriage()" disabled
+                    style="background: linear-gradient(135deg, #d97706, #92400e); color: white;"
+                    title="Stufe 1: Bulk-KI-Triage. Sendet 30-40 Mails (Subject+Body) pro KI-Call. Kein PDF-Upload. Setzt Pool-XXL voraus.">
+                &#129302; Bulk-Triage (Stufe 1, KI ohne PDF)
             </button>
             <button class="btn btn-warning" id="btnCancel" onclick="cancelAnalysis()" disabled>
                 &#9632; Abbrechen
@@ -772,9 +777,15 @@ function refreshStartButton() {
     var canXxl = !state.running &&
                  state.folderPath.length > 0 &&
                  state.msgFiles.length > 0;
+    // Bulk-Triage: braucht Cookie + Folder + Mails (Outlook nicht zwingend)
+    var canBulk = !state.running &&
+                  state.cookie.length > 50 &&
+                  state.folderPath.length > 0 &&
+                  state.msgFiles.length > 0;
     document.getElementById("btnStart").disabled = !canStart;
     document.getElementById("btnQuickPool").disabled = !canQuick;
     document.getElementById("btnQuickPoolXxl").disabled = !canXxl;
+    document.getElementById("btnBulkTriage").disabled = !canBulk;
     document.getElementById("btnCancel").disabled = !state.running;
     document.getElementById("btnExcel").disabled = state.results.length === 0;
     document.getElementById("btnJson").disabled = state.results.length === 0;
@@ -3404,7 +3415,9 @@ function finishXxl() {
             source: "",
             sourceDetail: "",
             attCount: 0,
-            attNames: r.attNames || ""
+            attNames: r.attNames || "",
+            body: r.body || "",        // fuer Bulk-Triage (Stufe 1)
+            path: r.path || ""          // fuer ggf. Stufe 2 (PDF-Upload aus Pfad)
         };
         var atPos = row.absMail.indexOf("@");
         if (atPos >= 0) row.absDomain = row.absMail.substr(atPos + 1).toLowerCase();
@@ -3433,6 +3446,9 @@ function finishXxl() {
         rows.push(row);
     }
 
+    // In-memory cache fuer Stufe 1 (Bulk-Triage) - selbe Session
+    state.xxlResults = rows;
+
     // VBS-Skript aufraeumen (nur wenn kein Debug-Modus)
     if (!xs.firstFailureDiag) {
         try {
@@ -3449,6 +3465,9 @@ function finishXxl() {
     } catch(e) {
         showError("Excel-Export fehlgeschlagen: " + e.message);
     }
+
+    // Wenn User vorher Bulk-Triage gewaehlt hat, automatisch weiter
+    maybeAutoStartBulkAfterXxl();
 }
 
 // VBS-Skript fuer den .msg-Direkt-Parser.
@@ -3792,6 +3811,580 @@ function buildParseMsgVbs() {
     v.push("End Function");
 
     return v.join("\r\n");
+}
+
+// ============================================================================
+// STUFE 1: BULK-KI-TRIAGE (Stufe 0 / Pool-XXL nutzend)
+// ============================================================================
+// Schickt N (Default 30) Mails als batched-Prompt an ErgoGPT in EINEM Call.
+// Kein PDF-Upload. Antwort: JSON-Array mit pro-Mail-Klassifikation. Mehrere
+// Batches parallel via Slot-Pipeline (3 Slots). Pool-Vorerkennung aus Stufe 0
+// wird als Kontext mitgegeben, damit GPT die Pool-ID nicht selbst raten muss.
+
+function runBulkTriage() {
+    if (state.running) return;
+    if (state.cookie.length < 50) { showError("Cookie fehlt - oben einfuegen + speichern."); return; }
+
+    // Daten-Quelle: state.xxlResults (aus letztem Pool-XXL-Lauf in dieser Session)
+    var src = state.xxlResults || [];
+    if (src.length === 0) {
+        // Keine XXL-Daten - bietet sofortigen XXL-Run an
+        var doIt = confirm(
+            "Bulk-Triage braucht Mail-Inhalte (Subject + Body), die Pool-XXL " +
+            "vorab eingesammelt hat.\n\n" +
+            "Aktuell sind keine XXL-Daten im Speicher.\n\n" +
+            "Soll ich Pool-XXL jetzt schnell ausfuehren (~3 min fuer " + state.msgFiles.length + " Mails) " +
+            "und danach automatisch Bulk-Triage starten?\n\n" +
+            "OK = ja, beides nacheinander.\n" +
+            "Abbrechen = nichts tun (du kannst Pool-XXL separat klicken)."
+        );
+        if (!doIt) return;
+        state.bulkAutoChain = true;
+        runQuickPoolOverviewXxl();
+        return;
+    }
+
+    // Filter: nur potentielle Makler-Vorgaenge (ergo-intern raus, unbekannt drin)
+    var workable = [];
+    for (var i = 0; i < src.length; i++) {
+        var r = src[i];
+        // Ergo-intern: das sind OUTBOUND-Mails von uns - skip
+        if (r.pool === "ERGO (intern, kein Maklerpool)") continue;
+        workable.push(r);
+    }
+
+    if (workable.length === 0) {
+        showError("Keine analysefaehigen Mails - alle wurden in Stufe 0 als Ergo-intern markiert.");
+        return;
+    }
+
+    var skipped = src.length - workable.length;
+    var limitStr = window.prompt(
+        "Wieviele Mails durchziehen?\n\n" +
+        "Verfuegbar (nach Pre-Filter): " + workable.length + "\n" +
+        "(Pre-Filter hat " + skipped + " Ergo-interne Outbounds rausgenommen)\n\n" +
+        "leer / 0 = alle, oder Zahl (z.B. 50 zum Testen)",
+        workable.length
+    );
+    if (limitStr === null) return;
+    var limit = parseInt(limitStr) || workable.length;
+    if (limit <= 0 || limit > workable.length) limit = workable.length;
+
+    var batchStr = window.prompt(
+        "Batch-Groesse (Mails pro KI-Call)?\n\n" +
+        "Empfehlung: 30 (gute Balance Geschwindigkeit/Qualitaet)\n" +
+        "Werte: 5-50.\n\n" +
+        "Bei zu hohem Wert: GPT halluziniert mehr / kuerzt Output.",
+        30
+    );
+    if (batchStr === null) return;
+    var batchSize = parseInt(batchStr) || 30;
+    if (batchSize < 5) batchSize = 5;
+    if (batchSize > 50) batchSize = 50;
+
+    var parallel = parseInt(document.getElementById("parallelInput").value) || 3;
+    if (parallel < 1) parallel = 1;
+    if (parallel > 6) parallel = 6;
+
+    var batchCount = Math.ceil(limit / batchSize);
+    var estMin = Math.max(1, Math.round((batchCount / parallel) * 25 / 60));
+    var ok = confirm(
+        "Bulk-Triage starten?\n\n" +
+        "Mails: " + limit + "\n" +
+        "Batch-Groesse: " + batchSize + " Mails/Call\n" +
+        "Batches: " + batchCount + "\n" +
+        "Parallel-Slots: " + parallel + "\n" +
+        "Geschaetzte Laufzeit: ~" + estMin + " Minuten\n\n" +
+        "OK = starten, Abbrechen = nicht."
+    );
+    if (!ok) return;
+
+    state.running = true;
+    state.cancelled = false;
+    state.bulkState = {
+        workable: workable.slice(0, limit),
+        batchSize: batchSize,
+        parallelN: parallel,
+        slots: {},
+        slotCounter: 0,
+        nextBatchIdx: 0,
+        batches: [],
+        startTime: new Date().getTime(),
+        processed: 0,
+        errors: 0,
+        cookie: state.cookie
+    };
+    for (var bb = 0; bb < state.bulkState.workable.length; bb += batchSize) {
+        state.bulkState.batches.push(state.bulkState.workable.slice(bb, bb + batchSize));
+    }
+
+    document.getElementById("progressContainer").style.display = "block";
+    document.getElementById("slotStatus").innerText = "";
+    refreshStartButton();
+    hideStatus();
+    updateProgress(0, state.bulkState.workable.length,
+        "Bulk-Triage startet (" + state.bulkState.batches.length + " Batches, " + parallel + " parallel)...");
+
+    setTimeout(bulkTriageTick, 50);
+}
+
+function bulkTriageTick() {
+    if (!state.running) return;
+    var bs = state.bulkState;
+
+    // A) freie Slots fuellen
+    while (Object.keysCount(bs.slots) < bs.parallelN && bs.nextBatchIdx < bs.batches.length && !state.cancelled) {
+        var bIdx = bs.nextBatchIdx;
+        var batch = bs.batches[bIdx];
+        bs.slotCounter++;
+        var slot = {
+            id: bs.slotCounter,
+            batchIdx: bIdx,
+            batch: batch,
+            phase: "prep",
+            phaseAt: new Date().getTime()
+        };
+        try {
+            setSlotPhase(slot, "Prompt bauen (B" + (bIdx + 1) + ", " + batch.length + " Mails)");
+            var prompt = buildBulkTriagePrompt(batch);
+            setSlotPhase(slot, "Conversation anlegen (B" + (bIdx + 1) + ")");
+            slot.convId = createConversationSync(prompt);
+            setSlotPhase(slot, "warte auf GPT (B" + (bIdx + 1) + ")");
+            slot.http = startAnswerAsync(slot.convId, prompt, "[]");
+            bs.slots["b" + slot.id] = slot;
+        } catch(e) {
+            // Slot-Erzeugung gescheitert - Batch als Fehler markieren
+            for (var fi = 0; fi < batch.length; fi++) {
+                batch[fi].triage = { error: "Slot-Init: " + e.message, konfidenz: "niedrig" };
+            }
+            bs.errors += batch.length;
+            if (isAuthError(e.message)) state.cancelled = true;
+        }
+        bs.nextBatchIdx++;
+    }
+
+    // B) Slots pollen
+    var toRemove = [];
+    for (var k in bs.slots) {
+        if (!bs.slots.hasOwnProperty(k)) continue;
+        var s = bs.slots[k];
+        var done = false;
+        var winErr = null;
+        try { done = s.http.WaitForResponse(0); } catch(e) { winErr = e; }
+
+        if (winErr) {
+            for (var ei = 0; ei < s.batch.length; ei++) {
+                s.batch[ei].triage = { error: "[ASYNC] " + winErr.message, konfidenz: "niedrig" };
+            }
+            bs.errors += s.batch.length;
+            fireDelete(s.convId);
+            toRemove.push(k);
+        } else if (done) {
+            processBulkTriageResponse(s);
+            fireDelete(s.convId);
+            toRemove.push(k);
+        }
+    }
+    for (var t = 0; t < toRemove.length; t++) delete bs.slots[toRemove[t]];
+
+    // Status
+    var inflight = Object.keysCount(bs.slots);
+    var elapsed = Math.round((new Date().getTime() - bs.startTime) / 1000);
+    var totalDone = bs.processed + bs.errors;
+    updateProgress(totalDone, bs.workable.length,
+        elapsed + "s | " + inflight + " parallel | " +
+        bs.processed + " ok | " + bs.errors + " fehler | " +
+        (bs.workable.length - totalDone) + " offen");
+    renderSlotStatus();
+
+    // Done?
+    if (state.cancelled || (bs.nextBatchIdx >= bs.batches.length && Object.keysCount(bs.slots) === 0)) {
+        if (state.cancelled && Object.keysCount(bs.slots) > 0) {
+            // wait for inflight to abort
+            for (var ck in bs.slots) {
+                if (!bs.slots.hasOwnProperty(ck)) continue;
+                try { bs.slots[ck].http.Abort(); } catch(e) {}
+            }
+            bs.slots = {};
+        }
+        finishBulkTriage();
+        return;
+    }
+
+    var delay = (inflight >= bs.parallelN || bs.nextBatchIdx >= bs.batches.length) ? 250 : 50;
+    setTimeout(bulkTriageTick, delay);
+}
+
+function processBulkTriageResponse(slot) {
+    var bs = state.bulkState;
+    try {
+        var resp = "";
+        try { resp = slot.http.ResponseText; } catch(e) {}
+        var answer = extractAssistantFromNdjson(resp);
+        if (!answer || answer.length === 0) {
+            for (var i = 0; i < slot.batch.length; i++) {
+                slot.batch[i].triage = { error: "KI: leere Antwort", konfidenz: "niedrig" };
+            }
+            bs.errors += slot.batch.length;
+            return;
+        }
+        var antwort = jsonUnescape(answer).replace(/\\n/g, "\n");
+        var arr = parseGptJsonArray(antwort);
+        if (!arr || arr.length === 0) {
+            for (var i2 = 0; i2 < slot.batch.length; i2++) {
+                slot.batch[i2].triage = { error: "KI: kein Array geparst - " + antwort.substr(0, 100), konfidenz: "niedrig" };
+            }
+            bs.errors += slot.batch.length;
+            return;
+        }
+        // Map results back via 'nr' field oder Reihenfolge
+        for (var m = 0; m < slot.batch.length; m++) {
+            var mail = slot.batch[m];
+            var ki = null;
+            // Try by nr
+            for (var ai = 0; ai < arr.length; ai++) {
+                if (arr[ai] && (parseInt(arr[ai].nr) === (m + 1) || arr[ai].nr === String(m + 1))) {
+                    ki = arr[ai];
+                    break;
+                }
+            }
+            // Fallback: positional
+            if (!ki && arr[m]) ki = arr[m];
+
+            if (ki) {
+                mail.triage = ki;
+                bs.processed++;
+            } else {
+                mail.triage = { error: "Keine Antwort im Array fuer Mail " + (m + 1), konfidenz: "niedrig" };
+                bs.errors++;
+            }
+        }
+    } catch(e) {
+        for (var fi = 0; fi < slot.batch.length; fi++) {
+            slot.batch[fi].triage = { error: "Parse-Exception: " + e.message, konfidenz: "niedrig" };
+        }
+        bs.errors += slot.batch.length;
+    }
+}
+
+// Parser fuer JSON-Array-Antwort, robust gegen Markdown-Fences + Vorwort.
+function parseGptJsonArray(text) {
+    var t = trim(text);
+    if (t.substr(0, 7) === "```json") t = t.substr(7);
+    if (t.substr(0, 3) === "```") t = t.substr(3);
+    if (t.substr(t.length - 3) === "```") t = t.substr(0, t.length - 3);
+    t = trim(t);
+    var s = t.indexOf("[");
+    var e = t.lastIndexOf("]");
+    if (s < 0 || e <= s) return null;
+    t = t.substr(s, e - s + 1);
+    try {
+        if (typeof JSON !== "undefined" && JSON.parse) return JSON.parse(t);
+        return eval("(" + t + ")");
+    } catch(ex) {
+        // Letzter Versuch: einzelne Objects parsen
+        var out = [];
+        var depth = 0, start = -1;
+        for (var i = 0; i < t.length; i++) {
+            var c = t.charAt(i);
+            if (c === "{") { if (depth === 0) start = i; depth++; }
+            else if (c === "}") {
+                depth--;
+                if (depth === 0 && start >= 0) {
+                    try {
+                        out.push(JSON.parse(t.substr(start, i - start + 1)));
+                    } catch(eO) {}
+                    start = -1;
+                }
+            }
+        }
+        return out.length > 0 ? out : null;
+    }
+}
+
+function buildBulkTriagePrompt(batch) {
+    var p = "";
+    p += "Du bist ein erfahrener Sachbearbeiter im Innendienst eines deutschen Komposit-Versicherers (SHUK).\n";
+    p += "Du analysierst eine Liste eingehender Makler-Emails - ohne PDF-Inhalt, nur Header + Body + Pool-Kontext.\n\n";
+    p += "Es folgen " + batch.length + " Mails, nummeriert 1 bis " + batch.length + ".\n";
+    p += "Antworte mit GENAU einem JSON-Array, das fuer JEDE Mail genau ein Objekt enthaelt - in gleicher Reihenfolge, mit 'nr' = Mail-Nummer.\n\n";
+    p += "FELDER PRO MAIL-OBJEKT (alle als String):\n";
+    p += "- nr (Mail-Nummer 1-" + batch.length + ")\n";
+    p += "- vorgangstyp: 'Makler-Vorgang' / 'Bounce-NDR' / 'Ergo-Outbound' / 'System-Mail' / 'Werbung-Spam' / 'Unklar'\n";
+    p += "- klassifikation: 'BUe-Vorgang' / 'Mahnung-Reminder' / 'Schadenmeldung' / 'Antrag-Aenderung' / 'Anfrage-Ruecksprache' / 'Nicht-Standard' / 'Kein-Makler-Vorgang'\n";
+    p += "- klassifikation_grund: kurz, max 150 Zeichen, konkretes Indiz\n";
+    p += "- geschaefts_typ: 'BUe einfacher Vertrag' / 'BUe Kundenverbindung' / 'Keine BUe'\n";
+    p += "- ist_reminder: 'ja' / 'nein' / 'nicht_pruefbar'\n";
+    p += "- sonderfall: 'Flottengeschaeft' / 'Sondertarif' / 'Kein Sonderfall'\n";
+    p += "- sparte: 'Komposit' / 'Leben' / 'KV' / 'Mehrere' / 'Unbekannt'\n";
+    p += "- kunde_nachname (wenn im Body genannt, sonst '')\n";
+    p += "- kunde_vorname (wenn im Body genannt, sonst '')\n";
+    p += "- versicherungsnummer (VNR aus Body, sonst '')\n";
+    p += "- unterlagen_angefragt: 'ja' / 'nein'\n";
+    p += "- unterlagen_liste: kommagetrennt, sonst ''\n";
+    p += "- enthaelt_maklervollmacht: 'ja' / 'nein' / 'nicht_pruefbar' (aus Anhang-Namen, MV im Body erwaehnt etc.)\n";
+    p += "- mv_pruefung_noetig: 'ja' wenn BUe-Vorgang mit MV-Anhang -> Stufe-2 (PDF-Pruefung) noetig; sonst 'nein'\n";
+    p += "- konfidenz: 'hoch' / 'mittel' / 'niedrig' - wie sicher bist du bei dieser Mail?\n";
+    p += "- hinweis: 1 Satz, max 150 Zeichen, was auffaellt\n\n";
+    p += "REGELN:\n";
+    p += "- Pool-Kontext steht pro Mail dabei - nutze ihn (Pool-Erkennung wurde bereits vorab gemacht).\n";
+    p += "- Wenn vorgangstyp != 'Makler-Vorgang': klassifikation = 'Kein-Makler-Vorgang', restliche Felder ''.\n";
+    p += "- Bei niedriger Konfidenz: hinweis erklaert was unklar ist.\n";
+    p += "- Anhang-Namen sind Hinweis: 'Maklerauftrag*.pdf' -> meist BUe-Vorgang, 'Mahnung*.pdf' -> Reminder.\n";
+    p += "- Antworte AUSSCHLIESSLICH mit dem JSON-Array. Kein Markdown, keine Erklaerung, keine Code-Fences.\n\n";
+    p += "===== MAILS =====\n";
+    for (var i = 0; i < batch.length; i++) {
+        var m = batch[i];
+        p += "\n--- MAIL " + (i + 1) + " ---\n";
+        p += "Pool (vorerkannt): " + (m.pool || "(unbekannt)") + "\n";
+        p += "Absender: " + (m.absName || "") + " <" + (m.absMail || "") + ">\n";
+        p += "Empfaenger: " + (m.empfaenger || "(intern)") + "\n";
+        p += "Datum: " + (m.datum || "") + "\n";
+        p += "Betreff: " + (m.betreff || "") + "\n";
+        p += "Anhaenge: " + (m.attNames || "(keine)") + "\n";
+        var body = (m.body || "").substr(0, 1200);
+        // Kein triple-quote Risiko - Body in Single-Block
+        p += "Body:\n<<<\n" + body + "\n>>>\n";
+    }
+    p += "\n===== ENDE MAILS =====\n\n";
+    p += "Antworte JETZT mit dem JSON-Array fuer alle " + batch.length + " Mails:\n";
+    return p;
+}
+
+function finishBulkTriage() {
+    var bs = state.bulkState;
+    var elapsedSec = Math.round((new Date().getTime() - bs.startTime) / 1000);
+
+    document.getElementById("progressContainer").style.display = "none";
+    document.getElementById("slotStatus").innerText = "";
+    state.running = false;
+    refreshStartButton();
+
+    if (state.cancelled) {
+        showInfo("Bulk-Triage abgebrochen. Bisher: " + bs.processed + " ok, " + bs.errors + " fehler. Excel-Export weiter moeglich.");
+    }
+
+    try {
+        exportBulkTriageToExcel(bs.workable, elapsedSec);
+        var rate = elapsedSec > 0 ? Math.round(bs.processed / elapsedSec * 60) : 0;
+        if (!state.cancelled) {
+            showSuccess("Bulk-Triage fertig: " + bs.processed + " ok, " + bs.errors + " fehler in " +
+                        elapsedSec + "s (~" + rate + " Mails/min). Excel mit KI-Spalten geoeffnet.");
+        }
+    } catch(e) {
+        showError("Excel-Export fehlgeschlagen: " + e.message);
+    }
+}
+
+function exportBulkTriageToExcel(rows, elapsedSec) {
+    if (rows.length === 0) { showError("Keine Daten."); return; }
+    var excel = new ActiveXObject("Excel.Application");
+    excel.Visible = true;
+    excel.DisplayAlerts = false;
+    var wb = excel.Workbooks.Add();
+
+    // Sheet 1: Alle Mails mit Triage
+    var sheet = wb.ActiveSheet;
+    try { sheet.Name = "Triage"; } catch(e) {}
+    var headers = ["#", "Datei", "Datum", "Absender Name", "Absender Email", "Domain",
+                   "Empfaenger (bei uns)", "Betreff", "Erkannter Pool (Stufe 0)",
+                   "Vorgangstyp (KI)", "Klassifikation (KI)", "Klass-Grund (KI)",
+                   "Geschaefts_Typ (KI)", "Ist_Reminder (KI)", "Sonderfall (KI)", "Sparte (KI)",
+                   "Kunde_Nachname (KI)", "Kunde_Vorname (KI)", "VNR (KI)",
+                   "Unterlagen_Angefragt (KI)", "Unterlagen_Liste (KI)",
+                   "MV_Enthalten (KI)", "MV_Pruefung_noetig (KI)",
+                   "Konfidenz (KI)", "Hinweis (KI)", "Anhang-Anzahl", "Anhang-Namen", "Fehler"];
+    for (var c = 0; c < headers.length; c++) sheet.Cells(1, c + 1).Value = headers[c];
+
+    // Header-Farbe (Lila wie Bulk-Triage-Button + Stufe-0-Indigo Block + KI-Bordeaux Block)
+    try {
+        var BG_STAMM = rgb(30, 64, 175);
+        var BG_KI    = rgb(217, 119, 6);
+        sheet.Range(sheet.Cells(1,1), sheet.Cells(1, 9)).Interior.Color = BG_STAMM;
+        sheet.Range(sheet.Cells(1,10), sheet.Cells(1, 25)).Interior.Color = BG_KI;
+        sheet.Range(sheet.Cells(1,26), sheet.Cells(1, 28)).Interior.Color = rgb(76, 29, 149);
+        sheet.Range(sheet.Cells(1,1), sheet.Cells(1, headers.length)).Font.Color = rgb(255, 255, 255);
+        sheet.Range(sheet.Cells(1,1), sheet.Cells(1, headers.length)).Font.Bold = true;
+        sheet.Range(sheet.Cells(1,1), sheet.Cells(1, headers.length)).HorizontalAlignment = -4108;
+        sheet.Rows(1).RowHeight = 28;
+        sheet.Range(sheet.Cells(1,1), sheet.Cells(1, headers.length)).WrapText = true;
+    } catch(e) {}
+
+    var H_ROT   = rgb(252, 165, 165);
+    var H_GRUEN = rgb(187, 247, 208);
+    var H_GELB  = rgb(254, 240, 138);
+    var H_GRAU  = rgb(229, 231, 235);
+
+    for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var t = r.triage || {};
+        var row = i + 2;
+        sheet.Cells(row, 1).Value = i + 1;
+        sheet.Cells(row, 2).Value = cellSafe(r.msgFile);
+        sheet.Cells(row, 3).Value = cellSafe(r.datum);
+        sheet.Cells(row, 4).Value = cellSafe(r.absName);
+        sheet.Cells(row, 5).Value = cellSafe(r.absMail);
+        sheet.Cells(row, 6).Value = cellSafe(r.absDomain);
+        sheet.Cells(row, 7).Value = cellSafe(r.empfaenger);
+        sheet.Cells(row, 8).Value = cellSafe(r.betreff);
+        sheet.Cells(row, 9).Value = cellSafe(r.pool);
+        sheet.Cells(row, 10).Value = cellSafe(t.vorgangstyp || "");
+        sheet.Cells(row, 11).Value = cellSafe(t.klassifikation || "");
+        sheet.Cells(row, 12).Value = cellSafe(t.klassifikation_grund || "");
+        sheet.Cells(row, 13).Value = cellSafe(t.geschaefts_typ || "");
+        sheet.Cells(row, 14).Value = cellSafe(t.ist_reminder || "");
+        sheet.Cells(row, 15).Value = cellSafe(t.sonderfall || "");
+        sheet.Cells(row, 16).Value = cellSafe(t.sparte || "");
+        sheet.Cells(row, 17).Value = cellSafe(t.kunde_nachname || "");
+        sheet.Cells(row, 18).Value = cellSafe(t.kunde_vorname || "");
+        sheet.Cells(row, 19).Value = cellSafe(t.versicherungsnummer || "");
+        sheet.Cells(row, 20).Value = cellSafe(t.unterlagen_angefragt || "");
+        sheet.Cells(row, 21).Value = cellSafe(t.unterlagen_liste || "");
+        sheet.Cells(row, 22).Value = cellSafe(t.enthaelt_maklervollmacht || "");
+        sheet.Cells(row, 23).Value = cellSafe(t.mv_pruefung_noetig || "");
+        sheet.Cells(row, 24).Value = cellSafe(t.konfidenz || "");
+        sheet.Cells(row, 25).Value = cellSafe(t.hinweis || "");
+        sheet.Cells(row, 26).Value = r.attCount || 0;
+        sheet.Cells(row, 27).Value = cellSafe(r.attNames);
+        sheet.Cells(row, 28).Value = cellSafe(t.error || "");
+
+        // Highlights
+        try {
+            if (t.error) sheet.Cells(row, 28).Interior.Color = H_ROT;
+            if (t.konfidenz === "niedrig") sheet.Cells(row, 24).Interior.Color = H_GELB;
+            else if (t.konfidenz === "hoch") sheet.Cells(row, 24).Interior.Color = H_GRUEN;
+            if (t.mv_pruefung_noetig === "ja") sheet.Cells(row, 23).Interior.Color = H_GELB;
+            if (t.klassifikation === "Nicht-Standard") sheet.Cells(row, 11).Interior.Color = rgb(253, 230, 138);
+            if (t.vorgangstyp && t.vorgangstyp !== "Makler-Vorgang" && t.vorgangstyp !== "") {
+                sheet.Range(sheet.Cells(row, 10), sheet.Cells(row, 27)).Interior.Color = H_GRAU;
+            }
+        } catch(e) {}
+    }
+
+    try {
+        sheet.Columns("A").ColumnWidth = 5;
+        sheet.Columns("B").ColumnWidth = 30;
+        sheet.Columns("C").ColumnWidth = 14;
+        sheet.Columns("D:E").ColumnWidth = 24;
+        sheet.Columns("F").ColumnWidth = 22;
+        sheet.Columns("G").ColumnWidth = 24;
+        sheet.Columns("H").ColumnWidth = 45;
+        sheet.Columns("I").ColumnWidth = 30;
+        sheet.Columns("J:K").ColumnWidth = 18;
+        sheet.Columns("L").ColumnWidth = 35;
+        sheet.Columns("M:V").ColumnWidth = 16;
+        sheet.Columns("W:X").ColumnWidth = 12;
+        sheet.Columns("Y").ColumnWidth = 35;
+        sheet.Columns("Z").ColumnWidth = 10;
+        sheet.Columns("AA").ColumnWidth = 30;
+        sheet.Columns("AB").ColumnWidth = 30;
+        sheet.Cells.Font.Name = "Open Sans";
+        sheet.Range(sheet.Cells(1,1), sheet.Cells(rows.length + 1, headers.length)).AutoFilter();
+        sheet.Range("A2").Select();
+        excel.ActiveWindow.FreezePanes = true;
+    } catch(e) {}
+
+    // Sheet 2: Stats
+    try { buildBulkTriageStats(wb, rows, elapsedSec); } catch(e) {}
+
+    excel.DisplayAlerts = true;
+}
+
+function buildBulkTriageStats(wb, rows, elapsedSec) {
+    var st = wb.Worksheets.Add();
+    try {
+        st.Move(null, wb.Sheets(wb.Sheets.Count));
+        st.Name = "Stats";
+    } catch(e) {}
+    var row = 1;
+    function header(text, color) {
+        st.Cells(row, 1).Value = text;
+        var rg = st.Range(st.Cells(row, 1), st.Cells(row, 3));
+        try { rg.Merge(); } catch(e) {}
+        rg.Font.Bold = true; rg.Font.Size = 13;
+        rg.Font.Color = rgb(255, 255, 255);
+        rg.Interior.Color = color || rgb(30, 64, 175);
+        st.Rows(row).RowHeight = 22;
+        row++;
+    }
+    function r(label, val, share, indent) {
+        st.Cells(row, 1).Value = (indent ? "    " : "") + label;
+        st.Cells(row, 2).Value = val;
+        st.Cells(row, 3).Value = share || "";
+        row++;
+    }
+    function pct(part, total) {
+        return total > 0 ? (Math.round(part / total * 1000) / 10) + "%" : "-";
+    }
+
+    // Counts
+    var total = rows.length;
+    var processed = 0, errors = 0, classifCounts = {}, vorgangstypCounts = {}, konfidenzCounts = {}, mvNeededCount = 0;
+    for (var i = 0; i < rows.length; i++) {
+        var r0 = rows[i];
+        var t = r0.triage || {};
+        if (t.error) { errors++; continue; }
+        processed++;
+        var vt = t.vorgangstyp || "(leer)";
+        vorgangstypCounts[vt] = (vorgangstypCounts[vt] || 0) + 1;
+        if (vt === "Makler-Vorgang") {
+            var k = t.klassifikation || "(leer)";
+            classifCounts[k] = (classifCounts[k] || 0) + 1;
+            if (t.mv_pruefung_noetig === "ja") mvNeededCount++;
+        }
+        var c = t.konfidenz || "(leer)";
+        konfidenzCounts[c] = (konfidenzCounts[c] || 0) + 1;
+    }
+
+    header("BULK-TRIAGE LAUF-STATS", rgb(217, 119, 6));
+    r("Mails gesamt", total, "100%", false);
+    r("Erfolgreich KI-klassifiziert", processed, pct(processed, total), true);
+    r("Fehler", errors, pct(errors, total), true);
+    r("Laufzeit", elapsedSec + " sec", "");
+    row++;
+
+    header("VORGANGSTYP (KI-Triage)", rgb(76, 29, 149));
+    var vtOrder = ["Makler-Vorgang", "Bounce-NDR", "Ergo-Outbound", "System-Mail", "Werbung-Spam", "Unklar"];
+    for (var vi = 0; vi < vtOrder.length; vi++) {
+        r(vtOrder[vi], vorgangstypCounts[vtOrder[vi]] || 0, pct(vorgangstypCounts[vtOrder[vi]] || 0, processed), true);
+    }
+    row++;
+
+    var maklerCount = vorgangstypCounts["Makler-Vorgang"] || 0;
+    header("KLASSIFIKATION (nur Makler-Vorgaenge, n=" + maklerCount + ")", rgb(15, 118, 110));
+    var clOrder = ["BUe-Vorgang", "Mahnung-Reminder", "Schadenmeldung", "Antrag-Aenderung", "Anfrage-Ruecksprache", "Nicht-Standard"];
+    for (var ci = 0; ci < clOrder.length; ci++) {
+        r(clOrder[ci], classifCounts[clOrder[ci]] || 0, pct(classifCounts[clOrder[ci]] || 0, maklerCount), true);
+    }
+    row++;
+
+    header("KONFIDENZ-VERTEILUNG", rgb(22, 101, 52));
+    r("hoch", konfidenzCounts["hoch"] || 0, pct(konfidenzCounts["hoch"] || 0, processed), true);
+    r("mittel", konfidenzCounts["mittel"] || 0, pct(konfidenzCounts["mittel"] || 0, processed), true);
+    r("niedrig", konfidenzCounts["niedrig"] || 0, pct(konfidenzCounts["niedrig"] || 0, processed), true);
+    row++;
+
+    header("STUFE 2 (PDF-Analyse) ERFORDERLICH", rgb(159, 18, 57));
+    r("MV-Pruefung noetig (laut Stufe 1)", mvNeededCount, pct(mvNeededCount, maklerCount), false, true);
+    r("(Bei Grossmaklern kann diese Pruefung in Stufe 2b uebersprungen werden)", "", "", true);
+
+    try {
+        st.Columns("A").ColumnWidth = 50;
+        st.Columns("B").ColumnWidth = 14;
+        st.Columns("C").ColumnWidth = 14;
+        st.Cells.Font.Name = "Open Sans";
+        st.Range("B:C").HorizontalAlignment = -4108;
+        wb.Sheets("Triage").Activate();
+    } catch(e) {}
+}
+
+// Hook: wenn XXL fertig ist und User vorher Bulk-Triage gewaehlt hat (bulkAutoChain),
+// dann automatisch Bulk-Triage starten.
+function maybeAutoStartBulkAfterXxl() {
+    if (state.bulkAutoChain) {
+        state.bulkAutoChain = false;
+        setTimeout(runBulkTriage, 300);
+    }
 }
 </script>
 </body>
