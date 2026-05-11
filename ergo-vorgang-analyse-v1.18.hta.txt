@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.17"
+        VERSION="1.18"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.17 - XXL-Endfix: Output direkt als UTF-16 lesen (kein Multi-Variant-Vergleich mehr)</div>
+            <div class="ver">v1.18 - Excel cellSafe: =/+/-/@-Strings escapen (sonst Formel-Parser-Crash)</div>
         </div>
 
         <!-- Cookie -->
@@ -1890,41 +1890,41 @@ function exportToExcel() {
             var d = r.data || {};
             var row = i + 2;
             sheet.Cells(row,1).Value = i+1;
-            sheet.Cells(row,2).Value = r.msgFile || "";
-            sheet.Cells(row,3).Value = r.datum || "";
-            sheet.Cells(row,4).Value = sg(d, "auftrag_datum");
-            sheet.Cells(row,5).Value = r.absName || "";
-            sheet.Cells(row,6).Value = r.absMail || "";
-            sheet.Cells(row,7).Value = r.betreff || "";
-            sheet.Cells(row,8).Value = r.anhangAlle || "";
-            sheet.Cells(row,9).Value = sg(d, "maklerpool");
-            sheet.Cells(row,10).Value = sg(d, "makler_nachname");
-            sheet.Cells(row,11).Value = sg(d, "makler_vorname");
-            sheet.Cells(row,12).Value = sg(d, "makler_nummer");
-            sheet.Cells(row,13).Value = sg(d, "kunde_nachname");
-            sheet.Cells(row,14).Value = sg(d, "kunde_vorname");
-            sheet.Cells(row,15).Value = sg(d, "kunde_nummer");
-            sheet.Cells(row,16).Value = sg(d, "versicherungsnummer");
-            sheet.Cells(row,17).Value = sg(d, "vorgangstyp");
-            sheet.Cells(row,18).Value = sg(d, "ist_reminder");
-            sheet.Cells(row,19).Value = sg(d, "klassifikation");
-            sheet.Cells(row,20).Value = sg(d, "klassifikation_grund");
-            sheet.Cells(row,21).Value = sg(d, "geschaefts_typ");
-            sheet.Cells(row,22).Value = sg(d, "unterlagen_angefragt");
-            sheet.Cells(row,23).Value = sg(d, "unterlagen_liste");
-            sheet.Cells(row,24).Value = sg(d, "sonderfall");
-            sheet.Cells(row,25).Value = sg(d, "sparte");
-            sheet.Cells(row,26).Value = sg(d, "anhang_typen");
-            sheet.Cells(row,27).Value = sg(d, "pdf_qualitaet");
-            sheet.Cells(row,28).Value = sg(d, "enthaelt_maklervollmacht");
-            sheet.Cells(row,29).Value = sg(d, "mv_vollumfaenglich");
-            sheet.Cells(row,30).Value = sg(d, "mv_einschraenkungen");
-            sheet.Cells(row,31).Value = sg(d, "unterschrift_kunde");
-            sheet.Cells(row,32).Value = sg(d, "unterschrift_makler");
-            sheet.Cells(row,33).Value = sg(d, "auf_vn_ausgestellt");
-            sheet.Cells(row,34).Value = sg(d, "makler_namentlich_genannt");
-            sheet.Cells(row,35).Value = sg(d, "hinweis");
-            sheet.Cells(row,36).Value = r.ok ? "" : r.errMsg;
+            sheet.Cells(row,2).Value = cellSafe(r.msgFile);
+            sheet.Cells(row,3).Value = cellSafe(r.datum);
+            sheet.Cells(row,4).Value = cellSafe(sg(d, "auftrag_datum"));
+            sheet.Cells(row,5).Value = cellSafe(r.absName);
+            sheet.Cells(row,6).Value = cellSafe(r.absMail);
+            sheet.Cells(row,7).Value = cellSafe(r.betreff);
+            sheet.Cells(row,8).Value = cellSafe(r.anhangAlle);
+            sheet.Cells(row,9).Value = cellSafe(sg(d, "maklerpool"));
+            sheet.Cells(row,10).Value = cellSafe(sg(d, "makler_nachname"));
+            sheet.Cells(row,11).Value = cellSafe(sg(d, "makler_vorname"));
+            sheet.Cells(row,12).Value = cellSafe(sg(d, "makler_nummer"));
+            sheet.Cells(row,13).Value = cellSafe(sg(d, "kunde_nachname"));
+            sheet.Cells(row,14).Value = cellSafe(sg(d, "kunde_vorname"));
+            sheet.Cells(row,15).Value = cellSafe(sg(d, "kunde_nummer"));
+            sheet.Cells(row,16).Value = cellSafe(sg(d, "versicherungsnummer"));
+            sheet.Cells(row,17).Value = cellSafe(sg(d, "vorgangstyp"));
+            sheet.Cells(row,18).Value = cellSafe(sg(d, "ist_reminder"));
+            sheet.Cells(row,19).Value = cellSafe(sg(d, "klassifikation"));
+            sheet.Cells(row,20).Value = cellSafe(sg(d, "klassifikation_grund"));
+            sheet.Cells(row,21).Value = cellSafe(sg(d, "geschaefts_typ"));
+            sheet.Cells(row,22).Value = cellSafe(sg(d, "unterlagen_angefragt"));
+            sheet.Cells(row,23).Value = cellSafe(sg(d, "unterlagen_liste"));
+            sheet.Cells(row,24).Value = cellSafe(sg(d, "sonderfall"));
+            sheet.Cells(row,25).Value = cellSafe(sg(d, "sparte"));
+            sheet.Cells(row,26).Value = cellSafe(sg(d, "anhang_typen"));
+            sheet.Cells(row,27).Value = cellSafe(sg(d, "pdf_qualitaet"));
+            sheet.Cells(row,28).Value = cellSafe(sg(d, "enthaelt_maklervollmacht"));
+            sheet.Cells(row,29).Value = cellSafe(sg(d, "mv_vollumfaenglich"));
+            sheet.Cells(row,30).Value = cellSafe(sg(d, "mv_einschraenkungen"));
+            sheet.Cells(row,31).Value = cellSafe(sg(d, "unterschrift_kunde"));
+            sheet.Cells(row,32).Value = cellSafe(sg(d, "unterschrift_makler"));
+            sheet.Cells(row,33).Value = cellSafe(sg(d, "auf_vn_ausgestellt"));
+            sheet.Cells(row,34).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
+            sheet.Cells(row,35).Value = cellSafe(sg(d, "hinweis"));
+            sheet.Cells(row,36).Value = r.ok ? "" : cellSafe(r.errMsg);
 
             // Highlights pro Zelle (VBA-Logik)
             try {
@@ -2163,6 +2163,20 @@ function sg(d, k) {
     var v = d[k];
     if (v === undefined || v === null) return "";
     return String(v);
+}
+
+// Excel interpretiert Strings, die mit = + - @ anfangen, als Formel - und
+// wirft "';' erwartet" wenn die Syntax kaputt ist (z.B. bei MIME-encoded
+// Subjects wie =?utf-8?Q?...?=). Wir prefixen mit Apostroph -> Force-Text.
+function cellSafe(v) {
+    if (v == null) return "";
+    var s = String(v);
+    if (s.length === 0) return "";
+    var c0 = s.charAt(0);
+    if (c0 === "=" || c0 === "+" || c0 === "-" || c0 === "@") {
+        return "'" + s;
+    }
+    return s;
 }
 
 // ============================================================================
@@ -2954,18 +2968,18 @@ function exportPoolOverviewToExcel(rows, poolCounts, sourceCounts) {
         var r = rows[i];
         var row = i + 2;
         sheet1.Cells(row, 1).Value = r.idx;
-        sheet1.Cells(row, 2).Value = r.msgFile;
-        sheet1.Cells(row, 3).Value = r.datum;
-        sheet1.Cells(row, 4).Value = r.absName;
-        sheet1.Cells(row, 5).Value = r.absMail;
-        sheet1.Cells(row, 6).Value = r.absDomain;
-        sheet1.Cells(row, 7).Value = r.empfaenger;
-        sheet1.Cells(row, 8).Value = r.betreff;
-        sheet1.Cells(row, 9).Value = r.pool;
-        sheet1.Cells(row, 10).Value = r.source;
-        sheet1.Cells(row, 11).Value = r.sourceDetail;
+        sheet1.Cells(row, 2).Value = cellSafe(r.msgFile);
+        sheet1.Cells(row, 3).Value = cellSafe(r.datum);
+        sheet1.Cells(row, 4).Value = cellSafe(r.absName);
+        sheet1.Cells(row, 5).Value = cellSafe(r.absMail);
+        sheet1.Cells(row, 6).Value = cellSafe(r.absDomain);
+        sheet1.Cells(row, 7).Value = cellSafe(r.empfaenger);
+        sheet1.Cells(row, 8).Value = cellSafe(r.betreff);
+        sheet1.Cells(row, 9).Value = cellSafe(r.pool);
+        sheet1.Cells(row, 10).Value = cellSafe(r.source);
+        sheet1.Cells(row, 11).Value = cellSafe(r.sourceDetail);
         sheet1.Cells(row, 12).Value = r.attCount;
-        sheet1.Cells(row, 13).Value = r.attNames;
+        sheet1.Cells(row, 13).Value = cellSafe(r.attNames);
         // Highlight unbekannte / Fehler in Pool-Spalte (jetzt Spalte 9)
         if (r.pool === "(unbekannt)") {
             try { sheet1.Cells(row, 9).Interior.Color = rgb(254, 240, 138); } catch(e) {}
@@ -3021,7 +3035,7 @@ function exportPoolOverviewToExcel(rows, poolCounts, sourceCounts) {
     for (var pi = 0; pi < poolArr.length; pi++) {
         var pp = poolArr[pi];
         var row2 = pi + 2;
-        sheet2.Cells(row2, 1).Value = pp.name;
+        sheet2.Cells(row2, 1).Value = cellSafe(pp.name);
         sheet2.Cells(row2, 2).Value = pp.count;
         sheet2.Cells(row2, 3).Value = totalMails > 0 ? (Math.round((pp.count / totalMails) * 1000) / 10) + "%" : "-";
         // Erkennungs-Methoden zusammenstellen
@@ -3076,13 +3090,13 @@ function exportPoolOverviewToExcel(rows, poolCounts, sourceCounts) {
         for (var ui2 = 0; ui2 < unknownRows.length; ui2++) {
             var ur = unknownRows[ui2];
             sheet3.Cells(ui2 + 2, 1).Value = ur.idx;
-            sheet3.Cells(ui2 + 2, 2).Value = ur.msgFile;
-            sheet3.Cells(ui2 + 2, 3).Value = ur.absName;
-            sheet3.Cells(ui2 + 2, 4).Value = ur.absMail;
-            sheet3.Cells(ui2 + 2, 5).Value = ur.absDomain;
-            sheet3.Cells(ui2 + 2, 6).Value = ur.empfaenger;
-            sheet3.Cells(ui2 + 2, 7).Value = ur.betreff;
-            sheet3.Cells(ui2 + 2, 8).Value = ur.attNames;
+            sheet3.Cells(ui2 + 2, 2).Value = cellSafe(ur.msgFile);
+            sheet3.Cells(ui2 + 2, 3).Value = cellSafe(ur.absName);
+            sheet3.Cells(ui2 + 2, 4).Value = cellSafe(ur.absMail);
+            sheet3.Cells(ui2 + 2, 5).Value = cellSafe(ur.absDomain);
+            sheet3.Cells(ui2 + 2, 6).Value = cellSafe(ur.empfaenger);
+            sheet3.Cells(ui2 + 2, 7).Value = cellSafe(ur.betreff);
+            sheet3.Cells(ui2 + 2, 8).Value = cellSafe(ur.attNames);
         }
         try {
             sheet3.Columns("A:A").ColumnWidth = 5;
