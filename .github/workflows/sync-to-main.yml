@@ -1,0 +1,88 @@
+name: Sync claude/* branches to main
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Branch to sync into main'
+        required: true
+        type: string
+
+concurrency:
+  group: sync-to-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Determine source branch
+        id: src
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BRANCH="${{ github.event.inputs.source_branch }}"
+          else
+            BRANCH="${GITHUB_REF#refs/heads/}"
+          fi
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Source branch: $BRANCH"
+
+      - name: Checkout source branch (full history)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.src.outputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync into main (fast-forward or merge)
+        run: |
+          set -euo pipefail
+          BRANCH="${{ steps.src.outputs.branch }}"
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          echo "Source HEAD: $SOURCE_SHA on $BRANCH"
+
+          # If main doesn't exist on remote, just create it from current HEAD
+          if ! git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
+            echo "main does not exist on origin - creating from $BRANCH"
+            git checkout -B main "$SOURCE_SHA"
+            git push origin main
+            echo "Created main at $SOURCE_SHA"
+            exit 0
+          fi
+
+          # Fetch current main
+          git fetch origin main:refs/remotes/origin/main
+          git checkout -B main origin/main
+          MAIN_SHA="$(git rev-parse HEAD)"
+          echo "main HEAD: $MAIN_SHA"
+
+          if [ "$MAIN_SHA" = "$SOURCE_SHA" ]; then
+            echo "main is already at $SOURCE_SHA - nothing to do"
+            exit 0
+          fi
+
+          # Fast-forward if main is an ancestor of source
+          if git merge-base --is-ancestor "$MAIN_SHA" "$SOURCE_SHA"; then
+            echo "Fast-forwarding main -> $SOURCE_SHA"
+            git reset --hard "$SOURCE_SHA"
+          else
+            echo "main has diverged from $BRANCH - creating merge commit"
+            if ! git merge --no-ff "$SOURCE_SHA" -m "Auto-sync $BRANCH into main"; then
+              echo "::error::Merge conflict between main and $BRANCH - please resolve manually"
+              git merge --abort || true
+              exit 1
+            fi
+          fi
+
+          git push origin main
+          echo "main now at $(git rev-parse HEAD)"
