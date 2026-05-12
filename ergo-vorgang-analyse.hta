@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.54"
+        VERSION="1.55"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.54 - GROSSER WURF: Excel als persistenter Live-Cache. analyse.xlsx im _KI-Analyse-Ordner ist Wahrheitsquelle. Jeder fertige Vorgang wird sofort als Zeile geschrieben (Excel sichtbar!), wb.Save alle 10 Mails. Resume liest direkt aus xlsx - kein JSON-Partial-Read-Bug mehr</div>
+            <div class="ver">v1.55 - Migration cache.json->xlsx jetzt via FillRangeFromTsv Bulk-Write (1 COM-Call statt 41800). 1100+ Vorgaenge in einem Rutsch ohne Long-Running-Dialog. Excel-Live-Cache aus v1.54 unveraendert</div>
         </div>
 
         <!-- Cookie -->
@@ -1057,6 +1057,107 @@ function saveExcelLiveCache() {
     try { state.excelWb.Save(); } catch(e) {}
 }
 
+// Bulk-Write MEHRERE Results in EINEM Rutsch via VBScript-FillRangeFromTsv.
+// Verwendet fuer die initiale Migration (1100+ Vorgaenge aus cache.json -> xlsx),
+// damit nicht 1100 x 38 = 41800 sync COM-Calls den Long-Running-Script-Dialog
+// triggern und Excel ueberlasten. Returns true bei Erfolg, false bei Fehler.
+function bulkWriteResultsToExcel(results) {
+    if (!state.excelSheet || results.length === 0) return false;
+    var startRow = state.excelLiveRowCount + 2;
+    var nRows = results.length;
+    var nCols = EXCEL_HEADERS.length;
+
+    // TSV bauen: cellSafeTsv strippt Tabs/Newlines aus Werten
+    var rowsTsv = [];
+    for (var i = 0; i < nRows; i++) {
+        var r = results[i];
+        var d = r.data || {};
+        var rowNum = state.excelLiveRowCount + i + 1;
+        rowsTsv.push(
+            String(rowNum) + "\t" +
+            cellSafeTsv(r.msgFile) + "\t" +
+            cellSafeTsv(r.datum) + "\t" +
+            cellSafeTsv(sg(d, "auftrag_datum")) + "\t" +
+            cellSafeTsv(r.absName) + "\t" +
+            cellSafeTsv(r.absMail) + "\t" +
+            cellSafeTsv(r.empfaenger) + "\t" +
+            cellSafeTsv(r.betreff) + "\t" +
+            cellSafeTsv(r.anhangAlle) + "\t" +
+            cellSafeTsv(sg(d, "maklerpool")) + "\t" +
+            cellSafeTsv(sg(d, "makler_nachname")) + "\t" +
+            cellSafeTsv(sg(d, "makler_vorname")) + "\t" +
+            cellSafeTsv(sg(d, "makler_nummer")) + "\t" +
+            cellSafeTsv(sg(d, "kunde_nachname")) + "\t" +
+            cellSafeTsv(sg(d, "kunde_vorname")) + "\t" +
+            cellSafeTsv(sg(d, "kunde_nummer")) + "\t" +
+            cellSafeTsv(sg(d, "versicherungsnummer")) + "\t" +
+            cellSafeTsv(sg(d, "vorgangstyp")) + "\t" +
+            cellSafeTsv(sg(d, "ist_reminder")) + "\t" +
+            cellSafeTsv(sg(d, "klassifikation")) + "\t" +
+            cellSafeTsv(sg(d, "klassifikation_grund")) + "\t" +
+            cellSafeTsv(sg(d, "geschaefts_typ")) + "\t" +
+            cellSafeTsv(sg(d, "unterlagen_angefragt")) + "\t" +
+            cellSafeTsv(sg(d, "unterlagen_liste")) + "\t" +
+            cellSafeTsv(sg(d, "sonderfall")) + "\t" +
+            cellSafeTsv(sg(d, "sparte")) + "\t" +
+            cellSafeTsv(sg(d, "anhang_typen")) + "\t" +
+            cellSafeTsv(sg(d, "pdf_qualitaet")) + "\t" +
+            cellSafeTsv(sg(d, "enthaelt_maklervollmacht")) + "\t" +
+            cellSafeTsv(sg(d, "mv_vollumfaenglich")) + "\t" +
+            cellSafeTsv(sg(d, "mv_einschraenkungen")) + "\t" +
+            cellSafeTsv(computeMvStatus(r)) + "\t" +
+            cellSafeTsv(sg(d, "unterschrift_kunde")) + "\t" +
+            cellSafeTsv(sg(d, "unterschrift_makler")) + "\t" +
+            cellSafeTsv(sg(d, "auf_vn_ausgestellt")) + "\t" +
+            cellSafeTsv(sg(d, "makler_namentlich_genannt")) + "\t" +
+            cellSafeTsv(sg(d, "hinweis")) + "\t" +
+            (r.ok ? "" : cellSafeTsv(r.errMsg))
+        );
+        r._excelRow = startRow + i;
+    }
+    var bigTsv = rowsTsv.join("\n");
+
+    // Excel-Speed-Flags waehrend Bulk-Write
+    try { state.excelApp.ScreenUpdating = false; } catch(eF) {}
+    try { state.excelApp.Calculation = -4135; } catch(eF) {}
+    try { state.excelApp.EnableEvents = false; } catch(eF) {}
+
+    var ok = false;
+    try {
+        var rng = state.excelSheet.Range(
+            state.excelSheet.Cells(startRow, 1),
+            state.excelSheet.Cells(startRow + nRows - 1, nCols)
+        );
+        FillRangeFromTsv(rng, bigTsv, "\n", "\t", nRows, nCols);
+        // Sanity-Check: 3 Stichproben
+        var s1 = String(state.excelSheet.Cells(startRow, 2).Value || "");
+        var midR = startRow + Math.floor(nRows / 2);
+        var sM = String(state.excelSheet.Cells(midR, 2).Value || "");
+        var sE = String(state.excelSheet.Cells(startRow + nRows - 1, 2).Value || "");
+        if (s1.length > 0 && sM.length > 0 && sE.length > 0) {
+            state.excelLiveRowCount += nRows;
+            ok = true;
+        }
+    } catch(eB) {}
+
+    // Flags zurueck
+    try { state.excelApp.ScreenUpdating = true; } catch(eF) {}
+    try { state.excelApp.Calculation = -4105; } catch(eF) {}
+    try { state.excelApp.EnableEvents = true; } catch(eF) {}
+
+    if (!ok) {
+        // Cleanup partial write + reset _excelRow markers
+        try {
+            state.excelSheet.Range(
+                state.excelSheet.Cells(startRow, 1),
+                state.excelSheet.Cells(startRow + nRows - 1, nCols)
+            ).ClearContents();
+        } catch(eC) {}
+        for (var j = 0; j < nRows; j++) results[j]._excelRow = 0;
+    }
+    return ok;
+}
+
 // Liest die Daten aus einem existierenden xlsx (vor Analyse-Start)
 // und befuellt state.results + state.pendingMap. Returns Anzahl gelesener Zeilen.
 function readResultsFromExcelLive() {
@@ -1271,13 +1372,23 @@ function startAnalysis() {
         return;
     }
     // Falls state.results bereits Daten aus cache.json hat, aber Excel noch leer ist,
-    // alle bisherigen Eintraege ins Excel migrieren (ohne _excelRow gesetzt).
+    // alle bisherigen Eintraege ins Excel migrieren - VIA BULK-WRITE, NICHT zellweise!
+    // Bei 1100+ Vorgaengen wuerde zellweise 41800 sync COM-Calls bedeuten -> Long-Running-
+    // Script-Dialog + Excel-Hang. Bulk-Write via VBScript FillRangeFromTsv = 1 Call.
     if (state.results.length > 0 && state.excelLiveRowCount === 0) {
-        appendAiLog("OK", "", "Excel-Migration: " + state.results.length + " Vorgaenge aus cache.json -> xlsx");
-        for (var mi = 0; mi < state.results.length; mi++) {
-            writeResultRowToExcel(state.results[mi]);
+        appendAiLog("OK", "", "Excel-Migration (Bulk): " + state.results.length + " Vorgaenge aus cache.json -> xlsx");
+        showInfo("Migriere " + state.results.length + " Vorgaenge in Excel (Bulk-Write)...");
+        if (bulkWriteResultsToExcel(state.results)) {
+            appendAiLog("OK", "", "Migration erfolgreich. xlsx hat jetzt " + state.excelLiveRowCount + " Zeilen.");
+        } else {
+            appendAiLog("FEHLER", "", "Bulk-Migration scheiterte - faelle auf zellweisen Write zurueck");
+            // Fallback: zellweise (kann Dialog triggern bei vielen Eintraegen)
+            for (var mi = 0; mi < state.results.length; mi++) {
+                writeResultRowToExcel(state.results[mi]);
+            }
         }
         saveExcelLiveCache();
+        hideStatus();
     }
 
     // Determine work list: nur Mails im Zeitraum, minus already-cached
