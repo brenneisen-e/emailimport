@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.32"
+        VERSION="1.33"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.32 - Rolling-Replacement: Tick-Delay 0ms wenn Slot frei wird, Slot-Start-Log fuer bessere Sichtbarkeit der parallelen Pipeline</div>
+            <div class="ver">v1.33 - Empfaenger-Spalte, Postfach-Drilldown in Auswertung, Klassifikation 'Mahnung-Reminder' raus (ist_reminder cross-cutting), Parallel-Cap auf 50</div>
         </div>
 
         <!-- Cookie -->
@@ -293,8 +293,8 @@
                     <input type="text" id="modelInput" value="gpt-51-chat">
                 </div>
                 <div>
-                    <label>Parallel-Slots (1-15)</label>
-                    <input type="number" id="parallelInput" value="3" min="1" max="15">
+                    <label>Parallel-Slots (1-50)</label>
+                    <input type="number" id="parallelInput" value="3" min="1" max="50">
                 </div>
             </div>
             <div style="margin-top: 0.5rem;" class="compact">
@@ -858,7 +858,7 @@ function startAnalysis() {
 
     state.parallelN = parseInt(document.getElementById("parallelInput").value) || 3;
     if (state.parallelN < 1) state.parallelN = 1;
-    if (state.parallelN > 15) state.parallelN = 15;
+    if (state.parallelN > 50) state.parallelN = 50;
 
     var reanalyze = document.getElementById("reanalyzeAll").checked;
     if (reanalyze) {
@@ -1120,6 +1120,7 @@ function prepareSlot(slot) {
         slot.datum = "";
         slot.absName = "";
         slot.absMail = "";
+        slot.empfaenger = "";
         slot.betreff = "";
         slot.body = "";
         try {
@@ -1129,6 +1130,7 @@ function prepareSlot(slot) {
         } catch(e) {}
         try { slot.absName = String(it.SenderName || ""); } catch(e) {}
         try { slot.absMail = getSenderEmail(it); } catch(e) {}
+        try { slot.empfaenger = String(it.To || ""); } catch(e) {}
         try { slot.betreff = String(it.Subject || ""); } catch(e) {}
         try { slot.body = String(it.Body || ""); } catch(e) {}
 
@@ -1251,6 +1253,7 @@ function makeResult(slot, ok, errMsg) {
         dateIso: slot.dateIso || "",
         absName: slot.absName || "",
         absMail: slot.absMail || "",
+        empfaenger: slot.empfaenger || "",
         betreff: slot.betreff || "",
         anhangAlle: slot.anhangAlle || "",
         pdfListe: slot.pdfListe || "",
@@ -1869,12 +1872,14 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
 
     p += "4) klassifikation - GENAU EINER von:\n";
     p += "   - 'BUe-Vorgang' (Bestandsuebertragung)\n";
-    p += "   - 'Mahnung-Reminder' (Erinnerung/Mahnung/WV - Routine, KEINE Eskalation!)\n";
     p += "   - 'Schadenmeldung'\n";
     p += "   - 'Antrag-Aenderung' (Neuantrag, Tarifwechsel, Adresswechsel, Bankverbindung)\n";
     p += "   - 'Anfrage-Ruecksprache'\n";
     p += "   - 'Nicht-Standard' (echte Eskalation: Beschwerde, Klage, BaFin, Vorstand, Konsortium)\n";
     p += "   - 'Kein-Makler-Vorgang' (nur wenn vorgangstyp != 'Makler-Vorgang')\n";
+    p += "   WICHTIG: Mahnungen / Reminder / Wiedervorlagen sind KEINE eigene Klassifikation. Wenn eine\n";
+    p += "   Mail ein Reminder ist, klassifiziere sie nach dem zugrunde liegenden Vorgang (meist 'BUe-Vorgang',\n";
+    p += "   selten 'Anfrage-Ruecksprache' oder 'Antrag-Aenderung') und setze ist_reminder = 'ja' (Feld 17).\n";
     p += "4a) klassifikation_grund - kurze Begruendung (max 200 Z.), konkrete Indizien nennen.\n\n";
 
     p += "5) geschaefts_typ - 'BUe einfacher Vertrag' / 'BUe Kundenverbindung' / 'Keine BUe'\n";
@@ -1903,8 +1908,9 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "15) auf_vn_ausgestellt - 'ja' / 'nein' / 'nicht_pruefbar'.\n";
     p += "16) makler_namentlich_genannt - 'ja' / 'nein' / 'nicht_pruefbar'.\n\n";
 
-    p += "17) ist_reminder - 'ja' / 'nein' / 'nicht_pruefbar'.\n";
-    p += "    Indikatoren (case-insensitiv): Betreff 'Erinnerung','Reminder','WV','Mahnung','2. Mahnung','Sachstandsanfrage'; Body 'wir warten noch','haben wir noch nichts erhalten','bitten um Rueckmeldung'; Anhang-Dateinamen mit 'Mahnung','Reminder','Erinnerung'.\n\n";
+    p += "17) ist_reminder - 'ja' / 'nein' / 'nicht_pruefbar' (CROSS-CUTTING - orthogonal zur Klassifikation).\n";
+    p += "    Indikatoren (case-insensitiv): Betreff 'Erinnerung','Reminder','WV','Mahnung','2. Mahnung','Sachstandsanfrage'; Body 'wir warten noch','haben wir noch nichts erhalten','bitten um Rueckmeldung'; Anhang-Dateinamen mit 'Mahnung','Reminder','Erinnerung'.\n";
+    p += "    Ein Reminder bekommt die normale klassifikation (z.B. 'BUe-Vorgang'), nicht 'Mahnung-Reminder'.\n\n";
 
     p += "18) hinweis - EIN kurzer Satz (max 200 Z.) was an dem Vorgang auffaellig ist.\n";
     p += "    BOILERPLATE NICHT erwaehnen: Folgende Formulierungen sind Standard-Textbausteine in Pool-BUe-Mails und gehoeren NICHT in den Hinweis:\n";
@@ -1946,21 +1952,21 @@ function exportToExcel() {
         var sheet = wb.ActiveSheet;
         try { sheet.Name = "Analyse"; } catch(e) {}
 
-        var headers = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absender Email","Betreff","Anhaenge",
+        var headers = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absender Email","Empfaenger","Betreff","Anhaenge",
                        "Maklerpool","Makler_Nachname","Makler_Vorname","Maklernummer",
                        "Kunde_Nachname","Kunde_Vorname","Kundennummer","Versicherungsnummer",
                        "Vorgangstyp","Ist_Reminder","Klassifikation","Klassifikation_Grund",
                        "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
                        "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen",
                        "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler"];
-        // Spalten-Konstanten (1-basiert)
-        var COL_DATEI = 2, COL_HINWEIS = 35, COL_FEHLER = 36;
-        var COL_MAKLERPOOL = 9, COL_MAKLER_NR = 12;
-        var COL_KUNDE_NACH = 13, COL_VERS_NR = 16;
-        var COL_VORGANGSTYP = 17, COL_REMINDER = 18;
-        var COL_KLASSIFIK = 19, COL_GESCHTYP = 21, COL_UNTERLAGEN = 22, COL_SONDERFALL = 24, COL_SPARTE = 25;
-        var COL_ANH_TYPEN = 26, COL_PDF_QUAL = 27;
-        var COL_VM_VORHAND = 28, COL_VM_VOLLST = 29, COL_VM_FEHLT = 30, COL_UNTERSCHR_K = 31, COL_UNTERSCHR_M = 32, COL_AUF_VN = 33, COL_MAKL_NAM = 34;
+        // Spalten-Konstanten (1-basiert) - nach Empfaenger-Spalte alles +1 verschoben
+        var COL_DATEI = 2, COL_HINWEIS = 36, COL_FEHLER = 37;
+        var COL_MAKLERPOOL = 10, COL_MAKLER_NR = 13;
+        var COL_KUNDE_NACH = 14, COL_VERS_NR = 17;
+        var COL_VORGANGSTYP = 18, COL_REMINDER = 19;
+        var COL_KLASSIFIK = 20, COL_GESCHTYP = 22, COL_UNTERLAGEN = 23, COL_SONDERFALL = 25, COL_SPARTE = 26;
+        var COL_ANH_TYPEN = 27, COL_PDF_QUAL = 28;
+        var COL_VM_VORHAND = 29, COL_VM_VOLLST = 30, COL_VM_FEHLT = 31, COL_UNTERSCHR_K = 32, COL_UNTERSCHR_M = 33, COL_AUF_VN = 34, COL_MAKL_NAM = 35;
 
         for (var c = 0; c < headers.length; c++) {
             sheet.Cells(1, c+1).Value = headers[c];
@@ -1984,7 +1990,7 @@ function exportToExcel() {
             hr.WrapText = true;
             sheet.Rows(1).RowHeight = 30;
             // Pro Gruppe einfaerben
-            sheet.Range(sheet.Cells(1,1), sheet.Cells(1, 8)).Interior.Color = F_STAMM;
+            sheet.Range(sheet.Cells(1,1), sheet.Cells(1, 9)).Interior.Color = F_STAMM;
             sheet.Range(sheet.Cells(1, COL_MAKLERPOOL), sheet.Cells(1, COL_MAKLER_NR)).Interior.Color = F_MAKLER;
             sheet.Range(sheet.Cells(1, COL_KUNDE_NACH), sheet.Cells(1, COL_VERS_NR)).Interior.Color = F_KUNDE;
             sheet.Range(sheet.Cells(1, COL_VORGANGSTYP), sheet.Cells(1, COL_REMINDER)).Interior.Color = F_TRIAGE;
@@ -2013,36 +2019,37 @@ function exportToExcel() {
             sheet.Cells(row,4).Value = cellSafe(sg(d, "auftrag_datum"));
             sheet.Cells(row,5).Value = cellSafe(r.absName);
             sheet.Cells(row,6).Value = cellSafe(r.absMail);
-            sheet.Cells(row,7).Value = cellSafe(r.betreff);
-            sheet.Cells(row,8).Value = cellSafe(r.anhangAlle);
-            sheet.Cells(row,9).Value = cellSafe(sg(d, "maklerpool"));
-            sheet.Cells(row,10).Value = cellSafe(sg(d, "makler_nachname"));
-            sheet.Cells(row,11).Value = cellSafe(sg(d, "makler_vorname"));
-            sheet.Cells(row,12).Value = cellSafe(sg(d, "makler_nummer"));
-            sheet.Cells(row,13).Value = cellSafe(sg(d, "kunde_nachname"));
-            sheet.Cells(row,14).Value = cellSafe(sg(d, "kunde_vorname"));
-            sheet.Cells(row,15).Value = cellSafe(sg(d, "kunde_nummer"));
-            sheet.Cells(row,16).Value = cellSafe(sg(d, "versicherungsnummer"));
-            sheet.Cells(row,17).Value = cellSafe(sg(d, "vorgangstyp"));
-            sheet.Cells(row,18).Value = cellSafe(sg(d, "ist_reminder"));
-            sheet.Cells(row,19).Value = cellSafe(sg(d, "klassifikation"));
-            sheet.Cells(row,20).Value = cellSafe(sg(d, "klassifikation_grund"));
-            sheet.Cells(row,21).Value = cellSafe(sg(d, "geschaefts_typ"));
-            sheet.Cells(row,22).Value = cellSafe(sg(d, "unterlagen_angefragt"));
-            sheet.Cells(row,23).Value = cellSafe(sg(d, "unterlagen_liste"));
-            sheet.Cells(row,24).Value = cellSafe(sg(d, "sonderfall"));
-            sheet.Cells(row,25).Value = cellSafe(sg(d, "sparte"));
-            sheet.Cells(row,26).Value = cellSafe(sg(d, "anhang_typen"));
-            sheet.Cells(row,27).Value = cellSafe(sg(d, "pdf_qualitaet"));
-            sheet.Cells(row,28).Value = cellSafe(sg(d, "enthaelt_maklervollmacht"));
-            sheet.Cells(row,29).Value = cellSafe(sg(d, "mv_vollumfaenglich"));
-            sheet.Cells(row,30).Value = cellSafe(sg(d, "mv_einschraenkungen"));
-            sheet.Cells(row,31).Value = cellSafe(sg(d, "unterschrift_kunde"));
-            sheet.Cells(row,32).Value = cellSafe(sg(d, "unterschrift_makler"));
-            sheet.Cells(row,33).Value = cellSafe(sg(d, "auf_vn_ausgestellt"));
-            sheet.Cells(row,34).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
-            sheet.Cells(row,35).Value = cellSafe(sg(d, "hinweis"));
-            sheet.Cells(row,36).Value = r.ok ? "" : cellSafe(r.errMsg);
+            sheet.Cells(row,7).Value = cellSafe(r.empfaenger);
+            sheet.Cells(row,8).Value = cellSafe(r.betreff);
+            sheet.Cells(row,9).Value = cellSafe(r.anhangAlle);
+            sheet.Cells(row,10).Value = cellSafe(sg(d, "maklerpool"));
+            sheet.Cells(row,11).Value = cellSafe(sg(d, "makler_nachname"));
+            sheet.Cells(row,12).Value = cellSafe(sg(d, "makler_vorname"));
+            sheet.Cells(row,13).Value = cellSafe(sg(d, "makler_nummer"));
+            sheet.Cells(row,14).Value = cellSafe(sg(d, "kunde_nachname"));
+            sheet.Cells(row,15).Value = cellSafe(sg(d, "kunde_vorname"));
+            sheet.Cells(row,16).Value = cellSafe(sg(d, "kunde_nummer"));
+            sheet.Cells(row,17).Value = cellSafe(sg(d, "versicherungsnummer"));
+            sheet.Cells(row,18).Value = cellSafe(sg(d, "vorgangstyp"));
+            sheet.Cells(row,19).Value = cellSafe(sg(d, "ist_reminder"));
+            sheet.Cells(row,20).Value = cellSafe(sg(d, "klassifikation"));
+            sheet.Cells(row,21).Value = cellSafe(sg(d, "klassifikation_grund"));
+            sheet.Cells(row,22).Value = cellSafe(sg(d, "geschaefts_typ"));
+            sheet.Cells(row,23).Value = cellSafe(sg(d, "unterlagen_angefragt"));
+            sheet.Cells(row,24).Value = cellSafe(sg(d, "unterlagen_liste"));
+            sheet.Cells(row,25).Value = cellSafe(sg(d, "sonderfall"));
+            sheet.Cells(row,26).Value = cellSafe(sg(d, "sparte"));
+            sheet.Cells(row,27).Value = cellSafe(sg(d, "anhang_typen"));
+            sheet.Cells(row,28).Value = cellSafe(sg(d, "pdf_qualitaet"));
+            sheet.Cells(row,29).Value = cellSafe(sg(d, "enthaelt_maklervollmacht"));
+            sheet.Cells(row,30).Value = cellSafe(sg(d, "mv_vollumfaenglich"));
+            sheet.Cells(row,31).Value = cellSafe(sg(d, "mv_einschraenkungen"));
+            sheet.Cells(row,32).Value = cellSafe(sg(d, "unterschrift_kunde"));
+            sheet.Cells(row,33).Value = cellSafe(sg(d, "unterschrift_makler"));
+            sheet.Cells(row,34).Value = cellSafe(sg(d, "auf_vn_ausgestellt"));
+            sheet.Cells(row,35).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
+            sheet.Cells(row,36).Value = cellSafe(sg(d, "hinweis"));
+            sheet.Cells(row,37).Value = r.ok ? "" : cellSafe(r.errMsg);
 
             // Highlights pro Zelle (VBA-Logik)
             try {
@@ -2098,38 +2105,75 @@ function exportToExcel() {
     }
 }
 
-// Zweites Excel-Sheet "Auswertung": Maklerpool-Statistik + BU-Detail-Stats.
-// Zaehlt nur echte Makler-Vorgaenge (vorgangstyp=Makler-Vorgang).
-function buildAuswertungSheet(wb, excel) {
-    // Stats sammeln
-    var totalMaklerVorgang = 0;
-    var classifCounts = {};
-    var bueResults = [];
-    var poolCountsBue = {};
-    var reminderInBue = 0;
-    var einfacherVertragBue = 0;
-    var kundenverbindungBue = 0;
-    var bueTypUnklar = 0;
+// Extrahiert die reine E-Mail-Adresse aus einem To-String wie
+// "Bestandsuebertragungen <bestandsuebertragungen@ergo.de>" oder "foo@bar.de".
+// Lowercased fuer konsistentes Gruppieren.
+function extractRecipientEmail(s) {
+    if (!s) return "";
+    var str = String(s);
+    // Erst: Inhalt zwischen < und >
+    var m = str.match(/<([^>]+@[^>]+)>/);
+    if (m) return m[1].toLowerCase();
+    // Sonst: erste Email-Adresse im String
+    var m2 = str.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/);
+    if (m2) return m2[1].toLowerCase();
+    return str.toLowerCase();
+}
 
-    for (var i = 0; i < state.results.length; i++) {
-        var r = state.results[i];
+// Berechnet Statistik fuer ein Subset von Ergebnissen. Liefert ein Objekt
+// mit allen Zwischenwerten, die buildAuswertungSheet zum Rendern braucht.
+function computeAuswertungStats(results) {
+    var st = {
+        totalMaklerVorgang: 0,
+        classifCounts: {},
+        bueResults: [],
+        poolCountsBue: {},
+        reminderInBue: 0,
+        einfacherVertragBue: 0,
+        kundenverbindungBue: 0,
+        bueTypUnklar: 0
+    };
+    for (var i = 0; i < results.length; i++) {
+        var r = results[i];
         if (!r.ok || !r.data) continue;
         var vt = sg(r.data, "vorgangstyp");
         if (vt !== "Makler-Vorgang") continue;
-        totalMaklerVorgang++;
+        st.totalMaklerVorgang++;
         var klass = sg(r.data, "klassifikation") || "(leer)";
-        classifCounts[klass] = (classifCounts[klass] || 0) + 1;
+        st.classifCounts[klass] = (st.classifCounts[klass] || 0) + 1;
         if (klass === "BUe-Vorgang") {
-            bueResults.push(r);
+            st.bueResults.push(r);
             var pool = sg(r.data, "maklerpool") || "(kein Pool angegeben)";
-            poolCountsBue[pool] = (poolCountsBue[pool] || 0) + 1;
-            if (sg(r.data, "ist_reminder") === "ja") reminderInBue++;
+            st.poolCountsBue[pool] = (st.poolCountsBue[pool] || 0) + 1;
+            if (sg(r.data, "ist_reminder") === "ja") st.reminderInBue++;
             var gt = sg(r.data, "geschaefts_typ") || "";
-            if (gt.indexOf("einfacher") >= 0 || gt.indexOf("einzeln") >= 0) einfacherVertragBue++;
-            else if (gt.indexOf("Kundenverbindung") >= 0 || gt.indexOf("kundenverbindung") >= 0) kundenverbindungBue++;
-            else bueTypUnklar++;
+            if (gt.indexOf("einfacher") >= 0 || gt.indexOf("einzeln") >= 0) st.einfacherVertragBue++;
+            else if (gt.indexOf("Kundenverbindung") >= 0 || gt.indexOf("kundenverbindung") >= 0) st.kundenverbindungBue++;
+            else st.bueTypUnklar++;
         }
     }
+    return st;
+}
+
+// Zweites Excel-Sheet "Auswertung": Maklerpool-Statistik + BU-Detail-Stats.
+// Zaehlt nur echte Makler-Vorgaenge (vorgangstyp=Makler-Vorgang).
+// Hat 3 Sektionen: GESAMT (alle Postfaecher), dann pro Postfach ein Drill-Down.
+function buildAuswertungSheet(wb, excel) {
+    // GESAMT-Stats
+    var gesamt = computeAuswertungStats(state.results);
+
+    // Per-Postfach gruppieren
+    var byPostfach = {};
+    for (var i0 = 0; i0 < state.results.length; i0++) {
+        var r0 = state.results[i0];
+        var pf = extractRecipientEmail(r0.empfaenger) || "(kein Empfaenger)";
+        if (!byPostfach[pf]) byPostfach[pf] = [];
+        byPostfach[pf].push(r0);
+    }
+    // Postfaecher sortiert nach Anzahl Mails (egal welcher Klassifikation), absteigend
+    var postfaecher = [];
+    for (var k0 in byPostfach) if (byPostfach.hasOwnProperty(k0)) postfaecher.push({ email: k0, count: byPostfach[k0].length });
+    postfaecher.sort(function(a, b) { return b.count - a.count; });
 
     // Neues Sheet hinten anhaengen
     var aus = wb.Worksheets.Add();
@@ -2165,81 +2209,97 @@ function buildAuswertungSheet(wb, excel) {
         row++;
     }
 
-    // BLOCK 1: Uebersicht aller Klassifikationen
-    header("UEBERSICHT (echte Makler-Vorgaenge)", rgb(30, 64, 175));
-    dataRow("Vorgaenge gesamt", totalMaklerVorgang, "100%", false, true);
-    row++;
-    var classifOrder = ["BUe-Vorgang", "Mahnung-Reminder", "Schadenmeldung", "Antrag-Aenderung", "Anfrage-Ruecksprache", "Nicht-Standard"];
-    for (var k = 0; k < classifOrder.length; k++) {
-        var c = classifCounts[classifOrder[k]] || 0;
-        dataRow(classifOrder[k], c, pct(c, totalMaklerVorgang), true);
-    }
-    for (var ck in classifCounts) {
-        if (!classifCounts.hasOwnProperty(ck)) continue;
-        var inList = false;
-        for (var j = 0; j < classifOrder.length; j++) if (classifOrder[j] === ck) { inList = true; break; }
-        if (inList) continue;
-        dataRow(ck, classifCounts[ck], pct(classifCounts[ck], totalMaklerVorgang), true);
-    }
-    row++;
-
-    // BLOCK 2: BU-Detail (nur wenn BUs vorhanden)
-    if (bueResults.length > 0) {
-        header("BU-VORGAENGE im Detail (n=" + bueResults.length + ")", rgb(22, 101, 52));
-        dataRow("BUs gesamt", bueResults.length, "100%", false, true);
+    // Rendert einen Statistik-Block (Uebersicht + BU-Detail + Maklerpools) fuer
+    // einen gegebenen Stats-Container. Verwendet die obigen Closures aus
+    // buildAuswertungSheet (aus, row, header, dataRow, pct).
+    function renderBlock(titlePrefix, st, baseColor) {
+        // Uebersicht
+        header(titlePrefix + " (echte Makler-Vorgaenge)", baseColor || rgb(30, 64, 175));
+        dataRow("Vorgaenge gesamt", st.totalMaklerVorgang, "100%", false, true);
         row++;
-        // Reminder vs. Erstvorgang
-        var erst = bueResults.length - reminderInBue;
-        dataRow("Erstvorgang", erst, pct(erst, bueResults.length), true);
-        dataRow("Reminder / Wiedervorlage", reminderInBue, pct(reminderInBue, bueResults.length), true);
-        row++;
-        // Einfacher Vertrag vs. Kundenverbindung
-        dataRow("einfacher Vertrag", einfacherVertragBue, pct(einfacherVertragBue, bueResults.length), true);
-        dataRow("ganze Kundenverbindung", kundenverbindungBue, pct(kundenverbindungBue, bueResults.length), true);
-        if (bueTypUnklar > 0) dataRow("BU-Typ unklar", bueTypUnklar, pct(bueTypUnklar, bueResults.length), true);
-        row++;
-
-        // BLOCK 3: Maklerpool-Aufstellung (nur BU-Vorgaenge)
-        header("MAKLERPOOLS (nur BU-Vorgaenge, sortiert nach Haeufigkeit)", rgb(14, 116, 144));
-        var pools = [];
-        for (var p in poolCountsBue) if (poolCountsBue.hasOwnProperty(p)) pools.push({ name: p, count: poolCountsBue[p] });
-        pools.sort(function(a, b) { return b.count - a.count; });
-
-        // Grossmakler (>=5 Vorgaenge oder >=10%), Kleinmakler signifikant (>=2),
-        // Einzelfaelle aggregiert
-        var einzelfallSum = 0;
-        var einzelfallNames = [];
-        var grossThreshold = 5;
-        var sigThreshold = 2;
-        // Wenn nur sehr wenige BUs: Schwellen senken
-        if (bueResults.length < 10) { grossThreshold = 2; sigThreshold = 2; }
-
-        var listedGross = 0, listedKlein = 0;
-        for (var pi = 0; pi < pools.length; pi++) {
-            var pp = pools[pi];
-            if (pp.count >= grossThreshold) {
-                dataRow(pp.name, pp.count, pct(pp.count, bueResults.length));
-                listedGross++;
-            } else if (pp.count >= sigThreshold) {
-                dataRow(pp.name, pp.count, pct(pp.count, bueResults.length));
-                listedKlein++;
-            } else {
-                einzelfallSum++;
-                einzelfallNames.push(pp.name);
-            }
+        var classifOrder = ["BUe-Vorgang", "Schadenmeldung", "Antrag-Aenderung", "Anfrage-Ruecksprache", "Nicht-Standard"];
+        for (var k = 0; k < classifOrder.length; k++) {
+            var c = st.classifCounts[classifOrder[k]] || 0;
+            dataRow(classifOrder[k], c, pct(c, st.totalMaklerVorgang), true);
         }
-        if (einzelfallSum > 0) {
-            dataRow("Sonstige (je 1 Vorgang)", einzelfallSum, pct(einzelfallSum, bueResults.length), false, true);
-            // Pool-Namen in Spalte B/C zur Doku
-            var startNameRow = row;
-            for (var ni = 0; ni < einzelfallNames.length; ni++) {
-                aus.Cells(row, 1).Value = "      - " + einzelfallNames[ni];
-                row++;
+        for (var ck in st.classifCounts) {
+            if (!st.classifCounts.hasOwnProperty(ck)) continue;
+            var inList = false;
+            for (var j = 0; j < classifOrder.length; j++) if (classifOrder[j] === ck) { inList = true; break; }
+            if (inList) continue;
+            // Mahnung-Reminder aus alten Cache-Eintraegen: einklappen unter Klassifikation, ignorieren - cross-cutting via ist_reminder
+            if (ck === "Mahnung-Reminder") {
+                dataRow(ck + " (alt-Cache, neu: BUe + Reminder)", st.classifCounts[ck], pct(st.classifCounts[ck], st.totalMaklerVorgang), true);
+                continue;
             }
+            dataRow(ck, st.classifCounts[ck], pct(st.classifCounts[ck], st.totalMaklerVorgang), true);
         }
-    } else {
-        header("BU-VORGAENGE im Detail", rgb(22, 101, 52));
-        dataRow("Keine BU-Vorgaenge gefunden", 0, "");
+        row++;
+
+        // BU-Detail
+        if (st.bueResults.length > 0) {
+            header("BU-VORGAENGE im Detail (n=" + st.bueResults.length + ")", rgb(22, 101, 52));
+            dataRow("BUs gesamt", st.bueResults.length, "100%", false, true);
+            row++;
+            var erst = st.bueResults.length - st.reminderInBue;
+            dataRow("Erstvorgang", erst, pct(erst, st.bueResults.length), true);
+            dataRow("Reminder / Wiedervorlage", st.reminderInBue, pct(st.reminderInBue, st.bueResults.length), true);
+            row++;
+            dataRow("einfacher Vertrag", st.einfacherVertragBue, pct(st.einfacherVertragBue, st.bueResults.length), true);
+            dataRow("ganze Kundenverbindung", st.kundenverbindungBue, pct(st.kundenverbindungBue, st.bueResults.length), true);
+            if (st.bueTypUnklar > 0) dataRow("BU-Typ unklar", st.bueTypUnklar, pct(st.bueTypUnklar, st.bueResults.length), true);
+            row++;
+
+            // Maklerpool-Aufstellung
+            header("MAKLERPOOLS (nur BU-Vorgaenge, sortiert nach Haeufigkeit)", rgb(14, 116, 144));
+            var pools = [];
+            for (var p in st.poolCountsBue) if (st.poolCountsBue.hasOwnProperty(p)) pools.push({ name: p, count: st.poolCountsBue[p] });
+            pools.sort(function(a, b) { return b.count - a.count; });
+
+            var grossThreshold = 5;
+            var sigThreshold = 2;
+            if (st.bueResults.length < 10) { grossThreshold = 2; sigThreshold = 2; }
+
+            var einzelfallSum = 0;
+            var einzelfallNames = [];
+            for (var pi = 0; pi < pools.length; pi++) {
+                var pp = pools[pi];
+                if (pp.count >= grossThreshold) {
+                    dataRow(pp.name, pp.count, pct(pp.count, st.bueResults.length));
+                } else if (pp.count >= sigThreshold) {
+                    dataRow(pp.name, pp.count, pct(pp.count, st.bueResults.length));
+                } else {
+                    einzelfallSum++;
+                    einzelfallNames.push(pp.name);
+                }
+            }
+            if (einzelfallSum > 0) {
+                dataRow("Sonstige (je 1 Vorgang)", einzelfallSum, pct(einzelfallSum, st.bueResults.length), false, true);
+                for (var ni = 0; ni < einzelfallNames.length; ni++) {
+                    aus.Cells(row, 1).Value = "      - " + einzelfallNames[ni];
+                    row++;
+                }
+            }
+        } else if (st.totalMaklerVorgang > 0) {
+            header("BU-VORGAENGE im Detail", rgb(22, 101, 52));
+            dataRow("Keine BU-Vorgaenge gefunden", 0, "");
+        }
+        row += 2; // zwei Leerzeilen vor naechstem Block
+    }
+
+    // GESAMT-Block
+    renderBlock("UEBERSICHT GESAMT (alle Postfaecher)", gesamt, rgb(30, 64, 175));
+
+    // Per-Postfach Drilldown
+    if (postfaecher.length > 1) {
+        for (var pfi = 0; pfi < postfaecher.length; pfi++) {
+            var pfEmail = postfaecher[pfi].email;
+            var pfResults = byPostfach[pfEmail];
+            var pfStats = computeAuswertungStats(pfResults);
+            // Nur Postfaecher mit min. 1 echtem Makler-Vorgang anzeigen
+            if (pfStats.totalMaklerVorgang === 0) continue;
+            renderBlock("POSTFACH: " + pfEmail + " (n=" + pfResults.length + ")", pfStats, rgb(76, 29, 149));
+        }
     }
 
     // Format
