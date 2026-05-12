@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.52"
+        VERSION="1.53"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.52 - Cache: ADODB Binary-Read + manuelle UTF-16-Dekodierung in JScript - umgeht ADODB-Text-Konversion-Quirks komplett. Plus Stream.Size-Verify gegen LoadFromFile-Race. Ein Versuch, deterministisch</div>
+            <div class="ver">v1.53 - Cache: VBScript-Helper macht den KOMPLETTEN Read intern (binary load + size-verify + UTF-16-Decode + BSTR-Rueckgabe). Eliminiert JScript-VBArray.toArray()-Marshaling-Bug bei grossen Arrays. EIN deterministischer Read</div>
         </div>
 
         <!-- Cookie -->
@@ -758,61 +758,24 @@ function loadCache() {
     var raw = "";
     var readMethod = "";
     var readErr = "";
-    // OFFIZIELLER PATTERN (deterministisch, ein Versuch):
-    // 1. ADODB.Stream Type=1 (Binary). LoadFromFile blockt synchron bis ALLE Bytes
-    //    in den Stream geladen sind (RAM-Buffer, NICHT OS-File-Cache abhaengig).
-    // 2. Stream.Size verifizieren - muss == fileSize sein.
-    // 3. Alle Bytes via stm.Read() als SafeArray of Byte holen.
-    // 4. UTF-16 LE manuell in JScript dekodieren (Byte-Paare zu Chars).
-    // Dadurch wird die ADODB-Text-Konversion (mit ihren bekannten Quirks bei
-    // grossen Dateien) komplett umgangen.
+    // OFFIZIELLER deterministischer Read: VBScript-Helper macht ALLES intern:
+    //   1. ADODB.Stream Type=1 + LoadFromFile (blockt synchron bis komplett im RAM)
+    //   2. Stream.Size-Verify gegen fileSize
+    //   3. stm.Read() liefert SafeArray of Bytes
+    //   4. UTF-16-LE-Decode via MidB/AscB/ChrW direkt in VBScript
+    //   5. Rueckgabe als String (BSTR) - marshalt 1:1 nach JScript
+    // KEIN JScript-VBArray.toArray() - das hat bei grossen Arrays Partial-Returns.
     try {
-        var stm = new ActiveXObject("ADODB.Stream");
-        stm.Type = 1;
-        stm.Open();
-        stm.LoadFromFile(p);
-        var streamSize = 0;
-        try { streamSize = stm.Size; } catch(eSz) {}
-        if (fileSize > 0 && streamSize !== fileSize) {
-            // LoadFromFile hat nicht alles geladen - sollte praktisch nie passieren
-            stm.Close();
-            throw new Error("Stream.Size " + streamSize + " != fileSize " + fileSize + " (LoadFromFile incomplete)");
-        }
-        stm.Position = 0;
-        var byteSafe = stm.Read();   // Alle Bytes als SafeArray of Byte
-        stm.Close();
-
-        // Konvertierung zu JScript-Array. VBArray.toArray() ist O(n) bei grossen Arrays
-        // (kann 1-2s dauern bei 3 MB), aber deterministisch.
-        var vba = new VBArray(byteSafe);
-        var bytes = vba.toArray();
-        var totalBytes = bytes.length;
-
-        // BOM-Erkennung: UTF-16 LE BOM = 0xFF 0xFE
-        var startIdx = (totalBytes >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) ? 2 : 0;
-
-        // UTF-16 LE manuell dekodieren. Chunked via String.fromCharCode.apply
-        // damit der String-Builder nicht O(n^2) wird bei 1.5M Chars.
-        var charsOut = [];
-        var chunkBuf = [];
-        for (var bi = startIdx; bi < totalBytes - 1; bi += 2) {
-            chunkBuf.push(bytes[bi] | (bytes[bi + 1] << 8));
-            if (chunkBuf.length >= 16384) {
-                charsOut.push(String.fromCharCode.apply(null, chunkBuf));
-                chunkBuf = [];
-            }
-        }
-        if (chunkBuf.length > 0) charsOut.push(String.fromCharCode.apply(null, chunkBuf));
-        raw = charsOut.join("");
-        readMethod = "ADODB binary + JScript UTF-16 decode (" + totalBytes + " bytes -> " + raw.length + " chars)";
+        raw = String(ReadFileFullUtf16LE(p));
+        readMethod = "VBScript binary->UTF16LE decode (" + raw.length + " chars)";
     } catch(eA) {
-        readErr += "Binary-Read: " + eA.message + ". ";
-        // Fallback: FSO ReadAll - falls VBArray.toArray() bei sehr grossen Dateien stirbt
+        readErr += "VBScript-Read: " + eA.message + ". ";
+        // Fallback 1: FSO ReadAll
         try {
             var fRead = fsoCk.OpenTextFile(p, 1, false, -1);
             raw = String(fRead.ReadAll());
             fRead.Close();
-            readMethod = "FSO Unicode (Binary-Read scheiterte)";
+            readMethod = "FSO Unicode (VBScript-Read scheiterte)";
         } catch(eU) {
             showError("Cache laden fehlgeschlagen. " + readErr + "FSO: " + eU.message + " (Pfad: " + p + ")");
             return;
@@ -6175,12 +6138,65 @@ function countRenameCandidates() {
 }
 </script>
 
-<!-- VBScript-Helper: konvertiert TSV-String in echte SafeArray fuer Excel.Range.Value.
-     JScript-Arrays marshalen sich beim COM-Call NICHT als SafeArray, sondern als BSTR
-     mit comma-join - das resultiert in "alle Zellen kriegen den gleichen CSV-String"
-     wenn man sheet.Range(...).Value = jsArr macht. VBScript's Array() oder Split()
-     liefert dagegen ein echtes Variant-Array, das Excel korrekt auf die Range verteilt. -->
 <script language="VBScript">
+' Liest eine Datei komplett: binary load via ADODB.Stream, verify size, return raw text
+' decoded as UTF-16 LE. Macht ALLES in VBScript - keine JScript-VBArray-Konversion,
+' die bei grossen Arrays Partial-Returns produziert.
+Function ReadFileFullUtf16LE(path)
+    Dim stm, fso, fileSize, byteCount, raw, i, sb, b1, b2
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FileExists(path) Then
+        ReadFileFullUtf16LE = ""
+        Exit Function
+    End If
+    fileSize = fso.GetFile(path).Size
+    Set stm = CreateObject("ADODB.Stream")
+    stm.Type = 1  ' Binary
+    stm.Open
+    stm.LoadFromFile path
+    byteCount = stm.Size
+    If byteCount <> fileSize Then
+        stm.Close
+        Err.Raise vbObjectError + 1, "ReadFileFullUtf16LE", "Stream.Size " & byteCount & " <> fileSize " & fileSize
+    End If
+    stm.Position = 0
+    Dim byteArr
+    byteArr = stm.Read
+    stm.Close
+
+    ' BOM erkennen
+    Dim startIdx
+    startIdx = 0
+    If byteCount >= 2 Then
+        If AscB(MidB(byteArr, 1, 1)) = 255 And AscB(MidB(byteArr, 2, 1)) = 254 Then
+            startIdx = 2
+        End If
+    End If
+
+    ' UTF-16 LE Byte-Paare zu Chars. MidB(byteArr, n, 1) liefert das n-te Byte (1-basiert).
+    ' Wir bauen in 32k-Chunks, dann Join - vermeidet O(n^2) String-Concat.
+    Dim chunks(), chunkCount, cur
+    ReDim chunks(byteCount \ 65536 + 2)
+    chunkCount = 0
+    cur = ""
+    For i = startIdx + 1 To byteCount - 1 Step 2
+        b1 = AscB(MidB(byteArr, i, 1))
+        b2 = AscB(MidB(byteArr, i + 1, 1))
+        cur = cur & ChrW(b1 + b2 * 256)
+        If Len(cur) >= 32768 Then
+            chunks(chunkCount) = cur
+            chunkCount = chunkCount + 1
+            cur = ""
+        End If
+    Next
+    If Len(cur) > 0 Then
+        chunks(chunkCount) = cur
+        chunkCount = chunkCount + 1
+    End If
+    ReDim Preserve chunks(chunkCount - 1)
+    ReadFileFullUtf16LE = Join(chunks, "")
+End Function
+
 ' Kanonisches Pattern (Eric Lippert / MS Learn): JScript kann SafeArrays NICHT
 ' zurueck zu COM marshalen. Wenn ein VBScript-Helper ein Array baut und zurueck-
 ' gibt, sieht JScript es als IDispatch-Wrapper - Excel.Range.Value akzeptiert das
