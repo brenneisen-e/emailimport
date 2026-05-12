@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.50"
+        VERSION="1.51"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.50 - Cache-Diagnose verbessert (mod-time, full-CRC, Ende-Sample, JSON-vs-eval-Parser-Vergleich). Bulk-Write Sanity-Check jetzt mit Mitte+Anfang+Ende (statt nur Anfang+Ende - verhindert dass partial-writes als OK durchgehen)</div>
+            <div class="ver">v1.51 - Cache: 3 Lese-Versuche mit Stream-Size-Verify (gegen OS-File-Cache-Warmup). Excel: setTimeout-chunked Write + Colors - kein "Script-Ausfuehrung dauert lange"-Dialog mehr</div>
         </div>
 
         <!-- Cookie -->
@@ -758,58 +758,63 @@ function loadCache() {
     var raw = "";
     var readMethod = "";
     var readErr = "";
-    // KANONISCHES PATTERN (MS KB280067):
-    // - Type=2 + Charset SETZEN BEVOR Open() - sonst gibt's bei grossen UTF-16-Dateien
-    //   Partial-Read-Bug. LoadFromFile setzt Position automatisch auf 0.
-    // - ReadText(-1) hat dokumentierten Bug bei grossen Files - stattdessen IN
-    //   131072-Zeichen-Bloecken bis EOS=true lesen. Microsoft's eigene KB-Empfehlung.
-    try {
-        var stm = new ActiveXObject("ADODB.Stream");
-        stm.Type = 2;              // adTypeText - VOR Open setzen
-        stm.Charset = "unicode";   // UTF-16 LE (BOM auto-detected)
-        stm.Open();
-        stm.LoadFromFile(p);
-        var chunks = [];
-        var safetyCounter = 0;
-        while (!stm.EOS && safetyCounter < 1000) {   // 1000 * 128k = 128M chars Limit
-            var chunk = stm.ReadText(131072);   // 128K chars per KB280067
-            if (chunk === null || String(chunk).length === 0) break;
-            chunks.push(String(chunk));
-            safetyCounter++;
+    // STRATEGIE (gegen OS-File-Cache-Warmup-Bug):
+    // 1. ADODB Binary-Load - liest ALLE Bytes in den Stream-Speicher (synchron)
+    // 2. Verify: stm.Size MUSS == fileSize sein. Wenn nicht: retry (OS Cache war kalt).
+    // 3. Erst dann Type=2 umschalten und ReadText - jetzt ist alles im RAM
+    // Plus 3 Retries falls die ersten zu wenig lesen.
+    var bestLen = 0;
+    var bestRaw = "";
+    var bestMethod = "";
+    for (var attempt = 1; attempt <= 3; attempt++) {
+        try {
+            var stm = new ActiveXObject("ADODB.Stream");
+            stm.Type = 1;   // BINARY - liefert deterministisch die volle Datei
+            stm.Open();
+            stm.LoadFromFile(p);
+            var streamSize = 0;
+            try { streamSize = stm.Size; } catch(eSz) {}
+            // Verify-Step: wenn Stream nicht die ganze Datei kennt, ADODB hat partial geladen
+            var sizeMatch = (fileSize === 0 || streamSize === fileSize);
+            stm.Position = 0;
+            stm.Type = 2;
+            stm.Charset = "unicode";
+            // Chunked ReadText bis EOS
+            var chunks = [];
+            var safetyCounter = 0;
+            while (!stm.EOS && safetyCounter < 1000) {
+                var chunk = stm.ReadText(131072);
+                if (chunk === null || String(chunk).length === 0) break;
+                chunks.push(String(chunk));
+                safetyCounter++;
+            }
+            stm.Close();
+            var attemptRaw = chunks.join("");
+            if (attemptRaw.length > bestLen) {
+                bestLen = attemptRaw.length;
+                bestRaw = attemptRaw;
+                bestMethod = "ADODB bin->text chunked attempt " + attempt + (sizeMatch ? " (size-ok)" : " (size-mismatch " + streamSize + "/" + fileSize + ")");
+            }
+            // Wenn diese Iteration die erwartete Groesse erreicht hat, fertig
+            var expectedThis = fileSize > 0 ? Math.floor((fileSize - 2) / 2) : 0;
+            if (expectedThis > 0 && attemptRaw.length >= expectedThis) break;
+        } catch(eA) {
+            readErr += "Attempt " + attempt + ": " + eA.message + ". ";
         }
-        stm.Close();
-        raw = chunks.join("");
-        readMethod = "ADODB chunked unicode (" + chunks.length + " x 128k)";
-    } catch(eA) {
-        readErr += "ADODB-chunked-unicode: " + eA.message + ". ";
-        // Fallback 1: FSO Unicode (Format -1)
+    }
+    if (bestLen > 0) {
+        raw = bestRaw;
+        readMethod = bestMethod;
+    } else {
+        // Fallback: FSO ReadAll
         try {
             var fRead = fsoCk.OpenTextFile(p, 1, false, -1);
             raw = String(fRead.ReadAll());
             fRead.Close();
-            readMethod = "FSO Unicode";
+            readMethod = "FSO Unicode (alle ADODB-Versuche scheiterten)";
         } catch(eU) {
-            readErr += "FSO-Unicode: " + eU.message + ". ";
-            // Fallback 2: ADODB UTF-8 (falls Datei doch UTF-8)
-            try {
-                var stm2 = new ActiveXObject("ADODB.Stream");
-                stm2.Type = 2;
-                stm2.Charset = "utf-8";
-                stm2.Open();
-                stm2.LoadFromFile(p);
-                var chunks8 = [];
-                while (!stm2.EOS && chunks8.length < 1000) {
-                    var c8 = stm2.ReadText(131072);
-                    if (!c8 || String(c8).length === 0) break;
-                    chunks8.push(String(c8));
-                }
-                stm2.Close();
-                raw = chunks8.join("");
-                readMethod = "ADODB chunked utf-8";
-            } catch(eU8) {
-                showError("Cache laden fehlgeschlagen (Lesen). " + readErr + "ADODB-utf8: " + eU8.message + " (Pfad: " + p + ")");
-                return;
-            }
+            showError("Cache laden fehlgeschlagen (alle Lese-Versuche). " + readErr + "FSO: " + eU.message + " (Pfad: " + p + ")");
+            return;
         }
     }
 
@@ -2490,161 +2495,210 @@ function exportToExcel() {
             bulkErrors.push("VBScript-Bulk fehlgeschlagen: " + (eBulk.message || "?") + " - Per-Cell-Fallback laeuft");
         }
 
-        if (!bulkOk) {
-            // Per-Cell-Fallback. Langsam (~30-60s fuer 2000 Zeilen) aber proven.
-            try { sheet.Range(sheet.Cells(2, 1), sheet.Cells(state.results.length + 1, headers.length)).ClearContents(); } catch(eClr) {}
-            for (var ii2 = 0; ii2 < state.results.length; ii2++) {
-                var r2 = state.results[ii2];
-                var d2 = r2.data || {};
-                var row2 = ii2 + 2;
-                try {
-                    sheet.Cells(row2, 1).Value = ii2 + 1;
-                    sheet.Cells(row2, 2).Value = cellSafe(r2.msgFile);
-                    sheet.Cells(row2, 3).Value = cellSafe(r2.datum);
-                    sheet.Cells(row2, 4).Value = cellSafe(sg(d2, "auftrag_datum"));
-                    sheet.Cells(row2, 5).Value = cellSafe(r2.absName);
-                    sheet.Cells(row2, 6).Value = cellSafe(r2.absMail);
-                    sheet.Cells(row2, 7).Value = cellSafe(r2.empfaenger);
-                    sheet.Cells(row2, 8).Value = cellSafe(r2.betreff);
-                    sheet.Cells(row2, 9).Value = cellSafe(r2.anhangAlle);
-                    sheet.Cells(row2, 10).Value = cellSafe(sg(d2, "maklerpool"));
-                    sheet.Cells(row2, 11).Value = cellSafe(sg(d2, "makler_nachname"));
-                    sheet.Cells(row2, 12).Value = cellSafe(sg(d2, "makler_vorname"));
-                    sheet.Cells(row2, 13).Value = cellSafe(sg(d2, "makler_nummer"));
-                    sheet.Cells(row2, 14).Value = cellSafe(sg(d2, "kunde_nachname"));
-                    sheet.Cells(row2, 15).Value = cellSafe(sg(d2, "kunde_vorname"));
-                    sheet.Cells(row2, 16).Value = cellSafe(sg(d2, "kunde_nummer"));
-                    sheet.Cells(row2, 17).Value = cellSafe(sg(d2, "versicherungsnummer"));
-                    sheet.Cells(row2, 18).Value = cellSafe(sg(d2, "vorgangstyp"));
-                    sheet.Cells(row2, 19).Value = cellSafe(sg(d2, "ist_reminder"));
-                    sheet.Cells(row2, 20).Value = cellSafe(sg(d2, "klassifikation"));
-                    sheet.Cells(row2, 21).Value = cellSafe(sg(d2, "klassifikation_grund"));
-                    sheet.Cells(row2, 22).Value = cellSafe(sg(d2, "geschaefts_typ"));
-                    sheet.Cells(row2, 23).Value = cellSafe(sg(d2, "unterlagen_angefragt"));
-                    sheet.Cells(row2, 24).Value = cellSafe(sg(d2, "unterlagen_liste"));
-                    sheet.Cells(row2, 25).Value = cellSafe(sg(d2, "sonderfall"));
-                    sheet.Cells(row2, 26).Value = cellSafe(sg(d2, "sparte"));
-                    sheet.Cells(row2, 27).Value = cellSafe(sg(d2, "anhang_typen"));
-                    sheet.Cells(row2, 28).Value = cellSafe(sg(d2, "pdf_qualitaet"));
-                    sheet.Cells(row2, 29).Value = cellSafe(sg(d2, "enthaelt_maklervollmacht"));
-                    sheet.Cells(row2, 30).Value = cellSafe(sg(d2, "mv_vollumfaenglich"));
-                    sheet.Cells(row2, 31).Value = cellSafe(sg(d2, "mv_einschraenkungen"));
-                    sheet.Cells(row2, 32).Value = cellSafe(computeMvStatus(r2));
-                    sheet.Cells(row2, 33).Value = cellSafe(sg(d2, "unterschrift_kunde"));
-                    sheet.Cells(row2, 34).Value = cellSafe(sg(d2, "unterschrift_makler"));
-                    sheet.Cells(row2, 35).Value = cellSafe(sg(d2, "auf_vn_ausgestellt"));
-                    sheet.Cells(row2, 36).Value = cellSafe(sg(d2, "makler_namentlich_genannt"));
-                    sheet.Cells(row2, 37).Value = cellSafe(sg(d2, "hinweis"));
-                    sheet.Cells(row2, 38).Value = r2.ok ? "" : cellSafe(r2.errMsg);
-                } catch(eR2) {
-                    bulkErrors.push("Zeile " + row2 + ": " + (eR2.message || "?"));
-                }
-                if ((ii2 + 1) % 50 === 0) {
-                    if (statusEl) statusEl.innerText = "Excel-Export: Per-Cell " + (ii2 + 1) + " / " + exportTotal;
-                    forceRepaint();
-                    if ((ii2 + 1) % 500 === 0) {
-                        try { excel.ScreenUpdating = true; excel.ScreenUpdating = false; } catch(eFlush) {}
+        // -----------------------------------------------------------------------
+        // ASYNC CHUNKED PIPELINE - zerlegt synchrone Loops in setTimeout-Chunks.
+        // Jeder Chunk ist eine eigene JS-Task. Windows-Script-Statement-Counter
+        // resettet sich zwischen Tasks - kein "Script-Ausfuehrung dauert lange"-
+        // Dialog mehr. Ablauf:
+        //   bulkOk=true  -> startColorsChunked -> finalizeExport
+        //   bulkOk=false -> writePerCellChunk(0) -> startColorsChunked -> finalizeExport
+        // -----------------------------------------------------------------------
+
+        // Nested function: chunked per-cell-write (Fallback wenn FillRangeFromTsv versagt)
+        function writePerCellChunk(startIdx) {
+            try {
+                var CHUNK_ROWS = 50;
+                var endIdx = Math.min(startIdx + CHUNK_ROWS, state.results.length);
+                for (var ii2 = startIdx; ii2 < endIdx; ii2++) {
+                    var r2 = state.results[ii2];
+                    var d2 = r2.data || {};
+                    var row2 = ii2 + 2;
+                    try {
+                        sheet.Cells(row2, 1).Value = ii2 + 1;
+                        sheet.Cells(row2, 2).Value = cellSafe(r2.msgFile);
+                        sheet.Cells(row2, 3).Value = cellSafe(r2.datum);
+                        sheet.Cells(row2, 4).Value = cellSafe(sg(d2, "auftrag_datum"));
+                        sheet.Cells(row2, 5).Value = cellSafe(r2.absName);
+                        sheet.Cells(row2, 6).Value = cellSafe(r2.absMail);
+                        sheet.Cells(row2, 7).Value = cellSafe(r2.empfaenger);
+                        sheet.Cells(row2, 8).Value = cellSafe(r2.betreff);
+                        sheet.Cells(row2, 9).Value = cellSafe(r2.anhangAlle);
+                        sheet.Cells(row2, 10).Value = cellSafe(sg(d2, "maklerpool"));
+                        sheet.Cells(row2, 11).Value = cellSafe(sg(d2, "makler_nachname"));
+                        sheet.Cells(row2, 12).Value = cellSafe(sg(d2, "makler_vorname"));
+                        sheet.Cells(row2, 13).Value = cellSafe(sg(d2, "makler_nummer"));
+                        sheet.Cells(row2, 14).Value = cellSafe(sg(d2, "kunde_nachname"));
+                        sheet.Cells(row2, 15).Value = cellSafe(sg(d2, "kunde_vorname"));
+                        sheet.Cells(row2, 16).Value = cellSafe(sg(d2, "kunde_nummer"));
+                        sheet.Cells(row2, 17).Value = cellSafe(sg(d2, "versicherungsnummer"));
+                        sheet.Cells(row2, 18).Value = cellSafe(sg(d2, "vorgangstyp"));
+                        sheet.Cells(row2, 19).Value = cellSafe(sg(d2, "ist_reminder"));
+                        sheet.Cells(row2, 20).Value = cellSafe(sg(d2, "klassifikation"));
+                        sheet.Cells(row2, 21).Value = cellSafe(sg(d2, "klassifikation_grund"));
+                        sheet.Cells(row2, 22).Value = cellSafe(sg(d2, "geschaefts_typ"));
+                        sheet.Cells(row2, 23).Value = cellSafe(sg(d2, "unterlagen_angefragt"));
+                        sheet.Cells(row2, 24).Value = cellSafe(sg(d2, "unterlagen_liste"));
+                        sheet.Cells(row2, 25).Value = cellSafe(sg(d2, "sonderfall"));
+                        sheet.Cells(row2, 26).Value = cellSafe(sg(d2, "sparte"));
+                        sheet.Cells(row2, 27).Value = cellSafe(sg(d2, "anhang_typen"));
+                        sheet.Cells(row2, 28).Value = cellSafe(sg(d2, "pdf_qualitaet"));
+                        sheet.Cells(row2, 29).Value = cellSafe(sg(d2, "enthaelt_maklervollmacht"));
+                        sheet.Cells(row2, 30).Value = cellSafe(sg(d2, "mv_vollumfaenglich"));
+                        sheet.Cells(row2, 31).Value = cellSafe(sg(d2, "mv_einschraenkungen"));
+                        sheet.Cells(row2, 32).Value = cellSafe(computeMvStatus(r2));
+                        sheet.Cells(row2, 33).Value = cellSafe(sg(d2, "unterschrift_kunde"));
+                        sheet.Cells(row2, 34).Value = cellSafe(sg(d2, "unterschrift_makler"));
+                        sheet.Cells(row2, 35).Value = cellSafe(sg(d2, "auf_vn_ausgestellt"));
+                        sheet.Cells(row2, 36).Value = cellSafe(sg(d2, "makler_namentlich_genannt"));
+                        sheet.Cells(row2, 37).Value = cellSafe(sg(d2, "hinweis"));
+                        sheet.Cells(row2, 38).Value = r2.ok ? "" : cellSafe(r2.errMsg);
+                    } catch(eR2) {
+                        bulkErrors.push("Zeile " + row2 + ": " + (eR2.message || "?"));
                     }
                 }
-            }
-        }
-
-        // Phase 2: Color-Highlighting pro Zeile (pro Mail eigenes try/catch -
-        // ein Fehler auf einer Zeile darf nicht den ganzen Lauf killen).
-        if (statusEl) statusEl.innerText = "Excel-Export: " + exportTotal + " / " + exportTotal + " (Farben...)";
-        forceRepaint();
-        for (var ii = 0; ii < state.results.length; ii++) {
-            var rr = state.results[ii];
-            var dd = rr.data || {};
-            var row = ii + 2;
-            try {
-                if (!rr.ok || rr.errMsg) {
-                    sheet.Cells(row, COL_FEHLER).Interior.Color = H_ROT;
-                }
-                var vt = sg(dd, "vorgangstyp");
-                if (vt && vt !== "Makler-Vorgang" && vt !== "") {
-                    sheet.Range(sheet.Cells(row, COL_MAKLERPOOL), sheet.Cells(row, COL_HINWEIS)).Interior.Color = H_GRAU;
-                    sheet.Cells(row, COL_VORGANGSTYP).Interior.Color = H_ORANGE;
-                }
-                if (sg(dd, "ist_reminder") === "ja") sheet.Cells(row, COL_REMINDER).Interior.Color = H_ORANGE;
-                var sond = sg(dd, "sonderfall");
-                if (sond === "Flottengeschaeft" || sond === "Sondertarif") sheet.Cells(row, COL_SONDERFALL).Interior.Color = H_ROT;
-                var kl = sg(dd, "klassifikation");
-                if (kl === "Nicht-Standard") sheet.Cells(row, COL_KLASSIFIK).Interior.Color = H_BERN;
-                var pq = sg(dd, "pdf_qualitaet");
-                if (pq === "Scan") sheet.Cells(row, COL_PDF_QUAL).Interior.Color = H_BERN;
-                else if (pq === "Mixed") sheet.Cells(row, COL_PDF_QUAL).Interior.Color = H_GELB;
-                var mvv = sg(dd, "mv_vollumfaenglich");
-                if (mvv === "teilweise" || mvv === "nein") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_ROT;
-                else if (mvv === "ja") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_GRUEN;
-                var mvSt = computeMvStatus(rr);
-                if (mvSt === "OK") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GRUEN;
-                else if (mvSt === "MV unvollstaendig" || mvSt === "MV fehlt") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_ROT;
-                else if (mvSt === "kein Anhang") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GRAU;
-                else if (mvSt === "nicht pruefbar") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GELB;
-                var uk = sg(dd, "unterschrift_kunde");
-                if (uk === "nein") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_ROT;
-                else if (uk === "ja") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_GRUEN;
-                var um = sg(dd, "unterschrift_makler");
-                if (um === "nein") sheet.Cells(row, COL_UNTERSCHR_M).Interior.Color = H_ROT;
-                else if (um === "ja") sheet.Cells(row, COL_UNTERSCHR_M).Interior.Color = H_GRUEN;
-            } catch(eHL) {
-                bulkErrors.push("Highlight Zeile " + row + ": " + (eHL.message || "?"));
-            }
-            if ((ii + 1) % 200 === 0) {
-                if (statusEl) statusEl.innerText = "Excel-Export: Farben " + (ii + 1) + " / " + exportTotal;
+                if (statusEl) statusEl.innerText = "Excel-Export: Per-Cell " + endIdx + " / " + exportTotal;
                 forceRepaint();
-                if ((ii + 1) % 1000 === 0) {
+                if (endIdx % 500 === 0) {
                     try { excel.ScreenUpdating = true; excel.ScreenUpdating = false; } catch(eFlush) {}
                 }
+                if (endIdx < state.results.length) {
+                    setTimeout(function() { writePerCellChunk(endIdx); }, 0);
+                } else {
+                    startColorsChunked();
+                }
+            } catch(eChunk) {
+                failExport("Per-Cell-Chunk-Fehler bei Zeile " + (startIdx + 1) + ": " + eChunk.message);
             }
         }
-        if (statusEl) statusEl.innerText = "Excel-Export: Auswertung + Formatierung...";
-        forceRepaint();
 
-        try {
-            sheet.Columns("A:A").ColumnWidth = 5;
-            sheet.Columns("B:B").ColumnWidth = 40;
-            sheet.Columns("C:H").ColumnWidth = 18;
-            sheet.Cells.Font.Name = "Open Sans";
-            sheet.Cells.WrapText = false;
-            // Autofilter
-            sheet.Range(sheet.Cells(1,1), sheet.Cells(state.results.length + 1, headers.length)).AutoFilter();
-            sheet.Range("A2").Select();
-            excel.ActiveWindow.FreezePanes = true;
-        } catch(e) {}
-
-        // Zweites Sheet: Auswertung (Maklerpool-Statistik + BU-Detail)
-        var auswErr = "";
-        try { buildAuswertungSheet(wb, excel); } catch(e) {
-            auswErr = e.message || "unbekannter Fehler";
+        function startColorsChunked() {
+            if (statusEl) statusEl.innerText = "Excel-Export: " + exportTotal + " / " + exportTotal + " (Farben starten)";
+            forceRepaint();
+            colorsChunk(0);
         }
 
-        // Speed-Boost-Einstellungen wieder zuruecksetzen, sonst bleibt Excel
-        // bei Bedienung "frozen" (kein Bildschirm-Update, manuelle Berechnung).
-        try { excel.ScreenUpdating = true; } catch(eS) {}
-        try { excel.Calculation = -4105; /* xlCalculationAutomatic */ } catch(eS) {}
-        try { excel.EnableEvents = true; } catch(eS) {}
-        try { excel.DisplayStatusBar = true; } catch(eS) {}
-        excel.DisplayAlerts = true;
-        // JETZT Excel sichtbar machen - alle Schreibarbeiten sind durch,
-        // Window-Manager-Hang-Risiko vorbei.
-        try { excel.Visible = true; } catch(eS) {}
+        function colorsChunk(startIdx) {
+            try {
+                var CHUNK_ROWS = 200;
+                var endIdx = Math.min(startIdx + CHUNK_ROWS, state.results.length);
+                for (var ii = startIdx; ii < endIdx; ii++) {
+                    var rr = state.results[ii];
+                    var dd = rr.data || {};
+                    var row = ii + 2;
+                    try {
+                        if (!rr.ok || rr.errMsg) {
+                            sheet.Cells(row, COL_FEHLER).Interior.Color = H_ROT;
+                        }
+                        var vt = sg(dd, "vorgangstyp");
+                        if (vt && vt !== "Makler-Vorgang" && vt !== "") {
+                            sheet.Range(sheet.Cells(row, COL_MAKLERPOOL), sheet.Cells(row, COL_HINWEIS)).Interior.Color = H_GRAU;
+                            sheet.Cells(row, COL_VORGANGSTYP).Interior.Color = H_ORANGE;
+                        }
+                        if (sg(dd, "ist_reminder") === "ja") sheet.Cells(row, COL_REMINDER).Interior.Color = H_ORANGE;
+                        var sond = sg(dd, "sonderfall");
+                        if (sond === "Flottengeschaeft" || sond === "Sondertarif") sheet.Cells(row, COL_SONDERFALL).Interior.Color = H_ROT;
+                        var kl = sg(dd, "klassifikation");
+                        if (kl === "Nicht-Standard") sheet.Cells(row, COL_KLASSIFIK).Interior.Color = H_BERN;
+                        var pq = sg(dd, "pdf_qualitaet");
+                        if (pq === "Scan") sheet.Cells(row, COL_PDF_QUAL).Interior.Color = H_BERN;
+                        else if (pq === "Mixed") sheet.Cells(row, COL_PDF_QUAL).Interior.Color = H_GELB;
+                        var mvv = sg(dd, "mv_vollumfaenglich");
+                        if (mvv === "teilweise" || mvv === "nein") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_ROT;
+                        else if (mvv === "ja") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_GRUEN;
+                        var mvSt = computeMvStatus(rr);
+                        if (mvSt === "OK") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GRUEN;
+                        else if (mvSt === "MV unvollstaendig" || mvSt === "MV fehlt") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_ROT;
+                        else if (mvSt === "kein Anhang") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GRAU;
+                        else if (mvSt === "nicht pruefbar") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GELB;
+                        var uk = sg(dd, "unterschrift_kunde");
+                        if (uk === "nein") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_ROT;
+                        else if (uk === "ja") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_GRUEN;
+                        var um = sg(dd, "unterschrift_makler");
+                        if (um === "nein") sheet.Cells(row, COL_UNTERSCHR_M).Interior.Color = H_ROT;
+                        else if (um === "ja") sheet.Cells(row, COL_UNTERSCHR_M).Interior.Color = H_GRUEN;
+                    } catch(eHL) {
+                        bulkErrors.push("Highlight Zeile " + row + ": " + (eHL.message || "?"));
+                    }
+                }
+                if (statusEl) statusEl.innerText = "Excel-Export: Farben " + endIdx + " / " + exportTotal;
+                forceRepaint();
+                if (endIdx % 1000 === 0) {
+                    try { excel.ScreenUpdating = true; excel.ScreenUpdating = false; } catch(eFlush) {}
+                }
+                if (endIdx < state.results.length) {
+                    setTimeout(function() { colorsChunk(endIdx); }, 0);
+                } else {
+                    finalizeExport();
+                }
+            } catch(eC) {
+                failExport("Color-Chunk-Fehler bei Zeile " + (startIdx + 1) + ": " + eC.message);
+            }
+        }
 
-        // Erfolgsmeldung mit Fehler-Zusammenfassung falls Probleme
-        var okMsg = "Excel mit " + state.results.length + " Vorgaengen + Auswertung-Sheet geoeffnet.";
-        if (bulkErrors.length > 0) {
-            okMsg += " <strong>" + bulkErrors.length + " Zeilen mit Schreibfehlern</strong> (zellweiser Fallback aktiv): " +
-                     bulkErrors.slice(0, 3).join(" | ") + (bulkErrors.length > 3 ? " ..." : "");
+        function finalizeExport() {
+            try {
+                if (statusEl) statusEl.innerText = "Excel-Export: Auswertung + Formatierung...";
+                forceRepaint();
+
+                try {
+                    sheet.Columns("A:A").ColumnWidth = 5;
+                    sheet.Columns("B:B").ColumnWidth = 40;
+                    sheet.Columns("C:H").ColumnWidth = 18;
+                    sheet.Cells.Font.Name = "Open Sans";
+                    sheet.Cells.WrapText = false;
+                    sheet.Range(sheet.Cells(1,1), sheet.Cells(state.results.length + 1, headers.length)).AutoFilter();
+                    sheet.Range("A2").Select();
+                    excel.ActiveWindow.FreezePanes = true;
+                } catch(eFmt) {}
+
+                var auswErr = "";
+                try { buildAuswertungSheet(wb, excel); } catch(eAusw) {
+                    auswErr = eAusw.message || "unbekannter Fehler";
+                }
+
+                try { excel.ScreenUpdating = true; } catch(eS) {}
+                try { excel.Calculation = -4105; } catch(eS) {}
+                try { excel.EnableEvents = true; } catch(eS) {}
+                try { excel.DisplayStatusBar = true; } catch(eS) {}
+                excel.DisplayAlerts = true;
+                try { excel.Visible = true; } catch(eS) {}
+
+                var okMsg = "Excel mit " + state.results.length + " Vorgaengen + Auswertung-Sheet geoeffnet.";
+                if (bulkErrors.length > 0) {
+                    okMsg += " <strong>" + bulkErrors.length + " Zeilen mit Schreibfehlern</strong>: " +
+                             bulkErrors.slice(0, 3).join(" | ") + (bulkErrors.length > 3 ? " ..." : "");
+                }
+                if (auswErr) okMsg += " <strong>Auswertung-Sheet fehlgeschlagen:</strong> " + auswErr;
+                okMsg += " Bitte manuell speichern.";
+                if (statusEl) statusEl.innerText = "";
+                if (pgEl && !state.running) pgEl.style.display = "none";
+                showSuccess(okMsg);
+            } catch(eF) {
+                failExport("Finalize-Fehler: " + eF.message);
+            }
         }
-        if (auswErr) {
-            okMsg += " <strong>Auswertung-Sheet fehlgeschlagen:</strong> " + auswErr;
+
+        function failExport(msg) {
+            try { if (typeof excel !== "undefined") {
+                excel.ScreenUpdating = true;
+                excel.Calculation = -4105;
+                excel.EnableEvents = true;
+                excel.DisplayAlerts = true;
+                excel.DisplayStatusBar = true;
+                excel.Visible = true;
+            }} catch(eR) {}
+            if (statusEl) statusEl.innerText = "";
+            if (pgEl && !state.running) pgEl.style.display = "none";
+            showError("Excel-Export fehlgeschlagen: " + msg);
         }
-        okMsg += " Bitte manuell speichern.";
-        // Progress-Container wieder verstecken (war fuer Export-Progress eingeblendet)
-        if (statusEl) statusEl.innerText = "";
-        if (pgEl && !state.running) pgEl.style.display = "none";
-        showSuccess(okMsg);
+
+        // KICKOFF: erster Chunk je nach bulkOk-Status
+        if (!bulkOk) {
+            try { sheet.Range(sheet.Cells(2, 1), sheet.Cells(state.results.length + 1, headers.length)).ClearContents(); } catch(eClr) {}
+            setTimeout(function() { writePerCellChunk(0); }, 0);
+        } else {
+            setTimeout(startColorsChunked, 0);
+        }
     } catch(e) {
         // Settings auch im Fehlerfall zuruecksetzen (sonst bleibt Excel ggf.
         // unsichtbar/frozen falls Crash zwischen Visible=false und Visible=true)
