@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.35"
+        VERSION="1.36"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.35 - Async Conversation-Create: alle Slots wirklich gleichzeitig startbar (PUT /conversation laeuft im Hintergrund), neue Stage CREATING_CONV vor UPLOADING/READY/RUNNING</div>
+            <div class="ver">v1.36 - Neue MV-Status-Spalte (OK / MV unvollstaendig / MV fehlt / kein Anhang / nicht pruefbar) mit Farb-Highlight, MV-Status-Statistik-Block in Auswertung pro Postfach</div>
         </div>
 
         <!-- Cookie -->
@@ -2178,16 +2178,16 @@ function exportToExcel() {
                        "Kunde_Nachname","Kunde_Vorname","Kundennummer","Versicherungsnummer",
                        "Vorgangstyp","Ist_Reminder","Klassifikation","Klassifikation_Grund",
                        "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
-                       "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen",
+                       "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen","MV_Status",
                        "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler"];
-        // Spalten-Konstanten (1-basiert) - nach Empfaenger-Spalte alles +1 verschoben
-        var COL_DATEI = 2, COL_HINWEIS = 36, COL_FEHLER = 37;
+        // Spalten-Konstanten (1-basiert) - nach MV_Status alles ab Spalte 33 +1 verschoben
+        var COL_DATEI = 2, COL_HINWEIS = 37, COL_FEHLER = 38;
         var COL_MAKLERPOOL = 10, COL_MAKLER_NR = 13;
         var COL_KUNDE_NACH = 14, COL_VERS_NR = 17;
         var COL_VORGANGSTYP = 18, COL_REMINDER = 19;
         var COL_KLASSIFIK = 20, COL_GESCHTYP = 22, COL_UNTERLAGEN = 23, COL_SONDERFALL = 25, COL_SPARTE = 26;
         var COL_ANH_TYPEN = 27, COL_PDF_QUAL = 28;
-        var COL_VM_VORHAND = 29, COL_VM_VOLLST = 30, COL_VM_FEHLT = 31, COL_UNTERSCHR_K = 32, COL_UNTERSCHR_M = 33, COL_AUF_VN = 34, COL_MAKL_NAM = 35;
+        var COL_VM_VORHAND = 29, COL_VM_VOLLST = 30, COL_VM_FEHLT = 31, COL_MV_STATUS = 32, COL_UNTERSCHR_K = 33, COL_UNTERSCHR_M = 34, COL_AUF_VN = 35, COL_MAKL_NAM = 36;
 
         for (var c = 0; c < headers.length; c++) {
             sheet.Cells(1, c+1).Value = headers[c];
@@ -2265,12 +2265,13 @@ function exportToExcel() {
             sheet.Cells(row,29).Value = cellSafe(sg(d, "enthaelt_maklervollmacht"));
             sheet.Cells(row,30).Value = cellSafe(sg(d, "mv_vollumfaenglich"));
             sheet.Cells(row,31).Value = cellSafe(sg(d, "mv_einschraenkungen"));
-            sheet.Cells(row,32).Value = cellSafe(sg(d, "unterschrift_kunde"));
-            sheet.Cells(row,33).Value = cellSafe(sg(d, "unterschrift_makler"));
-            sheet.Cells(row,34).Value = cellSafe(sg(d, "auf_vn_ausgestellt"));
-            sheet.Cells(row,35).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
-            sheet.Cells(row,36).Value = cellSafe(sg(d, "hinweis"));
-            sheet.Cells(row,37).Value = r.ok ? "" : cellSafe(r.errMsg);
+            sheet.Cells(row,32).Value = cellSafe(computeMvStatus(r));
+            sheet.Cells(row,33).Value = cellSafe(sg(d, "unterschrift_kunde"));
+            sheet.Cells(row,34).Value = cellSafe(sg(d, "unterschrift_makler"));
+            sheet.Cells(row,35).Value = cellSafe(sg(d, "auf_vn_ausgestellt"));
+            sheet.Cells(row,36).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
+            sheet.Cells(row,37).Value = cellSafe(sg(d, "hinweis"));
+            sheet.Cells(row,38).Value = r.ok ? "" : cellSafe(r.errMsg);
 
             // Highlights pro Zelle (VBA-Logik)
             try {
@@ -2293,6 +2294,12 @@ function exportToExcel() {
                 var mvv = sg(d, "mv_vollumfaenglich");
                 if (mvv === "teilweise" || mvv === "nein") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_ROT;
                 else if (mvv === "ja") sheet.Cells(row, COL_VM_VOLLST).Interior.Color = H_GRUEN;
+                // MV-Status farblich markieren
+                var mvSt = computeMvStatus(r);
+                if (mvSt === "OK") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GRUEN;
+                else if (mvSt === "MV unvollstaendig" || mvSt === "MV fehlt") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_ROT;
+                else if (mvSt === "kein Anhang") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GRAU;
+                else if (mvSt === "nicht pruefbar") sheet.Cells(row, COL_MV_STATUS).Interior.Color = H_GELB;
                 var uk = sg(d, "unterschrift_kunde");
                 if (uk === "nein") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_ROT;
                 else if (uk === "ja") sheet.Cells(row, COL_UNTERSCHR_K).Interior.Color = H_GRUEN;
@@ -2352,7 +2359,8 @@ function computeAuswertungStats(results) {
         reminderInBue: 0,
         einfacherVertragBue: 0,
         kundenverbindungBue: 0,
-        bueTypUnklar: 0
+        bueTypUnklar: 0,
+        mvStatusBue: { "OK": 0, "MV unvollstaendig": 0, "MV fehlt": 0, "kein Anhang": 0, "nicht pruefbar": 0 }
     };
     for (var i = 0; i < results.length; i++) {
         var r = results[i];
@@ -2371,6 +2379,9 @@ function computeAuswertungStats(results) {
             if (gt.indexOf("einfacher") >= 0 || gt.indexOf("einzeln") >= 0) st.einfacherVertragBue++;
             else if (gt.indexOf("Kundenverbindung") >= 0 || gt.indexOf("kundenverbindung") >= 0) st.kundenverbindungBue++;
             else st.bueTypUnklar++;
+            var mvs = computeMvStatus(r);
+            if (mvs in st.mvStatusBue) st.mvStatusBue[mvs]++;
+            else st.mvStatusBue[mvs] = (st.mvStatusBue[mvs] || 0) + 1;
         }
     }
     return st;
@@ -2379,6 +2390,23 @@ function computeAuswertungStats(results) {
 // Zweites Excel-Sheet "Auswertung": Maklerpool-Statistik + BU-Detail-Stats.
 // Zaehlt nur echte Makler-Vorgaenge (vorgangstyp=Makler-Vorgang).
 // Hat 3 Sektionen: GESAMT (alle Postfaecher), dann pro Postfach ein Drill-Down.
+// Konsolidierte MV-Status-Spalte. Reduziert die drei MV-Felder + Anhang-Info
+// auf einen Single-Glance-Wert. Reihenfolge zaehlt: zuerst "kein Anhang"
+// pruefen, dann "MV fehlt" (Anhang da, aber MV-Flag nein), dann Vollumfang.
+function computeMvStatus(r) {
+    if (!r || !r.data) return "";
+    var d = r.data;
+    var anhang = String(r.anhangAlle || "").replace(/^\s+|\s+$/g, "");
+    if (!anhang) return "kein Anhang";
+    var enth = (sg(d, "enthaelt_maklervollmacht") || "").toLowerCase();
+    var voll = (sg(d, "mv_vollumfaenglich") || "").toLowerCase();
+    if (enth === "nein") return "MV fehlt";
+    if (voll === "ja") return "OK";
+    if (voll === "teilweise") return "MV unvollstaendig";
+    if (voll === "nein") return "MV unvollstaendig";
+    return "nicht pruefbar";
+}
+
 function buildAuswertungSheet(wb, excel) {
     // GESAMT-Stats
     var gesamt = computeAuswertungStats(state.results);
@@ -2469,6 +2497,23 @@ function buildAuswertungSheet(wb, excel) {
             dataRow("einfacher Vertrag", st.einfacherVertragBue, pct(st.einfacherVertragBue, st.bueResults.length), true);
             dataRow("ganze Kundenverbindung", st.kundenverbindungBue, pct(st.kundenverbindungBue, st.bueResults.length), true);
             if (st.bueTypUnklar > 0) dataRow("BU-Typ unklar", st.bueTypUnklar, pct(st.bueTypUnklar, st.bueResults.length), true);
+            row++;
+
+            // MV-Status-Block (konsolidierter Blick)
+            header("MV-STATUS (nur BU-Vorgaenge)", rgb(159, 18, 57));
+            var mvOrder = ["OK", "MV unvollstaendig", "MV fehlt", "kein Anhang", "nicht pruefbar"];
+            for (var mi = 0; mi < mvOrder.length; mi++) {
+                var mk = mvOrder[mi];
+                var mv = st.mvStatusBue[mk] || 0;
+                dataRow(mk, mv, pct(mv, st.bueResults.length), true);
+            }
+            // Zusaetzliche unerwartete Werte (sollte nie passieren)
+            for (var emk in st.mvStatusBue) {
+                if (!st.mvStatusBue.hasOwnProperty(emk)) continue;
+                var inOrder = false;
+                for (var oi = 0; oi < mvOrder.length; oi++) if (mvOrder[oi] === emk) { inOrder = true; break; }
+                if (!inOrder && st.mvStatusBue[emk] > 0) dataRow(emk, st.mvStatusBue[emk], pct(st.mvStatusBue[emk], st.bueResults.length), true);
+            }
             row++;
 
             // Maklerpool-Aufstellung
