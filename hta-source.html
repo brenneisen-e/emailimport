@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.46 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.47 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.46</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.47</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.46"
+        VERSION="1.47"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.46 - FIX Excel-Hang: 2D-SafeArray via VBScript, EIN einziger Range.Value-Call statt 5000 (Recherche: 22k COM-Calls flood Excel-Message-Queue -> DWM 'Not Responding'). Plus Excel.Visible=false waehrend Write</div>
+            <div class="ver">v1.47 - FIX 2D-Bulk-Write silent-fail (Farben da aber leere Zellen): Sanity-Check liest 2 Stichproben nach dem Write, faellt bei leeren Werten automatisch auf zeilenweisen 1D-SafeArray-Write zurueck</div>
         </div>
 
         <!-- Cookie -->
@@ -2586,11 +2586,24 @@ function exportToExcel() {
             if (statusEl) statusEl.innerText = "Excel-Export: Bulk-Write in Excel...";
             forceRepaint();
             sheet.Range(sheet.Cells(2, 1), sheet.Cells(state.results.length + 1, headers.length)).Value = arr2d;
+            // SANITY-CHECK: 2D-Write kann silent failen (z.B. VBScript-Memory-Limit
+            // bei >1MB TSV, oder Excel akzeptiert die SafeArray-Form nicht). Verify
+            // mit einer Stichprobe - wenn die leer ist, throw und fallback per-row.
+            var sample1 = String(sheet.Cells(2, 2).Value || "");
+            var sample2 = String(sheet.Cells(state.results.length + 1, 2).Value || "");
+            if (sample1.length === 0 || sample2.length === 0) {
+                throw new Error("2D-Bulk produzierte leere Zellen (sample1='" + sample1.substr(0,30) + "', sample2='" + sample2.substr(0,30) + "')");
+            }
         } catch(eBulk) {
-            // Fallback bei Riesen-TSV: zeilenweise mit TsvToVbArray
+            // Fallback bei Riesen-TSV oder silent-empty-Write: zeilenweise mit
+            // TsvToVbArray (1D SafeArray pro Zeile, proven in v1.44).
             bulkErrors.push("Bulk-2D fehlgeschlagen, faelle zurueck auf Zeilen-Modus: " + (eBulk.message || "?"));
             if (statusEl) statusEl.innerText = "Excel-Export: Fallback Zeilen-Modus...";
             forceRepaint();
+            // Erst die ggf. teilweise gefuellten Zeilen aus dem 2D-Versuch leeren
+            try {
+                sheet.Range(sheet.Cells(2, 1), sheet.Cells(state.results.length + 1, headers.length)).ClearContents();
+            } catch(eClr) {}
             for (var bi = 0; bi < rowsTsv.length; bi++) {
                 try {
                     var vbArr = TsvToVbArray(rowsTsv[bi], "\t");
@@ -2601,6 +2614,9 @@ function exportToExcel() {
                 if ((bi + 1) % 100 === 0) {
                     if (statusEl) statusEl.innerText = "Excel-Export: Fallback " + (bi + 1) + " / " + exportTotal;
                     forceRepaint();
+                }
+                if ((bi + 1) % 500 === 0) {
+                    try { excel.ScreenUpdating = true; excel.ScreenUpdating = false; } catch(eFlush) {}
                 }
             }
         }
