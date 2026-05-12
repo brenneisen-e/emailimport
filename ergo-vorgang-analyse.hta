@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.26"
+        VERSION="1.27"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.26 - Sammeln: FLAT-Copy + kurzer Ordner-Name (_zr_YYMMDD) gegen 260-Pfad-Limit</div>
+            <div class="ver">v1.27 - Zufallsstichprobe in neuen Ordner kopieren (z.B. 1000 von 5000)</div>
         </div>
 
         <!-- Cookie -->
@@ -271,8 +271,15 @@
                             title="Kopiert alle Mails im gewaehlten Zeitraum aus dem Ordner (rekursiv durch Unterordner) in einen neuen Ziel-Ordner. Der neue Ordner wird automatisch zum Analyse-Ordner.">
                         &#128193; Mails aus Zeitraum in neuen Ordner sammeln
                     </button>
+                    <button class="btn" id="btnRandomSample" onclick="copyRandomSampleToNewFolder()" disabled
+                            style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white; font-size: 12px; padding: 8px 14px; margin-left: 6px;"
+                            title="Zieht eine zufaellige Stichprobe (z.B. 1000 Mails) aus dem aktuellen Ordner / Filter und kopiert sie in einen neuen Ordner fuer's Sampling.">
+                        &#127922; Zufallsstichprobe in neuen Ordner kopieren
+                    </button>
                     <div style="font-size:11px; color: #94a3b8; margin-top:4px;">
-                        Quelle wird rekursiv durchsucht (z.B. Ober-Ordner mit zwei Postfach-Subfoldern). Originale bleiben erhalten - Kopie in neuen Ordner.
+                        <strong>Sammeln:</strong> alle Mails im Zeitraum (Filter wird angewendet).<br>
+                        <strong>Zufalls-Stichprobe:</strong> N zufaellig gewaehlte Mails aus dem aktuellen Filter (z.B. 1000 von 5000 fuer Pool-Analyse).<br>
+                        Beide kopieren FLACH (keine Unterordner), Originale bleiben erhalten.
                     </div>
                 </div>
             </div>
@@ -833,6 +840,9 @@ function refreshStartButton() {
     // Collect-Button: braucht Ordner + Mails + min. 1 Datum
     var btnCl = document.getElementById("btnCollectByDate");
     if (btnCl) btnCl.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0 || (!state.dateFrom && !state.dateTo);
+    // Random-Sample-Button: braucht nur Ordner + Mails (Datum optional)
+    var btnRs = document.getElementById("btnRandomSample");
+    if (btnRs) btnRs.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0;
 }
 
 function startAnalysis() {
@@ -5008,6 +5018,10 @@ function copyZeitraumToNewFolder() {
         "Fortfahren?"
     )) return;
 
+    executeFlatCopy(filtered, targetParent, "Sammeln");
+    return;
+
+    // -- ALTER INLINE-CODE BLEIBT UNBENUTZT, WIRD VOM RETURN OBERHALB UEBERSPRUNGEN --
     state.running = true;
     refreshStartButton();
     document.getElementById("progressContainer").style.display = "block";
@@ -5167,6 +5181,180 @@ function ensureFolderPath(fso, path) {
     var parent = path.substr(0, path.lastIndexOf("\\"));
     if (parent && !fso.FolderExists(parent)) ensureFolderPath(fso, parent);
     if (!fso.FolderExists(path)) fso.CreateFolder(path);
+}
+
+// ============================================================================
+// ZUFALLSSTICHPROBE: N zufaellige Mails in neuen Ordner kopieren
+// ============================================================================
+function copyRandomSampleToNewFolder() {
+    if (state.running) return;
+    if (!state.folderPath) { showError("Erst Ordner waehlen."); return; }
+    var filtered = getFilteredMsgFiles();
+    if (filtered.length === 0) {
+        showError("Keine Mails verfuegbar.");
+        return;
+    }
+
+    var defaultN = Math.min(1000, filtered.length);
+    var nStr = window.prompt(
+        "Zufallsstichprobe ziehen\n\n" +
+        "Verfuegbar im Filter: " + filtered.length + " Mails\n\n" +
+        "Wieviele zufaellig auswaehlen?\n" +
+        "(Empfehlung: 100-1000 fuer Pool-Sampling)",
+        defaultN
+    );
+    if (nStr === null) return;
+    var n = parseInt(nStr);
+    if (!n || n < 1) { showError("Ungueltige Anzahl."); return; }
+    if (n > filtered.length) n = filtered.length;
+
+    // Fisher-Yates Shuffle in-place
+    var pool = filtered.slice(0);
+    for (var sh = pool.length - 1; sh > 0; sh--) {
+        var sj = Math.floor(Math.random() * (sh + 1));
+        var tmp = pool[sh]; pool[sh] = pool[sj]; pool[sj] = tmp;
+    }
+    var sample = pool.slice(0, n);
+
+    // Ziel-Name (mit Zeitraum falls Filter, sonst nur _sample_N)
+    var dateSuffix = "";
+    if (state.dateFrom) dateSuffix += "_" + shortDateForFolder(state.dateFrom);
+    if (state.dateTo) dateSuffix += "_" + shortDateForFolder(state.dateTo);
+    var folderSuffix = "_sample_" + n + dateSuffix;
+    var targetParent = state.folderPath + "\\" + folderSuffix;
+
+    if (!confirm(
+        "Zufallsstichprobe in neuen Ordner kopieren\n\n" +
+        "Quelle: " + state.folderPath + "\n" +
+        "Verfuegbar: " + filtered.length + " Mails\n" +
+        "Stichprobe: " + n + " zufaellig gewaehlte Mails\n\n" +
+        "Ziel-Ordner:\n  " + targetParent + "\n\n" +
+        "- FLAT: alle Mails direkt in einem Ordner\n" +
+        "- Bei Namens-Konflikten: _2, _3, ... Suffix\n" +
+        "- Originale bleiben erhalten\n" +
+        "- Danach wird der neue Ordner als Analyse-Ordner aktiviert\n\n" +
+        "Fortfahren?"
+    )) return;
+
+    executeFlatCopy(sample, targetParent, "Stichprobe");
+}
+
+// Gemeinsame Copy-Engine fuer Zeitraum-Sammeln + Zufallsstichprobe.
+// Erwartet: fileList (Array von vollen Pfaden), targetParent (Ziel-Ordner),
+// label (z.B. "Sammeln" oder "Stichprobe" - fuer Statusmeldungen).
+function executeFlatCopy(fileList, targetParent, label) {
+    state.running = true;
+    refreshStartButton();
+    document.getElementById("progressContainer").style.display = "block";
+    hideStatus();
+
+    var fso;
+    try { fso = new ActiveXObject("Scripting.FileSystemObject"); }
+    catch(e) {
+        showError("FSO nicht verfuegbar: " + e.message);
+        state.running = false;
+        refreshStartButton();
+        document.getElementById("progressContainer").style.display = "none";
+        return;
+    }
+    try { ensureFolderPath(fso, targetParent); }
+    catch(e) {
+        showError("Ziel-Ordner konnte nicht erstellt werden: " + e.message);
+        state.running = false;
+        refreshStartButton();
+        document.getElementById("progressContainer").style.display = "none";
+        return;
+    }
+
+    var copied = 0, errors = 0, total = fileList.length;
+    var errorSamples = [];
+    var errorByReason = {};
+    var i = 0;
+    function step() {
+        var end = Math.min(i + 50, total);
+        for (; i < end; i++) {
+            var src = fileList[i];
+            var fileName = getFileName(src);
+            if (src.toLowerCase().indexOf(targetParent.toLowerCase()) === 0) continue;
+            var dest = targetParent + "\\" + fileName;
+            var phase = "init";
+            try {
+                phase = "conflict-check";
+                if (fso.FileExists(dest)) {
+                    var dotPos = dest.lastIndexOf(".");
+                    var nN = 2;
+                    while (nN < 1000) {
+                        var altDest = (dotPos > 0)
+                            ? dest.substr(0, dotPos) + "_" + nN + dest.substr(dotPos)
+                            : dest + "_" + nN;
+                        if (!fso.FileExists(altDest)) { dest = altDest; break; }
+                        nN++;
+                    }
+                }
+                phase = "CopyFile (destPath len=" + dest.length + ")";
+                fso.CopyFile(src, dest, false);
+                copied++;
+            } catch(eC) {
+                errors++;
+                var reasonKey = phase + " | " + (eC.message || eC.description || String(eC)).substr(0, 80);
+                errorByReason[reasonKey] = (errorByReason[reasonKey] || 0) + 1;
+                if (errorSamples.length < 20) {
+                    errorSamples.push({
+                        phase: phase, msg: (eC.message || eC.description || String(eC)),
+                        src: src, srcLen: src.length, dest: dest, destLen: dest.length
+                    });
+                }
+            }
+        }
+        updateProgress(i, total, label + ": " + i + "/" + total + " (ok: " + copied + ", fehler: " + errors + ")");
+        if (i < total) {
+            setTimeout(step, 5);
+        } else {
+            document.getElementById("progressContainer").style.display = "none";
+            state.running = false;
+
+            var diagHtml = "";
+            if (errors > 0) {
+                diagHtml = "<br><br><strong>Fehler-Diagnose:</strong><br>";
+                diagHtml += "<table style='font-size:11px;border-collapse:collapse;margin-top:4px;'>";
+                var sortedReasons = [];
+                for (var rk in errorByReason) if (errorByReason.hasOwnProperty(rk)) sortedReasons.push({ key: rk, count: errorByReason[rk] });
+                sortedReasons.sort(function(a,b){ return b.count - a.count; });
+                for (var sr = 0; sr < Math.min(8, sortedReasons.length); sr++) {
+                    diagHtml += "<tr><td style='padding:2px 8px;color:#fca5a5'>" + esc(sortedReasons[sr].key) + "</td>" +
+                                "<td style='padding:2px 8px;text-align:right'><strong>" + sortedReasons[sr].count + "</strong></td></tr>";
+                }
+                diagHtml += "</table>";
+                var longPaths = 0;
+                for (var lp = 0; lp < errorSamples.length; lp++) {
+                    if (errorSamples[lp].destLen >= 250) longPaths++;
+                }
+                if (longPaths > 0) {
+                    diagHtml += "<br><strong style='color:#fbbf24'>Tipp:</strong> " +
+                                "Windows-Pfade duerfen max ~260 Zeichen lang sein. " +
+                                "Probiere einen kuerzeren Ziel-Pfad (Ordner mit kuerzerem Namen).";
+                }
+            }
+
+            if (copied === 0) {
+                refreshStartButton();
+                showError("<strong>" + label + ": Keine Mails kopiert (" + errors + " Fehler).</strong>" + diagHtml);
+                return;
+            }
+
+            state.xxlResults = [];
+            state.results = [];
+            state.pendingMap = {};
+            resetDateRange();
+            useFolder(targetParent);
+            if (errors === 0) {
+                showSuccess(label + ": " + copied + " von " + total + " Mails nach <code>" + esc(targetParent) + "</code> kopiert. Ordner ist jetzt aktiv.");
+            } else {
+                showError("<strong>" + label + ": " + copied + " von " + total + " Mails kopiert, " + errors + " Fehler!</strong><br>Ziel: <code>" + esc(targetParent) + "</code> (jetzt aktiv)." + diagHtml);
+            }
+        }
+    }
+    setTimeout(step, 50);
 }
 
 function countRenameCandidates() {
