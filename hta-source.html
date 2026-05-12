@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.31 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.32 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.31</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.32</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.31"
+        VERSION="1.32"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.31 - Fix Long-Running-Script-Dialog: nur 1 Slot pro Tick befuellen (statt alle parallelN auf einmal), Live-Log, Parallel bis 15, Sonderkondition-Boilerplate, ASYNC-Retry</div>
+            <div class="ver">v1.32 - Rolling-Replacement: Tick-Delay 0ms wenn Slot frei wird, Slot-Start-Log fuer bessere Sichtbarkeit der parallelen Pipeline</div>
         </div>
 
         <!-- Cookie -->
@@ -1076,6 +1076,7 @@ function workerTick() {
             var prepOk = prepareSlot(slot);
             if (prepOk) {
                 state.slots["s" + slot.id] = slot;
+                appendAiLog("OK", slot.msgPath, "Slot " + slot.id + " gestartet (PDFs=" + (slot.pdfListe ? slot.pdfListe.split(";").length : 0) + ")");
             } else {
                 // Prep error - write result, continue
                 var r = makeResult(slot, false, slot.errMsg || "Vorbereitung fehlgeschlagen");
@@ -1185,8 +1186,14 @@ function workerTick() {
         return;
     }
 
-    // Schedule next tick - faster when queue not full, slower when idle
-    var delay = (countSlots() >= state.parallelN || state.nextIdx >= state.workQueue.length) ? 200 : 50;
+    // Schedule next tick:
+    // - 0ms wenn freie Slots da sind UND noch Mails zu prepa-ren - so fuellen wir
+    //   sofort nach Completion einen neuen Slot nach (Rolling-Replacement).
+    // - 200ms wenn alle Slots voll (nur polling, kein CPU-Burner).
+    // - 200ms wenn keine Mails mehr - workerTick wartet auf die letzten Inflights.
+    var hasFreeSlot = countSlots() < state.parallelN;
+    var hasMoreWork = state.nextIdx < state.workQueue.length;
+    var delay = (hasFreeSlot &amp;&amp; hasMoreWork) ? 0 : 200;
     setTimeout(workerTick, delay);
 }
 

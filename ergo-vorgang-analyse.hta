@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.31"
+        VERSION="1.32"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.31 - Fix Long-Running-Script-Dialog: nur 1 Slot pro Tick befuellen (statt alle parallelN auf einmal), Live-Log, Parallel bis 15, Sonderkondition-Boilerplate, ASYNC-Retry</div>
+            <div class="ver">v1.32 - Rolling-Replacement: Tick-Delay 0ms wenn Slot frei wird, Slot-Start-Log fuer bessere Sichtbarkeit der parallelen Pipeline</div>
         </div>
 
         <!-- Cookie -->
@@ -940,6 +940,7 @@ function workerTick() {
             var prepOk = prepareSlot(slot);
             if (prepOk) {
                 state.slots["s" + slot.id] = slot;
+                appendAiLog("OK", slot.msgPath, "Slot " + slot.id + " gestartet (PDFs=" + (slot.pdfListe ? slot.pdfListe.split(";").length : 0) + ")");
             } else {
                 // Prep error - write result, continue
                 var r = makeResult(slot, false, slot.errMsg || "Vorbereitung fehlgeschlagen");
@@ -1049,8 +1050,14 @@ function workerTick() {
         return;
     }
 
-    // Schedule next tick - faster when queue not full, slower when idle
-    var delay = (countSlots() >= state.parallelN || state.nextIdx >= state.workQueue.length) ? 200 : 50;
+    // Schedule next tick:
+    // - 0ms wenn freie Slots da sind UND noch Mails zu prepa-ren - so fuellen wir
+    //   sofort nach Completion einen neuen Slot nach (Rolling-Replacement).
+    // - 200ms wenn alle Slots voll (nur polling, kein CPU-Burner).
+    // - 200ms wenn keine Mails mehr - workerTick wartet auf die letzten Inflights.
+    var hasFreeSlot = countSlots() < state.parallelN;
+    var hasMoreWork = state.nextIdx < state.workQueue.length;
+    var delay = (hasFreeSlot && hasMoreWork) ? 0 : 200;
     setTimeout(workerTick, delay);
 }
 
