@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.41 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.42 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.41</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.42</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.41"
+        VERSION="1.42"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.41 - FIX: loadCache liest jetzt explizit UTF-16 LE (Cache wird so geschrieben). Vorher ASCII-Fallback fuehrte zu BOM-Schrott 'ÿþ{' und JSON-Parse-Fehler</div>
+            <div class="ver">v1.42 - FIX: nicht-deterministische Cache-Read. FSO.ReadAll() hat bei >1MB Bug (mal 748 mal 810 Eintraege). Jetzt ADODB.Stream Charset=unicode + Dateigroessen-Sanity-Check, zeigt Bytes-erwartet/gelesen</div>
         </div>
 
         <!-- Cookie -->
@@ -881,32 +881,66 @@ function loadCache() {
         return;
     }
 
-    // Cache.json wird von saveCache() IMMER als UTF-16 LE geschrieben
-    // (FSO.CreateTextFile mit unicode=true). Hier explizit mit Format -1
-    // lesen, sonst wird ASCII-Read auf UTF-16-Datei genommen (BOM 0xFF 0xFE
-    // wird zu Zeichen ÿþ, JSON ist Schrott).
-    var raw = "";
-    var readErr = "";
+    // Cache.json wird von saveCache() IMMER als UTF-16 LE geschrieben.
+    // ADODB.Stream mit Charset="unicode" liest deterministisch die volle Datei -
+    // FSO.OpenTextFile.ReadAll() hat bei >1 MB Dateien einen bekannten Bug, der
+    // unterschiedlich viel zurueckliefert je nach Memory-State.
+    var fileSize = 0;
     try {
-        var fRead = fsoCk.OpenTextFile(p, 1, false, -1);   // Unicode (-1)
-        raw = String(fRead.ReadAll());
-        fRead.Close();
-    } catch(eU) {
-        readErr = "Unicode-Read: " + eU.message;
-        // Fallback: vielleicht doch ASCII-Encoding (alte Cache-Dateien)
+        var f = fsoCk.GetFile(p);
+        fileSize = f.Size;
+    } catch(eFS) {}
+
+    var raw = "";
+    var readMethod = "";
+    var readErr = "";
+    // Versuch 1: ADODB.Stream Charset="unicode" (UTF-16 LE) - empfohlen
+    try {
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2;            // adTypeText
+        stm.Charset = "unicode"; // UTF-16 LE - matched saveCache's Format
+        stm.Open();
+        stm.LoadFromFile(p);
+        raw = String(stm.ReadText());
+        stm.Close();
+        readMethod = "ADODB unicode";
+    } catch(eA) {
+        readErr += "ADODB-unicode: " + eA.message + ". ";
+        // Versuch 2: FSO Unicode (Format -1) als Fallback
         try {
-            var fRead2 = fsoCk.OpenTextFile(p, 1, false, 0);
-            raw = String(fRead2.ReadAll());
-            fRead2.Close();
-        } catch(eA) {
-            showError("Cache laden fehlgeschlagen (Lesen). " + readErr + " | ASCII-Read: " + eA.message + " (Pfad: " + p + ")");
-            return;
+            var fRead = fsoCk.OpenTextFile(p, 1, false, -1);
+            raw = String(fRead.ReadAll());
+            fRead.Close();
+            readMethod = "FSO Unicode";
+        } catch(eU) {
+            readErr += "FSO-Unicode: " + eU.message + ". ";
+            // Versuch 3: ADODB UTF-8 (falls Datei doch UTF-8 geschrieben wurde)
+            try {
+                var stm2 = new ActiveXObject("ADODB.Stream");
+                stm2.Type = 2;
+                stm2.Charset = "utf-8";
+                stm2.Open();
+                stm2.LoadFromFile(p);
+                raw = String(stm2.ReadText());
+                stm2.Close();
+                readMethod = "ADODB utf-8";
+            } catch(eU8) {
+                showError("Cache laden fehlgeschlagen (Lesen). " + readErr + "ADODB-utf8: " + eU8.message + " (Pfad: " + p + ")");
+                return;
+            }
         }
     }
-    // BOM strippen (FEFF im JS-String nach Unicode-Read)
+
+    // BOM strippen (ADODB.unicode strippt BOM normalerweise selbst, aber sicher ist sicher)
     if (raw.length > 0 &amp;&amp; raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
+
+    // Sanity-Check: erwartete Char-Anzahl bei UTF-16 LE = (fileSize - 2 BOM) / 2
+    var expectedChars = fileSize > 0 ? Math.floor((fileSize - 2) / 2) : 0;
+    var readPctOk = expectedChars > 0 ? Math.round((raw.length / expectedChars) * 100) : 0;
+    var sizeInfo = " [Datei: " + Math.round(fileSize / 1024) + " KB, gelesen: " + Math.round(raw.length * 2 / 1024) + " KB-equivalent via " + readMethod + ", " + readPctOk + "% erwartet]";
+
     if (!raw || raw.length < 10) {
-        showError("Cache-Datei leer oder zu klein (" + raw.length + " Zeichen). Pfad: " + p);
+        showError("Cache-Datei leer oder zu klein (" + raw.length + " Zeichen)." + sizeInfo);
         return;
     }
 
@@ -930,7 +964,7 @@ function loadCache() {
         return;
     }
     if (!data.results || data.results.length === 0) {
-        showInfo("Cache-Datei vorhanden aber leer (data.results=" + (data.results ? data.results.length : "fehlt") + ").");
+        showInfo("Cache-Datei vorhanden aber leer (data.results=" + (data.results ? data.results.length : "fehlt") + ")." + sizeInfo);
         return;
     }
     state.results = data.results;
@@ -938,7 +972,10 @@ function loadCache() {
     for (var i = 0; i < state.results.length; i++) {
         state.pendingMap[String(state.results[i].msgPath).toLowerCase()] = true;
     }
-    showInfo("Cache geladen: <strong>" + state.results.length + "</strong> Vorgaenge aus " + Math.round(raw.length / 1024) + " KB Datei. (Dateipfade werden beim Start gematcht - schon analysierte Mails werden uebersprungen.)");
+    // Letzten Eintrag anzeigen damit User sieht, was der "letzte" gecachte Vorgang war
+    var lastEntry = state.results[state.results.length - 1];
+    var lastInfo = lastEntry ? " Letzter Eintrag: " + (lastEntry.msgFile || lastEntry.msgPath || "?") + " (" + (lastEntry.analyzedAt || "?") + ")" : "";
+    showInfo("Cache geladen: <strong>" + state.results.length + "</strong> Vorgaenge." + sizeInfo + lastInfo);
 }
 
 function saveCache() {
