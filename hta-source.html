@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.40 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.41 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.40</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.41</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.40"
+        VERSION="1.41"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.40 - FIX: scanFolder hat nach loadCache() ein hideStatus() gerufen und so die Cache-Diagnose direkt wieder unsichtbar gemacht. Jetzt bleibt die Cache-Meldung stehen</div>
+            <div class="ver">v1.41 - FIX: loadCache liest jetzt explizit UTF-16 LE (Cache wird so geschrieben). Vorher ASCII-Fallback fuehrte zu BOM-Schrott 'ÿþ{' und JSON-Parse-Fehler</div>
         </div>
 
         <!-- Cookie -->
@@ -881,13 +881,30 @@ function loadCache() {
         return;
     }
 
+    // Cache.json wird von saveCache() IMMER als UTF-16 LE geschrieben
+    // (FSO.CreateTextFile mit unicode=true). Hier explizit mit Format -1
+    // lesen, sonst wird ASCII-Read auf UTF-16-Datei genommen (BOM 0xFF 0xFE
+    // wird zu Zeichen ÿþ, JSON ist Schrott).
     var raw = "";
+    var readErr = "";
     try {
-        raw = readTextFile(p) || "";
-    } catch(eR) {
-        showError("Cache laden fehlgeschlagen (Lesen): " + eR.message + " (Pfad: " + p + ")");
-        return;
+        var fRead = fsoCk.OpenTextFile(p, 1, false, -1);   // Unicode (-1)
+        raw = String(fRead.ReadAll());
+        fRead.Close();
+    } catch(eU) {
+        readErr = "Unicode-Read: " + eU.message;
+        // Fallback: vielleicht doch ASCII-Encoding (alte Cache-Dateien)
+        try {
+            var fRead2 = fsoCk.OpenTextFile(p, 1, false, 0);
+            raw = String(fRead2.ReadAll());
+            fRead2.Close();
+        } catch(eA) {
+            showError("Cache laden fehlgeschlagen (Lesen). " + readErr + " | ASCII-Read: " + eA.message + " (Pfad: " + p + ")");
+            return;
+        }
     }
+    // BOM strippen (FEFF im JS-String nach Unicode-Read)
+    if (raw.length > 0 &amp;&amp; raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
     if (!raw || raw.length < 10) {
         showError("Cache-Datei leer oder zu klein (" + raw.length + " Zeichen). Pfad: " + p);
         return;
