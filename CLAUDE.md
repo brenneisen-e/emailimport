@@ -86,3 +86,30 @@ cp ANLEITUNG-ERGO-VORGANG-ANALYSE.txt /tmp/ergo-va-build/
 4. ZIP neu bauen (siehe Tabelle/Skript oben) — auch bei reinen `.bas`-Aenderungen
 5. Bei Versions-Bump der ERGO-ZIPs: Links in `index.html` anpassen
 6. Alles zusammen committen (Source + ZIP + index.html)
+
+### 4. Sonderfall `ergo-vorgang-analyse.hta` — KEIN ZIP / KEINE .hta.txt mehr
+Ab v1.25 wird die `ergo-vorgang-analyse.hta` **NICHT** mehr als ZIP oder `.hta.txt`
+ausgeliefert. Stattdessen gibt es eine **Standalone-Quellcode-Seite**
+`hta-source.html`, die den kompletten HTA-Quellcode inline in einer Textarea
+einbettet, plus einen Copy-Button und einen Blob-basierten Download-Button.
+Vorteil: umgeht Corporate-Proxy-Filter und Cloudflare-Glitches.
+
+**Bei jeder Aenderung an `ergo-vorgang-analyse.hta` muss `hta-source.html` neu
+gebaut werden.** Dafuer gibt es das Skript `build-hta-source.sh` im Repo:
+
+```bash
+./build-hta-source.sh
+```
+
+Es liest die aktuelle HTA, escaped `&` zu `&amp;` (sonst werden die Ampersands
+in der Textarea als Entity-Start interpretiert), wraps das Ganze in einen
+HTML-Header (Styling + Anleitung + Copy-Button + Download-Button) und einen
+Footer (JS fuer copyCode / downloadCode / selectAll). Die VERSION wird aus
+dem `<HTA:APPLICATION VERSION="X.Y"/>`-Tag automatisch ausgelesen.
+
+In `index.html` verlinkt **nur noch** `hta-source.html` — die Tile fuehrt
+direkt auf die Quellcode-Seite. Die ZIP-Variante `ERGO-Vorgang-Analyse-HTA-*.zip`
+und die `ergo-vorgang-analyse-v*.hta.txt`-Variante wurden bewusst entfernt.
+
+VERSION im `<HTA:APPLICATION>`-Tag und sichtbarer Header-String (`<div class="ver">v1.X - ...`)
+hochzaehlen wie gewohnt.

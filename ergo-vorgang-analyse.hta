@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.24"
+        VERSION="1.25"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.24 - Datum-Input akzeptiert TT.MM.JJJJ und JJJJ-MM-TT (IE11-HTA-Fix)</div>
+            <div class="ver">v1.25 - Sammeln: Fehler-Diagnose (Pfad-Laenge, Fehler-Gruppierung)</div>
         </div>
 
         <!-- Cookie -->
@@ -4961,9 +4961,26 @@ function copyZeitraumToNewFolder() {
         return;
     }
 
+    // Limit-Frage: erlaubt Test-Lauf mit kleiner Anzahl
+    var limitStr = window.prompt(
+        "Wieviele Mails kopieren?\n\n" +
+        "Verfuegbar im Zeitraum: " + filtered.length + "\n\n" +
+        "leer / 0 = alle\n" +
+        "Zahl = Test-Limit (z.B. 100)",
+        ""
+    );
+    if (limitStr === null) return; // Cancel
+    var limit = parseInt(limitStr) || filtered.length;
+    if (limit > 0 && limit < filtered.length) {
+        filtered = filtered.slice(0, limit);
+    }
+
     var fromStr = state.dateFrom ? isoDateInput(state.dateFrom) : "alles";
     var toStr = state.dateTo ? isoDateInput(state.dateTo) : "heute";
     var folderSuffix = "_Zeitraum_" + fromStr + "_bis_" + toStr;
+    if (limit < filtered.length + 1 && limit < state.msgFiles.length) {
+        folderSuffix += "_TEST" + filtered.length;
+    }
     var targetParent = state.folderPath + "\\" + folderSuffix;
 
     var srcParent = state.folderPath;
@@ -4971,7 +4988,8 @@ function copyZeitraumToNewFolder() {
         "Mails aus Zeitraum sammeln\n\n" +
         "Quelle (rekursiv):\n  " + srcParent + "\n\n" +
         "Zeitraum: " + fromStr + " bis " + toStr + "\n" +
-        "Mails im Filter: " + filtered.length + "\n\n" +
+        "Mails zu kopieren: " + filtered.length +
+        (filtered.length < state.msgFiles.length ? " (Test-Lauf, Limit gesetzt)" : "") + "\n\n" +
         "Ziel-Ordner (wird erstellt):\n  " + targetParent + "\n\n" +
         "- Originale bleiben erhalten (kopiert, nicht verschoben)\n" +
         "- Unterordner-Struktur wird beibehalten\n" +
@@ -5005,6 +5023,8 @@ function copyZeitraumToNewFolder() {
     }
 
     var copied = 0, errors = 0, total = filtered.length;
+    var errorSamples = [];      // erste 20 Fehler-Details fuer Diagnose
+    var errorByReason = {};     // Gruppierung nach Fehler-Typ
     var srcLower = srcParent.toLowerCase();
     var i = 0;
     function step() {
@@ -5024,9 +5044,12 @@ function copyZeitraumToNewFolder() {
             if (rel.indexOf(folderSuffix) === 0) continue;
 
             var dest = targetParent + "\\" + rel;
+            var phase = "init";
             try {
+                phase = "ensureFolderPath";
                 var destDir = dest.substr(0, dest.lastIndexOf("\\"));
                 ensureFolderPath(fso, destDir);
+                phase = "conflict-check";
                 if (fso.FileExists(dest)) {
                     var dotPos = dest.lastIndexOf(".");
                     var n = 2;
@@ -5038,10 +5061,23 @@ function copyZeitraumToNewFolder() {
                         n++;
                     }
                 }
+                phase = "CopyFile (destPath len=" + dest.length + ")";
                 fso.CopyFile(src, dest, false);
                 copied++;
             } catch(eC) {
                 errors++;
+                var reasonKey = phase + " | " + (eC.message || eC.description || String(eC)).substr(0, 80);
+                errorByReason[reasonKey] = (errorByReason[reasonKey] || 0) + 1;
+                if (errorSamples.length < 20) {
+                    errorSamples.push({
+                        phase: phase,
+                        msg: (eC.message || eC.description || String(eC)),
+                        src: src,
+                        srcLen: src.length,
+                        dest: dest,
+                        destLen: dest.length
+                    });
+                }
             }
         }
         updateProgress(i, total, "Kopiere: " + i + "/" + total + " (ok: " + copied + ", fehler: " + errors + ")");
@@ -5051,9 +5087,57 @@ function copyZeitraumToNewFolder() {
             document.getElementById("progressContainer").style.display = "none";
             state.running = false;
 
+            // Diagnose fuer User
+            var diagHtml = "";
+            if (errors > 0) {
+                diagHtml = "<br><br><strong>Fehler-Diagnose:</strong>";
+                diagHtml += "<br><em>Gruppiert nach Ursache:</em>";
+                diagHtml += "<table style='font-size:11px;border-collapse:collapse;margin-top:4px;'>";
+                var sortedReasons = [];
+                for (var rk in errorByReason) if (errorByReason.hasOwnProperty(rk)) {
+                    sortedReasons.push({ key: rk, count: errorByReason[rk] });
+                }
+                sortedReasons.sort(function(a,b){ return b.count - a.count; });
+                for (var sr = 0; sr < Math.min(8, sortedReasons.length); sr++) {
+                    diagHtml += "<tr><td style='padding:2px 8px;color:#fca5a5'>" + esc(sortedReasons[sr].key) + "</td>" +
+                                "<td style='padding:2px 8px;text-align:right'><strong>" + sortedReasons[sr].count + "</strong></td></tr>";
+                }
+                diagHtml += "</table>";
+
+                if (errorSamples.length > 0) {
+                    diagHtml += "<br><em>Beispiel-Fehler (max 5):</em>";
+                    diagHtml += "<table style='font-size:10px;border-collapse:collapse;margin-top:4px;'>";
+                    for (var es = 0; es < Math.min(5, errorSamples.length); es++) {
+                        var s = errorSamples[es];
+                        diagHtml += "<tr><td style='padding:2px 4px;color:#94a3b8'>Quelle (" + s.srcLen + " Z.):</td>" +
+                                    "<td style='padding:2px 4px;font-family:monospace'>" + esc(s.src.substr(s.src.lastIndexOf('\\\\')+1)) + "</td></tr>";
+                        diagHtml += "<tr><td style='padding:2px 4px;color:#94a3b8'>Ziel-Len:</td>" +
+                                    "<td style='padding:2px 4px'>" + s.destLen + " Zeichen</td></tr>";
+                        diagHtml += "<tr><td style='padding:2px 4px;color:#fca5a5'>Phase:</td>" +
+                                    "<td style='padding:2px 4px'>" + esc(s.phase) + "</td></tr>";
+                        diagHtml += "<tr><td style='padding:2px 4px;color:#fca5a5'>Fehler:</td>" +
+                                    "<td style='padding:2px 4px'>" + esc(s.msg) + "</td></tr>";
+                        diagHtml += "<tr><td colspan='2' style='border-bottom:1px solid #334155;height:2px'></td></tr>";
+                    }
+                    diagHtml += "</table>";
+                }
+
+                // Path-Length-Hinweis wenn viele lange Pfade dabei sind
+                var longPaths = 0;
+                for (var lp = 0; lp < errorSamples.length; lp++) {
+                    if (errorSamples[lp].destLen >= 250) longPaths++;
+                }
+                if (longPaths > 0 || total > 1000) {
+                    diagHtml += "<br><strong style='color:#fbbf24'>Tipp:</strong> " +
+                                "Windows-Pfade duerfen max ~260 Zeichen lang sein. Bei langen UNC-Pfaden " +
+                                "und langen Mail-Filenames kann das schnell ueberschritten werden. " +
+                                "Probiere einen kuerzeren Ziel-Pfad, z.B. <code>C:\\BU-Snap\\</code> statt unter <code>HOME\\Eigene Dateien\\...</code>.";
+                }
+            }
+
             if (copied === 0) {
                 refreshStartButton();
-                showError("Keine Mails kopiert (" + errors + " Fehler). Ziel-Ordner: " + targetParent);
+                showError("<strong>Keine Mails kopiert (" + errors + " Fehler).</strong><br>Ziel-Ordner: <code>" + esc(targetParent) + "</code>" + diagHtml);
                 return;
             }
 
@@ -5063,7 +5147,12 @@ function copyZeitraumToNewFolder() {
             state.pendingMap = {};
             resetDateRange();
             useFolder(targetParent);
-            showSuccess(copied + " von " + total + " Mails nach\n" + targetParent + "\nkopiert (" + errors + " Fehler). Ordner ist jetzt aktiv.");
+            if (errors === 0) {
+                showSuccess(copied + " von " + total + " Mails nach <code>" + esc(targetParent) + "</code> kopiert. Ordner ist jetzt aktiv.");
+            } else {
+                showError("<strong>" + copied + " von " + total + " Mails kopiert, aber " + errors + " Fehler!</strong><br>" +
+                          "Ziel: <code>" + esc(targetParent) + "</code> (jetzt aktiv)." + diagHtml);
+            }
         }
     }
     setTimeout(step, 50);
