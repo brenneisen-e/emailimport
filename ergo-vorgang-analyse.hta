@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.53"
+        VERSION="1.54"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.53 - Cache: VBScript-Helper macht den KOMPLETTEN Read intern (binary load + size-verify + UTF-16-Decode + BSTR-Rueckgabe). Eliminiert JScript-VBArray.toArray()-Marshaling-Bug bei grossen Arrays. EIN deterministischer Read</div>
+            <div class="ver">v1.54 - GROSSER WURF: Excel als persistenter Live-Cache. analyse.xlsx im _KI-Analyse-Ordner ist Wahrheitsquelle. Jeder fertige Vorgang wird sofort als Zeile geschrieben (Excel sichtbar!), wb.Save alle 10 Mails. Resume liest direkt aus xlsx - kein JSON-Partial-Read-Bug mehr</div>
         </div>
 
         <!-- Cookie -->
@@ -429,7 +429,15 @@ var state = {
     parallelN: 3,
     txtFolderEnabled: false,
     dateFrom: null,       // Date object oder null
-    dateTo: null          // Date object oder null
+    dateTo: null,         // Date object oder null
+    // Excel-Live-Cache (v1.54): waehrend Analyse wird jeder Vorgang sofort als
+    // Zeile in eine .xlsx-Datei im _KI-Analyse-Ordner geschrieben. Excel ist
+    // sichtbar, User sieht live wie's waechst. Wb.Save alle 10 Mails.
+    excelApp: null,
+    excelWb: null,
+    excelSheet: null,
+    excelXlsxPath: "",
+    excelLiveRowCount: 0    // Anzahl Zeilen ab Zeile 2 die schon geschrieben sind
 };
 
 // ============================================================================
@@ -643,9 +651,9 @@ function scanFolder() {
     state.msgFiles = [];
     state.results = [];
     state.pendingMap = {};
-    // Vorherigen Status (z.B. alte Fehlermeldung) ZUERST wegklicken,
-    // BEVOR loadCache() seine eigene Diagnose schreibt - sonst wischt
-    // hideStatus() am Ende die Cache-Meldung wieder weg.
+    // Excel-Cache-State zuruecksetzen (wird ggf. neu geoeffnet)
+    state.excelApp = null; state.excelWb = null; state.excelSheet = null;
+    state.excelLiveRowCount = 0;
     hideStatus();
     try {
         var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -655,13 +663,25 @@ function scanFolder() {
             return;
         }
         collectMsgFiles(fso, fso.GetFolder(state.folderPath));
-        loadCache();   // setzt showInfo/showError/showSuccess - bleibt sichtbar
+
+        // PREFERRED: wenn _KI-Analyse/analyse.xlsx existiert, daraus lesen.
+        // Das ist die neue Wahrheitsquelle (kein Partial-Read-Risiko wie bei json).
+        // FALLBACK: cache.json wenn xlsx noch nicht existiert (legacy / Migration).
+        var xlsxPath = getXlsxCachePath();
+        if (xlsxPath && fso.FileExists(xlsxPath)) {
+            if (ensureExcelCache()) {
+                var n = readResultsFromExcelLive();
+                showInfo("Excel-Cache geladen: <strong>" + n + "</strong> Vorgaenge aus <code>" + xlsxPath + "</code>. Diese .xlsx-Datei ist die Wahrheitsquelle - neue Vorgaenge werden direkt hineingeschrieben.");
+            }
+        } else {
+            // Fallback: alte cache.json lesen (Migration)
+            loadCache();
+        }
+
         renderTable();
         refreshFolderStats();
         refreshDateRangeStatus();
         if (state.msgFiles.length === 0) showInfo("Keine .msg-Dateien gefunden.");
-        // KEIN hideStatus() mehr - sonst werden Cache-Diagnose-Meldungen
-        // unsichtbar gemacht. User kann die Info-Box manuell wegklicken.
     } catch(e) {
         showError("Ordner-Scan fehlgeschlagen: " + e.message);
     }
@@ -872,6 +892,244 @@ function saveCache() {
     }
 }
 
+// ============================================================================
+// EXCEL-LIVE-CACHE (v1.54)
+// xlsx-Datei im _KI-Analyse-Ordner ist die Wahrheitsquelle. Waehrend Analyse
+// wird jeder fertige Vorgang sofort als Zeile geschrieben (eine Range.Value
+// pro Cell = ~50ms pro Vorgang - vernachlaessigbar vs ErgoGPT ~3-5s).
+// Wb.Save alle 10 Vorgaenge, sowie bei Pause/Finish.
+// ============================================================================
+function getXlsxCachePath() {
+    if (!state.folderPath) return "";
+    return state.folderPath + "\\_KI-Analyse\\analyse.xlsx";
+}
+
+var EXCEL_HEADERS = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absender Email","Empfaenger","Betreff","Anhaenge",
+                     "Maklerpool","Makler_Nachname","Makler_Vorname","Maklernummer",
+                     "Kunde_Nachname","Kunde_Vorname","Kundennummer","Versicherungsnummer",
+                     "Vorgangstyp","Ist_Reminder","Klassifikation","Klassifikation_Grund",
+                     "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
+                     "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen","MV_Status",
+                     "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler"];
+
+// Stellt sicher dass state.excelApp / Wb / Sheet existieren und das xlsx
+// im _KI-Analyse-Ordner geoeffnet/erstellt ist. Returns true bei Erfolg.
+function ensureExcelCache() {
+    if (state.excelSheet) {
+        // Check ob die Reference noch lebt
+        try { var test = state.excelSheet.Cells(1, 1).Value; return true; } catch(e) {
+            state.excelApp = null; state.excelWb = null; state.excelSheet = null;
+            state.excelLiveRowCount = 0;
+        }
+    }
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var dir = state.folderPath + "\\_KI-Analyse";
+        if (!fso.FolderExists(dir)) {
+            try { fso.CreateFolder(dir); } catch(eDir) {}
+        }
+        var xlsxPath = getXlsxCachePath();
+        state.excelXlsxPath = xlsxPath;
+
+        if (!state.excelApp) {
+            state.excelApp = new ActiveXObject("Excel.Application");
+            state.excelApp.Visible = true;
+            state.excelApp.DisplayAlerts = false;
+        }
+
+        if (fso.FileExists(xlsxPath)) {
+            state.excelWb = state.excelApp.Workbooks.Open(xlsxPath);
+        } else {
+            state.excelWb = state.excelApp.Workbooks.Add();
+            try { state.excelWb.ActiveSheet.Name = "Analyse"; } catch(eN) {}
+            state.excelWb.SaveAs(xlsxPath, 51);   // 51 = xlOpenXMLWorkbook (.xlsx)
+        }
+        try { state.excelSheet = state.excelWb.Sheets("Analyse"); } catch(eSht) {
+            state.excelSheet = state.excelWb.ActiveSheet;
+            try { state.excelSheet.Name = "Analyse"; } catch(eN2) {}
+        }
+
+        // Header schreiben wenn Zeile 1 noch leer
+        var cellA1 = "";
+        try { cellA1 = String(state.excelSheet.Cells(1, 1).Value || ""); } catch(eC) {}
+        if (cellA1 === "" || cellA1 === "0") {
+            writeExcelLiveHeaders(state.excelSheet);
+            state.excelLiveRowCount = 0;
+        } else {
+            // Bestimme wie viele Datenzeilen schon drin sind
+            var used = 0;
+            try { used = state.excelSheet.UsedRange.Rows.Count; } catch(eU) {}
+            state.excelLiveRowCount = Math.max(0, used - 1);
+        }
+        return true;
+    } catch(e) {
+        showError("Excel-Live-Cache konnte nicht initialisiert werden: " + e.message);
+        return false;
+    }
+}
+
+function writeExcelLiveHeaders(sheet) {
+    try {
+        for (var c = 0; c < EXCEL_HEADERS.length; c++) {
+            sheet.Cells(1, c + 1).Value = EXCEL_HEADERS[c];
+        }
+        var hr = sheet.Range(sheet.Cells(1, 1), sheet.Cells(1, EXCEL_HEADERS.length));
+        hr.Font.Bold = true;
+        hr.Font.Color = rgb(255, 255, 255);
+        hr.Interior.Color = rgb(30, 64, 175);
+        hr.HorizontalAlignment = -4108;
+        hr.WrapText = true;
+        sheet.Rows(1).RowHeight = 28;
+        // Freeze pane
+        try {
+            sheet.Range("A2").Select();
+            state.excelApp.ActiveWindow.FreezePanes = true;
+        } catch(eFr) {}
+        // Spaltenbreiten grob
+        try {
+            sheet.Columns("A:A").ColumnWidth = 5;
+            sheet.Columns("B:B").ColumnWidth = 40;
+            sheet.Columns("C:I").ColumnWidth = 16;
+        } catch(eCw) {}
+    } catch(e) {}
+}
+
+// Schreibt eine Result-Zeile in das Excel-Live-Sheet. Verwendet r._excelRow
+// wenn gesetzt (Update), sonst Append am Ende.
+function writeResultRowToExcel(r) {
+    if (!state.excelSheet) return;
+    try {
+        var rowIdx;
+        if (r._excelRow && r._excelRow >= 2) {
+            rowIdx = r._excelRow;
+        } else {
+            state.excelLiveRowCount++;
+            rowIdx = state.excelLiveRowCount + 1;
+            r._excelRow = rowIdx;
+        }
+        var d = r.data || {};
+        var sht = state.excelSheet;
+        sht.Cells(rowIdx, 1).Value = rowIdx - 1;
+        sht.Cells(rowIdx, 2).Value = cellSafe(r.msgFile);
+        sht.Cells(rowIdx, 3).Value = cellSafe(r.datum);
+        sht.Cells(rowIdx, 4).Value = cellSafe(sg(d, "auftrag_datum"));
+        sht.Cells(rowIdx, 5).Value = cellSafe(r.absName);
+        sht.Cells(rowIdx, 6).Value = cellSafe(r.absMail);
+        sht.Cells(rowIdx, 7).Value = cellSafe(r.empfaenger);
+        sht.Cells(rowIdx, 8).Value = cellSafe(r.betreff);
+        sht.Cells(rowIdx, 9).Value = cellSafe(r.anhangAlle);
+        sht.Cells(rowIdx, 10).Value = cellSafe(sg(d, "maklerpool"));
+        sht.Cells(rowIdx, 11).Value = cellSafe(sg(d, "makler_nachname"));
+        sht.Cells(rowIdx, 12).Value = cellSafe(sg(d, "makler_vorname"));
+        sht.Cells(rowIdx, 13).Value = cellSafe(sg(d, "makler_nummer"));
+        sht.Cells(rowIdx, 14).Value = cellSafe(sg(d, "kunde_nachname"));
+        sht.Cells(rowIdx, 15).Value = cellSafe(sg(d, "kunde_vorname"));
+        sht.Cells(rowIdx, 16).Value = cellSafe(sg(d, "kunde_nummer"));
+        sht.Cells(rowIdx, 17).Value = cellSafe(sg(d, "versicherungsnummer"));
+        sht.Cells(rowIdx, 18).Value = cellSafe(sg(d, "vorgangstyp"));
+        sht.Cells(rowIdx, 19).Value = cellSafe(sg(d, "ist_reminder"));
+        sht.Cells(rowIdx, 20).Value = cellSafe(sg(d, "klassifikation"));
+        sht.Cells(rowIdx, 21).Value = cellSafe(sg(d, "klassifikation_grund"));
+        sht.Cells(rowIdx, 22).Value = cellSafe(sg(d, "geschaefts_typ"));
+        sht.Cells(rowIdx, 23).Value = cellSafe(sg(d, "unterlagen_angefragt"));
+        sht.Cells(rowIdx, 24).Value = cellSafe(sg(d, "unterlagen_liste"));
+        sht.Cells(rowIdx, 25).Value = cellSafe(sg(d, "sonderfall"));
+        sht.Cells(rowIdx, 26).Value = cellSafe(sg(d, "sparte"));
+        sht.Cells(rowIdx, 27).Value = cellSafe(sg(d, "anhang_typen"));
+        sht.Cells(rowIdx, 28).Value = cellSafe(sg(d, "pdf_qualitaet"));
+        sht.Cells(rowIdx, 29).Value = cellSafe(sg(d, "enthaelt_maklervollmacht"));
+        sht.Cells(rowIdx, 30).Value = cellSafe(sg(d, "mv_vollumfaenglich"));
+        sht.Cells(rowIdx, 31).Value = cellSafe(sg(d, "mv_einschraenkungen"));
+        sht.Cells(rowIdx, 32).Value = cellSafe(computeMvStatus(r));
+        sht.Cells(rowIdx, 33).Value = cellSafe(sg(d, "unterschrift_kunde"));
+        sht.Cells(rowIdx, 34).Value = cellSafe(sg(d, "unterschrift_makler"));
+        sht.Cells(rowIdx, 35).Value = cellSafe(sg(d, "auf_vn_ausgestellt"));
+        sht.Cells(rowIdx, 36).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
+        sht.Cells(rowIdx, 37).Value = cellSafe(sg(d, "hinweis"));
+        sht.Cells(rowIdx, 38).Value = r.ok ? "" : cellSafe(r.errMsg);
+    } catch(e) {
+        // Schreib-Fehler einer Zeile darf den Analyse-Lauf nicht killen
+    }
+}
+
+function saveExcelLiveCache() {
+    if (!state.excelWb) return;
+    try { state.excelWb.Save(); } catch(e) {}
+}
+
+// Liest die Daten aus einem existierenden xlsx (vor Analyse-Start)
+// und befuellt state.results + state.pendingMap. Returns Anzahl gelesener Zeilen.
+function readResultsFromExcelLive() {
+    if (!state.excelSheet) return 0;
+    var lastRow = 1;
+    try { lastRow = state.excelSheet.UsedRange.Rows.Count; } catch(e) {}
+    if (lastRow < 2) return 0;
+    // Build msgFile -> msgPath map aus state.msgFiles
+    var fileToPath = {};
+    for (var fi = 0; fi < state.msgFiles.length; fi++) {
+        var fp = state.msgFiles[fi];
+        var fn = fp.substr(fp.lastIndexOf("\\") + 1);
+        fileToPath[fn.toLowerCase()] = fp;
+    }
+    state.results = [];
+    state.pendingMap = {};
+    for (var r = 2; r <= lastRow; r++) {
+        try {
+            var msgFile = String(state.excelSheet.Cells(r, 2).Value || "");
+            if (!msgFile) continue;
+            var msgPath = fileToPath[msgFile.toLowerCase()] || msgFile;  // fallback: nur filename
+            var errMsgStr = String(state.excelSheet.Cells(r, 38).Value || "");
+            var entry = {
+                msgPath: msgPath,
+                msgFile: msgFile,
+                datum: String(state.excelSheet.Cells(r, 3).Value || ""),
+                absName: String(state.excelSheet.Cells(r, 5).Value || ""),
+                absMail: String(state.excelSheet.Cells(r, 6).Value || ""),
+                empfaenger: String(state.excelSheet.Cells(r, 7).Value || ""),
+                betreff: String(state.excelSheet.Cells(r, 8).Value || ""),
+                anhangAlle: String(state.excelSheet.Cells(r, 9).Value || ""),
+                ok: !errMsgStr,
+                errMsg: errMsgStr,
+                _excelRow: r,
+                data: {
+                    auftrag_datum: String(state.excelSheet.Cells(r, 4).Value || ""),
+                    maklerpool: String(state.excelSheet.Cells(r, 10).Value || ""),
+                    makler_nachname: String(state.excelSheet.Cells(r, 11).Value || ""),
+                    makler_vorname: String(state.excelSheet.Cells(r, 12).Value || ""),
+                    makler_nummer: String(state.excelSheet.Cells(r, 13).Value || ""),
+                    kunde_nachname: String(state.excelSheet.Cells(r, 14).Value || ""),
+                    kunde_vorname: String(state.excelSheet.Cells(r, 15).Value || ""),
+                    kunde_nummer: String(state.excelSheet.Cells(r, 16).Value || ""),
+                    versicherungsnummer: String(state.excelSheet.Cells(r, 17).Value || ""),
+                    vorgangstyp: String(state.excelSheet.Cells(r, 18).Value || ""),
+                    ist_reminder: String(state.excelSheet.Cells(r, 19).Value || ""),
+                    klassifikation: String(state.excelSheet.Cells(r, 20).Value || ""),
+                    klassifikation_grund: String(state.excelSheet.Cells(r, 21).Value || ""),
+                    geschaefts_typ: String(state.excelSheet.Cells(r, 22).Value || ""),
+                    unterlagen_angefragt: String(state.excelSheet.Cells(r, 23).Value || ""),
+                    unterlagen_liste: String(state.excelSheet.Cells(r, 24).Value || ""),
+                    sonderfall: String(state.excelSheet.Cells(r, 25).Value || ""),
+                    sparte: String(state.excelSheet.Cells(r, 26).Value || ""),
+                    anhang_typen: String(state.excelSheet.Cells(r, 27).Value || ""),
+                    pdf_qualitaet: String(state.excelSheet.Cells(r, 28).Value || ""),
+                    enthaelt_maklervollmacht: String(state.excelSheet.Cells(r, 29).Value || ""),
+                    mv_vollumfaenglich: String(state.excelSheet.Cells(r, 30).Value || ""),
+                    mv_einschraenkungen: String(state.excelSheet.Cells(r, 31).Value || ""),
+                    unterschrift_kunde: String(state.excelSheet.Cells(r, 33).Value || ""),
+                    unterschrift_makler: String(state.excelSheet.Cells(r, 34).Value || ""),
+                    auf_vn_ausgestellt: String(state.excelSheet.Cells(r, 35).Value || ""),
+                    makler_namentlich_genannt: String(state.excelSheet.Cells(r, 36).Value || ""),
+                    hinweis: String(state.excelSheet.Cells(r, 37).Value || "")
+                }
+            };
+            state.results.push(entry);
+            state.pendingMap[msgPath.toLowerCase()] = true;
+        } catch(eR) {}
+    }
+    state.excelLiveRowCount = state.results.length;
+    return state.results.length;
+}
+
 // FSO-first, ADODB.Stream-Fallback Pattern (von BGAV-HTA abgeleitet).
 // Notwendig fuer UNC/Internet-Zone: ADODB.Stream blockiert mit
 // "Datenquelle in anderer Domaene", FSO nicht.
@@ -1002,6 +1260,24 @@ function startAnalysis() {
     if (reanalyze) {
         state.results = [];
         state.pendingMap = {};
+        // Excel-Cache neu beginnen
+        state.excelApp = null; state.excelWb = null; state.excelSheet = null;
+        state.excelLiveRowCount = 0;
+    }
+
+    // EXCEL-LIVE-CACHE initialisieren. Sichtbares Excel-Fenster, persistentes xlsx.
+    if (!ensureExcelCache()) {
+        showError("Excel-Live-Cache konnte nicht initialisiert werden. Analyse wird nicht gestartet.");
+        return;
+    }
+    // Falls state.results bereits Daten aus cache.json hat, aber Excel noch leer ist,
+    // alle bisherigen Eintraege ins Excel migrieren (ohne _excelRow gesetzt).
+    if (state.results.length > 0 && state.excelLiveRowCount === 0) {
+        appendAiLog("OK", "", "Excel-Migration: " + state.results.length + " Vorgaenge aus cache.json -> xlsx");
+        for (var mi = 0; mi < state.results.length; mi++) {
+            writeResultRowToExcel(state.results[mi]);
+        }
+        saveExcelLiveCache();
     }
 
     // Determine work list: nur Mails im Zeitraum, minus already-cached
@@ -1296,10 +1572,18 @@ function workerTick() {
             (state.workTotal - state.nextIdx) + " warten");
         renderSlotStatus();
 
-        // D) Save cache every 3 finished
+        // D) Save cache every batch finished. cache.json bleibt als Backup,
+        // aber das xlsx ist die neue Wahrheitsquelle. wb.Save alle ~10 neue
+        // Vorgaenge - sonst wird's bei 5000 Speicher-Aufrufen langsam.
         if (toRemove.length > 0) {
             saveCache();
             renderTable();
+            if (!state._excelSaveCounter) state._excelSaveCounter = 0;
+            state._excelSaveCounter += toRemove.length;
+            if (state._excelSaveCounter >= 10) {
+                saveExcelLiveCache();
+                state._excelSaveCounter = 0;
+            }
         }
 
         // E) Continue or finish?
@@ -1350,6 +1634,7 @@ function countSlots() {
 function finishAnalysis(reason) {
     state.running = false;
     saveCache();
+    saveExcelLiveCache();   // finaler Save des xlsx
     renderTable();
     document.getElementById("progressContainer").style.display = "none";
     document.getElementById("slotStatus").innerText = "";
@@ -1602,13 +1887,19 @@ function addResult(r) {
     var key = String(r.msgPath).toLowerCase();
     for (var i = 0; i < state.results.length; i++) {
         if (String(state.results[i].msgPath).toLowerCase() === key) {
+            // Update: behalte existing _excelRow falls vorhanden
+            if (state.results[i]._excelRow && !r._excelRow) r._excelRow = state.results[i]._excelRow;
             state.results[i] = r;
             state.pendingMap[key] = true;
+            // Excel-Live-Write (Update vorhandener Zeile)
+            writeResultRowToExcel(r);
             return;
         }
     }
     state.results.push(r);
     state.pendingMap[key] = true;
+    // Excel-Live-Write (Append neue Zeile)
+    writeResultRowToExcel(r);
 }
 
 // ============================================================================
