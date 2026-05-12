@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.29 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.30 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.29</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.30</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.29"
+        VERSION="1.30"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.29 - Pause-Knopf statt Abbrechen: schreibt Cache, oeffnet Excel sofort, Resume per Start-Klick</div>
+            <div class="ver">v1.30 - Live-Log pro Mail, Parallel-Slots bis 15, Sonderkonditionsvorbehalt als Boilerplate erkannt, ASYNC-Retry statt Sofort-Fehler</div>
         </div>
 
         <!-- Cookie -->
@@ -429,8 +429,8 @@ Alles markieren
                     <input type="text" id="modelInput" value="gpt-51-chat">
                 </div>
                 <div>
-                    <label>Parallel-Slots (1-6)</label>
-                    <input type="number" id="parallelInput" value="3" min="1" max="6">
+                    <label>Parallel-Slots (1-15)</label>
+                    <input type="number" id="parallelInput" value="3" min="1" max="15">
                 </div>
             </div>
             <div style="margin-top: 0.5rem;" class="compact">
@@ -480,6 +480,8 @@ Alles markieren
             <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
             <div class="progress-text" id="progressText">Verarbeite...</div>
             <div id="slotStatus" style="display:flex; flex-direction: column; gap: 2px; margin-top: 6px; font-size: 11px; color: #cbd5e1; font-family: 'Consolas', monospace;"></div>
+            <div style="margin-top: 8px; font-size: 11px; color: #94a3b8;">Live-Log (letzte 50 Mails):</div>
+            <div id="aiLog" style="margin-top: 4px; max-height: 220px; overflow-y: auto; font-size: 11px; color: #e2e8f0; font-family: 'Consolas', monospace; background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 4px; padding: 6px 8px; white-space: pre-wrap;"></div>
         </div>
 
         <div class="status success" id="successStatus"><span id="successMsg"></span></div>
@@ -992,7 +994,7 @@ function startAnalysis() {
 
     state.parallelN = parseInt(document.getElementById("parallelInput").value) || 3;
     if (state.parallelN < 1) state.parallelN = 1;
-    if (state.parallelN > 6) state.parallelN = 6;
+    if (state.parallelN > 15) state.parallelN = 15;
 
     var reanalyze = document.getElementById("reanalyzeAll").checked;
     if (reanalyze) {
@@ -1027,6 +1029,8 @@ function startAnalysis() {
     state.abortReason = "";
 
     document.getElementById("progressContainer").style.display = "block";
+    clearAiLog();
+    appendAiLog("OK", "", "Start: " + work.length + " Mails, " + state.parallelN + " parallele Slots");
     refreshStartButton();
     renderTable();
 
@@ -1073,6 +1077,7 @@ function workerTick() {
                 var r = makeResult(slot, false, slot.errMsg || "Vorbereitung fehlgeschlagen");
                 addResult(r);
                 state.errors++;
+                appendAiLog("FEHLER", slot.msgPath, "Prep: " + (slot.errMsg || "Vorbereitung fehlgeschlagen").substr(0, 80));
                 if (isAuthError(r.errMsg)) state.abortReason = "AUTH";
                 if (isModelError(r.errMsg)) state.abortReason = "MODELL";
             }
@@ -1092,17 +1097,38 @@ function workerTick() {
             }
 
             if (winErr) {
-                var r2 = makeResult(s, false, "[ASYNC] " + winErr.message);
-                addResult(r2);
-                state.errors++;
-                fireDelete(s.convId);
-                toRemove.push(key);
+                // WinHttp wirft manchmal "Send-Methode nicht aufgerufen" als transienten Race zwischen
+                // Send() und dem ersten WaitForResponse-Poll. Bis zu 8 ticks (~1s) soft-retry,
+                // erst danach als ASYNC-Fehler abbuchen.
+                var msg = (winErr.message || "").toString();
+                var isSendRace = msg.indexOf("Send") >= 0 || msg.indexOf("send") >= 0;
+                if (!s.waitRetries) s.waitRetries = 0;
+                if (isSendRace &amp;&amp; s.waitRetries < 8 &amp;&amp; !s.cancelled) {
+                    s.waitRetries++;
+                    setSlotPhase(s, "warte (retry " + s.waitRetries + "/8)");
+                    // Slot bleibt in state.slots, naechster Tick versucht es erneut
+                } else if (s.cancelled) {
+                    // Pause angefordert - kein Excel-Eintrag als Fehler, einfach raus
+                    fireDelete(s.convId);
+                    toRemove.push(key);
+                } else {
+                    var r2 = makeResult(s, false, "[ASYNC] " + msg);
+                    addResult(r2);
+                    state.errors++;
+                    appendAiLog("FEHLER", s.msgPath, "[ASYNC] " + msg.substr(0, 80));
+                    fireDelete(s.convId);
+                    toRemove.push(key);
+                }
             } else if (done) {
                 var r3 = finalizeSlot(s);
                 addResult(r3);
                 if (r3.ok) state.processed++; else state.errors++;
                 if (isAuthError(r3.errMsg)) state.abortReason = "AUTH";
                 if (isModelError(r3.errMsg)) state.abortReason = "MODELL";
+                var d3 = r3.data || {};
+                appendAiLog(r3.ok ? "OK" : "FEHLER", s.msgPath,
+                    r3.ok ? ((d3.klassifikation || "?") + " | " + (d3.maklerpool || "")) : (r3.errMsg || "")
+                );
                 fireDelete(s.convId);
                 toRemove.push(key);
             }
@@ -2005,7 +2031,13 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "17) ist_reminder - 'ja' / 'nein' / 'nicht_pruefbar'.\n";
     p += "    Indikatoren (case-insensitiv): Betreff 'Erinnerung','Reminder','WV','Mahnung','2. Mahnung','Sachstandsanfrage'; Body 'wir warten noch','haben wir noch nichts erhalten','bitten um Rueckmeldung'; Anhang-Dateinamen mit 'Mahnung','Reminder','Erinnerung'.\n\n";
 
-    p += "18) hinweis - EIN kurzer Satz (max 200 Z.) was an dem Vorgang auffaellig ist.\n\n";
+    p += "18) hinweis - EIN kurzer Satz (max 200 Z.) was an dem Vorgang auffaellig ist.\n";
+    p += "    BOILERPLATE NICHT erwaehnen: Folgende Formulierungen sind Standard-Textbausteine in Pool-BUe-Mails und gehoeren NICHT in den Hinweis:\n";
+    p += "    - 'Sonderkonditionsvorbehalt' / 'Sonderkonditionen duerfen nicht verloren gehen' / 'falls Sonderkonditionen bestehen, bitten wir um Rueckmeldung'\n";
+    p += "    - 'Wir bitten um Bestaetigung' / 'Vorlage der Maklervollmacht' (Standardtext)\n";
+    p += "    - Kuendigung der bisherigen Betreuung (Standardklausel im Maklerwechsel)\n";
+    p += "    Erwaehne den Hinweis nur, wenn der Vorgang AUSSERGEWOEHNLICH ist (z.B. echte Sondertarife im Vertrag genannt, ungewoehnliche Anhaenge, Eskalations-Indikatoren, unklare MV, mehrere Vertraege).\n";
+    p += "    Wenn nichts auffaellig: leerer String ''.\n\n";
 
     p += "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 28 Schluessel):\n";
     p += '{"vorgangstyp":"...","auftrag_datum":"...",';
@@ -2967,6 +2999,30 @@ function setSlotPhase(slot, phase) {
     slot.phase = phase;
     slot.phaseAt = new Date().getTime();
     renderSlotStatus();
+}
+
+// Live-Log: Eine Zeile pro abgeschlossener Mail. Haelt nur die letzten 50.
+var _aiLogLines = [];
+function appendAiLog(kind, msgPath, detail) {
+    var name = msgPath ? msgPath.substr(msgPath.lastIndexOf("\\")+1) : "?";
+    if (name.length > 70) name = name.substr(0, 67) + "...";
+    var now = new Date();
+    var hh = pad(now.getHours()), mm = pad(now.getMinutes()), ss = pad(now.getSeconds());
+    var marker = (kind === "OK") ? "[OK]   " : "[FEHLER]";
+    var line = hh + ":" + mm + ":" + ss + " " + marker + " " + name + (detail ? " - " + detail : "");
+    _aiLogLines.push(line);
+    if (_aiLogLines.length > 50) _aiLogLines.splice(0, _aiLogLines.length - 50);
+    var el = document.getElementById("aiLog");
+    if (el) {
+        el.innerText = _aiLogLines.join("\n");
+        try { el.scrollTop = el.scrollHeight; } catch(eS) {}
+    }
+}
+
+function clearAiLog() {
+    _aiLogLines = [];
+    var el = document.getElementById("aiLog");
+    if (el) el.innerText = "";
 }
 
 function renderSlotStatus() {
