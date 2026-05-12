@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.44"
+        VERSION="1.45"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.44 - FIX Excel-CSV-Chaos: JScript-Array marshalt nicht als SafeArray, sondern als toString-BSTR (alle Zellen kriegten den ganzen CSV-String). Jetzt VBScript-Helper Split() liefert echte SafeArray</div>
+            <div class="ver">v1.45 - FIX Partial-Read bei grosser cache.json (748 -> 810 -> 907 statt 2000): ADODB Type=1 (binary) -> LoadFromFile -> Position=0 -> Type=2 -> ReadText liest jetzt deterministisch. Plus CRC-Pruefsumme im Diagnose-Output</div>
         </div>
 
         <!-- Cookie -->
@@ -758,18 +758,23 @@ function loadCache() {
     var raw = "";
     var readMethod = "";
     var readErr = "";
-    // Versuch 1: ADODB.Stream Charset="unicode" (UTF-16 LE) - empfohlen
+    // Versuch 1: ADODB.Stream binary-load THEN text-read.
+    // Bekannter Gotcha: Type=2 + Charset SET BEFORE LoadFromFile liest manchmal
+    // partiell ab >1MB. Korrekte Reihenfolge:
+    //   Type=1 (Binary) -> Open -> LoadFromFile -> Position=0 -> Type=2 -> Charset -> ReadText(-1)
     try {
         var stm = new ActiveXObject("ADODB.Stream");
-        stm.Type = 2;            // adTypeText
-        stm.Charset = "unicode"; // UTF-16 LE - matched saveCache's Format
+        stm.Type = 1;              // adTypeBinary - LaedT roh
         stm.Open();
         stm.LoadFromFile(p);
-        raw = String(stm.ReadText());
+        stm.Position = 0;
+        stm.Type = 2;              // adTypeText - jetzt umschalten
+        stm.Charset = "unicode";   // UTF-16 LE
+        raw = String(stm.ReadText(-1));   // -1 = adReadAll
         stm.Close();
-        readMethod = "ADODB unicode";
+        readMethod = "ADODB bin->text unicode";
     } catch(eA) {
-        readErr += "ADODB-unicode: " + eA.message + ". ";
+        readErr += "ADODB-bin-unicode: " + eA.message + ". ";
         // Versuch 2: FSO Unicode (Format -1) als Fallback
         try {
             var fRead = fsoCk.OpenTextFile(p, 1, false, -1);
@@ -781,18 +786,27 @@ function loadCache() {
             // Versuch 3: ADODB UTF-8 (falls Datei doch UTF-8 geschrieben wurde)
             try {
                 var stm2 = new ActiveXObject("ADODB.Stream");
-                stm2.Type = 2;
-                stm2.Charset = "utf-8";
+                stm2.Type = 1;
                 stm2.Open();
                 stm2.LoadFromFile(p);
-                raw = String(stm2.ReadText());
+                stm2.Position = 0;
+                stm2.Type = 2;
+                stm2.Charset = "utf-8";
+                raw = String(stm2.ReadText(-1));
                 stm2.Close();
-                readMethod = "ADODB utf-8";
+                readMethod = "ADODB bin->text utf-8";
             } catch(eU8) {
                 showError("Cache laden fehlgeschlagen (Lesen). " + readErr + "ADODB-utf8: " + eU8.message + " (Pfad: " + p + ")");
                 return;
             }
         }
+    }
+
+    // Einfache Pruefsumme (erste 100k Zeichen) - User sieht ob sich Datei zwischen Loads aendert
+    var crc = 0;
+    var crcLen = Math.min(raw.length, 100000);
+    for (var ci = 0; ci < crcLen; ci++) {
+        crc = ((crc << 5) - crc + raw.charCodeAt(ci)) | 0;  // |0 = int32 truncate
     }
 
     // BOM strippen (ADODB.unicode strippt BOM normalerweise selbst, aber sicher ist sicher)
@@ -801,7 +815,8 @@ function loadCache() {
     // Sanity-Check: erwartete Char-Anzahl bei UTF-16 LE = (fileSize - 2 BOM) / 2
     var expectedChars = fileSize > 0 ? Math.floor((fileSize - 2) / 2) : 0;
     var readPctOk = expectedChars > 0 ? Math.round((raw.length / expectedChars) * 100) : 0;
-    var sizeInfo = " [Datei: " + Math.round(fileSize / 1024) + " KB, gelesen: " + Math.round(raw.length * 2 / 1024) + " KB-equivalent via " + readMethod + ", " + readPctOk + "% erwartet]";
+    var sizeInfo = " [Datei: " + Math.round(fileSize / 1024) + " KB, gelesen: " + Math.round(raw.length * 2 / 1024) +
+                   " KB via " + readMethod + ", " + readPctOk + "%, CRC=" + (crc >>> 0).toString(16) + "]";
 
     if (!raw || raw.length < 10) {
         showError("Cache-Datei leer oder zu klein (" + raw.length + " Zeichen)." + sizeInfo);
