@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.30 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.31 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.30</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.31</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.30"
+        VERSION="1.31"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.30 - Live-Log pro Mail, Parallel-Slots bis 15, Sonderkonditionsvorbehalt als Boilerplate erkannt, ASYNC-Retry statt Sofort-Fehler</div>
+            <div class="ver">v1.31 - Fix Long-Running-Script-Dialog: nur 1 Slot pro Tick befuellen (statt alle parallelN auf einmal), Live-Log, Parallel bis 15, Sonderkondition-Boilerplate, ASYNC-Retry</div>
         </div>
 
         <!-- Cookie -->
@@ -1055,8 +1055,12 @@ function workerTick() {
     if (!state.running) return;
 
     try {
-        // A) Fill free slots (sequential prep)
-        while (countSlots() < state.parallelN &amp;&amp; state.nextIdx < state.workQueue.length &amp;&amp; !state.cancelled &amp;&amp; !state.abortReason) {
+        // A) Fill ONE free slot per tick (sequential prep). prepareSlot ist synchron
+        // (Outlook-COM + sync-HTTP + PDF-Upload via VBS, ~1-3s pro Mail). Wuerde man
+        // 10 Slots in EINEM Tick prepa-ren, blockiert man 20-30s und Windows zeigt
+        // den Long-Running-Script-Dialog. Stattdessen: pro Tick ein Slot, naechster
+        // Tick laeuft nach 30ms - Ramp-up auf 10 Slots dauert ~300ms, dann steady-state.
+        if (countSlots() < state.parallelN &amp;&amp; state.nextIdx < state.workQueue.length &amp;&amp; !state.cancelled &amp;&amp; !state.abortReason) {
             var msgPath = state.workQueue[state.nextIdx];
             state.nextIdx++;
 
