@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.55"
+        VERSION="1.56"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.55 - Migration cache.json->xlsx jetzt via FillRangeFromTsv Bulk-Write (1 COM-Call statt 41800). 1100+ Vorgaenge in einem Rutsch ohne Long-Running-Dialog. Excel-Live-Cache aus v1.54 unveraendert</div>
+            <div class="ver">v1.56 - Bulk-Write hat jetzt 2 Methoden: FillRangeFromTsv (VBScript-Internal) + Clipboard-Paste als Fallback. Wenn beide failen, faellt's auf zellweise zurueck. Log zeigt welche Methode geklappt hat</div>
         </div>
 
         <!-- Cookie -->
@@ -1123,6 +1123,7 @@ function bulkWriteResultsToExcel(results) {
     try { state.excelApp.EnableEvents = false; } catch(eF) {}
 
     var ok = false;
+    var method = "";
     try {
         var rng = state.excelSheet.Range(
             state.excelSheet.Cells(startRow, 1),
@@ -1137,15 +1138,46 @@ function bulkWriteResultsToExcel(results) {
         if (s1.length > 0 && sM.length > 0 && sE.length > 0) {
             state.excelLiveRowCount += nRows;
             ok = true;
+            method = "FillRangeFromTsv";
         }
     } catch(eB) {}
+
+    if (!ok) {
+        // Methode 2: Clipboard-Paste. Bewaehrte Excel-Bulk-Methode.
+        // Tab-Newline-TSV in Clipboard, Cell selektieren, Paste.
+        try {
+            // Cleanup falls erster Versuch teilweise gefuellt hat
+            try {
+                state.excelSheet.Range(
+                    state.excelSheet.Cells(startRow, 1),
+                    state.excelSheet.Cells(startRow + nRows - 1, nCols)
+                ).ClearContents();
+            } catch(eClr) {}
+            window.clipboardData.clearData();
+            window.clipboardData.setData("Text", bigTsv);
+            state.excelSheet.Range(state.excelSheet.Cells(startRow, 1), state.excelSheet.Cells(startRow, 1)).Select();
+            state.excelSheet.Paste();
+            // Sanity
+            var c1 = String(state.excelSheet.Cells(startRow, 2).Value || "");
+            var cM = String(state.excelSheet.Cells(startRow + Math.floor(nRows / 2), 2).Value || "");
+            var cE = String(state.excelSheet.Cells(startRow + nRows - 1, 2).Value || "");
+            if (c1.length > 0 && cM.length > 0 && cE.length > 0) {
+                state.excelLiveRowCount += nRows;
+                ok = true;
+                method = "Clipboard-Paste";
+            }
+            try { window.clipboardData.clearData(); } catch(eCC) {}
+        } catch(eCp) {}
+    }
 
     // Flags zurueck
     try { state.excelApp.ScreenUpdating = true; } catch(eF) {}
     try { state.excelApp.Calculation = -4105; } catch(eF) {}
     try { state.excelApp.EnableEvents = true; } catch(eF) {}
 
-    if (!ok) {
+    if (ok) {
+        appendAiLog("OK", "", "Bulk-Write erfolgreich via " + method + " (" + nRows + " Zeilen)");
+    } else {
         // Cleanup partial write + reset _excelRow markers
         try {
             state.excelSheet.Range(
