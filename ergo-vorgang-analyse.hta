@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.56"
+        VERSION="1.57"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.56 - Bulk-Write hat jetzt 2 Methoden: FillRangeFromTsv (VBScript-Internal) + Clipboard-Paste als Fallback. Wenn beide failen, faellt's auf zellweise zurueck. Log zeigt welche Methode geklappt hat</div>
+            <div class="ver">v1.57 - Live-Excel mit Farb-Highlights pro Zeile + Auswertung-Sheet automatisch (nach Migration + auf finishAnalysis). Plus neuer Button "Farben + Auswertung" um manuell nachzuziehen</div>
         </div>
 
         <!-- Cookie -->
@@ -332,6 +332,11 @@
                 &#9208; Pause (Excel + Resume)
             </button>
             <div style="flex:1;"></div>
+            <button class="btn" id="btnRefreshLive" onclick="refreshLiveExcelDecor()" disabled
+                    style="background: linear-gradient(135deg, #0d9488, #115e59); color: white;"
+                    title="Wendet Farb-Highlights auf ALLE Zeilen im Live-Excel an und baut Auswertung-Sheet neu. Falls die Migration die Farben noch nicht hatte.">
+                &#127912; Farben + Auswertung
+            </button>
             <button class="btn btn-success" id="btnExcel" onclick="exportToExcel()" disabled>
                 &#128202; Excel-Export
             </button>
@@ -1047,6 +1052,9 @@ function writeResultRowToExcel(r) {
         sht.Cells(rowIdx, 36).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
         sht.Cells(rowIdx, 37).Value = cellSafe(sg(d, "hinweis"));
         sht.Cells(rowIdx, 38).Value = r.ok ? "" : cellSafe(r.errMsg);
+        // Highlights live anwenden (~6-10 zusaetzliche COM-Calls, vernachlaessigbar
+        // weil Mail-Analyse-Tempo ~3-5s pro Mail).
+        applyHighlightsToLiveRow(rowIdx, r);
     } catch(e) {
         // Schreib-Fehler einer Zeile darf den Analyse-Lauf nicht killen
     }
@@ -1055,6 +1063,119 @@ function writeResultRowToExcel(r) {
 function saveExcelLiveCache() {
     if (!state.excelWb) return;
     try { state.excelWb.Save(); } catch(e) {}
+}
+
+// Highlight-Farben (gleich wie in exportToExcel)
+var H_LIVE_ROT    = function() { return rgb(252, 165, 165); };
+var H_LIVE_GRUEN  = function() { return rgb(187, 247, 208); };
+var H_LIVE_GELB   = function() { return rgb(254, 240, 138); };
+var H_LIVE_ORANGE = function() { return rgb(254, 215, 170); };
+var H_LIVE_BERN   = function() { return rgb(253, 230, 138); };
+var H_LIVE_GRAU   = function() { return rgb(229, 231, 235); };
+
+// Spalten-Indizes im Live-Excel (1-basiert) - muss zur EXCEL_HEADERS-Reihenfolge passen
+var LIVE_COL_VORGANGSTYP = 18, LIVE_COL_REMINDER = 19, LIVE_COL_KLASSIFIK = 20;
+var LIVE_COL_SONDERFALL = 25, LIVE_COL_PDF_QUAL = 28;
+var LIVE_COL_VM_VOLLST = 30, LIVE_COL_MV_STATUS = 32;
+var LIVE_COL_UNTERSCHR_K = 33, LIVE_COL_UNTERSCHR_M = 34;
+var LIVE_COL_MAKLERPOOL = 10, LIVE_COL_HINWEIS = 37, LIVE_COL_FEHLER = 38;
+
+// Wendet Highlight-Farben auf EINE Zeile im Live-Excel an. Wird sowohl per-Zeile
+// waehrend Analyse aufgerufen als auch im Bulk-Pass nach Migration.
+function applyHighlightsToLiveRow(rowIdx, r) {
+    if (!state.excelSheet) return;
+    var d = r.data || {};
+    try {
+        if (!r.ok || r.errMsg) {
+            state.excelSheet.Cells(rowIdx, LIVE_COL_FEHLER).Interior.Color = H_LIVE_ROT();
+        }
+        var vt = sg(d, "vorgangstyp");
+        if (vt && vt !== "Makler-Vorgang" && vt !== "") {
+            state.excelSheet.Range(state.excelSheet.Cells(rowIdx, LIVE_COL_MAKLERPOOL), state.excelSheet.Cells(rowIdx, LIVE_COL_HINWEIS)).Interior.Color = H_LIVE_GRAU();
+            state.excelSheet.Cells(rowIdx, LIVE_COL_VORGANGSTYP).Interior.Color = H_LIVE_ORANGE();
+        }
+        if (sg(d, "ist_reminder") === "ja") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER).Interior.Color = H_LIVE_ORANGE();
+        var sond = sg(d, "sonderfall");
+        if (sond === "Flottengeschaeft" || sond === "Sondertarif") state.excelSheet.Cells(rowIdx, LIVE_COL_SONDERFALL).Interior.Color = H_LIVE_ROT();
+        var kl = sg(d, "klassifikation");
+        if (kl === "Nicht-Standard") state.excelSheet.Cells(rowIdx, LIVE_COL_KLASSIFIK).Interior.Color = H_LIVE_BERN();
+        var pq = sg(d, "pdf_qualitaet");
+        if (pq === "Scan") state.excelSheet.Cells(rowIdx, LIVE_COL_PDF_QUAL).Interior.Color = H_LIVE_BERN();
+        else if (pq === "Mixed") state.excelSheet.Cells(rowIdx, LIVE_COL_PDF_QUAL).Interior.Color = H_LIVE_GELB();
+        var mvv = sg(d, "mv_vollumfaenglich");
+        if (mvv === "teilweise" || mvv === "nein") state.excelSheet.Cells(rowIdx, LIVE_COL_VM_VOLLST).Interior.Color = H_LIVE_ROT();
+        else if (mvv === "ja") state.excelSheet.Cells(rowIdx, LIVE_COL_VM_VOLLST).Interior.Color = H_LIVE_GRUEN();
+        var mvSt = computeMvStatus(r);
+        if (mvSt === "OK") state.excelSheet.Cells(rowIdx, LIVE_COL_MV_STATUS).Interior.Color = H_LIVE_GRUEN();
+        else if (mvSt === "MV unvollstaendig" || mvSt === "MV fehlt") state.excelSheet.Cells(rowIdx, LIVE_COL_MV_STATUS).Interior.Color = H_LIVE_ROT();
+        else if (mvSt === "kein Anhang") state.excelSheet.Cells(rowIdx, LIVE_COL_MV_STATUS).Interior.Color = H_LIVE_GRAU();
+        else if (mvSt === "nicht pruefbar") state.excelSheet.Cells(rowIdx, LIVE_COL_MV_STATUS).Interior.Color = H_LIVE_GELB();
+        var uk = sg(d, "unterschrift_kunde");
+        if (uk === "nein") state.excelSheet.Cells(rowIdx, LIVE_COL_UNTERSCHR_K).Interior.Color = H_LIVE_ROT();
+        else if (uk === "ja") state.excelSheet.Cells(rowIdx, LIVE_COL_UNTERSCHR_K).Interior.Color = H_LIVE_GRUEN();
+        var um = sg(d, "unterschrift_makler");
+        if (um === "nein") state.excelSheet.Cells(rowIdx, LIVE_COL_UNTERSCHR_M).Interior.Color = H_LIVE_ROT();
+        else if (um === "ja") state.excelSheet.Cells(rowIdx, LIVE_COL_UNTERSCHR_M).Interior.Color = H_LIVE_GRUEN();
+    } catch(eHL) {}
+}
+
+// Wendet Highlights auf MEHRERE Zeilen an (Bulk nach Migration). Mit
+// Excel-Speed-Flags damit das schnell geht.
+function applyHighlightsToLiveRows(startRow, endRow, results) {
+    if (!state.excelSheet) return;
+    try { state.excelApp.ScreenUpdating = false; } catch(eF) {}
+    try { state.excelApp.Calculation = -4135; } catch(eF) {}
+    for (var i = 0; i < results.length; i++) {
+        applyHighlightsToLiveRow(startRow + i, results[i]);
+    }
+    try { state.excelApp.ScreenUpdating = true; } catch(eF) {}
+    try { state.excelApp.Calculation = -4105; } catch(eF) {}
+}
+
+// Baut die Auswertung-Sheet neu im Excel-Live-Workbook. Loescht ein
+// existierendes Auswertung-Sheet und ruft die buildAuswertungSheet-Funktion
+// aus exportToExcel auf - die kennt die Stats-Logik (Postfach-Drilldown, MV-Status etc).
+// User-Trigger: wendet Farb-Highlights auf ALLE Zeilen im Live-Excel an und
+// baut die Auswertung neu. Hilfreich nach bereits gelaufener Migration ohne
+// Highlights, oder um Stats nach manuellen Aenderungen zu aktualisieren.
+function refreshLiveExcelDecor() {
+    if (!state.excelSheet || state.results.length === 0) {
+        showError("Kein Excel-Live-Cache offen oder keine Daten. Erst Ordner waehlen und Analyse-Start druecken.");
+        return;
+    }
+    hideStatus();
+    showInfo("Wende Farben auf " + state.results.length + " Zeilen an + baue Auswertung neu...");
+    try { state.excelApp.ScreenUpdating = false; } catch(eF) {}
+    try { state.excelApp.Calculation = -4135; } catch(eF) {}
+    var done = 0;
+    for (var i = 0; i < state.results.length; i++) {
+        var r = state.results[i];
+        var rowIdx = r._excelRow || (i + 2);
+        applyHighlightsToLiveRow(rowIdx, r);
+        done++;
+    }
+    try { state.excelApp.ScreenUpdating = true; } catch(eF) {}
+    try { state.excelApp.Calculation = -4105; } catch(eF) {}
+    try { rebuildLiveAuswertungSheet(); } catch(eA) {}
+    try { saveExcelLiveCache(); } catch(eS) {}
+    showSuccess("Farben + Auswertung aktualisiert (" + done + " Zeilen). Excel ist auf neuestem Stand.");
+}
+
+function rebuildLiveAuswertungSheet() {
+    if (!state.excelWb || !state.excelApp) return;
+    try {
+        // Existing loeschen
+        try {
+            state.excelApp.DisplayAlerts = false;
+            var existing = state.excelWb.Sheets("Auswertung");
+            existing.Delete();
+        } catch(eD) {}
+        try { state.excelApp.DisplayAlerts = true; } catch(eDA) {}
+        // Neu bauen via existierender Funktion
+        buildAuswertungSheet(state.excelWb, state.excelApp);
+        // Zurueck zum Analyse-Sheet
+        try { state.excelWb.Sheets("Analyse").Activate(); } catch(eA) {}
+    } catch(e) {}
 }
 
 // Bulk-Write MEHRERE Results in EINEM Rutsch via VBScript-FillRangeFromTsv.
@@ -1177,6 +1298,12 @@ function bulkWriteResultsToExcel(results) {
 
     if (ok) {
         appendAiLog("OK", "", "Bulk-Write erfolgreich via " + method + " (" + nRows + " Zeilen)");
+        // Highlights bulk-applizieren auf alle frisch geschriebenen Zeilen
+        appendAiLog("OK", "", "Wende Farb-Highlights an (" + nRows + " Zeilen)...");
+        applyHighlightsToLiveRows(startRow, startRow + nRows - 1, results);
+        appendAiLog("OK", "", "Highlights fertig. Baue Auswertung-Sheet...");
+        rebuildLiveAuswertungSheet();
+        appendAiLog("OK", "", "Auswertung-Sheet fertig.");
     } else {
         // Cleanup partial write + reset _excelRow markers
         try {
@@ -1365,6 +1492,8 @@ function refreshStartButton() {
     document.getElementById("btnBulkTriage").disabled = !canBulk;
     document.getElementById("btnCancel").disabled = !state.running;
     document.getElementById("btnExcel").disabled = state.results.length === 0;
+    var btnRf = document.getElementById("btnRefreshLive");
+    if (btnRf) btnRf.disabled = !state.excelSheet || state.results.length === 0;
     document.getElementById("btnJson").disabled = state.results.length === 0;
     // Rename-Button: braucht nur Ordner + Mails
     var btnRn = document.getElementById("btnRenameWithDate");
@@ -1778,6 +1907,9 @@ function finishAnalysis(reason) {
     state.running = false;
     saveCache();
     saveExcelLiveCache();   // finaler Save des xlsx
+    // Auswertung-Sheet im Live-xlsx neu bauen (mit allen aktuellen Daten)
+    try { rebuildLiveAuswertungSheet(); } catch(eA) {}
+    try { saveExcelLiveCache(); } catch(eS) {}
     renderTable();
     document.getElementById("progressContainer").style.display = "none";
     document.getElementById("slotStatus").innerText = "";
