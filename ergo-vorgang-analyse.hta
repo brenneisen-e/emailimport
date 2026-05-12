@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.43"
+        VERSION="1.44"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.43 - Excel-Export mit sichtbarem Progress (Daten + Farben pro Zeile), ScreenUpdating-Toggle alle 500 Zeilen zum Flushen der Excel-Render-Queue (gegen "haengt sich auf"-Look)</div>
+            <div class="ver">v1.44 - FIX Excel-CSV-Chaos: JScript-Array marshalt nicht als SafeArray, sondern als toString-BSTR (alle Zellen kriegten den ganzen CSV-String). Jetzt VBScript-Helper Split() liefert echte SafeArray</div>
         </div>
 
         <!-- Cookie -->
@@ -2377,51 +2377,59 @@ function exportToExcel() {
             var r = state.results[i];
             var d = r.data || {};
             var row = i + 2;
+            // cellSafeTsv strippt Tabs/Newlines, damit join("\t") + Split sauber funktioniert.
+            // Werte als Strings: Excel inferiert "34" beim Schreiben automatisch wieder zu Zahl.
             var values = [
-                i + 1,
-                cellSafe(r.msgFile),
-                cellSafe(r.datum),
-                cellSafe(sg(d, "auftrag_datum")),
-                cellSafe(r.absName),
-                cellSafe(r.absMail),
-                cellSafe(r.empfaenger),
-                cellSafe(r.betreff),
-                cellSafe(r.anhangAlle),
-                cellSafe(sg(d, "maklerpool")),
-                cellSafe(sg(d, "makler_nachname")),
-                cellSafe(sg(d, "makler_vorname")),
-                cellSafe(sg(d, "makler_nummer")),
-                cellSafe(sg(d, "kunde_nachname")),
-                cellSafe(sg(d, "kunde_vorname")),
-                cellSafe(sg(d, "kunde_nummer")),
-                cellSafe(sg(d, "versicherungsnummer")),
-                cellSafe(sg(d, "vorgangstyp")),
-                cellSafe(sg(d, "ist_reminder")),
-                cellSafe(sg(d, "klassifikation")),
-                cellSafe(sg(d, "klassifikation_grund")),
-                cellSafe(sg(d, "geschaefts_typ")),
-                cellSafe(sg(d, "unterlagen_angefragt")),
-                cellSafe(sg(d, "unterlagen_liste")),
-                cellSafe(sg(d, "sonderfall")),
-                cellSafe(sg(d, "sparte")),
-                cellSafe(sg(d, "anhang_typen")),
-                cellSafe(sg(d, "pdf_qualitaet")),
-                cellSafe(sg(d, "enthaelt_maklervollmacht")),
-                cellSafe(sg(d, "mv_vollumfaenglich")),
-                cellSafe(sg(d, "mv_einschraenkungen")),
-                cellSafe(computeMvStatus(r)),
-                cellSafe(sg(d, "unterschrift_kunde")),
-                cellSafe(sg(d, "unterschrift_makler")),
-                cellSafe(sg(d, "auf_vn_ausgestellt")),
-                cellSafe(sg(d, "makler_namentlich_genannt")),
-                cellSafe(sg(d, "hinweis")),
-                r.ok ? "" : cellSafe(r.errMsg)
+                String(i + 1),
+                cellSafeTsv(r.msgFile),
+                cellSafeTsv(r.datum),
+                cellSafeTsv(sg(d, "auftrag_datum")),
+                cellSafeTsv(r.absName),
+                cellSafeTsv(r.absMail),
+                cellSafeTsv(r.empfaenger),
+                cellSafeTsv(r.betreff),
+                cellSafeTsv(r.anhangAlle),
+                cellSafeTsv(sg(d, "maklerpool")),
+                cellSafeTsv(sg(d, "makler_nachname")),
+                cellSafeTsv(sg(d, "makler_vorname")),
+                cellSafeTsv(sg(d, "makler_nummer")),
+                cellSafeTsv(sg(d, "kunde_nachname")),
+                cellSafeTsv(sg(d, "kunde_vorname")),
+                cellSafeTsv(sg(d, "kunde_nummer")),
+                cellSafeTsv(sg(d, "versicherungsnummer")),
+                cellSafeTsv(sg(d, "vorgangstyp")),
+                cellSafeTsv(sg(d, "ist_reminder")),
+                cellSafeTsv(sg(d, "klassifikation")),
+                cellSafeTsv(sg(d, "klassifikation_grund")),
+                cellSafeTsv(sg(d, "geschaefts_typ")),
+                cellSafeTsv(sg(d, "unterlagen_angefragt")),
+                cellSafeTsv(sg(d, "unterlagen_liste")),
+                cellSafeTsv(sg(d, "sonderfall")),
+                cellSafeTsv(sg(d, "sparte")),
+                cellSafeTsv(sg(d, "anhang_typen")),
+                cellSafeTsv(sg(d, "pdf_qualitaet")),
+                cellSafeTsv(sg(d, "enthaelt_maklervollmacht")),
+                cellSafeTsv(sg(d, "mv_vollumfaenglich")),
+                cellSafeTsv(sg(d, "mv_einschraenkungen")),
+                cellSafeTsv(computeMvStatus(r)),
+                cellSafeTsv(sg(d, "unterschrift_kunde")),
+                cellSafeTsv(sg(d, "unterschrift_makler")),
+                cellSafeTsv(sg(d, "auf_vn_ausgestellt")),
+                cellSafeTsv(sg(d, "makler_namentlich_genannt")),
+                cellSafeTsv(sg(d, "hinweis")),
+                r.ok ? "" : cellSafeTsv(r.errMsg)
             ];
             try {
-                sheet.Range(sheet.Cells(row, 1), sheet.Cells(row, headers.length)).Value = values;
+                // VBScript-Helper TsvToVbArray liefert eine echte SafeArray, die Excel
+                // korrekt auf die N Zellen der Range verteilt. Ohne diesen Umweg packt
+                // Excel den toString()'d CSV-String in JEDE Zelle der Range (bekannter
+                // JScript-COM-Marshalling-Bug).
+                var tsv = values.join("\t");
+                var vbArr = TsvToVbArray(tsv, "\t");
+                sheet.Range(sheet.Cells(row, 1), sheet.Cells(row, headers.length)).Value = vbArr;
             } catch(eBulk) {
-                // Fallback: zellweise. Falls eine einzelne Zelle Aerger macht
-                // (z.B. exotisches Encoding), kommen wir trotzdem zum Excel.
+                // Fallback: zellweise. Falls TsvToVbArray/Range.Value Aerger macht,
+                // kommen wir trotzdem zum Excel.
                 for (var ci = 0; ci < values.length; ci++) {
                     try { sheet.Cells(row, ci + 1).Value = values[ci]; } catch(eCell) {}
                 }
@@ -2832,6 +2840,15 @@ function cellSafe(v) {
         return "'" + s;
     }
     return s;
+}
+
+// Wie cellSafe, aber strippt zusaetzlich Tab/Newline/CR. Wird beim Bulk-Write
+// per VBScript-TSV-Split gebraucht, damit der \t-Separator nicht in einem
+// Zell-Wert versehentlich auftaucht.
+function cellSafeTsv(v) {
+    var s = cellSafe(v);
+    if (!s) return "";
+    return s.replace(/[\r\n\t]+/g, " ");
 }
 
 // ============================================================================
@@ -5992,5 +6009,17 @@ function countRenameCandidates() {
     return { toRename: toRename, alreadyOk: alreadyOk, noDate: noDate };
 }
 </script>
+
+<!-- VBScript-Helper: konvertiert TSV-String in echte SafeArray fuer Excel.Range.Value.
+     JScript-Arrays marshalen sich beim COM-Call NICHT als SafeArray, sondern als BSTR
+     mit comma-join - das resultiert in "alle Zellen kriegen den gleichen CSV-String"
+     wenn man sheet.Range(...).Value = jsArr macht. VBScript's Array() oder Split()
+     liefert dagegen ein echtes Variant-Array, das Excel korrekt auf die Range verteilt. -->
+<script language="VBScript">
+Function TsvToVbArray(tsv, sep)
+    TsvToVbArray = Split(tsv, sep)
+End Function
+</script>
+
 </body>
 </html>
