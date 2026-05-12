@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.28"
+        VERSION="1.29"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.28 - Pool-Uebersicht (Outlook) speichert Body -> Bulk-Triage geht jetzt auch ohne XXL</div>
+            <div class="ver">v1.29 - Pause-Knopf statt Abbrechen: schreibt Cache, oeffnet Excel sofort, Resume per Start-Klick</div>
         </div>
 
         <!-- Cookie -->
@@ -327,8 +327,9 @@
                     title="Stufe 1: Bulk-KI-Triage. Sendet 30-40 Mails (Subject+Body) pro KI-Call. Kein PDF-Upload. Setzt Pool-XXL voraus.">
                 &#129302; Bulk-Triage (Stufe 1, KI ohne PDF)
             </button>
-            <button class="btn btn-warning" id="btnCancel" onclick="cancelAnalysis()" disabled>
-                &#9632; Abbrechen
+            <button class="btn btn-warning" id="btnCancel" onclick="cancelAnalysis()" disabled
+                    title="Pausiert die Analyse, schreibt den Cache und oeffnet Excel mit den bisherigen Ergebnissen. Beim naechsten Klick auf Start wird automatisch nahtlos weitergemacht - schon analysierte Mails werden uebersprungen.">
+                &#9208; Pause (Excel + Resume)
             </button>
             <div style="flex:1;"></div>
             <button class="btn btn-success" id="btnExcel" onclick="exportToExcel()" disabled>
@@ -900,7 +901,7 @@ function startAnalysis() {
 function cancelAnalysis() {
     if (!state.running) return;
     state.cancelled = true;
-    showInfo("Abbruch angefordert - laufende Calls werden gestoppt...");
+    showInfo("Pause angefordert - laufende Calls werden zu Ende gefuehrt, dann Cache + Excel...");
     // Abort all inflight slots
     for (var k in state.slots) {
         if (state.slots.hasOwnProperty(k)) {
@@ -1044,8 +1045,16 @@ function finishAnalysis(reason) {
             showSuccess(msg);
             break;
         case "Abgebrochen":
-            msg = "Abgebrochen. Bisher: " + state.processed + " ok, " + state.errors + " fehler. Ergebnisse sind im Cache - 'Excel-Export' nutzbar.";
+            msg = "Pausiert. Bisher: " + state.processed + " ok, " + state.errors + " fehler. Cache geschrieben - klicke 'Start', um nahtlos weiterzumachen (analysierte Mails werden uebersprungen). Excel wird jetzt geoeffnet...";
             showInfo(msg);
+            // Auto-Excel-Export mit aktuellen Ergebnissen (inkl. Stats)
+            try {
+                if (state.results && state.results.length > 0) {
+                    exportToExcel();
+                }
+            } catch(eExp) {
+                showError("Pause-Excel-Export fehlgeschlagen: " + eExp.message + " - Daten sind aber im Cache, manueller Excel-Export per Button moeglich.");
+            }
             break;
         case "AUTH":
             showError("Cookie abgelaufen (HTTP 403). Bitte oben neuen Cookie einfuegen + speichern, dann erneut starten. Bisher: " + state.processed + " ok, " + state.errors + " fehler.");
