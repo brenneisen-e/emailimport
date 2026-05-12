@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.34 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.35 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.34</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.35</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.34"
+        VERSION="1.35"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.34 - Async PDF-Upload (fire-and-forget VBS, parallele Slots wirklich parallel), Slot-State-Machine UPLOADING-READY-RUNNING, Slot-Logs numerisch sortiert (9-10-11)</div>
+            <div class="ver">v1.35 - Async Conversation-Create: alle Slots wirklich gleichzeitig startbar (PUT /conversation laeuft im Hintergrund), neue Stage CREATING_CONV vor UPLOADING/READY/RUNNING</div>
         </div>
 
         <!-- Cookie -->
@@ -1101,11 +1101,96 @@ function workerTick() {
 
             // --- Cancelled: stille Entfernung (alle Stages) ---
             if (s.cancelled) {
+                if (s.stage === "CREATING_CONV" &amp;&amp; s.convHttp) { try { s.convHttp.Abort(); } catch(eA) {} }
                 if (s.stage === "RUNNING" &amp;&amp; s.http) { try { s.http.Abort(); } catch(eA) {} }
-                if (s.stage === "UPLOADING") cleanupSlotTempFiles(s);
+                if (s.stage === "UPLOADING" || s.stage === "CREATING_CONV") cleanupSlotTempFiles(s);
                 if (s.convId) fireDelete(s.convId);
                 toRemove.push(key);
                 continue;
+            }
+
+            // --- CREATING_CONV: async conversation_id holen, dann uploads feuern ---
+            if (s.stage === "CREATING_CONV") {
+                var convElapsed = new Date().getTime() - (s.convStartedAt || 0);
+                if (convElapsed > UPLOAD_TIMEOUT_MS) {
+                    var rCT = makeResult(s, false, "[Conv-Timeout] >5min ohne conversation_id");
+                    addResult(rCT);
+                    state.errors++;
+                    appendAiLog("FEHLER", s.msgPath, "Conv-Timeout >5min");
+                    cleanupSlotTempFiles(s);
+                    toRemove.push(key);
+                    continue;
+                }
+                var convDone = false; var convWinErr = null;
+                try { convDone = s.convHttp.WaitForResponse(0); } catch(e) { convWinErr = e; }
+                if (convWinErr) {
+                    var cMsg = (convWinErr.message || "").toString();
+                    var cIsSendRace = cMsg.indexOf("Send") >= 0 || cMsg.indexOf("send") >= 0;
+                    if (!s.convRetries) s.convRetries = 0;
+                    if (cIsSendRace &amp;&amp; s.convRetries < 8) {
+                        s.convRetries++;
+                        setSlotPhase(s, "Conv-Wait retry " + s.convRetries + "/8");
+                    } else {
+                        var rCE = makeResult(s, false, "[CONV-ASYNC] " + cMsg);
+                        addResult(rCE);
+                        state.errors++;
+                        appendAiLog("FEHLER", s.msgPath, "[CONV-ASYNC] " + cMsg.substr(0, 80));
+                        cleanupSlotTempFiles(s);
+                        toRemove.push(key);
+                    }
+                    continue;
+                }
+                if (!convDone) {
+                    setSlotPhase(s, "Conv-Wait (" + Math.round(convElapsed/1000) + "s)");
+                    continue;
+                }
+                // convHttp ist fertig - convId extrahieren
+                try {
+                    var convStatus = 0;
+                    try { convStatus = s.convHttp.Status; } catch(eS) {}
+                    var convResp = "";
+                    try { convResp = s.convHttp.ResponseText; } catch(eR) {}
+                    if (convStatus !== 200) throw new Error("HTTP " + convStatus + " - " + convResp.substr(0, 200));
+                    s.convId = parseJsonStr(convResp, "id");
+                    if (!s.convId) throw new Error("Keine conversation_id in: " + convResp.substr(0, 200));
+                } catch(eC) {
+                    var rCE2 = makeResult(s, false, "[CONV] " + eC.message);
+                    addResult(rCE2);
+                    state.errors++;
+                    appendAiLog("FEHLER", s.msgPath, "[CONV] " + eC.message.substr(0, 80));
+                    cleanupSlotTempFiles(s);
+                    toRemove.push(key);
+                    continue;
+                }
+                // PDF-Uploads feuern oder direkt READY
+                if (s.tempPdfPaths &amp;&amp; s.tempPdfPaths.length > 0) {
+                    s.uploadHandles = [];
+                    try {
+                        var fsoU = new ActiveXObject("Scripting.FileSystemObject");
+                        for (var piX = 0; piX < s.tempPdfPaths.length; piX++) {
+                            var pdfX = s.tempPdfPaths[piX];
+                            var fnX = fsoU.GetFileName(pdfX);
+                            s.uploadHandles.push(uploadPdfStartAsync(s.convId, pdfX, fnX));
+                        }
+                        s.uploadStartedAt = new Date().getTime();
+                        s.stage = "UPLOADING";
+                        setSlotPhase(s, "Upload 0/" + s.uploadHandles.length + " (async)");
+                    } catch(eU) {
+                        var rUEf = makeResult(s, false, "[Upload-Start] " + eU.message);
+                        addResult(rUEf);
+                        state.errors++;
+                        appendAiLog("FEHLER", s.msgPath, "[Upload-Start] " + eU.message.substr(0, 80));
+                        cleanupSlotTempFiles(s);
+                        if (s.convId) fireDelete(s.convId);
+                        toRemove.push(key);
+                        continue;
+                    }
+                } else {
+                    s.docIdsJson = "[]";
+                    s.stage = "READY";
+                    cleanupSlotTempFiles(s);
+                }
+                // Drop-through zu UPLOADING/READY in diesem Tick
             }
 
             // --- UPLOADING: Async PDF-Uploads warten, dann finalize -> READY ---
@@ -1372,32 +1457,16 @@ function prepareSlot(slot) {
         if (bodyShort.length > BODY_CAP) bodyShort = bodyShort.substr(0, BODY_CAP) + " [...gekuerzt]";
         slot.prompt = buildVorgangPrompt(slot.datum, slot.absName, slot.absMail, slot.betreff, bodyShort, slot.anhangAlle, slot.pdfListe);
 
-        step = "Conversation anlegen";
-        setSlotPhase(slot, "Conversation anlegen");
-        slot.convId = createConversationSync(slot.prompt);
-        if (!slot.convId) throw new Error("Keine conversation_id zurueck");
-
-        step = "PDF-Upload starten (async)";
-        slot.uploadHandles = [];
-        slot.tempPdfPaths = pdfPaths;   // Cleanup nach Upload-Finalize
+        step = "Conversation anlegen (async)";
+        setSlotPhase(slot, "Conversation anlegen (async)");
+        slot.convHttp = createConversationAsyncFire(slot.prompt);
+        slot.convStartedAt = new Date().getTime();
+        slot.tempPdfPaths = pdfPaths;     // Cleanup nach Upload-Finalize
         slot.tempDir = tempDir;
-        if (pdfPaths.length > 0) {
-            for (var pi = 0; pi < pdfPaths.length; pi++) {
-                var pdfP = pdfPaths[pi];
-                var fname2 = fso.GetFileName(pdfP);
-                var handle = uploadPdfStartAsync(slot.convId, pdfP, fname2);
-                slot.uploadHandles.push(handle);
-            }
-            slot.stage = "UPLOADING";
-            slot.uploadStartedAt = new Date().getTime();
-            setSlotPhase(slot, "Upload 0/" + slot.uploadHandles.length + " (async)");
-        } else {
-            // Kein PDF - direkt READY
-            slot.docIdsJson = "[]";
-            slot.stage = "READY";
-            // Keine temp-Dateien zu cleanen (war nichts da)
-            try { if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true); } catch(e) {}
-        }
+        slot.stage = "CREATING_CONV";
+        // Achtung: convId und uploadHandles werden im naechsten Tick gesetzt,
+        // sobald die async PUT /conversation antwortet. Das macht 15-50 Slots
+        // wirklich gleichzeitig startbar.
         return true;
     } catch(e) {
         slot.errMsg = "[" + step + "] " + e.message;
@@ -1558,6 +1627,24 @@ function createConversationSync(prompt) {
         throw new Error("Create failed: " + http.Status + " - " + (http.ResponseText || "").substr(0, 200));
     }
     return parseJsonStr(http.ResponseText, "id");
+}
+
+// Async-Variante: feuert PUT /conversation mit async=true Open. Send kehrt
+// sofort zurueck, der Server-Request laeuft im Hintergrund. workerTick
+// polled spaeter via WaitForResponse(0) und liest die conversation_id ein.
+// Das ist der entscheidende Trick um 15-50 Slots WIRKLICH gleichzeitig zu
+// starten - createConversationSync hat vorher pro Slot 200-500ms blockiert.
+function createConversationAsyncFire(prompt) {
+    var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+    try { http.SetTimeouts(30000, 30000, 60000, 180000); } catch(e) {}
+    http.Open("PUT", ERGO_BASE + "/conversation", true);   // async = true
+    try { http.SetProxy(0); } catch(e) {}
+    setWinHttpHeaders(http);
+    http.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    var payload = buildPayload(cleanForJson(prompt), "[]");
+    var bodyBytes = stringToUtf8Bytes(payload);
+    if (bodyBytes) http.Send(bodyBytes); else http.Send(payload);
+    return http;
 }
 
 function startAnswerAsync(convId, prompt, docIdsJson) {
