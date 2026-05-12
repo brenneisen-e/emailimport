@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.49"
+        VERSION="1.50"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.49 - HARTE Cache-Diagnose: zeigt Datei-mod-time + CRC + Ende-Sample + Parser-Vergleich (JSON.parse vs eval - groesseres Ergebnis gewinnt). Nimmt das groessere Ergebnis aus beiden Parsern</div>
+            <div class="ver">v1.50 - Cache-Diagnose verbessert (mod-time, full-CRC, Ende-Sample, JSON-vs-eval-Parser-Vergleich). Bulk-Write Sanity-Check jetzt mit Mitte+Anfang+Ende (statt nur Anfang+Ende - verhindert dass partial-writes als OK durchgehen)</div>
         </div>
 
         <!-- Cookie -->
@@ -2474,13 +2474,17 @@ function exportToExcel() {
         try {
             var rng = sheet.Range(sheet.Cells(2, 1), sheet.Cells(state.results.length + 1, headers.length));
             FillRangeFromTsv(rng, bigTsv, "\n", "\t", state.results.length, headers.length);
-            // Sanity-Check: zwei Stichproben
+            // Sanity-Check: DREI Stichproben (Anfang, Mitte, Ende). FillRangeFromTsv kann
+            // bei grossen Arrays Memory-Probleme bekommen und partial schreiben.
+            var midRow = Math.floor((state.results.length + 1) / 2) + 1;
             var s1 = String(sheet.Cells(2, 2).Value || "");
+            var sM = String(sheet.Cells(midRow, 2).Value || "");
             var s2 = String(sheet.Cells(state.results.length + 1, 2).Value || "");
-            if (s1.length > 0 && s2.length > 0) {
+            if (s1.length > 0 && sM.length > 0 && s2.length > 0) {
                 bulkOk = true;
             } else {
-                throw new Error("FillRangeFromTsv: Stichproben leer (s1='" + s1.substr(0,30) + "', s2='" + s2.substr(0,30) + "')");
+                throw new Error("FillRangeFromTsv: Stichproben leer (anfang='" + s1.substr(0,30) +
+                                "', mitte='" + sM.substr(0,30) + "', ende='" + s2.substr(0,30) + "')");
             }
         } catch(eBulk) {
             bulkErrors.push("VBScript-Bulk fehlgeschlagen: " + (eBulk.message || "?") + " - Per-Cell-Fallback laeuft");
