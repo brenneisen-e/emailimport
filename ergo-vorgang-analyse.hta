@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.33"
+        VERSION="1.34"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.33 - Empfaenger-Spalte, Postfach-Drilldown in Auswertung, Klassifikation 'Mahnung-Reminder' raus (ist_reminder cross-cutting), Parallel-Cap auf 50</div>
+            <div class="ver">v1.34 - Async PDF-Upload (fire-and-forget VBS, parallele Slots wirklich parallel), Slot-State-Machine UPLOADING-READY-RUNNING, Slot-Logs numerisch sortiert (9-10-11)</div>
         </div>
 
         <!-- Cookie -->
@@ -906,11 +906,15 @@ function cancelAnalysis() {
     if (!state.running) return;
     state.cancelled = true;
     showInfo("Pause angefordert - laufende Calls werden zu Ende gefuehrt, dann Cache + Excel...");
-    // Abort all inflight slots
+    // Mark all slots cancelled; workerTick wird sie in Stage-abhaengig sauber entfernen.
+    // RUNNING-Slots: http.Abort() ruft Send-WaitForResponse ab.
+    // UPLOADING-Slots: VBS laeuft im OS weiter, wir ignorieren das Result.
     for (var k in state.slots) {
-        if (state.slots.hasOwnProperty(k)) {
-            try { state.slots[k].http.Abort(); } catch(e) {}
-            state.slots[k].cancelled = true;
+        if (!state.slots.hasOwnProperty(k)) continue;
+        var sl = state.slots[k];
+        sl.cancelled = true;
+        if (sl.stage === "RUNNING" && sl.http) {
+            try { sl.http.Abort(); } catch(e) {}
         }
     }
 }
@@ -952,54 +956,107 @@ function workerTick() {
             }
         }
 
-        // B) Poll all slots
+        // B) Poll all slots - State Machine: UPLOADING -> READY -> RUNNING -> DONE
         var toRemove = [];
+        var UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;  // 5 Min hartes Upload-Timeout
         for (var key in state.slots) {
             if (!state.slots.hasOwnProperty(key)) continue;
             var s = state.slots[key];
-            var done = false;
-            var winErr = null;
-            try {
-                done = s.http.WaitForResponse(0);
-            } catch(e) {
-                winErr = e;
+
+            // --- Cancelled: stille Entfernung (alle Stages) ---
+            if (s.cancelled) {
+                if (s.stage === "RUNNING" && s.http) { try { s.http.Abort(); } catch(eA) {} }
+                if (s.stage === "UPLOADING") cleanupSlotTempFiles(s);
+                if (s.convId) fireDelete(s.convId);
+                toRemove.push(key);
+                continue;
             }
 
-            if (winErr) {
-                // WinHttp wirft manchmal "Send-Methode nicht aufgerufen" als transienten Race zwischen
-                // Send() und dem ersten WaitForResponse-Poll. Bis zu 8 ticks (~1s) soft-retry,
-                // erst danach als ASYNC-Fehler abbuchen.
-                var msg = (winErr.message || "").toString();
-                var isSendRace = msg.indexOf("Send") >= 0 || msg.indexOf("send") >= 0;
-                if (!s.waitRetries) s.waitRetries = 0;
-                if (isSendRace && s.waitRetries < 8 && !s.cancelled) {
-                    s.waitRetries++;
-                    setSlotPhase(s, "warte (retry " + s.waitRetries + "/8)");
-                    // Slot bleibt in state.slots, naechster Tick versucht es erneut
-                } else if (s.cancelled) {
-                    // Pause angefordert - kein Excel-Eintrag als Fehler, einfach raus
-                    fireDelete(s.convId);
-                    toRemove.push(key);
-                } else {
-                    var r2 = makeResult(s, false, "[ASYNC] " + msg);
-                    addResult(r2);
+            // --- UPLOADING: Async PDF-Uploads warten, dann finalize -> READY ---
+            if (s.stage === "UPLOADING") {
+                var elapsed = new Date().getTime() - (s.uploadStartedAt || 0);
+                if (elapsed > UPLOAD_TIMEOUT_MS) {
+                    var rU = makeResult(s, false, "[Upload-Timeout] >5min ohne Result");
+                    addResult(rU);
                     state.errors++;
-                    appendAiLog("FEHLER", s.msgPath, "[ASYNC] " + msg.substr(0, 80));
+                    appendAiLog("FEHLER", s.msgPath, "Upload-Timeout >5min");
+                    cleanupSlotTempFiles(s);
+                    if (s.convId) fireDelete(s.convId);
+                    toRemove.push(key);
+                    continue;
+                }
+                if (pollSlotUploads(s)) {
+                    if (finalizeSlotUploads(s)) {
+                        // Stage jetzt READY - in diesem Tick gleich startAnswer probieren (drop through)
+                    } else {
+                        var rUE = makeResult(s, false, s.errMsg || "Upload fehlgeschlagen");
+                        addResult(rUE);
+                        state.errors++;
+                        appendAiLog("FEHLER", s.msgPath, s.errMsg || "Upload");
+                        if (s.convId) fireDelete(s.convId);
+                        toRemove.push(key);
+                        continue;
+                    }
+                } else {
+                    // Noch nicht alle Uploads fertig, naechster Tick erneut
+                    continue;
+                }
+            }
+
+            // --- READY: startAnswerAsync feuern -> RUNNING ---
+            if (s.stage === "READY") {
+                if (slotStartAnswer(s)) {
+                    // Stage jetzt RUNNING, drop through zu Polling
+                } else {
+                    var rRE = makeResult(s, false, s.errMsg || "Start-Fehler");
+                    addResult(rRE);
+                    state.errors++;
+                    appendAiLog("FEHLER", s.msgPath, s.errMsg || "Start");
+                    if (s.convId) fireDelete(s.convId);
+                    toRemove.push(key);
+                    continue;
+                }
+            }
+
+            // --- RUNNING: WaitForResponse(0) pollen ---
+            if (s.stage === "RUNNING") {
+                var done = false;
+                var winErr = null;
+                try {
+                    done = s.http.WaitForResponse(0);
+                } catch(e) {
+                    winErr = e;
+                }
+
+                if (winErr) {
+                    var msg = (winErr.message || "").toString();
+                    var isSendRace = msg.indexOf("Send") >= 0 || msg.indexOf("send") >= 0;
+                    if (!s.waitRetries) s.waitRetries = 0;
+                    if (isSendRace && s.waitRetries < 8) {
+                        s.waitRetries++;
+                        setSlotPhase(s, "warte (retry " + s.waitRetries + "/8)");
+                        // bleibt im Slot, naechster Tick erneut
+                    } else {
+                        var r2 = makeResult(s, false, "[ASYNC] " + msg);
+                        addResult(r2);
+                        state.errors++;
+                        appendAiLog("FEHLER", s.msgPath, "[ASYNC] " + msg.substr(0, 80));
+                        fireDelete(s.convId);
+                        toRemove.push(key);
+                    }
+                } else if (done) {
+                    var r3 = finalizeSlot(s);
+                    addResult(r3);
+                    if (r3.ok) state.processed++; else state.errors++;
+                    if (isAuthError(r3.errMsg)) state.abortReason = "AUTH";
+                    if (isModelError(r3.errMsg)) state.abortReason = "MODELL";
+                    var d3 = r3.data || {};
+                    appendAiLog(r3.ok ? "OK" : "FEHLER", s.msgPath,
+                        r3.ok ? ((d3.klassifikation || "?") + " | " + (d3.maklerpool || "")) : (r3.errMsg || "")
+                    );
                     fireDelete(s.convId);
                     toRemove.push(key);
                 }
-            } else if (done) {
-                var r3 = finalizeSlot(s);
-                addResult(r3);
-                if (r3.ok) state.processed++; else state.errors++;
-                if (isAuthError(r3.errMsg)) state.abortReason = "AUTH";
-                if (isModelError(r3.errMsg)) state.abortReason = "MODELL";
-                var d3 = r3.data || {};
-                appendAiLog(r3.ok ? "OK" : "FEHLER", s.msgPath,
-                    r3.ok ? ((d3.klassifikation || "?") + " | " + (d3.maklerpool || "")) : (r3.errMsg || "")
-                );
-                fireDelete(s.convId);
-                toRemove.push(key);
             }
         }
         for (var i = 0; i < toRemove.length; i++) {
@@ -1184,31 +1241,100 @@ function prepareSlot(slot) {
         slot.convId = createConversationSync(slot.prompt);
         if (!slot.convId) throw new Error("Keine conversation_id zurueck");
 
-        step = "PDFs hochladen";
-        var docIdsJson = "[]";
+        step = "PDF-Upload starten (async)";
+        slot.uploadHandles = [];
+        slot.tempPdfPaths = pdfPaths;   // Cleanup nach Upload-Finalize
+        slot.tempDir = tempDir;
         if (pdfPaths.length > 0) {
-            setSlotPhase(slot, "PDF 1/" + pdfPaths.length + " hochladen...");
-            docIdsJson = uploadPdfsSequential(slot.convId, pdfPaths, function(idx, total, name) {
-                setSlotPhase(slot, "PDF " + idx + "/" + total + ": " + name);
-            });
-        }
-        slot.docIdsJson = docIdsJson;
-
-        step = "Async Antwort-Call";
-        setSlotPhase(slot, "warte auf GPT-Antwort...");
-        slot.http = startAnswerAsync(slot.convId, slot.prompt, docIdsJson);
-
-        // Cleanup temp PDFs after upload (already in ErgoGPT)
-        try {
             for (var pi = 0; pi < pdfPaths.length; pi++) {
-                try { fso.DeleteFile(pdfPaths[pi], true); } catch(e) {}
+                var pdfP = pdfPaths[pi];
+                var fname2 = fso.GetFileName(pdfP);
+                var handle = uploadPdfStartAsync(slot.convId, pdfP, fname2);
+                slot.uploadHandles.push(handle);
             }
-            if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true);
-        } catch(e) {}
-
+            slot.stage = "UPLOADING";
+            slot.uploadStartedAt = new Date().getTime();
+            setSlotPhase(slot, "Upload 0/" + slot.uploadHandles.length + " (async)");
+        } else {
+            // Kein PDF - direkt READY
+            slot.docIdsJson = "[]";
+            slot.stage = "READY";
+            // Keine temp-Dateien zu cleanen (war nichts da)
+            try { if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true); } catch(e) {}
+        }
         return true;
     } catch(e) {
         slot.errMsg = "[" + step + "] " + e.message;
+        return false;
+    }
+}
+
+// Polling der async-Uploads. Setzt slot.phase fuer Live-Anzeige und liefert true,
+// wenn ALLE Handles fertig sind (Result-Datei existiert).
+function pollSlotUploads(slot) {
+    if (!slot.uploadHandles || slot.uploadHandles.length === 0) return true;
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var doneCount = 0;
+    for (var i = 0; i < slot.uploadHandles.length; i++) {
+        var h = slot.uploadHandles[i];
+        if (h.done) { doneCount++; continue; }
+        if (fso.FileExists(h.resultPath)) {
+            // Datei da, aber lesen tut finalize - hier nur "vorhanden" markieren.
+            doneCount++;
+        }
+    }
+    // Live-Anzeige
+    setSlotPhase(slot, "Upload " + doneCount + "/" + slot.uploadHandles.length + " (async)");
+    return doneCount === slot.uploadHandles.length;
+}
+
+// Liest alle Result-Dateien ein, baut docIdsJson, cleanup temp-PDFs. Setzt
+// slot.stage="READY" oder bei Fehler slot.errMsg + return false.
+function finalizeSlotUploads(slot) {
+    var ids = [];
+    for (var i = 0; i < slot.uploadHandles.length; i++) {
+        var h = slot.uploadHandles[i];
+        if (!h.done) uploadPdfReadResult(h);
+        if (h.errMsg) {
+            slot.errMsg = "[Upload " + h.fileName + "] " + h.errMsg;
+            // Restliche Handles trotzdem cleanen
+            for (var j = i; j < slot.uploadHandles.length; j++) {
+                if (!slot.uploadHandles[j].done) uploadPdfReadResult(slot.uploadHandles[j]);
+            }
+            cleanupSlotTempFiles(slot);
+            return false;
+        }
+        if (h.docId) ids.push(h.docId);
+    }
+    slot.docIdsJson = ids.length === 0 ? "[]" : ('["' + ids.join('","') + '"]');
+    cleanupSlotTempFiles(slot);
+    slot.stage = "READY";
+    return true;
+}
+
+function cleanupSlotTempFiles(slot) {
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        if (slot.tempPdfPaths) {
+            for (var i = 0; i < slot.tempPdfPaths.length; i++) {
+                try { fso.DeleteFile(slot.tempPdfPaths[i], true); } catch(e) {}
+            }
+        }
+        if (slot.tempDir && fso.FolderExists(slot.tempDir)) {
+            try { fso.DeleteFolder(slot.tempDir, true); } catch(e) {}
+        }
+    } catch(e) {}
+}
+
+// Feuert den Async-Antwort-Call. Setzt slot.http und stage="RUNNING".
+function slotStartAnswer(slot) {
+    setSlotPhase(slot, "warte auf GPT-Antwort...");
+    try {
+        slot.http = startAnswerAsync(slot.convId, slot.prompt, slot.docIdsJson);
+        slot.stage = "RUNNING";
+        return true;
+    } catch(e) {
+        slot.errMsg = "[Async Antwort-Call] " + e.message;
         return false;
     }
 }
@@ -1371,94 +1497,99 @@ function stringToUtf8Bytes(s) {
     return b;
 }
 
-function uploadPdfsSequential(convId, paths, progressCb) {
-    // Strategie: PowerShell-Subprozess statt In-Process-ADODB.Stream.
-    // Grund: IE/HTA-Sicherheits-Engine sperrt ADODB.Stream Binary-I/O in
-    // Zonen, die nicht 'Local Computer' sind. Subprozesse umgehen das,
-    // weil sie in einem separaten Sicherheitskontext laufen.
-    var ids = [];
-    var fso = new ActiveXObject("Scripting.FileSystemObject");
-    for (var i = 0; i < paths.length; i++) {
-        var path = paths[i];
-        var fileName = fso.GetFileName(path);
-        if (progressCb) {
-            try { progressCb(i + 1, paths.length, fileName); } catch(e) {}
-        }
-        try {
-            var did = uploadPdfViaPowerShell(convId, path, fileName);
-            if (did) ids.push(did);
-        } catch(e) {
-            throw new Error("Upload " + fileName + ": " + e.message);
-        }
-    }
-    if (ids.length === 0) return "[]";
-    return '["' + ids.join('","') + '"]';
-}
-
-// VBScript-Uploader: schreibt ein .vbs nach %TEMP%, fuehrt es ueber
-// wscript.exe aus. Im Gegensatz zu PowerShell hat WScript-Host keinen
-// ConstrainedLanguageMode und keine ExecutionPolicy-Bremse. ADODB.Stream
-// und WinHttp.WinHttpRequest sind dort frei nutzbar.
-function uploadPdfViaPowerShell(convId, pdfPath, fileName) {
-    // Funktionsname bleibt aus Refactor-Gruenden, intern jetzt VBS.
+// Feuert einen VBS-Upload-Subprozess fire-and-forget (Shell.Run mit
+// bWaitOnReturn=false). Liefert sofort einen Handle zurueck. Der eigentliche
+// Upload laeuft asynchron in einem separaten Prozess. Polling per FileExists
+// auf handle.resultPath - sobald die Datei existiert, ist der Upload fertig.
+// So koennen 15-50 Uploads PARALLEL laufen (jeder in eigenem OS-Prozess),
+// statt nacheinander mit ~1-3s blocking pro PDF.
+function uploadPdfStartAsync(convId, pdfPath, fileName) {
     var shell = new ActiveXObject("WScript.Shell");
     var fso = new ActiveXObject("Scripting.FileSystemObject");
     var tempDir = shell.ExpandEnvironmentStrings("%TEMP%");
-    var stamp = String(new Date().getTime()) + "_" + Math.floor(Math.random() * 1000000);
+    var stamp = String(new Date().getTime()) + "_" + Math.floor(Math.random() * 1000000) + "_" + Math.floor(Math.random() * 1000000);
     var vbsPath = tempDir + "\\ergo_upload_" + stamp + ".vbs";
     var resultPath = tempDir + "\\ergo_result_" + stamp + ".txt";
     var cookiePath = tempDir + "\\ergo_cookie_" + stamp + ".txt";
 
+    // Falls stale Result-Datei existiert: weg, sonst koennten wir sie als "fertig" misinterpretieren
+    try { fso.DeleteFile(resultPath, true); } catch(e) {}
+
+    // Cookie + VBS schreiben
+    var cookieFile = fso.CreateTextFile(cookiePath, true, false);
+    cookieFile.Write(state.cookie);
+    cookieFile.Close();
+    var vbsFile = fso.CreateTextFile(vbsPath, true, false);
+    vbsFile.Write(buildUploadVbs());
+    vbsFile.Close();
+
+    var fnArg = fileName.replace(/"/g, '""');
+    var pdfArg = pdfPath.replace(/"/g, '""');
+
+    var cmd = 'wscript.exe //NoLogo //B "' + vbsPath + '" ' +
+              '"' + cookiePath + '" ' +
+              '"' + convId + '" ' +
+              '"' + pdfArg + '" ' +
+              '"' + fnArg + '" ' +
+              '"' + resultPath + '"';
+
+    // FIRE-AND-FORGET: bWaitOnReturn=false. Run gibt sofort zurueck (oder wirft, falls Process nicht startbar).
+    shell.Run(cmd, 0, false);
+
+    return {
+        vbsPath: vbsPath,
+        resultPath: resultPath,
+        cookiePath: cookiePath,
+        fileName: fileName,
+        pdfPath: pdfPath,
+        startedAt: new Date().getTime(),
+        done: false,
+        docId: null,
+        errMsg: null
+    };
+}
+
+// Liest die Result-Datei eines fertigen Uploads, extrahiert document_id oder
+// setzt errMsg. Cleanup der temp-Dateien danach. Setzt handle.done=true.
+function uploadPdfReadResult(handle) {
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
     try {
-        // Cookie in temp-Datei (statt als Cmd-Argument: keine Quoting-Falle, keine Laengenbegrenzung)
-        var cookieFile = fso.CreateTextFile(cookiePath, true, false);
-        cookieFile.Write(state.cookie);
-        cookieFile.Close();
-
-        // VBS-Skript schreiben
-        var vbs = buildUploadVbs();
-        var vbsFile = fso.CreateTextFile(vbsPath, true, false);
-        vbsFile.Write(vbs);
-        vbsFile.Close();
-
-        // FileName-Argument: doppelte Anfuehrungszeichen als "" escapen
-        var fnArg = fileName.replace(/"/g, '""');
-        // pdfPath-Argument: gleiches Spiel
-        var pdfArg = pdfPath.replace(/"/g, '""');
-
-        // wscript.exe mit den 5 Argumenten
-        var cmd = 'wscript.exe //NoLogo //B "' + vbsPath + '" ' +
-                  '"' + cookiePath + '" ' +
-                  '"' + convId + '" ' +
-                  '"' + pdfArg + '" ' +
-                  '"' + fnArg + '" ' +
-                  '"' + resultPath + '"';
-        var rc = shell.Run(cmd, 0, true);
-
-        // Result lesen
-        if (!fso.FileExists(resultPath)) {
-            throw new Error("VBScript hat keine Result-Datei geschrieben (Exit " + rc + "). Pfad: " + vbsPath);
+        if (!fso.FileExists(handle.resultPath)) {
+            handle.errMsg = "Result-Datei fehlt (Timeout? VBS crashed?)";
+            handle.done = true;
+            return;
         }
-        var rf = fso.OpenTextFile(resultPath, 1, false, -2);
+        var rf = fso.OpenTextFile(handle.resultPath, 1, false, -2);
         var content = rf.ReadAll();
         rf.Close();
         var data = null;
         try { data = eval("(" + content + ")"); } catch(eP) {
-            throw new Error("Result-Datei nicht parsebar: " + content.substr(0, 200));
+            handle.errMsg = "Result nicht parsebar: " + content.substr(0, 200);
+            handle.done = true;
+            return;
         }
         if (!data || data.status === undefined) {
-            throw new Error("Result-Datei ohne 'status': " + content.substr(0, 200));
+            handle.errMsg = "Result ohne status: " + content.substr(0, 200);
+            handle.done = true;
+            return;
         }
         if (data.status !== 200) {
-            throw new Error("HTTP " + data.status + ": " + (data.body || "").substr(0, 200));
+            handle.errMsg = "HTTP " + data.status + ": " + (data.body || "").substr(0, 200);
+            handle.done = true;
+            return;
         }
         var did = parseJsonStr(data.body || "", "document_id");
-        if (!did) throw new Error("Keine document_id in: " + (data.body || "").substr(0, 200));
-        return did;
+        if (!did) {
+            handle.errMsg = "Keine document_id in: " + (data.body || "").substr(0, 200);
+            handle.done = true;
+            return;
+        }
+        handle.docId = did;
+        handle.done = true;
     } finally {
-        try { fso.DeleteFile(vbsPath, true); } catch(e) {}
-        try { fso.DeleteFile(resultPath, true); } catch(e) {}
-        try { fso.DeleteFile(cookiePath, true); } catch(e) {}
+        try { fso.DeleteFile(handle.vbsPath, true); } catch(e) {}
+        try { fso.DeleteFile(handle.resultPath, true); } catch(e) {}
+        try { fso.DeleteFile(handle.cookiePath, true); } catch(e) {}
     }
 }
 
@@ -1492,8 +1623,11 @@ function buildUploadVbs() {
     v.push("    f.Close");
     v.push("End Sub");
     v.push("");
+    // KEIN "Started"-Placeholder mehr: das JS polled per FileExists auf resultPath.
+    // Existiert die Datei, ist der Upload fertig (egal ob OK oder Error - in beiden
+    // Faellen schreibt das VBS-Skript ein Result-Objekt). Errors im VBS schreiben
+    // status=0 ueber WriteResult (siehe PDF-read- und HTTP-Error-Handler unten).
     v.push("On Error Resume Next");
-    v.push("WriteResult -1, \"Started\"");
     v.push("Err.Clear");
     v.push("");
     v.push("Dim fsoMain, ts, cookie");
@@ -2964,7 +3098,12 @@ function renderSlotStatus() {
     var lines = [];
     var slotIds = [];
     for (var k in state.slots) if (state.slots.hasOwnProperty(k)) slotIds.push(k);
-    slotIds.sort();
+    // Numerisch sortieren (s1, s2, ..., s9, s10 statt lexikal s1, s10, s11, s2)
+    slotIds.sort(function(a, b) {
+        var na = parseInt(String(a).replace(/^s/, ""), 10) || 0;
+        var nb = parseInt(String(b).replace(/^s/, ""), 10) || 0;
+        return na - nb;
+    });
     for (var i = 0; i < slotIds.length; i++) {
         var s = state.slots[slotIds[i]];
         var age = "";

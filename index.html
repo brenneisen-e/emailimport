@@ -1584,7 +1584,7 @@
                                     </a>
                                 </div>
                                 <div style="font-size: 11px; color: #fbbf24; margin-top: 6px;">Die Quellcode-Seite zeigt den vollen Code mit Copy-Button + Browser-Download-Button (umgeht Proxy-Filter). Datei in lokalen Ordner unter <code>C:\...</code> speichern (nicht direkt von Netzlaufwerk starten).</div>
-                                <div class="tool-meta">ergo-vorgang-analyse.hta v1.33 | Voraussetzung: Outlook (nur fuer KI-Modus und kleinen Pool-Modus), <strong>nicht</strong> noetig fuer XXL-Modus. <strong>v1.33:</strong> Neue Empfaenger-Spalte in der Excel, Postfach-Drilldown in der Auswertung (GESAMT + pro Postfach z.B. bestandsuebertragungen@ergo.de und maklerservice@ergo.de), 'Mahnung-Reminder' als eigene Klassifikation entfernt (Reminder werden jetzt als BUe-Vorgang mit ist_reminder=ja gefuehrt - cross-cutting Feld), Parallel-Cap auf 50. Davor v1.32: Rolling-Replacement (0ms Tick-Delay). v1.31: Long-Running-Script-Fix. v1.30: Live-Log + Boilerplate-Filter + ASYNC-Retry. v1.29: Pause-Knopf + Resume.</div>
+                                <div class="tool-meta">ergo-vorgang-analyse.hta v1.34 | Voraussetzung: Outlook (nur fuer KI-Modus und kleinen Pool-Modus), <strong>nicht</strong> noetig fuer XXL-Modus. <strong>v1.34:</strong> Async PDF-Upload - VBS-Subprozesse werden jetzt fire-and-forget gestartet (Shell.Run bWaitOnReturn=false), Slot-State-Machine UPLOADING -> READY -> RUNNING. Damit laufen 15-50 PDF-Uploads wirklich parallel (jeder in eigenem OS-Prozess), statt sequenziell 1-3s pro PDF zu blockieren. Ramp-up bei 15 Slots reduziert sich von ~30s auf ~3-5s. Slot-Log numerisch sortiert (9-10-11 statt 1-10-11-2). Davor v1.33: Empfaenger-Spalte, Postfach-Drilldown, Reminder cross-cutting, Cap 50. v1.31/32: Long-Running-Script-Fix + Rolling. v1.29/30: Pause + Resume + Live-Log + Boilerplate.</div>
                             </div>
                         </details>
 
@@ -1610,7 +1610,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 10.36
+                Version 10.37
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
