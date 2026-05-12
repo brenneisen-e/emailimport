@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.39 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.40 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.39</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.40</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.39"
+        VERSION="1.40"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.39 - Noch lautere Cache-Diagnose: zeigt erwarteten Pfad, listet Inhalt vom _KI-Analyse-Ordner, sucht in Unter-Ordnern wenn nicht direkt vorhanden. JSON.parse zuerst</div>
+            <div class="ver">v1.40 - FIX: scanFolder hat nach loadCache() ein hideStatus() gerufen und so die Cache-Diagnose direkt wieder unsichtbar gemacht. Jetzt bleibt die Cache-Meldung stehen</div>
         </div>
 
         <!-- Cookie -->
@@ -779,6 +779,10 @@ function scanFolder() {
     state.msgFiles = [];
     state.results = [];
     state.pendingMap = {};
+    // Vorherigen Status (z.B. alte Fehlermeldung) ZUERST wegklicken,
+    // BEVOR loadCache() seine eigene Diagnose schreibt - sonst wischt
+    // hideStatus() am Ende die Cache-Meldung wieder weg.
+    hideStatus();
     try {
         var fso = new ActiveXObject("Scripting.FileSystemObject");
         if (!fso.FolderExists(state.folderPath)) {
@@ -787,12 +791,13 @@ function scanFolder() {
             return;
         }
         collectMsgFiles(fso, fso.GetFolder(state.folderPath));
-        loadCache();
+        loadCache();   // setzt showInfo/showError/showSuccess - bleibt sichtbar
         renderTable();
         refreshFolderStats();
         refreshDateRangeStatus();
         if (state.msgFiles.length === 0) showInfo("Keine .msg-Dateien gefunden.");
-        else hideStatus();
+        // KEIN hideStatus() mehr - sonst werden Cache-Diagnose-Meldungen
+        // unsichtbar gemacht. User kann die Info-Box manuell wegklicken.
     } catch(e) {
         showError("Ordner-Scan fehlgeschlagen: " + e.message);
     }
