@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.45"
+        VERSION="1.46"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.45 - FIX Partial-Read bei grosser cache.json (748 -> 810 -> 907 statt 2000): ADODB Type=1 (binary) -> LoadFromFile -> Position=0 -> Type=2 -> ReadText liest jetzt deterministisch. Plus CRC-Pruefsumme im Diagnose-Output</div>
+            <div class="ver">v1.46 - FIX Excel-Hang: 2D-SafeArray via VBScript, EIN einziger Range.Value-Call statt 5000 (Recherche: 22k COM-Calls flood Excel-Message-Queue -> DWM 'Not Responding'). Plus Excel.Visible=false waehrend Write</div>
         </div>
 
         <!-- Cookie -->
@@ -2307,16 +2307,19 @@ function exportToExcel() {
     hideStatus();
     try {
         var excel = new ActiveXObject("Excel.Application");
-        excel.Visible = true;
+        // WICHTIG: Excel VERSTECKT lassen waehrend Bulk-Write. Sichtbares Fenster
+        // wird vom DWM/Window-Manager als "Not Responding" markiert wenn die
+        // COM-Schleife laenger als ~5s blockiert (Recherche: hidden Window
+        // unterliegt diesem Check nicht). Am Ende wieder einblenden.
+        excel.Visible = false;
         excel.DisplayAlerts = false;
-        // Speed-Boost waehrend des Bulk-Writes: kein Redraw, keine Auto-Calc, keine Events.
-        // Wird nach dem Schreiben wieder eingeschaltet. Gibt 5-10x Geschwindigkeit bei
-        // grossen Datensaetzen (5000+ Zeilen).
         try { excel.ScreenUpdating = false; } catch(eS) {}
         try { excel.Calculation = -4135; /* xlCalculationManual */ } catch(eS) {}
         try { excel.EnableEvents = false; } catch(eS) {}
+        try { excel.DisplayStatusBar = false; } catch(eS) {}
         var wb = excel.Workbooks.Add();
         var sheet = wb.ActiveSheet;
+        try { sheet.DisplayPageBreaks = false; } catch(eS) {}
         try { sheet.Name = "Analyse"; } catch(e) {}
 
         var headers = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absender Email","Empfaenger","Betreff","Anhaenge",
@@ -2376,87 +2379,92 @@ function exportToExcel() {
         var H_BERN  = rgb(253, 230, 138); // Klassifikation auffaellig
         var H_GRAU  = rgb(229, 231, 235); // Kein-Makler-Vorgang
 
-        // Phase 1: Daten bulk-schreiben mit Range.Value = 1D-Array pro Zeile.
-        // Statt 38 Einzel-Cells-Calls pro Zeile (~190k COM-Calls bei 5000 Zeilen) nur
-        // 1 Call pro Zeile (5000 Calls total). Plus ScreenUpdating=false oben gibt das
-        // einen ~30-100x Speedup.
+        // PHASE 1: GESAMT-Datensatz in EINEM COM-Call schreiben via 2D-SafeArray.
+        // Statt 5000 Range.Value-Calls (oder 190k Cells.Value-Calls) nur 1 einziger
+        // Range.Value = arr2d. Das ist der dramatische Speedup UND der einzige Weg
+        // das "Excel haengt sich auf"-Symptom zu vermeiden, weil Excel's Message-Queue
+        // sonst von 22k COM-Calls geflutet wird (DWM markiert das Fenster als
+        // 'Not Responding'). Recherche-Quelle: MS-VSTO/VBA Best-Practices, MrExcel.
         var bulkErrors = [];
         var exportTotal = state.results.length;
-        // Progress-Anzeige aktivieren falls progressContainer da ist
         var pgEl = document.getElementById("progressContainer");
         var statusEl = document.getElementById("slotStatus");
         if (pgEl) pgEl.style.display = "block";
-        if (statusEl) statusEl.innerText = "Excel-Export: 0 / " + exportTotal + " (Daten schreiben...)";
+        if (statusEl) statusEl.innerText = "Excel-Export: TSV bauen fuer " + exportTotal + " Zeilen...";
         forceRepaint();
+
+        // TSV-Riesen-String bauen. Spalten-Separator \t, Zeilen-Separator \n.
+        // cellSafeTsv strippt Tabs/Newlines aus Zellwerten - sonst wuerden die den Split kaputt machen.
+        var rowsTsv = [];
         for (var i = 0; i < state.results.length; i++) {
             var r = state.results[i];
             var d = r.data || {};
-            var row = i + 2;
-            // cellSafeTsv strippt Tabs/Newlines, damit join("\t") + Split sauber funktioniert.
-            // Werte als Strings: Excel inferiert "34" beim Schreiben automatisch wieder zu Zahl.
-            var values = [
-                String(i + 1),
-                cellSafeTsv(r.msgFile),
-                cellSafeTsv(r.datum),
-                cellSafeTsv(sg(d, "auftrag_datum")),
-                cellSafeTsv(r.absName),
-                cellSafeTsv(r.absMail),
-                cellSafeTsv(r.empfaenger),
-                cellSafeTsv(r.betreff),
-                cellSafeTsv(r.anhangAlle),
-                cellSafeTsv(sg(d, "maklerpool")),
-                cellSafeTsv(sg(d, "makler_nachname")),
-                cellSafeTsv(sg(d, "makler_vorname")),
-                cellSafeTsv(sg(d, "makler_nummer")),
-                cellSafeTsv(sg(d, "kunde_nachname")),
-                cellSafeTsv(sg(d, "kunde_vorname")),
-                cellSafeTsv(sg(d, "kunde_nummer")),
-                cellSafeTsv(sg(d, "versicherungsnummer")),
-                cellSafeTsv(sg(d, "vorgangstyp")),
-                cellSafeTsv(sg(d, "ist_reminder")),
-                cellSafeTsv(sg(d, "klassifikation")),
-                cellSafeTsv(sg(d, "klassifikation_grund")),
-                cellSafeTsv(sg(d, "geschaefts_typ")),
-                cellSafeTsv(sg(d, "unterlagen_angefragt")),
-                cellSafeTsv(sg(d, "unterlagen_liste")),
-                cellSafeTsv(sg(d, "sonderfall")),
-                cellSafeTsv(sg(d, "sparte")),
-                cellSafeTsv(sg(d, "anhang_typen")),
-                cellSafeTsv(sg(d, "pdf_qualitaet")),
-                cellSafeTsv(sg(d, "enthaelt_maklervollmacht")),
-                cellSafeTsv(sg(d, "mv_vollumfaenglich")),
-                cellSafeTsv(sg(d, "mv_einschraenkungen")),
-                cellSafeTsv(computeMvStatus(r)),
-                cellSafeTsv(sg(d, "unterschrift_kunde")),
-                cellSafeTsv(sg(d, "unterschrift_makler")),
-                cellSafeTsv(sg(d, "auf_vn_ausgestellt")),
-                cellSafeTsv(sg(d, "makler_namentlich_genannt")),
-                cellSafeTsv(sg(d, "hinweis")),
-                r.ok ? "" : cellSafeTsv(r.errMsg)
-            ];
-            try {
-                // VBScript-Helper TsvToVbArray liefert eine echte SafeArray, die Excel
-                // korrekt auf die N Zellen der Range verteilt. Ohne diesen Umweg packt
-                // Excel den toString()'d CSV-String in JEDE Zelle der Range (bekannter
-                // JScript-COM-Marshalling-Bug).
-                var tsv = values.join("\t");
-                var vbArr = TsvToVbArray(tsv, "\t");
-                sheet.Range(sheet.Cells(row, 1), sheet.Cells(row, headers.length)).Value = vbArr;
-            } catch(eBulk) {
-                // Fallback: zellweise. Falls TsvToVbArray/Range.Value Aerger macht,
-                // kommen wir trotzdem zum Excel.
-                for (var ci = 0; ci < values.length; ci++) {
-                    try { sheet.Cells(row, ci + 1).Value = values[ci]; } catch(eCell) {}
+            rowsTsv.push(
+                String(i + 1) + "\t" +
+                cellSafeTsv(r.msgFile) + "\t" +
+                cellSafeTsv(r.datum) + "\t" +
+                cellSafeTsv(sg(d, "auftrag_datum")) + "\t" +
+                cellSafeTsv(r.absName) + "\t" +
+                cellSafeTsv(r.absMail) + "\t" +
+                cellSafeTsv(r.empfaenger) + "\t" +
+                cellSafeTsv(r.betreff) + "\t" +
+                cellSafeTsv(r.anhangAlle) + "\t" +
+                cellSafeTsv(sg(d, "maklerpool")) + "\t" +
+                cellSafeTsv(sg(d, "makler_nachname")) + "\t" +
+                cellSafeTsv(sg(d, "makler_vorname")) + "\t" +
+                cellSafeTsv(sg(d, "makler_nummer")) + "\t" +
+                cellSafeTsv(sg(d, "kunde_nachname")) + "\t" +
+                cellSafeTsv(sg(d, "kunde_vorname")) + "\t" +
+                cellSafeTsv(sg(d, "kunde_nummer")) + "\t" +
+                cellSafeTsv(sg(d, "versicherungsnummer")) + "\t" +
+                cellSafeTsv(sg(d, "vorgangstyp")) + "\t" +
+                cellSafeTsv(sg(d, "ist_reminder")) + "\t" +
+                cellSafeTsv(sg(d, "klassifikation")) + "\t" +
+                cellSafeTsv(sg(d, "klassifikation_grund")) + "\t" +
+                cellSafeTsv(sg(d, "geschaefts_typ")) + "\t" +
+                cellSafeTsv(sg(d, "unterlagen_angefragt")) + "\t" +
+                cellSafeTsv(sg(d, "unterlagen_liste")) + "\t" +
+                cellSafeTsv(sg(d, "sonderfall")) + "\t" +
+                cellSafeTsv(sg(d, "sparte")) + "\t" +
+                cellSafeTsv(sg(d, "anhang_typen")) + "\t" +
+                cellSafeTsv(sg(d, "pdf_qualitaet")) + "\t" +
+                cellSafeTsv(sg(d, "enthaelt_maklervollmacht")) + "\t" +
+                cellSafeTsv(sg(d, "mv_vollumfaenglich")) + "\t" +
+                cellSafeTsv(sg(d, "mv_einschraenkungen")) + "\t" +
+                cellSafeTsv(computeMvStatus(r)) + "\t" +
+                cellSafeTsv(sg(d, "unterschrift_kunde")) + "\t" +
+                cellSafeTsv(sg(d, "unterschrift_makler")) + "\t" +
+                cellSafeTsv(sg(d, "auf_vn_ausgestellt")) + "\t" +
+                cellSafeTsv(sg(d, "makler_namentlich_genannt")) + "\t" +
+                cellSafeTsv(sg(d, "hinweis")) + "\t" +
+                (r.ok ? "" : cellSafeTsv(r.errMsg))
+            );
+        }
+        var bigTsv = rowsTsv.join("\n");
+        if (statusEl) statusEl.innerText = "Excel-Export: TSV->2D-Array (" + Math.round(bigTsv.length / 1024) + " KB)...";
+        forceRepaint();
+
+        try {
+            // VBScript baut 2D-SafeArray. Damit dann genau EIN Range.Value-Call.
+            var arr2d = TsvTo2DArray(bigTsv, "\n", "\t");
+            if (statusEl) statusEl.innerText = "Excel-Export: Bulk-Write in Excel...";
+            forceRepaint();
+            sheet.Range(sheet.Cells(2, 1), sheet.Cells(state.results.length + 1, headers.length)).Value = arr2d;
+        } catch(eBulk) {
+            // Fallback bei Riesen-TSV: zeilenweise mit TsvToVbArray
+            bulkErrors.push("Bulk-2D fehlgeschlagen, faelle zurueck auf Zeilen-Modus: " + (eBulk.message || "?"));
+            if (statusEl) statusEl.innerText = "Excel-Export: Fallback Zeilen-Modus...";
+            forceRepaint();
+            for (var bi = 0; bi < rowsTsv.length; bi++) {
+                try {
+                    var vbArr = TsvToVbArray(rowsTsv[bi], "\t");
+                    sheet.Range(sheet.Cells(bi + 2, 1), sheet.Cells(bi + 2, headers.length)).Value = vbArr;
+                } catch(eRow) {
+                    bulkErrors.push("Zeile " + (bi + 2) + ": " + (eRow.message || "?"));
                 }
-                bulkErrors.push("Zeile " + row + " (" + (r.msgFile || "?") + "): " + (eBulk.message || "unbekannt"));
-            }
-            // Progress alle 100 Zeilen + ScreenUpdating-Toggle zum Flushen der
-            // Excel-Render-Queue (sonst staut sich Speicher an, Excel wirkt eingefroren).
-            if ((i + 1) % 100 === 0) {
-                if (statusEl) statusEl.innerText = "Excel-Export: " + (i + 1) + " / " + exportTotal + " (Daten)";
-                forceRepaint();
-                if ((i + 1) % 500 === 0) {
-                    try { excel.ScreenUpdating = true; excel.ScreenUpdating = false; } catch(eFlush) {}
+                if ((bi + 1) % 100 === 0) {
+                    if (statusEl) statusEl.innerText = "Excel-Export: Fallback " + (bi + 1) + " / " + exportTotal;
+                    forceRepaint();
                 }
             }
         }
@@ -2537,7 +2545,11 @@ function exportToExcel() {
         try { excel.ScreenUpdating = true; } catch(eS) {}
         try { excel.Calculation = -4105; /* xlCalculationAutomatic */ } catch(eS) {}
         try { excel.EnableEvents = true; } catch(eS) {}
+        try { excel.DisplayStatusBar = true; } catch(eS) {}
         excel.DisplayAlerts = true;
+        // JETZT Excel sichtbar machen - alle Schreibarbeiten sind durch,
+        // Window-Manager-Hang-Risiko vorbei.
+        try { excel.Visible = true; } catch(eS) {}
 
         // Erfolgsmeldung mit Fehler-Zusammenfassung falls Probleme
         var okMsg = "Excel mit " + state.results.length + " Vorgaengen + Auswertung-Sheet geoeffnet.";
@@ -2554,12 +2566,15 @@ function exportToExcel() {
         if (pgEl && !state.running) pgEl.style.display = "none";
         showSuccess(okMsg);
     } catch(e) {
-        // Settings auch im Fehlerfall zuruecksetzen
+        // Settings auch im Fehlerfall zuruecksetzen (sonst bleibt Excel ggf.
+        // unsichtbar/frozen falls Crash zwischen Visible=false und Visible=true)
         try { if (typeof excel !== "undefined") {
             excel.ScreenUpdating = true;
             excel.Calculation = -4105;
             excel.EnableEvents = true;
             excel.DisplayAlerts = true;
+            excel.DisplayStatusBar = true;
+            excel.Visible = true;
         }} catch(eR) {}
         showError("Excel-Export fehlgeschlagen: " + (e.message || "unbekannter Laufzeitfehler") +
                   (e.number !== undefined ? " (Code " + e.number + ")" : "") +
@@ -6031,8 +6046,35 @@ function countRenameCandidates() {
      wenn man sheet.Range(...).Value = jsArr macht. VBScript's Array() oder Split()
      liefert dagegen ein echtes Variant-Array, das Excel korrekt auf die Range verteilt. -->
 <script language="VBScript">
+' 1D-SafeArray fuer eine einzelne Excel-Zeile (legacy, fallback)
 Function TsvToVbArray(tsv, sep)
     TsvToVbArray = Split(tsv, sep)
+End Function
+
+' 2D-SafeArray fuer einen kompletten Bulk-Write. JScript kann keine 2D-SafeArrays
+' bauen - VBScript schon. Damit kollabiert ein Excel-Bulk-Write von N*M Zellen
+' auf EINEN einzigen COM-Call: sheet.Range(...).Value = arr2d. Das ist der
+' Schluessel um den "Excel haengt sich auf"-Look zu verhindern: weniger
+' Round-Trips = Excel-Message-Queue stautet nicht.
+Function TsvTo2DArray(tsv, rowSep, colSep)
+    Dim lines, i, parts, j, arr(), nRows, nCols
+    lines = Split(tsv, rowSep)
+    nRows = UBound(lines) + 1
+    ' Spaltenzahl aus erster Zeile
+    parts = Split(lines(0), colSep)
+    nCols = UBound(parts) + 1
+    ReDim arr(nRows - 1, nCols - 1)
+    For i = 0 To nRows - 1
+        parts = Split(lines(i), colSep)
+        Dim limit
+        limit = UBound(parts)
+        If limit > nCols - 1 Then limit = nCols - 1
+        For j = 0 To limit
+            arr(i, j) = parts(j)
+        Next
+        ' Restliche Zellen leer (default Empty)
+    Next
+    TsvTo2DArray = arr
 End Function
 </script>
 
