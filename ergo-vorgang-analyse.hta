@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.51"
+        VERSION="1.52"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.51 - Cache: 3 Lese-Versuche mit Stream-Size-Verify (gegen OS-File-Cache-Warmup). Excel: setTimeout-chunked Write + Colors - kein "Script-Ausfuehrung dauert lange"-Dialog mehr</div>
+            <div class="ver">v1.52 - Cache: ADODB Binary-Read + manuelle UTF-16-Dekodierung in JScript - umgeht ADODB-Text-Konversion-Quirks komplett. Plus Stream.Size-Verify gegen LoadFromFile-Race. Ein Versuch, deterministisch</div>
         </div>
 
         <!-- Cookie -->
@@ -758,62 +758,63 @@ function loadCache() {
     var raw = "";
     var readMethod = "";
     var readErr = "";
-    // STRATEGIE (gegen OS-File-Cache-Warmup-Bug):
-    // 1. ADODB Binary-Load - liest ALLE Bytes in den Stream-Speicher (synchron)
-    // 2. Verify: stm.Size MUSS == fileSize sein. Wenn nicht: retry (OS Cache war kalt).
-    // 3. Erst dann Type=2 umschalten und ReadText - jetzt ist alles im RAM
-    // Plus 3 Retries falls die ersten zu wenig lesen.
-    var bestLen = 0;
-    var bestRaw = "";
-    var bestMethod = "";
-    for (var attempt = 1; attempt <= 3; attempt++) {
-        try {
-            var stm = new ActiveXObject("ADODB.Stream");
-            stm.Type = 1;   // BINARY - liefert deterministisch die volle Datei
-            stm.Open();
-            stm.LoadFromFile(p);
-            var streamSize = 0;
-            try { streamSize = stm.Size; } catch(eSz) {}
-            // Verify-Step: wenn Stream nicht die ganze Datei kennt, ADODB hat partial geladen
-            var sizeMatch = (fileSize === 0 || streamSize === fileSize);
-            stm.Position = 0;
-            stm.Type = 2;
-            stm.Charset = "unicode";
-            // Chunked ReadText bis EOS
-            var chunks = [];
-            var safetyCounter = 0;
-            while (!stm.EOS && safetyCounter < 1000) {
-                var chunk = stm.ReadText(131072);
-                if (chunk === null || String(chunk).length === 0) break;
-                chunks.push(String(chunk));
-                safetyCounter++;
-            }
+    // OFFIZIELLER PATTERN (deterministisch, ein Versuch):
+    // 1. ADODB.Stream Type=1 (Binary). LoadFromFile blockt synchron bis ALLE Bytes
+    //    in den Stream geladen sind (RAM-Buffer, NICHT OS-File-Cache abhaengig).
+    // 2. Stream.Size verifizieren - muss == fileSize sein.
+    // 3. Alle Bytes via stm.Read() als SafeArray of Byte holen.
+    // 4. UTF-16 LE manuell in JScript dekodieren (Byte-Paare zu Chars).
+    // Dadurch wird die ADODB-Text-Konversion (mit ihren bekannten Quirks bei
+    // grossen Dateien) komplett umgangen.
+    try {
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 1;
+        stm.Open();
+        stm.LoadFromFile(p);
+        var streamSize = 0;
+        try { streamSize = stm.Size; } catch(eSz) {}
+        if (fileSize > 0 && streamSize !== fileSize) {
+            // LoadFromFile hat nicht alles geladen - sollte praktisch nie passieren
             stm.Close();
-            var attemptRaw = chunks.join("");
-            if (attemptRaw.length > bestLen) {
-                bestLen = attemptRaw.length;
-                bestRaw = attemptRaw;
-                bestMethod = "ADODB bin->text chunked attempt " + attempt + (sizeMatch ? " (size-ok)" : " (size-mismatch " + streamSize + "/" + fileSize + ")");
-            }
-            // Wenn diese Iteration die erwartete Groesse erreicht hat, fertig
-            var expectedThis = fileSize > 0 ? Math.floor((fileSize - 2) / 2) : 0;
-            if (expectedThis > 0 && attemptRaw.length >= expectedThis) break;
-        } catch(eA) {
-            readErr += "Attempt " + attempt + ": " + eA.message + ". ";
+            throw new Error("Stream.Size " + streamSize + " != fileSize " + fileSize + " (LoadFromFile incomplete)");
         }
-    }
-    if (bestLen > 0) {
-        raw = bestRaw;
-        readMethod = bestMethod;
-    } else {
-        // Fallback: FSO ReadAll
+        stm.Position = 0;
+        var byteSafe = stm.Read();   // Alle Bytes als SafeArray of Byte
+        stm.Close();
+
+        // Konvertierung zu JScript-Array. VBArray.toArray() ist O(n) bei grossen Arrays
+        // (kann 1-2s dauern bei 3 MB), aber deterministisch.
+        var vba = new VBArray(byteSafe);
+        var bytes = vba.toArray();
+        var totalBytes = bytes.length;
+
+        // BOM-Erkennung: UTF-16 LE BOM = 0xFF 0xFE
+        var startIdx = (totalBytes >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) ? 2 : 0;
+
+        // UTF-16 LE manuell dekodieren. Chunked via String.fromCharCode.apply
+        // damit der String-Builder nicht O(n^2) wird bei 1.5M Chars.
+        var charsOut = [];
+        var chunkBuf = [];
+        for (var bi = startIdx; bi < totalBytes - 1; bi += 2) {
+            chunkBuf.push(bytes[bi] | (bytes[bi + 1] << 8));
+            if (chunkBuf.length >= 16384) {
+                charsOut.push(String.fromCharCode.apply(null, chunkBuf));
+                chunkBuf = [];
+            }
+        }
+        if (chunkBuf.length > 0) charsOut.push(String.fromCharCode.apply(null, chunkBuf));
+        raw = charsOut.join("");
+        readMethod = "ADODB binary + JScript UTF-16 decode (" + totalBytes + " bytes -> " + raw.length + " chars)";
+    } catch(eA) {
+        readErr += "Binary-Read: " + eA.message + ". ";
+        // Fallback: FSO ReadAll - falls VBArray.toArray() bei sehr grossen Dateien stirbt
         try {
             var fRead = fsoCk.OpenTextFile(p, 1, false, -1);
             raw = String(fRead.ReadAll());
             fRead.Close();
-            readMethod = "FSO Unicode (alle ADODB-Versuche scheiterten)";
+            readMethod = "FSO Unicode (Binary-Read scheiterte)";
         } catch(eU) {
-            showError("Cache laden fehlgeschlagen (alle Lese-Versuche). " + readErr + "FSO: " + eU.message + " (Pfad: " + p + ")");
+            showError("Cache laden fehlgeschlagen. " + readErr + "FSO: " + eU.message + " (Pfad: " + p + ")");
             return;
         }
     }
