@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.48"
+        VERSION="1.49"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.48 - DEFINITIVE FIX (Recherche Eric Lippert + KB280067): Excel-Bulk-Write via VBScript-Sub die rng.Value=arr INTERNAL macht (SafeArray-Round-Trip-Bug umgangen). Cache-Read chunked 131072 chars bis EOS</div>
+            <div class="ver">v1.49 - HARTE Cache-Diagnose: zeigt Datei-mod-time + CRC + Ende-Sample + Parser-Vergleich (JSON.parse vs eval - groesseres Ergebnis gewinnt). Nimmt das groessere Ergebnis aus beiden Parsern</div>
         </div>
 
         <!-- Cookie -->
@@ -813,39 +813,57 @@ function loadCache() {
         }
     }
 
-    // Einfache Pruefsumme (erste 100k Zeichen) - User sieht ob sich Datei zwischen Loads aendert
+    // CRC ueber gesamtes raw (nicht nur erste 100k!) - zeigt zuverlaessig ob
+    // sich die Datei zwischen Loads veraendert
     var crc = 0;
-    var crcLen = Math.min(raw.length, 100000);
-    for (var ci = 0; ci < crcLen; ci++) {
-        crc = ((crc << 5) - crc + raw.charCodeAt(ci)) | 0;  // |0 = int32 truncate
+    for (var ci = 0; ci < raw.length; ci++) {
+        crc = ((crc << 5) - crc + raw.charCodeAt(ci)) | 0;
     }
 
     // BOM strippen (ADODB.unicode strippt BOM normalerweise selbst, aber sicher ist sicher)
     if (raw.length > 0 && raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
 
+    // File-Modification-Time einlesen - User sieht ob sich Datei aendert zwischen Loads
+    var lastMod = "";
+    try { lastMod = String(fsoCk.GetFile(p).DateLastModified); } catch(eM) {}
+
+    // Letzte 200 Zeichen des raw - zeigt ob JSON sauber mit '] }' endet
+    var rawEnd = raw.length > 200 ? raw.substr(raw.length - 200) : raw;
+    rawEnd = rawEnd.replace(/[\r\n]+/g, " ");
+
     // Sanity-Check: erwartete Char-Anzahl bei UTF-16 LE = (fileSize - 2 BOM) / 2
     var expectedChars = fileSize > 0 ? Math.floor((fileSize - 2) / 2) : 0;
     var readPctOk = expectedChars > 0 ? Math.round((raw.length / expectedChars) * 100) : 0;
-    var sizeInfo = " [Datei: " + Math.round(fileSize / 1024) + " KB, gelesen: " + Math.round(raw.length * 2 / 1024) +
-                   " KB via " + readMethod + ", " + readPctOk + "%, CRC=" + (crc >>> 0).toString(16) + "]";
+    var sizeInfo = " [Datei: " + Math.round(fileSize / 1024) + " KB | mod: " + lastMod +
+                   " | gelesen: " + Math.round(raw.length * 2 / 1024) + " KB via " + readMethod +
+                   " | " + readPctOk + "% | CRC=" + (crc >>> 0).toString(16) +
+                   " | Ende: '..." + rawEnd.substr(rawEnd.length - 80).replace(/'/g, "\"") + "']";
 
     if (!raw || raw.length < 10) {
         showError("Cache-Datei leer oder zu klein (" + raw.length + " Zeichen)." + sizeInfo);
         return;
     }
 
-    // JSON.parse zuerst (robuster bei grossen Strings als eval), Fallback auf eval.
-    var data = null;
+    // BEIDE Parser laufen lassen und das groessere Ergebnis nehmen.
+    // Hintergrund: JSON.parse hat in IE11 bei sehr grossen Strings ggf. Quirks,
+    // eval ist permissiver. Wenn JSON.parse z.B. 1061 Eintraege liefert, eval
+    // aber 2000 - dann hatte JSON.parse partial-parse-Issue.
+    var dataJson = null, dataEval = null;
     var parseErr = "";
     try {
-        if (typeof JSON !== "undefined" && JSON.parse) {
-            data = JSON.parse(raw);
-        }
-    } catch(eJP) { parseErr = "JSON.parse: " + eJP.message; }
-    if (!data) {
-        try { data = eval("(" + raw + ")"); }
-        catch(eEv) { parseErr += " | eval: " + eEv.message; }
-    }
+        if (typeof JSON !== "undefined" && JSON.parse) dataJson = JSON.parse(raw);
+    } catch(eJP) { parseErr += "JSON.parse: " + eJP.message + ". "; }
+    try {
+        dataEval = eval("(" + raw + ")");
+    } catch(eEv) { parseErr += "eval: " + eEv.message + ". "; }
+
+    // Welcher Parser hat mehr Eintraege?
+    var jsonCount = (dataJson && dataJson.results && dataJson.results.length) || 0;
+    var evalCount = (dataEval && dataEval.results && dataEval.results.length) || 0;
+    var data = (evalCount > jsonCount) ? dataEval : dataJson;
+    if (!data) data = dataEval || dataJson;
+    var parserUsed = (evalCount > jsonCount) ? "eval(" + evalCount + ")" : "JSON.parse(" + jsonCount + ")";
+    sizeInfo += " [Parser: " + parserUsed + ", JSON=" + jsonCount + " eval=" + evalCount + "]";
     if (!data) {
         var sample = "Anfang: '" + raw.substr(0, 200).replace(/[\r\n]+/g, " ") + "' | Ende: '" +
                      raw.substr(Math.max(0, raw.length - 200)).replace(/[\r\n]+/g, " ") + "'";
