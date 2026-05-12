@@ -170,7 +170,7 @@ td.err { color: #fca5a5; }
 <div class="container">
 
 <div class="card">
-    <h1>ERGO Vorgang-Analyse <span class="ver">- Browser-KI v1.0</span></h1>
+    <h1>ERGO Vorgang-Analyse <span class="ver">- Browser-KI v1.1</span></h1>
     <p class="subtitle">.msg-Dateien direkt im Browser parsen und ueber die Claude-API klassifizieren - kein Outlook, kein HTA, keine Excel-Makros noetig.</p>
 </div>
 
@@ -294,10 +294,10 @@ td.err { color: #fca5a5; }
 
 </div><!-- /container -->
 
-<!-- msgreader (MSG Outlook parser) -->
-<script src="https://cdn.jsdelivr.net/npm/@kenjiuno/msgreader@1.22.0/lib/index.browser.js"></script>
-<!-- SheetJS for Excel export -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- msgreader (MSG Outlook parser) - lokal gebundelt mit esbuild, kein CDN -->
+<script src="vendor/msgreader.bundle.js"></script>
+<!-- SheetJS for Excel export - lokal -->
+<script src="vendor/xlsx.full.min.js"></script>
 
 <script>
 "use strict";
@@ -482,11 +482,11 @@ async function addFiles(fileList) {
 
 async function parseMsg(file) {
     const buf = await file.arrayBuffer();
-    // msgreader exposes global "MSGReader" via index.browser.js
-    const Reader = (typeof MSGReader !== "undefined") ? MSGReader
-                : (typeof window.MSGReader !== "undefined") ? window.MSGReader
+    // msgreader exposes window.MsgReader via vendor bundle
+    const Reader = (typeof MsgReader !== "undefined") ? MsgReader
+                : (typeof window.MsgReader !== "undefined") ? window.MsgReader
                 : null;
-    if (!Reader) throw new Error("msgreader-Bibliothek nicht geladen (CDN-Block?)");
+    if (!Reader) throw new Error("msgreader-Bibliothek nicht geladen (vendor/msgreader.bundle.js fehlt?)");
     const reader = new Reader(buf);
     const info = reader.getFileData();
     const senderEmail = info.senderEmail || info.lastModifierName || "";
