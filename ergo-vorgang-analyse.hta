@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.37"
+        VERSION="1.38"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.37 - Excel-Export 30-100x schneller: Range.Value=1D-Array statt Cells(r,c)=v (5000 Calls statt 190k), ScreenUpdating+Calc+Events ausgeschaltet, robusteres Error-Reporting mit Code/Description</div>
+            <div class="ver">v1.38 - Cache-Load mit sichtbarer Diagnose: zeigt geladene Anzahl ODER konkreten Fehler (Datei zu gross fuer eval, Parse-Fehler, Encoding etc.). JSON.parse zuerst, eval als Fallback</div>
         </div>
 
         <!-- Cookie -->
@@ -701,20 +701,53 @@ function ensureCacheFolder() {
 function loadCache() {
     var p = cachePath();
     if (!p) return;
+    // Pruefen ob Datei existiert (sonst still raus, kein Fehler)
     try {
-        var raw = readTextFile(p);
-        if (!raw) return;
-        var data = eval("(" + raw + ")");
-        if (data && data.results && data.results.length > 0) {
-            state.results = data.results;
-            state.pendingMap = {};
-            for (var i = 0; i < state.results.length; i++) {
-                state.pendingMap[String(state.results[i].msgPath).toLowerCase()] = true;
-            }
-        }
-    } catch(e) {
-        // ignore bad cache
+        var fsoCk = new ActiveXObject("Scripting.FileSystemObject");
+        if (!fsoCk.FileExists(p)) return;
+    } catch(eC) {}
+
+    var raw = "";
+    try {
+        raw = readTextFile(p) || "";
+    } catch(eR) {
+        showError("Cache laden fehlgeschlagen (Lesen): " + eR.message + " (Pfad: " + p + ")");
+        return;
     }
+    if (!raw || raw.length < 10) {
+        showError("Cache-Datei leer oder zu klein (" + raw.length + " Zeichen). Pfad: " + p);
+        return;
+    }
+
+    // JSON.parse zuerst (robuster bei grossen Strings als eval), Fallback auf eval.
+    var data = null;
+    var parseErr = "";
+    try {
+        if (typeof JSON !== "undefined" && JSON.parse) {
+            data = JSON.parse(raw);
+        }
+    } catch(eJP) { parseErr = "JSON.parse: " + eJP.message; }
+    if (!data) {
+        try { data = eval("(" + raw + ")"); }
+        catch(eEv) { parseErr += " | eval: " + eEv.message; }
+    }
+    if (!data) {
+        var sample = "Anfang: '" + raw.substr(0, 200).replace(/[\r\n]+/g, " ") + "' | Ende: '" +
+                     raw.substr(Math.max(0, raw.length - 200)).replace(/[\r\n]+/g, " ") + "'";
+        showError("Cache laden fehlgeschlagen (Parsing). Dateigroesse: " +
+                  Math.round(raw.length / 1024) + " KB. Fehler: " + parseErr + ". " + sample);
+        return;
+    }
+    if (!data.results || data.results.length === 0) {
+        showInfo("Cache-Datei vorhanden aber leer (data.results=" + (data.results ? data.results.length : "fehlt") + ").");
+        return;
+    }
+    state.results = data.results;
+    state.pendingMap = {};
+    for (var i = 0; i < state.results.length; i++) {
+        state.pendingMap[String(state.results[i].msgPath).toLowerCase()] = true;
+    }
+    showInfo("Cache geladen: <strong>" + state.results.length + "</strong> Vorgaenge aus " + Math.round(raw.length / 1024) + " KB Datei. (Dateipfade werden beim Start gematcht - schon analysierte Mails werden uebersprungen.)");
 }
 
 function saveCache() {
