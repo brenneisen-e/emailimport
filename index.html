@@ -1584,7 +1584,7 @@
                                     </a>
                                 </div>
                                 <div style="font-size: 11px; color: #fbbf24; margin-top: 6px;">Die Quellcode-Seite zeigt den vollen Code mit Copy-Button + Browser-Download-Button (umgeht Proxy-Filter). Datei in lokalen Ordner unter <code>C:\...</code> speichern (nicht direkt von Netzlaufwerk starten).</div>
-                                <div class="tool-meta">ergo-vorgang-analyse.hta v1.30 | Voraussetzung: Outlook (nur fuer KI-Modus und kleinen Pool-Modus), <strong>nicht</strong> noetig fuer XXL-Modus. <strong>v1.30:</strong> Live-Log mit OK/FEHLER + Klassifikation pro Mail (letzte 50), Parallel-Slots bis 15, Sonderkonditionsvorbehalt wird als Standard-Textbaustein erkannt und nicht mehr im Hinweis erwaehnt, ASYNC-WinHttp-Fehler werden 8x soft-retried statt sofort als Fehler abgebucht. Davor v1.29: Pause-Knopf - schreibt Cache <code>_KI-Analyse/cache.json</code>, oeffnet Excel sofort; Klick auf Start macht nahtlos weiter. Davor: Bulk-KI-Triage, Pool-XXL, Zeitraum-Filter, BUe-Funnel-Stats.</div>
+                                <div class="tool-meta">ergo-vorgang-analyse.hta v1.31 | Voraussetzung: Outlook (nur fuer KI-Modus und kleinen Pool-Modus), <strong>nicht</strong> noetig fuer XXL-Modus. <strong>v1.31:</strong> Fix Long-Running-Script-Dialog bei vielen parallelen Slots - workerTick befuellt jetzt nur EINEN Slot pro Tick (statt alle parallelN gleichzeitig), Ramp-up auf 10 Slots in ~300ms. Davor v1.30: Live-Log, Parallel-Slots bis 15, Sonderkonditionsvorbehalt als Boilerplate, ASYNC-Retry. Davor v1.29: Pause-Knopf mit Cache <code>_KI-Analyse/cache.json</code> + Excel-Auto-Open + Resume per Start-Klick.</div>
                             </div>
                         </details>
 
@@ -1610,7 +1610,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 10.33
+                Version 10.34
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
