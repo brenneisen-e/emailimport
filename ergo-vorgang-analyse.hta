@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.42"
+        VERSION="1.43"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.42 - FIX: nicht-deterministische Cache-Read. FSO.ReadAll() hat bei >1MB Bug (mal 748 mal 810 Eintraege). Jetzt ADODB.Stream Charset=unicode + Dateigroessen-Sanity-Check, zeigt Bytes-erwartet/gelesen</div>
+            <div class="ver">v1.43 - Excel-Export mit sichtbarem Progress (Daten + Farben pro Zeile), ScreenUpdating-Toggle alle 500 Zeilen zum Flushen der Excel-Render-Queue (gegen "haengt sich auf"-Look)</div>
         </div>
 
         <!-- Cookie -->
@@ -2366,6 +2366,13 @@ function exportToExcel() {
         // 1 Call pro Zeile (5000 Calls total). Plus ScreenUpdating=false oben gibt das
         // einen ~30-100x Speedup.
         var bulkErrors = [];
+        var exportTotal = state.results.length;
+        // Progress-Anzeige aktivieren falls progressContainer da ist
+        var pgEl = document.getElementById("progressContainer");
+        var statusEl = document.getElementById("slotStatus");
+        if (pgEl) pgEl.style.display = "block";
+        if (statusEl) statusEl.innerText = "Excel-Export: 0 / " + exportTotal + " (Daten schreiben...)";
+        forceRepaint();
         for (var i = 0; i < state.results.length; i++) {
             var r = state.results[i];
             var d = r.data || {};
@@ -2420,10 +2427,21 @@ function exportToExcel() {
                 }
                 bulkErrors.push("Zeile " + row + " (" + (r.msgFile || "?") + "): " + (eBulk.message || "unbekannt"));
             }
+            // Progress alle 100 Zeilen + ScreenUpdating-Toggle zum Flushen der
+            // Excel-Render-Queue (sonst staut sich Speicher an, Excel wirkt eingefroren).
+            if ((i + 1) % 100 === 0) {
+                if (statusEl) statusEl.innerText = "Excel-Export: " + (i + 1) + " / " + exportTotal + " (Daten)";
+                forceRepaint();
+                if ((i + 1) % 500 === 0) {
+                    try { excel.ScreenUpdating = true; excel.ScreenUpdating = false; } catch(eFlush) {}
+                }
+            }
         }
 
         // Phase 2: Color-Highlighting pro Zeile (pro Mail eigenes try/catch -
         // ein Fehler auf einer Zeile darf nicht den ganzen Lauf killen).
+        if (statusEl) statusEl.innerText = "Excel-Export: " + exportTotal + " / " + exportTotal + " (Farben...)";
+        forceRepaint();
         for (var ii = 0; ii < state.results.length; ii++) {
             var rr = state.results[ii];
             var dd = rr.data || {};
@@ -2462,7 +2480,16 @@ function exportToExcel() {
             } catch(eHL) {
                 bulkErrors.push("Highlight Zeile " + row + ": " + (eHL.message || "?"));
             }
+            if ((ii + 1) % 200 === 0) {
+                if (statusEl) statusEl.innerText = "Excel-Export: Farben " + (ii + 1) + " / " + exportTotal;
+                forceRepaint();
+                if ((ii + 1) % 1000 === 0) {
+                    try { excel.ScreenUpdating = true; excel.ScreenUpdating = false; } catch(eFlush) {}
+                }
+            }
         }
+        if (statusEl) statusEl.innerText = "Excel-Export: Auswertung + Formatierung...";
+        forceRepaint();
 
         try {
             sheet.Columns("A:A").ColumnWidth = 5;
@@ -2499,6 +2526,9 @@ function exportToExcel() {
             okMsg += " <strong>Auswertung-Sheet fehlgeschlagen:</strong> " + auswErr;
         }
         okMsg += " Bitte manuell speichern.";
+        // Progress-Container wieder verstecken (war fuer Export-Progress eingeblendet)
+        if (statusEl) statusEl.innerText = "";
+        if (pgEl && !state.running) pgEl.style.display = "none";
         showSuccess(okMsg);
     } catch(e) {
         // Settings auch im Fehlerfall zuruecksetzen
