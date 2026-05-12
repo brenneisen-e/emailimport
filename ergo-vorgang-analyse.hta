@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.27"
+        VERSION="1.28"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.27 - Zufallsstichprobe in neuen Ordner kopieren (z.B. 1000 von 5000)</div>
+            <div class="ver">v1.28 - Pool-Uebersicht (Outlook) speichert Body -> Bulk-Triage geht jetzt auch ohne XXL</div>
         </div>
 
         <!-- Cookie -->
@@ -3066,13 +3066,16 @@ function runQuickPoolOverview() {
 
 function doPoolScan(rows, poolCounts, sourceCounts, fso, files, total, idx) {
     if (idx >= total) {
-        // Fertig - Excel exportieren
+        // Fertig - Daten fuer Bulk-Triage merken + Excel exportieren
         document.getElementById("progressContainer").style.display = "none";
         state.running = false;
+        // Daten in state.xxlResults speichern, damit Bulk-Triage / weitere
+        // Stufen ohne separaten Pool-XXL-Lauf weitermachen koennen.
+        state.xxlResults = rows;
         refreshStartButton();
         try {
             exportPoolOverviewToExcel(rows, poolCounts, sourceCounts);
-            showSuccess(total + " Mails ausgewertet, " + Object.keysCount(poolCounts) + " unterschiedliche Pools erkannt.");
+            showSuccess(total + " Mails ausgewertet, " + Object.keysCount(poolCounts) + " unterschiedliche Pools erkannt. Bulk-Triage ist jetzt freigeschaltet.");
         } catch(e) {
             showError("Excel-Export fehlgeschlagen: " + e.message);
         }
@@ -3085,12 +3088,14 @@ function doPoolScan(rows, poolCounts, sourceCounts, fso, files, total, idx) {
     var row = {
         idx: idx + 1,
         msgFile: getFileName(msgPath),
+        path: msgPath,           // fuer downstream Stufe-2 (PDF-Upload)
         datum: "",
         absName: "",
         absMail: "",
         absDomain: "",
         empfaenger: "",
         betreff: "",
+        body: "",                // fuer Bulk-Triage-Prompt
         pool: "",
         source: "",
         sourceDetail: "",
@@ -3108,8 +3113,7 @@ function doPoolScan(rows, poolCounts, sourceCounts, fso, files, total, idx) {
         try { row.absMail = getSenderEmail(it); } catch(e) {}
         try { row.empfaenger = getRecipientsTo(it); } catch(e) {}
         try { row.betreff = String(it.Subject || ""); } catch(e) {}
-        var body = "";
-        try { body = String(it.Body || ""); } catch(e) {}
+        try { row.body = String(it.Body || ""); } catch(e) {}
 
         var atPos = row.absMail.indexOf("@");
         if (atPos >= 0) row.absDomain = row.absMail.substr(atPos + 1).toLowerCase();
@@ -3126,7 +3130,7 @@ function doPoolScan(rows, poolCounts, sourceCounts, fso, files, total, idx) {
 
         try { it.Close(1); } catch(e) {}
 
-        var detection = detectPool(row.absMail, row.absName, row.betreff, body);
+        var detection = detectPool(row.absMail, row.absName, row.betreff, row.body);
         if (detection) {
             row.pool = detection.name;
             row.source = detection.source;
