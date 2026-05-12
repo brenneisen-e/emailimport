@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.55 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.56 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.55</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.56</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.55"
+        VERSION="1.56"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.55 - Migration cache.json->xlsx jetzt via FillRangeFromTsv Bulk-Write (1 COM-Call statt 41800). 1100+ Vorgaenge in einem Rutsch ohne Long-Running-Dialog. Excel-Live-Cache aus v1.54 unveraendert</div>
+            <div class="ver">v1.56 - Bulk-Write hat jetzt 2 Methoden: FillRangeFromTsv (VBScript-Internal) + Clipboard-Paste als Fallback. Wenn beide failen, faellt's auf zellweise zurueck. Log zeigt welche Methode geklappt hat</div>
         </div>
 
         <!-- Cookie -->
@@ -1259,6 +1259,7 @@ function bulkWriteResultsToExcel(results) {
     try { state.excelApp.EnableEvents = false; } catch(eF) {}
 
     var ok = false;
+    var method = "";
     try {
         var rng = state.excelSheet.Range(
             state.excelSheet.Cells(startRow, 1),
@@ -1273,15 +1274,46 @@ function bulkWriteResultsToExcel(results) {
         if (s1.length > 0 &amp;&amp; sM.length > 0 &amp;&amp; sE.length > 0) {
             state.excelLiveRowCount += nRows;
             ok = true;
+            method = "FillRangeFromTsv";
         }
     } catch(eB) {}
+
+    if (!ok) {
+        // Methode 2: Clipboard-Paste. Bewaehrte Excel-Bulk-Methode.
+        // Tab-Newline-TSV in Clipboard, Cell selektieren, Paste.
+        try {
+            // Cleanup falls erster Versuch teilweise gefuellt hat
+            try {
+                state.excelSheet.Range(
+                    state.excelSheet.Cells(startRow, 1),
+                    state.excelSheet.Cells(startRow + nRows - 1, nCols)
+                ).ClearContents();
+            } catch(eClr) {}
+            window.clipboardData.clearData();
+            window.clipboardData.setData("Text", bigTsv);
+            state.excelSheet.Range(state.excelSheet.Cells(startRow, 1), state.excelSheet.Cells(startRow, 1)).Select();
+            state.excelSheet.Paste();
+            // Sanity
+            var c1 = String(state.excelSheet.Cells(startRow, 2).Value || "");
+            var cM = String(state.excelSheet.Cells(startRow + Math.floor(nRows / 2), 2).Value || "");
+            var cE = String(state.excelSheet.Cells(startRow + nRows - 1, 2).Value || "");
+            if (c1.length > 0 &amp;&amp; cM.length > 0 &amp;&amp; cE.length > 0) {
+                state.excelLiveRowCount += nRows;
+                ok = true;
+                method = "Clipboard-Paste";
+            }
+            try { window.clipboardData.clearData(); } catch(eCC) {}
+        } catch(eCp) {}
+    }
 
     // Flags zurueck
     try { state.excelApp.ScreenUpdating = true; } catch(eF) {}
     try { state.excelApp.Calculation = -4105; } catch(eF) {}
     try { state.excelApp.EnableEvents = true; } catch(eF) {}
 
-    if (!ok) {
+    if (ok) {
+        appendAiLog("OK", "", "Bulk-Write erfolgreich via " + method + " (" + nRows + " Zeilen)");
+    } else {
         // Cleanup partial write + reset _excelRow markers
         try {
             state.excelSheet.Range(
