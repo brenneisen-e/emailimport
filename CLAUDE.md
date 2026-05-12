@@ -113,3 +113,24 @@ und die `ergo-vorgang-analyse-v*.hta.txt`-Variante wurden bewusst entfernt.
 
 VERSION im `<HTA:APPLICATION>`-Tag und sichtbarer Header-String (`<div class="ver">v1.X - ...`)
 hochzaehlen wie gewohnt.
+
+### 5. Sonderfall `claude-analyse.html` — Browser-KI mit Claude-API direkt
+Standalone-Webseite (kein HTA, kein Outlook noetig). Laesst Anwender:
+1. Eigenen Anthropic-API-Key eingeben (LocalStorage),
+2. `.msg`-Dateien per Drag-Drop hochladen (msgreader via CDN parst CFB im Browser),
+3. Pool-Erkennung lokal (POOL_RULES portiert aus HTA),
+4. Bulk-Triage per direktem `fetch()` an `api.anthropic.com/v1/messages` mit
+   Header `anthropic-dangerous-direct-browser-access: true` und Prompt-Caching
+   (`cache_control: { type: "ephemeral" }`) auf dem System-Prompt,
+5. Excel-Export via SheetJS, JSON-Export als Blob.
+
+Default-Modell: `claude-sonnet-4-6`. Auswahl auch fuer `claude-haiku-4-5` (billig)
+und `claude-opus-4-7` (Premium). Kostenschaetzung wird live angezeigt.
+
+**Datenschutz-Warnung im UI:** Mail-Inhalte verlassen den Browser an Anthropic
+(USA). Nicht fuer produktive ERGO-Daten. Fuer den freigegebenen Weg gibt es
+das HTA-Tool mit ErgoGPT.
+
+Versionierung: VERSION in der Inline-Header-Zeile (`Browser-KI v1.X`) hochzaehlen.
+Kein ZIP, kein Build-Skript - die Datei wird direkt aus dem Repo serviert.
+In `index.html` verlinkt die Tile `claude-analyse.html` (ERGO-Kategorie).

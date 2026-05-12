@@ -1510,7 +1510,7 @@
                     <div class="tool-category-header" onclick="toggleCategory('catErgo')">
                         <div class="tool-category-icon ergo">E</div>
                         <div class="tool-category-title">ERGO</div>
-                        <div class="tool-category-count">3 Tools</div>
+                        <div class="tool-category-count">4 Tools</div>
                         <div class="tool-category-arrow">&#9654;</div>
                     </div>
                     <div class="tool-category-body">
@@ -1588,12 +1588,31 @@
                             </div>
                         </details>
 
+                        <!-- ERGO Vorgang-Analyse - Browser-KI (Claude API direkt) -->
+                        <details open>
+                            <summary>
+                                ERGO Vorgang-Analyse - Browser-KI (Claude API)
+                                <span class="tool-tag">Web / Claude</span>
+                            </summary>
+                            <div class="tool-body">
+                                <p><strong>Reine Browser-Loesung</strong> ohne HTA, ohne Outlook, ohne Excel-Makro. <code>.msg</code>-Dateien direkt im Browser hochladen, Pool-Erkennung laeuft lokal (17 Pools), Bulk-Triage an die <strong>Claude-API</strong> (eigener API-Token, im LocalStorage). Default-Modell: Sonnet 4.6 (~$0.50 fuer 200 Mails). Prompt-Caching aktiv. Excel- und JSON-Export.</p>
+                                <div class="tool-actions">
+                                    <a href="claude-analyse.html" class="btn-download" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                                        Browser-KI-Tool oeffnen
+                                    </a>
+                                </div>
+                                <div style="font-size: 11px; color: #fbbf24; margin-top: 6px;"><strong>Datenschutz:</strong> Mail-Inhalte gehen direkt vom Browser an api.anthropic.com (USA). Nicht fuer produktive ERGO-Daten ohne interne Freigabe verwenden - dafuer ist das HTA-Tool mit ErgoGPT da. Geeignet fuer eigene Tests, anonymisierte Pool-Beispiele, Konzept-Validierung.</div>
+                                <div class="tool-meta">claude-analyse.html v1.0 | Voraussetzung: Anthropic-API-Key (console.anthropic.com), moderner Browser (Chrome/Edge/Firefox - kein IE11). msgreader + SheetJS per CDN. Header <code>anthropic-dangerous-direct-browser-access</code>.</div>
+                            </div>
+                        </details>
+
                     </div><!-- /tool-category-body ERGO -->
                 </div><!-- /tool-category ERGO -->
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 10.28
+                Version 10.29
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
