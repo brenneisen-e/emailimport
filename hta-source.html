@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.38 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.39 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.38</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.39</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.38"
+        VERSION="1.39"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.38 - Cache-Load mit sichtbarer Diagnose: zeigt geladene Anzahl ODER konkreten Fehler (Datei zu gross fuer eval, Parse-Fehler, Encoding etc.). JSON.parse zuerst, eval als Fallback</div>
+            <div class="ver">v1.39 - Noch lautere Cache-Diagnose: zeigt erwarteten Pfad, listet Inhalt vom _KI-Analyse-Ordner, sucht in Unter-Ordnern wenn nicht direkt vorhanden. JSON.parse zuerst</div>
         </div>
 
         <!-- Cookie -->
@@ -836,12 +836,45 @@ function ensureCacheFolder() {
 
 function loadCache() {
     var p = cachePath();
-    if (!p) return;
-    // Pruefen ob Datei existiert (sonst still raus, kein Fehler)
-    try {
-        var fsoCk = new ActiveXObject("Scripting.FileSystemObject");
-        if (!fsoCk.FileExists(p)) return;
-    } catch(eC) {}
+    if (!p) {
+        showInfo("Cache: kein Pfad berechnet (folderPath leer?).");
+        return;
+    }
+    // Volle Diagnose, damit der User sieht was passiert
+    var fsoCk;
+    try { fsoCk = new ActiveXObject("Scripting.FileSystemObject"); }
+    catch(eF) { showError("Cache: FSO nicht verfuegbar - " + eF.message); return; }
+
+    if (!fsoCk.FileExists(p)) {
+        // Datei nicht da - zeige wo gesucht wurde + was im _KI-Analyse-Ordner liegt
+        var cacheDir = state.folderPath + "\\_KI-Analyse";
+        var diag = "Cache nicht gefunden bei: <code>" + p + "</code>. ";
+        if (fsoCk.FolderExists(cacheDir)) {
+            try {
+                var folder = fsoCk.GetFolder(cacheDir);
+                var en = new Enumerator(folder.Files);
+                var names = [];
+                for (; !en.atEnd(); en.moveNext()) names.push(String(en.item().Name));
+                diag += "Inhalt von <code>" + cacheDir + "</code>: [" + (names.length > 0 ? names.join(", ") : "leer") + "]";
+            } catch(eL) { diag += "Inhalt konnte nicht gelesen werden: " + eL.message; }
+        } else {
+            diag += "Unterordner <code>_KI-Analyse</code> existiert NICHT in <code>" + state.folderPath + "</code>.";
+            // Vielleicht in einem direkten Unterordner? Suche eine Ebene tiefer
+            try {
+                var topFolder = fsoCk.GetFolder(state.folderPath);
+                var subs = new Enumerator(topFolder.SubFolders);
+                var hits = [];
+                for (; !subs.atEnd(); subs.moveNext()) {
+                    var sub = subs.item();
+                    var subCache = String(sub.Path) + "\\_KI-Analyse\\cache.json";
+                    if (fsoCk.FileExists(subCache)) hits.push(subCache);
+                }
+                if (hits.length > 0) diag += " Aber Cache existiert in Unter-Ordnern: " + hits.join(", ") + " - dort den Ordner auswaehlen!";
+            } catch(eS) {}
+        }
+        showError(diag);
+        return;
+    }
 
     var raw = "";
     try {
