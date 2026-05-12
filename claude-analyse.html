@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>ERGO Vorgang-Analyse - Browser-KI (Claude API direkt)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f1f5f9;
+    min-height: 100vh;
+    padding: 1.5rem;
+    font-size: 14px;
+}
+.container { max-width: 1300px; margin: 0 auto; }
+h1 { font-size: 24px; margin-bottom: 0.25rem; }
+.subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 1rem; }
+.card {
+    background: rgba(30, 41, 59, 0.85);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    margin-bottom: 1rem;
+    border: 1px solid #334155;
+}
+.card h2 { font-size: 15px; margin-bottom: 0.75rem; color: #93c5fd; letter-spacing: 0.5px; text-transform: uppercase; }
+label { display: block; font-size: 12px; color: #cbd5e1; margin-bottom: 4px; }
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+    width: 100%;
+    background: #0f172a;
+    color: #f1f5f9;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid #3b82f6; border-color: #3b82f6; }
+.row { display: grid; gap: 0.75rem; }
+.row.cols-2 { grid-template-columns: 1fr 1fr; }
+.row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.15s;
+    background: #475569;
+    color: #f1f5f9;
+}
+button:hover { background: #64748b; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.primary { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+button.primary:hover { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+button.success { background: linear-gradient(135deg, #10b981, #059669); }
+button.warn { background: linear-gradient(135deg, #d97706, #b45309); }
+button.danger { background: linear-gradient(135deg, #dc2626, #991b1b); }
+.dropzone {
+    border: 2px dashed #475569;
+    border-radius: 10px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: rgba(15, 23, 42, 0.5);
+}
+.dropzone.dragover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.15); }
+.dropzone p { color: #94a3b8; margin: 4px 0; }
+.dropzone strong { color: #93c5fd; }
+.actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; align-items: center; }
+#status {
+    color: #6ee7b7;
+    font-size: 13px;
+    font-weight: 500;
+}
+#status.err { color: #fca5a5; }
+#status.warn { color: #fbbf24; }
+.progress-container { display: none; margin-top: 1rem; }
+.progress-bar-bg {
+    background: #1e293b;
+    border-radius: 6px;
+    height: 22px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #334155;
+}
+.progress-bar-fg {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    height: 100%;
+    transition: width 0.3s;
+    width: 0%;
+}
+.progress-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 0 4px rgba(0,0,0,0.6);
+}
+.progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-top: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; }
+th { background: #1e293b; color: #93c5fd; font-weight: 600; position: sticky; top: 0; }
+td.err { color: #fca5a5; }
+.table-wrap { max-height: 60vh; overflow: auto; border: 1px solid #334155; border-radius: 8px; background: #0f172a; }
+.badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.badge.bue { background: #1e40af; }
+.badge.mahnung { background: #b45309; }
+.badge.schaden { background: #b91c1c; }
+.badge.antrag { background: #7c3aed; }
+.badge.anfrage { background: #0d9488; }
+.badge.nicht { background: #525252; }
+.badge.kein { background: #1f2937; }
+.kbd { display: inline-block; padding: 1px 5px; border-radius: 3px; background: #0f172a; color: #fbbf24; font-family: 'Consolas', monospace; font-size: 11px; border: 1px solid #334155; }
+.help {
+    background: rgba(59, 130, 246, 0.08);
+    border-left: 3px solid #3b82f6;
+    padding: 10px 14px;
+    margin: 8px 0 12px;
+    font-size: 12px;
+    color: #cbd5e1;
+    border-radius: 4px;
+}
+.help strong { color: #93c5fd; }
+.help a { color: #60a5fa; }
+.cost-box {
+    background: rgba(217, 119, 6, 0.08);
+    border: 1px solid #d97706;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #fcd34d;
+}
+.cost-box strong { color: #fbbf24; }
+.fileitem { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 11px; color: #cbd5e1; }
+.fileitem .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileitem .size { color: #94a3b8; }
+.fileitem .rm { color: #fca5a5; cursor: pointer; padding: 0 6px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 0.75rem; border-bottom: 1px solid #334155; }
+.tab {
+    padding: 8px 16px; cursor: pointer; font-size: 12px; font-weight: 600;
+    color: #94a3b8; border-bottom: 2px solid transparent;
+}
+.tab.active { color: #93c5fd; border-bottom-color: #3b82f6; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.muted { color: #64748b; font-size: 11px; }
+.ver { font-size: 11px; color: #94a3b8; }
+.warn-banner {
+    background: rgba(220, 38, 38, 0.12);
+    border-left: 3px solid #dc2626;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #fecaca;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+.warn-banner strong { color: #fca5a5; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="card">
+    <h1>ERGO Vorgang-Analyse <span class="ver">- Browser-KI v1.0</span></h1>
+    <p class="subtitle">.msg-Dateien direkt im Browser parsen und ueber die Claude-API klassifizieren - kein Outlook, kein HTA, keine Excel-Makros noetig.</p>
+</div>
+
+<div class="warn-banner">
+    <strong>Hinweis Datenschutz:</strong> Diese Seite schickt Email-Inhalte direkt von deinem Browser an <code>api.anthropic.com</code> (Anthropic, USA).
+    Der API-Token bleibt nur in deinem Browser (LocalStorage). Pruefe vor Produktiv-Einsatz, ob das mit der ERGO-Datenschutzrichtlinie vereinbar ist.
+    Fuer den freigegebenen Weg gibt es das HTA-Tool mit ErgoGPT (intern, DSGVO-konform).
+</div>
+
+<div class="card">
+    <h2>1. Claude API-Token</h2>
+    <div class="help">
+        Hol dir einen API-Key auf <strong>console.anthropic.com</strong> (privates Konto, eigenes Geld). Der Key beginnt mit <span class="kbd">sk-ant-...</span> und wird im Browser-LocalStorage gespeichert (nicht zu Anthropic geschickt ausser per API-Call).
+    </div>
+    <div class="row cols-2">
+        <div>
+            <label>API-Key</label>
+            <input type="password" id="apiKey" placeholder="sk-ant-api03-...">
+        </div>
+        <div>
+            <label>&nbsp;</label>
+            <div style="display:flex; gap:8px;">
+                <button id="btnSaveKey" class="primary">Key speichern</button>
+                <button id="btnClearKey" class="danger">Key loeschen</button>
+                <button id="btnTestKey">Testen</button>
+            </div>
+        </div>
+    </div>
+    <div id="keyStatus" style="margin-top:8px; font-size:12px; color:#94a3b8;"></div>
+</div>
+
+<div class="card">
+    <h2>2. Einstellungen</h2>
+    <div class="row cols-4">
+        <div>
+            <label>Modell</label>
+            <select id="model">
+                <option value="claude-haiku-4-5">Haiku 4.5 (billig, schnell) - $1/$5 pro 1M</option>
+                <option value="claude-sonnet-4-6" selected>Sonnet 4.6 (empfohlen) - $3/$15 pro 1M</option>
+                <option value="claude-opus-4-7">Opus 4.7 (Premium) - $5/$25 pro 1M</option>
+            </select>
+        </div>
+        <div>
+            <label>Mails pro API-Call (Batch)</label>
+            <input type="number" id="batchSize" value="20" min="1" max="50">
+        </div>
+        <div>
+            <label>Parallele API-Calls</label>
+            <input type="number" id="parallel" value="3" min="1" max="6">
+        </div>
+        <div>
+            <label>Body-Limit pro Mail (Zeichen)</label>
+            <input type="number" id="bodyLimit" value="1200" min="200" max="5000">
+        </div>
+    </div>
+    <div class="cost-box" style="margin-top:0.75rem;">
+        <strong>Kostenschaetzung:</strong> <span id="costEst">Lade Dateien hoch...</span>
+    </div>
+</div>
+
+<div class="card">
+    <h2>3. .msg-Dateien hochladen</h2>
+    <div class="dropzone" id="dropzone">
+        <p><strong>Dateien hierher ziehen</strong> oder klicken zum Auswaehlen</p>
+        <p class="muted">Mehrere .msg-Dateien aus dem Windows-Explorer markieren (Strg+A) und reinziehen. Pool-Erkennung laeuft automatisch.</p>
+        <input type="file" id="fileInput" multiple accept=".msg" style="display:none;">
+    </div>
+    <div id="fileList" style="margin-top:0.75rem; max-height: 200px; overflow-y: auto;"></div>
+    <div class="actions">
+        <button id="btnStart" class="success" disabled>KI-Analyse starten</button>
+        <button id="btnCancel" class="danger" disabled>Abbrechen</button>
+        <button id="btnClearFiles">Dateien leeren</button>
+        <span id="status"></span>
+    </div>
+    <div class="progress-container" id="progressContainer">
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fg" id="progressBar"></div>
+            <div class="progress-text" id="progressText">0 / 0</div>
+        </div>
+        <div class="progress-meta">
+            <span id="progressDetail">Bereit</span>
+            <span id="progressCost">$0.0000</span>
+        </div>
+    </div>
+</div>
+
+<div class="card" id="resultsCard" style="display:none;">
+    <h2>4. Ergebnisse</h2>
+    <div class="tabs">
+        <div class="tab active" data-tab="triage">Triage (alle Mails)</div>
+        <div class="tab" data-tab="pool">Pool-Statistik</div>
+        <div class="tab" data-tab="raw">Roh-Antworten / Fehler</div>
+    </div>
+    <div class="tab-content active" id="tabTriage">
+        <div class="table-wrap"><table id="resultsTable"></table></div>
+        <div class="actions">
+            <button id="btnExportXlsx" class="success">Excel-Export (.xlsx)</button>
+            <button id="btnExportJson">JSON-Export</button>
+            <span class="muted" id="resultsSummary"></span>
+        </div>
+    </div>
+    <div class="tab-content" id="tabPool">
+        <div id="poolStats"></div>
+    </div>
+    <div class="tab-content" id="tabRaw">
+        <div id="rawList" style="max-height: 60vh; overflow:auto; font-family: Consolas, monospace; font-size: 11px; color: #cbd5e1; background:#0f172a; padding: 1rem; border-radius:6px;"></div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Hinweise &amp; Tipps</h2>
+    <ul style="font-size:12px; color:#cbd5e1; line-height:1.7; padding-left: 1.25rem;">
+        <li><strong>Pool-Erkennung lokal</strong> - laeuft im Browser, ohne API-Call (Domain &gt; Subject &gt; Signatur).</li>
+        <li><strong>Prompt-Caching aktiv</strong> - Systemprompt wird 5 Minuten gecached, spart ~50&#37; ab dem 2. Batch.</li>
+        <li><strong>Bei Fehler "CORS"</strong> - Anthropic erlaubt direkten Browser-Zugriff mit Header <code>anthropic-dangerous-direct-browser-access: true</code>. Falls deine Firma Cloudflare/Proxy zwischen Browser und API schaltet, kann der Call blockiert werden.</li>
+        <li><strong>Body wird auf X Zeichen gekuerzt</strong> (Default 1200) - reduziert Input-Tokens deutlich.</li>
+        <li><strong>Cache_control auf System</strong> - nur stabiler Prompt-Teil wird gecached, Mail-Inhalte sind volatil.</li>
+        <li><strong>Anhang-Namen aus .msg</strong> - nur Dateinamen, nicht der PDF-Inhalt (kein OCR).</li>
+    </ul>
+</div>
+
+</div><!-- /container -->
+
+<!-- msgreader (MSG Outlook parser) -->
+<script src="https://cdn.jsdelivr.net/npm/@kenjiuno/msgreader@1.22.0/lib/index.browser.js"></script>
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+"use strict";
+
+// ============================================================
+// POOL_RULES (portiert aus ergo-vorgang-analyse.hta)
+// ============================================================
+const POOL_RULES = [
+    { name: "Fonds Finanz Maklerservice GmbH", domains: ["fondsfinanz.de", "ff-maklerservice.de", "fonds-finanz.de", "fondsfinanz.com"], sigPatterns: [/Fonds[\s-]*Finanz/i], subjectPatterns: [] },
+    { name: "BCA AG", domains: ["bca.de", "bca-ag.de"], sigPatterns: [/\bBCA\s*AG\b/, /\bBCA\b.{0,40}\bMaklerservice/i], subjectPatterns: [/\bBCA[\s-]*ID\b/i] },
+    { name: "DEMA Deutsche Versicherungsmakler AG", domains: ["dema-ag.de", "dema.de"], sigPatterns: [/DEMA[\s-]*Deutsche[\s-]*Versicherungsmakler/i, /DEMA\s*AG/i, /DEMA\s*Maklerabteilung/i], subjectPatterns: [/Dokumente\s+von\s+der\s+DEMA/i, /DEMA[\s-]*Maklerabteilung/i, /DEMMAK/i] },
+    { name: "JDC Group AG / Jung DMS", domains: ["jdc.de", "jungdms.de", "jung-dms.de", "jdcgroup.de"], sigPatterns: [/JDC[\s-]*Group/i, /Jung[\s-]*DMS/i, /Jung,\s*DMS\s*&\s*Cie/i], subjectPatterns: [] },
+    { name: "Maxpool Maklerkooperation GmbH", domains: ["maxpool.de"], sigPatterns: [/Maxpool[\s-]*Maklerkooperation/i, /\bMaxpool\b.{0,40}GmbH/i], subjectPatterns: [] },
+    { name: "blau direkt GmbH & Co. KG", domains: ["blau-direkt.de", "blaudirekt.de"], sigPatterns: [/blau[\s-]*direkt/i], subjectPatterns: [] },
+    { name: "CHECK24 Vergleichsportal Versicherungen", domains: ["check24.de", "check24-versicherungen.de"], sigPatterns: [/CHECK24/, /Check24/], subjectPatterns: [] },
+    { name: "Apella AG", domains: ["apella.de", "apella-ag.de"], sigPatterns: [/Apella[\s-]*AG/i], subjectPatterns: [] },
+    { name: "Hypoport AG", domains: ["hypoport.de", "hypoport-systeme.de"], sigPatterns: [/Hypoport[\s-]*AG/i], subjectPatterns: [] },
+    { name: "Verifox GmbH", domains: ["verifox.de", "verifox.com"], sigPatterns: [/Verifox/i], subjectPatterns: [] },
+    { name: "Impuls Finanzmanagement AG", domains: ["impuls-finanzmanagement.de", "impuls-fm.de"], sigPatterns: [/Impuls[\s-]*Finanzmanagement/i], subjectPatterns: [] },
+    { name: "ROLAND Versicherungsmakler", domains: ["roland-versicherungsmakler.de"], sigPatterns: [/ROLAND[\s-]*Versicherungsmakler/i], subjectPatterns: [] },
+    { name: "WIFO Wirtschafts- und Finanzkontor", domains: ["wifo.de", "wifo-makler.de"], sigPatterns: [/WIFO[\s-]*Wirtschafts/i, /\bWIFO\b.{0,40}Finanzkontor/i], subjectPatterns: [] },
+    { name: "Aruna GmbH", domains: ["aruna.de"], sigPatterns: [/\bAruna\s*GmbH\b/i], subjectPatterns: [] },
+    { name: "Phoenix Maklergesellschaft", domains: ["phoenix-mg.de", "phoenix-maklergesellschaft.de"], sigPatterns: [/Ph(o|oe|ö)nix[\s-]*Maklergesellschaft/i], subjectPatterns: [] },
+    { name: "24-Vorsorge GmbH", domains: ["24-vorsorge.de"], sigPatterns: [/24[\s-]*Vorsorge/i], subjectPatterns: [] },
+    { name: "ERGO (intern, kein Maklerpool)", domains: ["ergo.de", "itergo.com", "ergo.com", "ergo-direkt.de"], sigPatterns: [], subjectPatterns: [] }
+];
+
+function extractSignature(body) {
+    if (!body) return "";
+    const lines = String(body).split(/\r?\n/);
+    while (lines.length > 0 && lines[lines.length-1].trim() === "") lines.pop();
+    return lines.slice(Math.max(0, lines.length - 20)).join("\n");
+}
+
+function detectPool(senderEmail, senderName, subject, body) {
+    const email = (senderEmail || "").toLowerCase();
+    const atPos = email.indexOf("@");
+    const emailDomain = atPos >= 0 ? email.substr(atPos + 1) : "";
+
+    for (const rule of POOL_RULES) {
+        for (const dom of rule.domains) {
+            if (emailDomain === dom || (emailDomain.length > dom.length + 1 && emailDomain.endsWith("." + dom))) {
+                return { name: rule.name, source: "Domain", detail: emailDomain };
+            }
+        }
+    }
+    const subj = String(subject || "");
+    for (const r of POOL_RULES) {
+        for (const pat of r.subjectPatterns) {
+            if (pat.test(subj)) return { name: r.name, source: "Subject", detail: pat.source };
+        }
+    }
+    const sig = extractSignature(body);
+    for (const r of POOL_RULES) {
+        for (const pat of r.sigPatterns) {
+            if (pat.test(sig)) return { name: r.name, source: "Signatur", detail: pat.source };
+        }
+    }
+    return null;
+}
+
+// ============================================================
+// State
+// ============================================================
+const state = {
+    files: [],          // {file, parsed, pool, err}
+    parsedMails: [],    // {idx, msgFile, absName, absMail, absDomain, empfaenger, datum, betreff, body, attNames, pool}
+    results: [],        // {...parsedMail, triage:{...}, err}
+    rawResponses: [],   // for "Roh-Antworten" tab
+    running: false,
+    cancelled: false,
+    totalTokensIn: 0,
+    totalTokensOut: 0,
+    totalTokensCacheRead: 0,
+    totalTokensCacheWrite: 0
+};
+
+// ============================================================
+// DOM helpers
+// ============================================================
+const $ = id => document.getElementById(id);
+function setStatus(msg, type) {
+    const el = $("status");
+    el.innerText = msg || "";
+    el.className = type || "";
+}
+
+// ============================================================
+// API-Key handling
+// ============================================================
+function loadKey() {
+    const k = localStorage.getItem("claude_api_key");
+    if (k) {
+        $("apiKey").value = k;
+        $("keyStatus").innerText = "Key aus LocalStorage geladen (" + k.substr(0, 14) + "..." + k.substr(-4) + ")";
+    }
+}
+$("btnSaveKey").addEventListener("click", () => {
+    const k = $("apiKey").value.trim();
+    if (!k.startsWith("sk-ant-")) { $("keyStatus").innerText = "Key beginnt nicht mit sk-ant- - sicher dass das ein Anthropic-Key ist?"; return; }
+    localStorage.setItem("claude_api_key", k);
+    $("keyStatus").innerText = "Gespeichert.";
+});
+$("btnClearKey").addEventListener("click", () => {
+    localStorage.removeItem("claude_api_key");
+    $("apiKey").value = "";
+    $("keyStatus").innerText = "Key geloescht.";
+});
+$("btnTestKey").addEventListener("click", async () => {
+    const k = $("apiKey").value.trim();
+    if (!k) { $("keyStatus").innerText = "Kein Key eingegeben."; return; }
+    $("keyStatus").innerText = "Teste...";
+    try {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+                "x-api-key": k,
+                "anthropic-version": "2023-06-01",
+                "anthropic-dangerous-direct-browser-access": "true",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: $("model").value,
+                max_tokens: 10,
+                messages: [{ role: "user", content: "ping" }]
+            })
+        });
+        if (r.ok) {
+            $("keyStatus").innerText = "OK - Modell " + $("model").value + " erreichbar.";
+        } else {
+            const t = await r.text();
+            $("keyStatus").innerText = "Fehler " + r.status + ": " + t.substr(0, 200);
+        }
+    } catch (e) {
+        $("keyStatus").innerText = "Netzwerk-Fehler: " + e.message;
+    }
+});
+
+// ============================================================
+// File drop / picker
+// ============================================================
+const dropzone = $("dropzone");
+const fileInput = $("fileInput");
+dropzone.addEventListener("click", () => fileInput.click());
+dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+dropzone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    addFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener("change", e => addFiles(e.target.files));
+$("btnClearFiles").addEventListener("click", () => {
+    state.files = [];
+    state.parsedMails = [];
+    renderFileList();
+    updateCostEstimate();
+    $("btnStart").disabled = true;
+});
+
+async function addFiles(fileList) {
+    setStatus("Parse .msg-Dateien...", "warn");
+    const arr = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith(".msg"));
+    let added = 0;
+    let failed = 0;
+    for (const f of arr) {
+        try {
+            const parsed = await parseMsg(f);
+            const pool = detectPool(parsed.senderEmail, parsed.senderName, parsed.subject, parsed.body);
+            state.files.push({ file: f, parsed, pool, err: null });
+            added++;
+        } catch (e) {
+            state.files.push({ file: f, parsed: null, pool: null, err: e.message });
+            failed++;
+        }
+    }
+    renderFileList();
+    updateCostEstimate();
+    $("btnStart").disabled = state.files.filter(x => x.parsed).length === 0;
+    setStatus(added + " Dateien geladen" + (failed ? ", " + failed + " Fehler" : "") + ".", failed ? "warn" : "");
+}
+
+async function parseMsg(file) {
+    const buf = await file.arrayBuffer();
+    // msgreader exposes global "MSGReader" via index.browser.js
+    const Reader = (typeof MSGReader !== "undefined") ? MSGReader
+                : (typeof window.MSGReader !== "undefined") ? window.MSGReader
+                : null;
+    if (!Reader) throw new Error("msgreader-Bibliothek nicht geladen (CDN-Block?)");
+    const reader = new Reader(buf);
+    const info = reader.getFileData();
+    const senderEmail = info.senderEmail || info.lastModifierName || "";
+    const senderName = info.senderName || "";
+    const subject = info.subject || file.name.replace(/\.msg$/i, "");
+    const body = info.body || info.bodyHTML || "";
+    const date = info.messageDeliveryTime || info.clientSubmitTime || info.creationTime || "";
+    const recipients = (info.recipients || []).map(r => r.email || r.name || "").filter(Boolean).join(", ");
+    const attachments = (info.attachments || []).map(a => a.fileName || a.displayName || "(unbenannt)");
+    let absDomain = "";
+    const at = senderEmail.indexOf("@");
+    if (at >= 0) absDomain = senderEmail.substr(at + 1);
+    return {
+        senderEmail, senderName, subject, body: stripHtml(body),
+        date: String(date || ""), recipients, attachments, absDomain
+    };
+}
+
+function stripHtml(s) {
+    if (!s) return "";
+    if (s.indexOf("<") < 0) return s;
+    const div = document.createElement("div");
+    div.innerHTML = s;
+    return (div.textContent || div.innerText || "").replace(/\s+\n/g, "\n").trim();
+}
+
+function renderFileList() {
+    const c = $("fileList");
+    if (state.files.length === 0) { c.innerHTML = '<div class="muted">Noch keine Dateien.</div>'; return; }
+    const ok = state.files.filter(x => x.parsed).length;
+    const err = state.files.filter(x => x.err).length;
+    let html = '<div style="font-size:12px;color:#cbd5e1;margin-bottom:6px;"><strong>' + state.files.length + '</strong> Dateien (' + ok + ' OK, ' + err + ' Fehler)</div>';
+    const max = Math.min(state.files.length, 50);
+    for (let i = 0; i < max; i++) {
+        const f = state.files[i];
+        const sz = (f.file.size / 1024).toFixed(0) + " KB";
+        const poolStr = f.pool ? f.pool.name + " (" + f.pool.source + ")" : (f.parsed ? "Pool unbekannt" : "PARSE-FEHLER");
+        const cls = f.err ? "err" : "";
+        html += '<div class="fileitem"><span class="name ' + cls + '">' + escapeHtml(f.file.name) + '</span>' +
+                '<span class="size">' + sz + '</span>' +
+                '<span class="muted">' + escapeHtml(poolStr) + '</span></div>';
+    }
+    if (state.files.length > max) html += '<div class="muted">... ' + (state.files.length - max) + ' weitere</div>';
+    c.innerHTML = html;
+}
+
+function escapeHtml(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+// ============================================================
+// Cost estimate
+// ============================================================
+const MODEL_COSTS = {
+    "claude-haiku-4-5":  { in: 1.0,  out: 5.0,  cacheRead: 0.10, cacheWrite: 1.25 },
+    "claude-sonnet-4-6": { in: 3.0,  out: 15.0, cacheRead: 0.30, cacheWrite: 3.75 },
+    "claude-opus-4-7":   { in: 5.0,  out: 25.0, cacheRead: 0.50, cacheWrite: 6.25 }
+};
+
+function updateCostEstimate() {
+    const okFiles = state.files.filter(x => x.parsed).length;
+    if (okFiles === 0) { $("costEst").innerText = "Lade Dateien hoch..."; return; }
+    const model = $("model").value;
+    const batch = Math.max(1, parseInt($("batchSize").value, 10) || 20);
+    const bodyLimit = Math.max(200, parseInt($("bodyLimit").value, 10) || 1200);
+    const c = MODEL_COSTS[model];
+
+    // Rough token estimate
+    const tokPerMail = Math.round(bodyLimit / 3.5 + 200); // body chars / 3.5 + meta
+    const tokSystem  = 1500;
+    const numBatches = Math.ceil(okFiles / batch);
+    const tokOutPerMail = 200;
+
+    // First batch writes cache, subsequent batches read it
+    const writeCost = tokSystem * c.cacheWrite / 1e6;
+    const readCost  = (numBatches - 1) * tokSystem * c.cacheRead / 1e6;
+    const inCost    = okFiles * tokPerMail * c.in / 1e6;
+    const outCost   = okFiles * tokOutPerMail * c.out / 1e6;
+    const total = writeCost + readCost + inCost + outCost;
+
+    $("costEst").innerText = okFiles + " Mails, " + numBatches + " Batches, ~$" + total.toFixed(4) + " (" +
+        "Model " + model + ", grobe Schaetzung)";
+}
+["model", "batchSize", "bodyLimit"].forEach(id => $(id).addEventListener("change", updateCostEstimate));
+["model", "batchSize", "bodyLimit"].forEach(id => $(id).addEventListener("input", updateCostEstimate));
+
+// ============================================================
+// Bulk-Triage Prompt (portiert aus HTA)
+// ============================================================
+const SYSTEM_PROMPT_STATIC =
+"Du bist ein erfahrener Sachbearbeiter im Innendienst eines deutschen Komposit-Versicherers (SHUK).\n" +
+"Du analysierst Listen eingehender Makler-Emails - ohne PDF-Inhalt, nur Header + Body + Pool-Kontext.\n\n" +
+"Antworte mit GENAU einem JSON-Array, das fuer JEDE Mail genau ein Objekt enthaelt - in gleicher Reihenfolge, mit 'nr' = Mail-Nummer.\n\n" +
+"FELDER PRO MAIL-OBJEKT (alle als String):\n" +
+"- nr (Mail-Nummer ab 1)\n" +
+"- vorgangstyp: 'Makler-Vorgang' / 'Bounce-NDR' / 'Ergo-Outbound' / 'System-Mail' / 'Werbung-Spam' / 'Unklar'\n" +
+"- klassifikation: 'BUe-Vorgang' / 'Mahnung-Reminder' / 'Schadenmeldung' / 'Antrag-Aenderung' / 'Anfrage-Ruecksprache' / 'Nicht-Standard' / 'Kein-Makler-Vorgang'\n" +
+"- klassifikation_grund: kurz, max 150 Zeichen, konkretes Indiz\n" +
+"- geschaefts_typ: 'BUe einfacher Vertrag' / 'BUe Kundenverbindung' / 'Keine BUe'\n" +
+"- ist_reminder: 'ja' / 'nein' / 'nicht_pruefbar'\n" +
+"- sonderfall: 'Flottengeschaeft' / 'Sondertarif' / 'Kein Sonderfall'\n" +
+"- sparte: 'Komposit' / 'Leben' / 'KV' / 'Mehrere' / 'Unbekannt'\n" +
+"- kunde_nachname (wenn im Body genannt, sonst '')\n" +
+"- kunde_vorname (wenn im Body genannt, sonst '')\n" +
+"- versicherungsnummer (VNR aus Body, sonst '')\n" +
+"- unterlagen_angefragt: 'ja' / 'nein'\n" +
+"- unterlagen_liste: kommagetrennt, sonst ''\n" +
+"- enthaelt_maklervollmacht: 'ja' / 'nein' / 'nicht_pruefbar' (aus Anhang-Namen, MV im Body erwaehnt etc.)\n" +
+"- mv_pruefung_noetig: 'ja' wenn BUe-Vorgang mit MV-Anhang -> Stufe-2 (PDF-Pruefung) noetig; sonst 'nein'\n" +
+"- konfidenz: 'hoch' / 'mittel' / 'niedrig' - wie sicher bist du bei dieser Mail?\n" +
+"- hinweis: 1 Satz, max 150 Zeichen, was auffaellt\n\n" +
+"REGELN:\n" +
+"- Pool-Kontext steht pro Mail dabei - nutze ihn (Pool-Erkennung wurde bereits vorab gemacht).\n" +
+"- Wenn vorgangstyp != 'Makler-Vorgang': klassifikation = 'Kein-Makler-Vorgang', restliche Felder ''.\n" +
+"- Bei niedriger Konfidenz: hinweis erklaert was unklar ist.\n" +
+"- Anhang-Namen sind Hinweis: 'Maklerauftrag*.pdf' -> meist BUe-Vorgang, 'Mahnung*.pdf' -> Reminder.\n" +
+"- Antworte AUSSCHLIESSLICH mit dem JSON-Array. Kein Markdown, keine Erklaerung, keine Code-Fences.";
+
+function buildUserPrompt(batch, bodyLimit) {
+    let p = "Es folgen " + batch.length + " Mails, nummeriert 1 bis " + batch.length + ".\n\n";
+    p += "===== MAILS =====\n";
+    for (let i = 0; i < batch.length; i++) {
+        const m = batch[i];
+        p += "\n--- MAIL " + (i + 1) + " ---\n";
+        p += "Pool (vorerkannt): " + (m.pool || "(unbekannt)") + "\n";
+        p += "Absender: " + (m.absName || "") + " <" + (m.absMail || "") + ">\n";
+        p += "Empfaenger: " + (m.empfaenger || "(intern)") + "\n";
+        p += "Datum: " + (m.datum || "") + "\n";
+        p += "Betreff: " + (m.betreff || "") + "\n";
+        p += "Anhaenge: " + (m.attNames || "(keine)") + "\n";
+        const body = (m.body || "").substr(0, bodyLimit);
+        p += "Body:\n<<<\n" + body + "\n>>>\n";
+    }
+    p += "\n===== ENDE MAILS =====\n\n";
+    p += "Antworte JETZT mit dem JSON-Array fuer alle " + batch.length + " Mails.";
+    return p;
+}
+
+// ============================================================
+// Start KI-Analyse
+// ============================================================
+$("btnStart").addEventListener("click", startAnalysis);
+$("btnCancel").addEventListener("click", () => { state.cancelled = true; setStatus("Abbruch angefordert...", "warn"); });
+
+async function startAnalysis() {
+    const key = $("apiKey").value.trim();
+    if (!key) { setStatus("Erst API-Key speichern.", "err"); return; }
+    const usable = state.files.filter(x => x.parsed);
+    if (usable.length === 0) { setStatus("Keine parsbaren Dateien.", "err"); return; }
+
+    // Build parsedMails array
+    state.parsedMails = usable.map((x, i) => {
+        const p = x.parsed;
+        return {
+            idx: i + 1,
+            msgFile: x.file.name,
+            absName: p.senderName,
+            absMail: p.senderEmail,
+            absDomain: p.absDomain,
+            empfaenger: p.recipients,
+            datum: p.date,
+            betreff: p.subject,
+            body: p.body,
+            attNames: p.attachments.join("; "),
+            pool: x.pool ? x.pool.name : "(unbekannt)",
+            poolSource: x.pool ? x.pool.source : ""
+        };
+    });
+
+    state.results = [];
+    state.rawResponses = [];
+    state.cancelled = false;
+    state.running = true;
+    state.totalTokensIn = 0;
+    state.totalTokensOut = 0;
+    state.totalTokensCacheRead = 0;
+    state.totalTokensCacheWrite = 0;
+
+    $("btnStart").disabled = true;
+    $("btnCancel").disabled = false;
+    $("progressContainer").style.display = "block";
+    $("resultsCard").style.display = "block";
+    renderResults();
+
+    const batchSize = Math.max(1, parseInt($("batchSize").value, 10) || 20);
+    const parallel = Math.max(1, parseInt($("parallel").value, 10) || 3);
+    const bodyLimit = Math.max(200, parseInt($("bodyLimit").value, 10) || 1200);
+    const model = $("model").value;
+
+    // Split into batches
+    const batches = [];
+    for (let i = 0; i < state.parsedMails.length; i += batchSize) {
+        batches.push(state.parsedMails.slice(i, i + batchSize));
+    }
+
+    const t0 = Date.now();
+    let processedBatches = 0;
+    let processedMails = 0;
+    const totalMails = state.parsedMails.length;
+
+    // Worker pool
+    let nextBatch = 0;
+    async function worker(slotId) {
+        while (!state.cancelled) {
+            const idx = nextBatch++;
+            if (idx >= batches.length) break;
+            const batch = batches[idx];
+            try {
+                const responses = await processBatch(batch, model, key, bodyLimit);
+                // Map responses back to mails
+                for (let j = 0; j < batch.length; j++) {
+                    const m = batch[j];
+                    const r = responses.find(x => parseInt(x.nr, 10) === (j + 1)) || {};
+                    state.results.push(Object.assign({}, m, { triage: r, err: null }));
+                }
+            } catch (e) {
+                for (const m of batch) {
+                    state.results.push(Object.assign({}, m, { triage: {}, err: e.message }));
+                }
+                state.rawResponses.push({ batchIdx: idx, error: e.message });
+            }
+            processedBatches++;
+            processedMails += batch.length;
+            updateProgress(processedMails, totalMails, processedBatches, batches.length, t0);
+            renderResults();
+        }
+    }
+
+    const workers = [];
+    for (let s = 0; s < parallel; s++) workers.push(worker(s));
+    await Promise.all(workers);
+
+    state.running = false;
+    $("btnStart").disabled = false;
+    $("btnCancel").disabled = true;
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    const okCount = state.results.filter(r => !r.err).length;
+    const errCount = state.results.length - okCount;
+    setStatus("Fertig: " + okCount + " ok, " + errCount + " Fehler in " + elapsed + "s. Kosten: $" + currentCost().toFixed(4), errCount ? "warn" : "");
+    renderResults();
+    renderPoolStats();
+    renderRaw();
+}
+
+function updateProgress(done, total, batchesDone, batchesTotal, t0) {
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    $("progressBar").style.width = pct + "%";
+    $("progressText").innerText = done + " / " + total + " (" + pct + "%)";
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
+    const rate = elapsed > 0 ? (done / elapsed * 60).toFixed(0) : "?";
+    $("progressDetail").innerText = "Batch " + batchesDone + "/" + batchesTotal + " | " + elapsed + "s | ~" + rate + " Mails/min";
+    $("progressCost").innerText = "$" + currentCost().toFixed(4);
+}
+
+function currentCost() {
+    const model = $("model").value;
+    const c = MODEL_COSTS[model] || MODEL_COSTS["claude-sonnet-4-6"];
+    return (state.totalTokensIn * c.in
+          + state.totalTokensOut * c.out
+          + state.totalTokensCacheRead * c.cacheRead
+          + state.totalTokensCacheWrite * c.cacheWrite) / 1e6;
+}
+
+async function processBatch(batch, model, key, bodyLimit) {
+    const userPrompt = buildUserPrompt(batch, bodyLimit);
+
+    const body = {
+        model: model,
+        max_tokens: Math.min(8000, 400 * batch.length + 500),
+        system: [
+            { type: "text", text: SYSTEM_PROMPT_STATIC, cache_control: { type: "ephemeral" } }
+        ],
+        messages: [
+            { role: "user", content: userPrompt }
+        ]
+    };
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+    });
+
+    const txt = await res.text();
+    if (!res.ok) {
+        throw new Error("HTTP " + res.status + ": " + txt.substr(0, 300));
+    }
+    let json;
+    try { json = JSON.parse(txt); } catch (e) { throw new Error("Antwort kein JSON: " + txt.substr(0, 200)); }
+    if (json.usage) {
+        state.totalTokensIn += json.usage.input_tokens || 0;
+        state.totalTokensOut += json.usage.output_tokens || 0;
+        state.totalTokensCacheRead += json.usage.cache_read_input_tokens || 0;
+        state.totalTokensCacheWrite += json.usage.cache_creation_input_tokens || 0;
+    }
+    const text = (json.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
+    state.rawResponses.push({ batchIdx: state.rawResponses.length, raw: text, usage: json.usage });
+
+    // Parse JSON array from response (strip code fences if present)
+    let cleaned = text.trim();
+    if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    }
+    const arr = JSON.parse(cleaned);
+    if (!Array.isArray(arr)) throw new Error("Antwort kein Array");
+    return arr;
+}
+
+// ============================================================
+// Render results
+// ============================================================
+const COLUMNS = [
+    { key: "msgFile", label: "Datei", w: 200 },
+    { key: "datum", label: "Datum", w: 110 },
+    { key: "absName", label: "Absender", w: 150 },
+    { key: "absDomain", label: "Domain", w: 130 },
+    { key: "pool", label: "Pool (Stufe 0)", w: 180 },
+    { key: "betreff", label: "Betreff", w: 250 },
+    { key: "_klass", label: "Klassifikation", w: 130 },
+    { key: "_typ", label: "Vorgangstyp", w: 110 },
+    { key: "_grund", label: "Grund", w: 200 },
+    { key: "_geschaeft", label: "Geschaeft", w: 130 },
+    { key: "_sparte", label: "Sparte", w: 80 },
+    { key: "_kunde", label: "Kunde", w: 140 },
+    { key: "_vnr", label: "VNR", w: 120 },
+    { key: "_mv", label: "MV", w: 80 },
+    { key: "_konfidenz", label: "Konfidenz", w: 90 },
+    { key: "_hinweis", label: "Hinweis", w: 220 },
+    { key: "err", label: "Fehler", w: 200 }
+];
+
+function badgeFor(klass) {
+    const k = (klass || "").toLowerCase();
+    if (k.indexOf("bue") >= 0) return '<span class="badge bue">' + escapeHtml(klass) + '</span>';
+    if (k.indexOf("mahnung") >= 0) return '<span class="badge mahnung">' + escapeHtml(klass) + '</span>';
+    if (k.indexOf("schaden") >= 0) return '<span class="badge schaden">' + escapeHtml(klass) + '</span>';
+    if (k.indexOf("antrag") >= 0) return '<span class="badge antrag">' + escapeHtml(klass) + '</span>';
+    if (k.indexOf("anfrage") >= 0) return '<span class="badge anfrage">' + escapeHtml(klass) + '</span>';
+    if (k.indexOf("nicht-standard") >= 0) return '<span class="badge nicht">' + escapeHtml(klass) + '</span>';
+    if (k) return '<span class="badge kein">' + escapeHtml(klass) + '</span>';
+    return "";
+}
+
+function renderResults() {
+    const tbl = $("resultsTable");
+    let html = "<thead><tr>";
+    for (const c of COLUMNS) html += '<th style="min-width:' + c.w + 'px;">' + c.label + "</th>";
+    html += "</tr></thead><tbody>";
+    for (const r of state.results) {
+        const t = r.triage || {};
+        const row = {
+            msgFile: r.msgFile, datum: r.datum, absName: r.absName, absDomain: r.absDomain,
+            pool: r.pool, betreff: r.betreff,
+            _klass: t.klassifikation || "", _typ: t.vorgangstyp || "", _grund: t.klassifikation_grund || "",
+            _geschaeft: t.geschaefts_typ || "", _sparte: t.sparte || "",
+            _kunde: ((t.kunde_vorname || "") + " " + (t.kunde_nachname || "")).trim(),
+            _vnr: t.versicherungsnummer || "",
+            _mv: t.enthaelt_maklervollmacht || "",
+            _konfidenz: t.konfidenz || "",
+            _hinweis: t.hinweis || "",
+            err: r.err || ""
+        };
+        html += "<tr>";
+        for (const c of COLUMNS) {
+            const cls = c.key === "err" && row.err ? ' class="err"' : "";
+            let v = row[c.key];
+            if (c.key === "_klass") v = badgeFor(v);
+            else v = escapeHtml(v || "");
+            html += "<td" + cls + ">" + v + "</td>";
+        }
+        html += "</tr>";
+    }
+    html += "</tbody>";
+    tbl.innerHTML = html;
+    $("resultsSummary").innerText = state.results.length + " Zeilen | " + state.results.filter(r => !r.err).length + " ok | " +
+                                    state.results.filter(r => r.err).length + " Fehler";
+}
+
+function renderPoolStats() {
+    const stats = {};
+    for (const r of state.results) {
+        const p = r.pool || "(unbekannt)";
+        const k = (r.triage && r.triage.klassifikation) || "(keine)";
+        if (!stats[p]) stats[p] = { total: 0, klass: {} };
+        stats[p].total++;
+        stats[p].klass[k] = (stats[p].klass[k] || 0) + 1;
+    }
+    let html = '<table><thead><tr><th>Pool</th><th>Anzahl</th><th>Top-Klassifikationen</th></tr></thead><tbody>';
+    const rows = Object.keys(stats).map(p => ({ p, ...stats[p] })).sort((a, b) => b.total - a.total);
+    for (const r of rows) {
+        const klassStr = Object.entries(r.klass).sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => k + " (" + v + ")").join(", ");
+        html += "<tr><td>" + escapeHtml(r.p) + "</td><td>" + r.total + "</td><td>" + escapeHtml(klassStr) + "</td></tr>";
+    }
+    html += "</tbody></table>";
+    $("poolStats").innerHTML = html;
+}
+
+function renderRaw() {
+    let html = "";
+    for (const r of state.rawResponses) {
+        html += '<div style="margin-bottom: 1rem; border-bottom: 1px solid #334155; padding-bottom: 0.5rem;">';
+        html += "<strong>Batch " + (r.batchIdx + 1) + "</strong>";
+        if (r.usage) html += ' <span class="muted">(in:' + (r.usage.input_tokens||0) +
+            ', out:' + (r.usage.output_tokens||0) +
+            ', cache_read:' + (r.usage.cache_read_input_tokens||0) +
+            ', cache_write:' + (r.usage.cache_creation_input_tokens||0) + ')</span>';
+        html += "<pre style='white-space: pre-wrap; word-break: break-word; margin-top:4px;'>" +
+            escapeHtml((r.error || r.raw || "").substr(0, 5000)) + "</pre></div>";
+    }
+    $("rawList").innerHTML = html || '<div class="muted">Noch keine Antworten.</div>';
+}
+
+// Tabs
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    $("tab" + t.dataset.tab.charAt(0).toUpperCase() + t.dataset.tab.slice(1)).classList.add("active");
+}));
+
+// ============================================================
+// Excel + JSON Export
+// ============================================================
+$("btnExportXlsx").addEventListener("click", () => {
+    if (state.results.length === 0) { setStatus("Nichts zu exportieren.", "err"); return; }
+    const headers = ["#", "Datei", "Datum", "Absender Name", "Absender Email", "Domain", "Empfaenger", "Betreff",
+                     "Pool (Stufe 0)", "Pool-Quelle", "Vorgangstyp", "Klassifikation", "Klass-Grund",
+                     "Geschaefts_Typ", "Ist_Reminder", "Sonderfall", "Sparte", "Kunde_Nachname", "Kunde_Vorname",
+                     "VNR", "Unterlagen_Angefragt", "Unterlagen_Liste", "MV_Enthalten", "MV_Pruefung_noetig",
+                     "Konfidenz", "Hinweis", "Anhang-Namen", "Fehler"];
+    const rows = [headers];
+    state.results.forEach((r, i) => {
+        const t = r.triage || {};
+        rows.push([
+            i + 1, r.msgFile, r.datum, r.absName, r.absMail, r.absDomain, r.empfaenger, r.betreff,
+            r.pool, r.poolSource || "",
+            t.vorgangstyp || "", t.klassifikation || "", t.klassifikation_grund || "",
+            t.geschaefts_typ || "", t.ist_reminder || "", t.sonderfall || "", t.sparte || "",
+            t.kunde_nachname || "", t.kunde_vorname || "", t.versicherungsnummer || "",
+            t.unterlagen_angefragt || "", t.unterlagen_liste || "",
+            t.enthaelt_maklervollmacht || "", t.mv_pruefung_noetig || "",
+            t.konfidenz || "", t.hinweis || "", r.attNames || "", r.err || ""
+        ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Triage");
+
+    // Pool stats sheet
+    const poolStats = {};
+    for (const r of state.results) {
+        const p = r.pool || "(unbekannt)";
+        const k = (r.triage && r.triage.klassifikation) || "(keine)";
+        if (!poolStats[p]) poolStats[p] = { total: 0, klass: {} };
+        poolStats[p].total++;
+        poolStats[p].klass[k] = (poolStats[p].klass[k] || 0) + 1;
+    }
+    const poolRows = [["Pool", "Anzahl", "Top-Klassifikationen"]];
+    Object.entries(poolStats).sort((a, b) => b[1].total - a[1].total).forEach(([p, s]) => {
+        const klassStr = Object.entries(s.klass).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + " (" + v + ")").join(", ");
+        poolRows.push([p, s.total, klassStr]);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(poolRows);
+    XLSX.utils.book_append_sheet(wb, ws2, "Pool-Stats");
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").substr(0, 19);
+    XLSX.writeFile(wb, "claude-analyse-" + stamp + ".xlsx");
+    setStatus("Excel exportiert.", "");
+});
+
+$("btnExportJson").addEventListener("click", () => {
+    if (state.results.length === 0) { setStatus("Nichts zu exportieren.", "err"); return; }
+    const blob = new Blob([JSON.stringify(state.results, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "claude-analyse-" + new Date().toISOString().replace(/[:.]/g, "-").substr(0, 19) + ".json";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+    setStatus("JSON exportiert.", "");
+});
+
+// ============================================================
+// Init
+// ============================================================
+loadKey();
+renderFileList();
+updateCostEstimate();
+</script>
+</body>
+</html>
