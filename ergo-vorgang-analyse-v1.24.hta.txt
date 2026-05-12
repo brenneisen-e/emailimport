@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.23"
+        VERSION="1.24"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.23 - Mails aus Zeitraum sammeln: rekursiv aus Oberordner in neuen Ordner kopieren</div>
+            <div class="ver">v1.24 - Datum-Input akzeptiert TT.MM.JJJJ und JJJJ-MM-TT (IE11-HTA-Fix)</div>
         </div>
 
         <!-- Cookie -->
@@ -263,7 +263,7 @@
                     <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="resetDateRange()">Reset (alle)</button>
                 </div>
                 <div id="dateRangeStatus" style="font-size:11px; color: #94a3b8; margin-top:6px;">
-                    Filtert nach Datum im Dateinamen (Muster <code>YYYY-MM-DD_HHMM_...</code>). Mails ohne erkennbares Datum im Dateinamen werden eingeschlossen.
+                    Datum-Format: <code>TT.MM.JJJJ</code> (z.B. <code>15.05.2026</code>) oder <code>JJJJ-MM-TT</code> (z.B. <code>2026-05-15</code>). Filtert nach Datum im Dateinamen (Muster <code>YYYY-MM-DD_HHMM_...</code>). Mails ohne erkennbares Datum werden eingeschlossen.
                 </div>
                 <div style="margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px solid #334155;">
                     <button class="btn" id="btnCollectByDate" onclick="copyZeitraumToNewFolder()" disabled
@@ -2602,11 +2602,44 @@ function isoDateInput(d) {
     return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
 }
 
+// Akzeptiert TT.MM.JJJJ (Deutsch), TT/MM/JJJJ und JJJJ-MM-TT (ISO).
+// IE11/HTA-Mode rendert <input type="date"> als normales Textfeld -> User
+// kann jedes Format tippen.
+function parseDateInput(s) {
+    if (!s) return null;
+    s = String(s).replace(/^\s+|\s+$/g, "");
+    if (!s) return null;
+    var m;
+    // ISO: 2026-05-15
+    m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) {
+        var d1 = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+        if (!isNaN(d1.getTime())) return d1;
+    }
+    // Deutsch: 15.05.2026 oder 1.5.26
+    m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+    if (m) {
+        var y = parseInt(m[3], 10);
+        if (y < 100) y += 2000;
+        var d2 = new Date(y, parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+        if (!isNaN(d2.getTime())) return d2;
+    }
+    // Slash: 15/05/2026
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (m) {
+        var y2 = parseInt(m[3], 10);
+        if (y2 < 100) y2 += 2000;
+        var d3 = new Date(y2, parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+        if (!isNaN(d3.getTime())) return d3;
+    }
+    return null;
+}
+
 function onDateChange() {
     var fromStr = document.getElementById("dateFrom").value;
     var toStr = document.getElementById("dateTo").value;
-    state.dateFrom = fromStr ? new Date(fromStr) : null;
-    state.dateTo = toStr ? new Date(toStr) : null;
+    state.dateFrom = parseDateInput(fromStr);
+    state.dateTo = parseDateInput(toStr);
     refreshFolderStats();
     refreshDateRangeStatus();
     refreshStartButton();
