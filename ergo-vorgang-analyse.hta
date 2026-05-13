@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.58"
+        VERSION="1.59"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.58 - Neue Spalte 39 "Reminder_Quelle" (Anhang / Betreff / Body-KI) - retrospektiv berechnet aus Anhang-Namen + Betreff. Auswertung zeigt Reminder-Breakdown nach Quelle. Refresh-Button schreibt's auch fuer alte Zeilen</div>
+            <div class="ver">v1.59 - reminder_quelle wird jetzt von der KI gemeldet (multi-source komma-getrennt: 'Mail-Betreff, Anhang-PDF-Inhalt' etc). Eigener Auswertung-Block REMINDER-QUELLEN mit atomarem Breakdown. Neuer Button "Reminder-Quellen" analysiert NUR die Reminder neu (Token-effizient)</div>
         </div>
 
         <!-- Cookie -->
@@ -334,8 +334,18 @@
             <div style="flex:1;"></div>
             <button class="btn" id="btnRefreshLive" onclick="refreshLiveExcelDecor()" disabled
                     style="background: linear-gradient(135deg, #0d9488, #115e59); color: white;"
-                    title="Wendet Farb-Highlights auf ALLE Zeilen im Live-Excel an und baut Auswertung-Sheet neu. Falls die Migration die Farben noch nicht hatte.">
+                    title="Wendet Farb-Highlights auf ALLE Zeilen im Live-Excel an und baut Auswertung-Sheet neu.">
                 &#127912; Farben + Auswertung
+            </button>
+            <button class="btn" id="btnReReminders" onclick="reAnalyzeReminders()" disabled
+                    style="background: linear-gradient(135deg, #b45309, #92400e); color: white;"
+                    title="Analysiert NUR die als Reminder erkannten Vorgaenge nochmal - um die neue Spalte 'Reminder_Quelle' (Anhang-PDF / Anhang-Name / Betreff / Body) zu fuellen. Spart Tokens vs Komplett-Neulauf.">
+                &#128260; Reminder-Quellen
+            </button>
+            <button class="btn" id="btnLoadExternalXlsx" onclick="loadExternalXlsx()"
+                    style="background: linear-gradient(135deg, #6366f1, #4338ca); color: white;"
+                    title="Laedt eine externe .xlsx (z.B. dein manuell gefiltertes Reminder-Subset) als Excel-Cache. .msg-Dateien werden im aktuell gewaehlten Ordner gematcht. Alle Eintraege werden zur Neuanalyse markiert.">
+                &#128194; Externes Excel laden
             </button>
             <button class="btn btn-success" id="btnExcel" onclick="exportToExcel()" disabled>
                 &#128202; Excel-Export
@@ -921,17 +931,35 @@ var EXCEL_HEADERS = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absend
 // auf einen Reminder hindeuten. Match-case-insensitiv.
 var REMINDER_RE = /\b(mahnung|reminder|erinnerung|wiedervorlage|\bWV\b|sachstandsanfrage|nachfass|2\.?\s*Mahnung)\b/i;
 
-// Heuristik: Wo kam die Reminder-Erkennung her? Wird retroaktiv aus den
-// gespeicherten Feldern berechnet (Betreff, Anhang-Namen). Mail-Body
-// haben wir nicht im Cache - "Body/KI" deckt diesen Fall ab.
+// Reminder-Quelle: bevorzugt KI-Antwort r.data.reminder_quelle (v1.59+).
+// Fallback fuer alte Cache-Eintraege: Heuristik auf Anhang-Name + Betreff.
+// Liefert komma-getrennte Liste falls mehrere Quellen zutreffen.
 function detectReminderSource(r) {
     if (!r || !r.data) return "";
     if (sg(r.data, "ist_reminder") !== "ja") return "";
-    var anh = String(r.anhangAlle || "");
-    var bt = String(r.betreff || "");
-    if (REMINDER_RE.test(anh)) return "Anhang";
-    if (REMINDER_RE.test(bt)) return "Betreff";
-    return "Body/KI";   // Body-Keywords oder reine KI-Inferenz
+    // KI-Antwort (neue Analysen ab v1.59) - bevorzugt, kann schon Komma-Liste sein
+    var kiQuelle = sg(r.data, "reminder_quelle");
+    if (kiQuelle && kiQuelle.length > 0) return kiQuelle;
+    // Fallback fuer alte Caches: Heuristik (kann Mail-Body / PDF-Inhalt nicht sehen)
+    var parts = [];
+    if (REMINDER_RE.test(String(r.anhangAlle || ""))) parts.push("Anhang-Dateiname");
+    if (REMINDER_RE.test(String(r.betreff || ""))) parts.push("Mail-Betreff");
+    if (parts.length === 0) return "Body/PDF (alt-Cache, Heuristik blind)";
+    return parts.join(", ") + " (Heuristik)";
+}
+
+// Splittet eine Reminder-Quelle-Liste in atomare Quellen.
+// Normalisiert "(Heuristik)"-Suffix weg, Whitespace, etc.
+function splitReminderQuellen(s) {
+    if (!s) return [];
+    var clean = String(s).replace(/\s*\(Heuristik\)\s*/gi, "").replace(/\s*\(alt-Cache.*?\)\s*/gi, "");
+    var parts = clean.split(",");
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+        var p = parts[i].replace(/^\s+|\s+$/g, "");
+        if (p.length > 0) out.push(p);
+    }
+    return out;
 }
 
 // Stellt sicher dass state.excelApp / Wb / Sheet existieren und das xlsx
@@ -1115,9 +1143,9 @@ function applyHighlightsToLiveRow(rowIdx, r) {
         if (sg(d, "ist_reminder") === "ja") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER).Interior.Color = H_LIVE_ORANGE();
         // Reminder_Quelle (Spalte 39) - farblich markieren je nach Quelle
         var rq = detectReminderSource(r);
-        if (rq === "Anhang") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = rgb(167, 139, 250);   // Violett - Anhang
-        else if (rq === "Betreff") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = H_LIVE_ORANGE();   // Orange - Betreff
-        else if (rq === "Body/KI") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = H_LIVE_GELB();      // Gelb - Body/KI
+        if (rq.indexOf("Anhang") === 0) state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = rgb(167, 139, 250);   // Violett
+        else if (rq.indexOf("Mail-Betreff") === 0 || rq.indexOf("Betreff") === 0) state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = H_LIVE_ORANGE();   // Orange
+        else if (rq.length > 0) state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = H_LIVE_GELB();      // Gelb
         var sond = sg(d, "sonderfall");
         if (sond === "Flottengeschaeft" || sond === "Sondertarif") state.excelSheet.Cells(rowIdx, LIVE_COL_SONDERFALL).Interior.Color = H_LIVE_ROT();
         var kl = sg(d, "klassifikation");
@@ -1158,6 +1186,106 @@ function applyHighlightsToLiveRows(startRow, endRow, results) {
 // Baut die Auswertung-Sheet neu im Excel-Live-Workbook. Loescht ein
 // existierendes Auswertung-Sheet und ruft die buildAuswertungSheet-Funktion
 // aus exportToExcel auf - die kennt die Stats-Logik (Postfach-Drilldown, MV-Status etc).
+// Externes Excel als Cache laden (z.B. manuell auf Reminder gefiltertes Subset).
+// Vorteil: nur ~700 Reminder im Cache statt 5000 Komplett-Daten.
+// Voraussetzung: Mail-Ordner ist schon gewaehlt (state.folderPath).
+function loadExternalXlsx() {
+    if (!state.folderPath) {
+        showError("Bitte zuerst den Mail-Ordner waehlen (Drop-Bereich oben). Dann externes Excel laden.");
+        return;
+    }
+    var path = prompt("Pfad zur externen Excel (z.B. C:\\Pfad\\reminders.xlsx):\n\nTipp: in Explorer Rechtsklick auf Datei -> 'Als Pfad kopieren' -> hier einfuegen.", state.excelXlsxPath || "");
+    if (!path) return;
+    path = String(path).replace(/^["']|["']$/g, "");   // Pfad-Anfuehrungszeichen weg
+    var fso;
+    try { fso = new ActiveXObject("Scripting.FileSystemObject"); } catch(eF) { showError("FSO nicht verfuegbar"); return; }
+    if (!fso.FileExists(path)) {
+        showError("Datei nicht gefunden: " + path);
+        return;
+    }
+    try {
+        // Existing Excel-Workbook schliessen falls offen
+        if (state.excelWb) {
+            try { state.excelWb.Close(false); } catch(eC) {}
+            state.excelWb = null;
+            state.excelSheet = null;
+        }
+        if (!state.excelApp) {
+            state.excelApp = new ActiveXObject("Excel.Application");
+            state.excelApp.DisplayAlerts = false;
+        }
+        state.excelApp.Visible = true;
+        state.excelWb = state.excelApp.Workbooks.Open(path);
+        state.excelXlsxPath = path;
+        try { state.excelSheet = state.excelWb.Sheets("Analyse"); } catch(eS) {
+            state.excelSheet = state.excelWb.ActiveSheet;
+        }
+        // Eintraege lesen + state.results befuellen
+        var n = readResultsFromExcelLive();
+        if (n === 0) {
+            showError("Externes Excel geoeffnet, aber 0 lesbare Zeilen gefunden. Erwartetes Format: gleicher Header wie das Live-Excel (Spalte B = Datei).");
+            return;
+        }
+        // Alle Eintraege zur Neuanalyse markieren (pendingMap leeren)
+        for (var k in state.pendingMap) {
+            if (state.pendingMap.hasOwnProperty(k)) delete state.pendingMap[k];
+        }
+        // .msg-Match-Statistik
+        var matched = 0, missing = 0;
+        for (var i = 0; i < state.results.length; i++) {
+            var p = state.results[i].msgPath || "";
+            if (fso.FileExists(p)) matched++; else missing++;
+        }
+        renderTable();
+        refreshFolderStats();
+        refreshStartButton();
+        showSuccess("Externes Excel geladen: <strong>" + n + "</strong> Eintraege. <strong>" + matched +
+                    "</strong> .msg-Dateien im Mail-Ordner gefunden, " + missing + " nicht. " +
+                    "Alle sind zur Re-Analyse markiert. <strong>Klick auf Start</strong>, um die " + matched +
+                    " gematchten Vorgaenge neu zu analysieren (mit reminder_quelle-Feld).");
+    } catch(e) {
+        showError("Externes Excel laden fehlgeschlagen: " + (e.message || "unbekannt"));
+    }
+}
+
+// User-Trigger: Analysiert NUR die als Reminder erkannten Vorgaenge neu,
+// um die reminder_quelle (PDF-Inhalt / Dateiname / Betreff / Body) nachzutragen.
+// Markiert sie als nicht-cached, dann normaler Start-Analyse-Lauf.
+function reAnalyzeReminders() {
+    if (state.results.length === 0) {
+        showError("Keine Daten - erst Ordner waehlen.");
+        return;
+    }
+    if (state.cookie.length < 50) {
+        showError("Cookie fehlt - kann nicht neu analysieren.");
+        return;
+    }
+    // Zaehle wieviele Reminders es gibt
+    var reminders = [];
+    for (var i = 0; i < state.results.length; i++) {
+        var r = state.results[i];
+        if (r && r.data && sg(r.data, "ist_reminder") === "ja") reminders.push(r);
+    }
+    if (reminders.length === 0) {
+        showInfo("Keine Reminder-Vorgaenge gefunden - nichts zu tun.");
+        return;
+    }
+    // Bestaetigung
+    var sure = confirm("Es werden " + reminders.length + " Reminder-Vorgaenge neu analysiert " +
+                       "(volle KI-Analyse pro Mail, ~" + Math.round(reminders.length * 0.05) +
+                       " Cent geschaetzt). Die reminder_quelle-Spalte wird danach befuellt.\n\n" +
+                       "Fortfahren?");
+    if (!sure) return;
+    // Aus pendingMap entfernen damit sie als nicht-cached gelten
+    for (var k = 0; k < reminders.length; k++) {
+        var rk = reminders[k];
+        delete state.pendingMap[String(rk.msgPath).toLowerCase()];
+    }
+    appendAiLog("OK", "", "Reminder-Re-Analyse: " + reminders.length + " Vorgaenge zur Neuanalyse markiert");
+    // Normaler Start-Lauf - der filtert ueber pendingMap und nimmt nur die Reminders
+    startAnalysis();
+}
+
 // User-Trigger: wendet Farb-Highlights auf ALLE Zeilen im Live-Excel an und
 // baut die Auswertung neu. Hilfreich nach bereits gelaufener Migration ohne
 // Highlights, oder um Stats nach manuellen Aenderungen zu aktualisieren.
@@ -1521,6 +1649,8 @@ function refreshStartButton() {
     document.getElementById("btnExcel").disabled = state.results.length === 0;
     var btnRf = document.getElementById("btnRefreshLive");
     if (btnRf) btnRf.disabled = !state.excelSheet || state.results.length === 0;
+    var btnRR = document.getElementById("btnReReminders");
+    if (btnRR) btnRR.disabled = state.running || state.results.length === 0 || state.cookie.length < 50;
     document.getElementById("btnJson").disabled = state.results.length === 0;
     // Rename-Button: braucht nur Ordner + Mails
     var btnRn = document.getElementById("btnRenameWithDate");
@@ -2864,6 +2994,16 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "    Indikatoren (case-insensitiv): Betreff 'Erinnerung','Reminder','WV','Mahnung','2. Mahnung','Sachstandsanfrage'; Body 'wir warten noch','haben wir noch nichts erhalten','bitten um Rueckmeldung'; Anhang-Dateinamen mit 'Mahnung','Reminder','Erinnerung'.\n";
     p += "    Ein Reminder bekommt die normale klassifikation (z.B. 'BUe-Vorgang'), nicht 'Mahnung-Reminder'.\n\n";
 
+    p += "17a) reminder_quelle - WO ueberall hast du den Reminder-Hinweis erkannt?\n";
+    p += "     Liste ALLER zutreffenden Quellen, komma-getrennt (Pipe nicht erlaubt). Atomare Werte:\n";
+    p += "     - 'Anhang-PDF-Inhalt'  : Mahnungs-/Erinnerungs-Text steht IM PDF-Body\n";
+    p += "     - 'Anhang-Dateiname'   : PDF heisst z.B. 'Mahnung_*.pdf' / 'Reminder_*.pdf'\n";
+    p += "     - 'Mail-Betreff'       : Betreff enthaelt 'Erinnerung','Reminder','Mahnung','WV','2. Mahnung'\n";
+    p += "     - 'Mail-Body'          : Mailtext enthaelt 'wir warten noch','noch nichts erhalten','bitten um Rueckmeldung'\n";
+    p += "     Bei mehreren Quellen: komma-getrennt mit Leerzeichen, z.B. 'Mail-Betreff, Anhang-PDF-Inhalt'.\n";
+    p += "     Leer wenn ist_reminder != 'ja'.\n";
+    p += "     WICHTIG: Sei genau - das ist die Grundlage fuer die Reminder-Validierungs-Statistik im Excel.\n\n";
+
     p += "18) hinweis - EIN kurzer Satz (max 200 Z.) was an dem Vorgang auffaellig ist.\n";
     p += "    BOILERPLATE NICHT erwaehnen: Folgende Formulierungen sind Standard-Textbausteine in Pool-BUe-Mails und gehoeren NICHT in den Hinweis:\n";
     p += "    - 'Sonderkonditionsvorbehalt' / 'Sonderkonditionen duerfen nicht verloren gehen' / 'falls Sonderkonditionen bestehen, bitten wir um Rueckmeldung'\n";
@@ -2872,7 +3012,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "    Erwaehne den Hinweis nur, wenn der Vorgang AUSSERGEWOEHNLICH ist (z.B. echte Sondertarife im Vertrag genannt, ungewoehnliche Anhaenge, Eskalations-Indikatoren, unklare MV, mehrere Vertraege).\n";
     p += "    Wenn nichts auffaellig: leerer String ''.\n\n";
 
-    p += "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 28 Schluessel):\n";
+    p += "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 29 Schluessel):\n";
     p += '{"vorgangstyp":"...","auftrag_datum":"...",';
     p += '"maklerpool":"...","makler_nachname":"...","makler_vorname":"...","makler_nummer":"...",';
     p += '"kunde_nachname":"...","kunde_vorname":"...","kunde_nummer":"...","versicherungsnummer":"...",';
@@ -2880,7 +3020,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += '"unterlagen_liste":"...","sonderfall":"...","sparte":"...","anhang_typen":"...","pdf_qualitaet":"...",';
     p += '"enthaelt_maklervollmacht":"...","mv_vollumfaenglich":"...","mv_einschraenkungen":"...",';
     p += '"unterschrift_kunde":"...","unterschrift_makler":"...","auf_vn_ausgestellt":"...","makler_namentlich_genannt":"...",';
-    p += '"ist_reminder":"...","hinweis":"..."}\n\n';
+    p += '"ist_reminder":"...","reminder_quelle":"...","hinweis":"..."}\n\n';
     p += "Antworte JETZT, nur das JSON-Objekt:\n";
 
     return p;
@@ -3300,6 +3440,13 @@ function computeAuswertungStats(results) {
         reminderSrcAnhang: 0,
         reminderSrcBetreff: 0,
         reminderSrcBodyKi: 0,
+        // Atomare Quellen-Counts (jeder Reminder kann zu mehreren beitragen)
+        rqAnhangPdf: 0,
+        rqAnhangDateiname: 0,
+        rqMailBetreff: 0,
+        rqMailBody: 0,
+        rqHeuristikBlind: 0,        // alt-Cache, keine Quelle erkennbar
+        rqMultiple: 0,              // Anzahl Reminders mit >1 Quelle
         einfacherVertragBue: 0,
         kundenverbindungBue: 0,
         bueTypUnklar: 0,
@@ -3320,9 +3467,22 @@ function computeAuswertungStats(results) {
             if (sg(r.data, "ist_reminder") === "ja") {
                 st.reminderInBue++;
                 var rqSrc = detectReminderSource(r);
-                if (rqSrc === "Anhang") st.reminderSrcAnhang++;
-                else if (rqSrc === "Betreff") st.reminderSrcBetreff++;
+                // Drei-Bucket-Variante fuer Backward-Compat
+                if (rqSrc.indexOf("Anhang") === 0) st.reminderSrcAnhang++;
+                else if (rqSrc.indexOf("Mail-Betreff") === 0 || rqSrc.indexOf("Betreff") === 0) st.reminderSrcBetreff++;
                 else st.reminderSrcBodyKi++;
+                // Atomare Quellen-Counts (jede Quelle zaehlt einzeln)
+                var atoms = splitReminderQuellen(rqSrc);
+                var hasReal = false;
+                for (var ai = 0; ai < atoms.length; ai++) {
+                    var atom = atoms[ai];
+                    if (atom === "Anhang-PDF-Inhalt") { st.rqAnhangPdf++; hasReal = true; }
+                    else if (atom === "Anhang-Dateiname") { st.rqAnhangDateiname++; hasReal = true; }
+                    else if (atom === "Mail-Betreff") { st.rqMailBetreff++; hasReal = true; }
+                    else if (atom === "Mail-Body") { st.rqMailBody++; hasReal = true; }
+                }
+                if (atoms.length > 1) st.rqMultiple++;
+                if (!hasReal) st.rqHeuristikBlind++;
             }
             var gt = sg(r.data, "geschaefts_typ") || "";
             if (gt.indexOf("einfacher") >= 0 || gt.indexOf("einzeln") >= 0) st.einfacherVertragBue++;
@@ -3442,16 +3602,23 @@ function buildAuswertungSheet(wb, excel) {
             var erst = st.bueResults.length - st.reminderInBue;
             dataRow("Erstvorgang", erst, pct(erst, st.bueResults.length), true);
             dataRow("Reminder / Wiedervorlage", st.reminderInBue, pct(st.reminderInBue, st.bueResults.length), true);
-            if (st.reminderInBue > 0) {
-                dataRow("    davon via Anhang-Name", st.reminderSrcAnhang, pct(st.reminderSrcAnhang, st.reminderInBue), true);
-                dataRow("    davon via Betreff", st.reminderSrcBetreff, pct(st.reminderSrcBetreff, st.reminderInBue), true);
-                dataRow("    davon via Body/KI-Inferenz", st.reminderSrcBodyKi, pct(st.reminderSrcBodyKi, st.reminderInBue), true);
-            }
             row++;
             dataRow("einfacher Vertrag", st.einfacherVertragBue, pct(st.einfacherVertragBue, st.bueResults.length), true);
             dataRow("ganze Kundenverbindung", st.kundenverbindungBue, pct(st.kundenverbindungBue, st.bueResults.length), true);
             if (st.bueTypUnklar > 0) dataRow("BU-Typ unklar", st.bueTypUnklar, pct(st.bueTypUnklar, st.bueResults.length), true);
             row++;
+
+            // REMINDER-QUELLEN-Block (eigene Statistik wo der Reminder erkannt wurde)
+            if (st.reminderInBue > 0) {
+                header("REMINDER-QUELLEN (n=" + st.reminderInBue + " Reminder-BUs)", rgb(180, 83, 9));
+                dataRow("Anhang-PDF-Inhalt", st.rqAnhangPdf, pct(st.rqAnhangPdf, st.reminderInBue), true);
+                dataRow("Anhang-Dateiname", st.rqAnhangDateiname, pct(st.rqAnhangDateiname, st.reminderInBue), true);
+                dataRow("Mail-Betreff", st.rqMailBetreff, pct(st.rqMailBetreff, st.reminderInBue), true);
+                dataRow("Mail-Body", st.rqMailBody, pct(st.rqMailBody, st.reminderInBue), true);
+                if (st.rqMultiple > 0) dataRow("davon Mehrfach-Quelle (kombiniert)", st.rqMultiple, pct(st.rqMultiple, st.reminderInBue), true);
+                if (st.rqHeuristikBlind > 0) dataRow("Quelle nicht erfasst (alt-Cache)", st.rqHeuristikBlind, pct(st.rqHeuristikBlind, st.reminderInBue), true);
+                row++;
+            }
 
             // MV-Status-Block (konsolidierter Blick)
             header("MV-STATUS (nur BU-Vorgaenge)", rgb(159, 18, 57));
