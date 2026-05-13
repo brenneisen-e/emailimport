@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.67 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.68 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.67</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.68</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.67"
+        VERSION="1.68"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.67 - Workshop-Modus arbeitet jetzt auf KOPIEN: Original-Mails bleiben unveraendert, modifizierte Mails landen in Unter-Ordner _Modified/. Plus detailliertes Step-Logging in der Fehlermeldung bei Outlook-Sicherheits-Bocks</div>
+            <div class="ver">v1.68 - Workshop ohne Mail-Modifikation: Outlook-Object-Model-Guard blockt jeglichen Schreibzugriff auf Mails. Loesung: KI-Notiz als separate HTML-Datei pro Mail in _Modified/, mit REMINDER_-Praefix bei Reminders. Am Ende Notizen im Browser + Mails read-only in Outlook geoeffnet</div>
         </div>
 
         <!-- Cookie -->
@@ -7470,21 +7470,19 @@ function wsProcessOneMail(msgPath) {
     var shell = new ActiveXObject("WScript.Shell");
 
     try {
-        // KOPIE-Ansatz: Original wird NICHT modifiziert. Wir kopieren das .msg in
-        // einen Unter-Ordner '_Modified' und arbeiten ausschliesslich auf der Kopie.
-        // Dadurch sind die Original-Mails sicher und wir umgehen das Outlook-
-        // Sicherheits-Risiko auf den Originalen.
-        step = "Kopie erstellen (_Modified)";
+        // OUTLOOK-SECURITY-BYPASS: Mails werden NICHT modifiziert (Attachments.Add,
+        // Subject-Set und mail.Save() loesen alle die Outlook-Objektmodell-Security
+        // aus, die unter corporate-GPO oft nicht abschaltbar ist).
+        // Stattdessen: HTML-Notiz pro Mail als SEPARATE Datei im _Modified-Ordner.
+        // Bei Reminder hat die HTML-Datei "REMINDER_" als Praefix im Dateinamen
+        // damit man sie auf einen Blick sieht. Am Ende werden alle Notizen im
+        // Browser geoeffnet + die Original-Mails read-only in Outlook angezeigt.
+        step = "_Modified-Ordner anlegen";
         var modDir = state._wsFolder + "\\_Modified";
         try { if (!fso.FolderExists(modDir)) fso.CreateFolder(modDir); } catch(eDir) {}
-        var copyPath = modDir + "\\" + fileName;
-        // Bei Wiederholtem Lauf: alte Kopie ueberschreiben
-        try { if (fso.FileExists(copyPath)) fso.DeleteFile(copyPath, true); } catch(eDel) {}
-        try { fso.CopyFile(msgPath, copyPath, true); }
-        catch(eCp) { throw new Error("Datei-Kopie fehlgeschlagen: " + eCp.message + " - Pfad: " + copyPath); }
 
-        step = "OpenSharedItem (Kopie)";
-        mail = outlookApp.Session.OpenSharedItem(copyPath);
+        step = "OpenSharedItem (Original read-only)";
+        mail = outlookApp.Session.OpenSharedItem(msgPath);
 
         // Properties
         step = "Properties lesen";
@@ -7550,34 +7548,35 @@ function wsProcessOneMail(msgPath) {
         var data = wsParseJson(jsonUnescape(extractAssistantFromNdjson(resp)).replace(/\\n/g, "\n"));
         if (!data) throw new Error("JSON nicht parsebar - Antwort-Anfang: '" + String(resp).substr(0, 200) + "'");
 
-        // Notiz erzeugen + Mail modifizieren - HIER kommt ggf. Outlook-Security-Wall
-        step = "Notiz-HTML schreiben";
-        var notizPath = wsWriteNotizFile(wsBuildNotizHtml(data), basename);
-
-        step = "Notiz an Mail anhaengen (Attachments.Add)";
+        // KEINE Mail-Modifikation - Outlook Object Model Guard wuerde sonst blocken.
+        // Stattdessen: Notiz als SEPARATE HTML-Datei im _Modified-Ordner.
+        // Bei Reminder bekommt die Datei "REMINDER_" als Praefix damit man's sieht.
+        step = "Notiz-HTML in _Modified schreiben";
+        var notizName = (data.ist_reminder === "ja" ? "REMINDER_" : "") +
+                        "KI-Analyse_" + basename + ".html";
+        var notizPath = modDir + "\\" + notizName;
+        var html = wsBuildNotizHtml(data);
         try {
-            mail.Attachments.Add(notizPath);
-        } catch(eA1) {
-            throw new Error("Outlook hat Attachments.Add blockiert: " + eA1.message +
-                            " - Falls eine Outlook-Sicherheitsabfrage aufpoppt, mit JA bestaetigen.");
-        }
-
-        step = "Reminder-Praefix im Betreff";
-        if (data.ist_reminder === "ja") {
-            if (betreff.toLowerCase().indexOf("reminder") !== 0) {
-                try { mail.Subject = "Reminder " + betreff; } catch(eSb) {
-                    throw new Error("Outlook hat Subject-Aenderung blockiert: " + eSb.message);
-                }
+            // Alte Notiz ggf. ueberschreiben
+            try { if (fso.FileExists(notizPath)) fso.DeleteFile(notizPath, true); } catch(eD) {}
+            var stmH = new ActiveXObject("ADODB.Stream");
+            stmH.Type = 2; stmH.Charset = "utf-8"; stmH.Open();
+            stmH.WriteText(html);
+            stmH.SaveToFile(notizPath, 2);
+            stmH.Close();
+        } catch(eH) {
+            // Fallback FSO
+            try {
+                var fH = fso.CreateTextFile(notizPath, true, false);
+                fH.Write(html); fH.Close();
+            } catch(eH2) {
+                throw new Error("Notiz-Datei konnte nicht geschrieben werden: " + eH2.message);
             }
         }
 
-        step = "Mail speichern (mail.Save)";
-        try {
-            mail.Save();
-        } catch(eSv) {
-            throw new Error("Outlook hat mail.Save() blockiert: " + eSv.message +
-                            " - meist Outlook-Sicherheits-Pop-up. Bitte mit JA bestaetigen.");
-        }
+        // Mail wieder schliessen ohne Aenderungen - read-only Zugriff war's
+        try { mail.Close(1); } catch(eCl) {}   // 1 = olDiscard
+        mail = null;
 
         // Cleanup
         try {
@@ -7591,10 +7590,10 @@ function wsProcessOneMail(msgPath) {
 
         return {
             msgPath: msgPath,
+            notizPath: notizPath,
             isReminder: data.ist_reminder === "ja",
             klassifikation: data.klassifikation || "",
-            summary: (data.zusammenfassung || "").substr(0, 100),
-            mailItem: mail
+            summary: (data.zusammenfassung || "").substr(0, 100)
         };
     } catch(eMain) {
         try { if (mail) mail.Close(1); } catch(e) {}
@@ -7646,24 +7645,36 @@ function wsFinishDemo(processed) {
     document.getElementById("wsClose").disabled = false;
     wsProgress(state._wsMsgFiles.length, state._wsMsgFiles.length);
     wsShowSuccess("Fertig! <strong>" + processed.length + " von " + state._wsMsgFiles.length +
-                  "</strong> Mails analysiert. Kopien liegen in <code>_Modified/</code> &amp;mdash; werden jetzt geoeffnet...");
+                  "</strong> Mails analysiert. KI-Notizen liegen in <code>_Modified/</code> und werden jetzt geoeffnet...");
     wsLog("");
-    wsLog("Modifizierte Kopien: " + state._wsFolder + "\\_Modified\\");
-    wsLog("Oeffne " + processed.length + " Mail-Kopien in Outlook...");
+    wsLog("Notizen-Ordner: " + state._wsFolder + "\\_Modified\\");
+    wsLog("Oeffne " + processed.length + " Notizen im Browser + Original-Mails in Outlook...");
     setTimeout(function() {
+        var shell = new ActiveXObject("WScript.Shell");
+        // Notizen im Browser oeffnen
         for (var i = 0; i < processed.length; i++) {
             try {
-                processed[i].mailItem.Display();
-                wsLog("   Geoeffnet: " + processed[i].msgPath.substr(processed[i].msgPath.lastIndexOf("\\")+1));
+                shell.Run('"' + processed[i].notizPath + '"', 1, false);
+                wsLog("   Notiz geoeffnet: " + processed[i].notizPath.substr(processed[i].notizPath.lastIndexOf("\\")+1));
             } catch(e) {
-                wsLog("   Display-Fehler: " + e.message);
+                wsLog("   Notiz-Oeffnen-Fehler: " + e.message);
+            }
+        }
+        // Plus Original-Mails read-only via Outlook
+        wsLog("");
+        wsLog("Oeffne Original-Mails (read-only) in Outlook...");
+        for (var j = 0; j < processed.length; j++) {
+            try {
+                var m = outlookApp.Session.OpenSharedItem(processed[j].msgPath);
+                m.Display();
+                wsLog("   Mail geoeffnet: " + processed[j].msgPath.substr(processed[j].msgPath.lastIndexOf("\\")+1));
+            } catch(e) {
+                wsLog("   Mail-Display-Fehler: " + e.message);
             }
         }
         wsLog("");
         wsLog("Demo abgeschlossen. Original-Mails bleiben unveraendert.");
-        wsLog("Die Kopien in _Modified/ haben:");
-        wsLog("  - 'KI-Analyse_*.html' als zusaetzlichen Anhang");
-        wsLog("  - Bei Reminder: 'Reminder ' im Betreff vorgestellt");
+        wsLog("Im _Modified-Ordner: HTML-Notizen pro Mail (REMINDER_ Praefix bei Reminders).");
     }, 200);
 }
 </script>
@@ -7898,8 +7909,9 @@ End Function
             </button>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
                 Pro Mail wird Inhalt + Anhaenge via ErgoGPT analysiert. Eine strukturierte<br>
-                HTML-Notiz wird als Anhang an die Mail gehaengt. Bei Reminder wird "Reminder "<br>
-                im Betreff vorgestellt. Anschliessend werden alle Mails geoeffnet.
+                HTML-Notiz wird als separate Datei in <code>_Modified/</code> abgelegt<br>
+                (REMINDER_-Praefix bei Reminders). Am Ende werden alle Notizen im Browser<br>
+                + Original-Mails in Outlook geoeffnet. <strong>Originale bleiben unveraendert.</strong>
             </div>
             <div class="ws-log" id="wsLog"></div>
         </div>
