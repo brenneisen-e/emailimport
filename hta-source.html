@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.61 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.62 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.61</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.62</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.61"
+        VERSION="1.62"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.61 - 'Externes Excel laden' oeffnet jetzt File-Dialog (kein prompt-Pfad-Tippen mehr). HTA's input type=file liefert vollen Pfad nach Auswahl.</div>
+            <div class="ver">v1.62 - FIX 'Externes Excel laden': state.msgFiles wird auf die N gematchten Eintraege beschraenkt (vorher: alle 5000 .msg im Ordner liefen los). Date-Filter wird gleichzeitig deaktiviert</div>
         </div>
 
         <!-- Cookie -->
@@ -1430,19 +1430,44 @@ function loadExternalXlsx(path) {
         for (var k in state.pendingMap) {
             if (state.pendingMap.hasOwnProperty(k)) delete state.pendingMap[k];
         }
-        // .msg-Match-Statistik
+        // KRITISCH: state.msgFiles auf NUR die gematchten Eintraege aus dem externen
+        // Excel beschraenken. Sonst wuerde Start alle 5000 .msg-Dateien im Ordner
+        // analysieren statt nur die ~700 Reminder.
         var matched = 0, missing = 0;
+        var matchedPaths = [];
+        var seenPath = {};
+        var missingList = [];
         for (var i = 0; i < state.results.length; i++) {
             var p = state.results[i].msgPath || "";
-            if (fso.FileExists(p)) matched++; else missing++;
+            if (p &amp;&amp; fso.FileExists(p) &amp;&amp; !seenPath[p.toLowerCase()]) {
+                matchedPaths.push(p);
+                seenPath[p.toLowerCase()] = true;
+                matched++;
+            } else if (p &amp;&amp; !fso.FileExists(p)) {
+                missing++;
+                if (missingList.length < 5) missingList.push(state.results[i].msgFile || p);
+            }
         }
+        state.msgFiles = matchedPaths;  // ueberschreibt die volle Liste mit dem Subset
+        // Date-Range-Filter ausschalten, damit alle Reminder durchkommen
+        state.dateFrom = null;
+        state.dateTo = null;
+        try {
+            var df = document.getElementById("dateFrom"); if (df) df.value = "";
+            var dt = document.getElementById("dateTo"); if (dt) dt.value = "";
+        } catch(eD) {}
         renderTable();
         refreshFolderStats();
+        refreshDateRangeStatus();
         refreshStartButton();
-        showSuccess("Externes Excel geladen: <strong>" + n + "</strong> Eintraege. <strong>" + matched +
-                    "</strong> .msg-Dateien im Mail-Ordner gefunden, " + missing + " nicht. " +
-                    "Alle sind zur Re-Analyse markiert. <strong>Klick auf Start</strong>, um die " + matched +
-                    " gematchten Vorgaenge neu zu analysieren (mit reminder_quelle-Feld).");
+        var msg = "Externes Excel geladen: <strong>" + n + "</strong> Eintraege. " +
+                  "<strong>" + matched + "</strong> .msg-Dateien im Ordner gefunden und ausgewaehlt. ";
+        if (missing > 0) msg += "<strong>" + missing + " fehlen</strong> im Ordner";
+        if (missingList.length > 0) msg += " (z.B.: " + missingList.join(", ") + "). ";
+        else msg += ". ";
+        msg += "Work-Queue ist auf diese " + matched + " Vorgaenge beschraenkt. " +
+               "<strong>Klick Start</strong> &amp;rarr; nur diese werden (re-)analysiert.";
+        showSuccess(msg);
     } catch(e) {
         showError("Externes Excel laden fehlgeschlagen: " + (e.message || "unbekannt"));
     }
