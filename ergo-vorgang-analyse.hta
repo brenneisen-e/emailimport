@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.62"
+        VERSION="1.63"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.62 - FIX 'Externes Excel laden': state.msgFiles wird auf die N gematchten Eintraege beschraenkt (vorher: alle 5000 .msg im Ordner liefen los). Date-Filter wird gleichzeitig deaktiviert</div>
+            <div class="ver">v1.63 - Optimierter KI-Prompt: 8 PDFs (statt 3) + 12k Body-Limit, Pool-Konsolidierungs-Map direkt im Prompt (JDC-Varianten etc.), BUe-Typ-Praezisierung (einfacher Vertrag vs Kundenverbindung). 2 neue Spalten Mail_Zusammenfassung + Nicht_Neu_Grund (KI erklaert pro Vorgang)</div>
         </div>
 
         <!-- Cookie -->
@@ -431,9 +431,9 @@ var outlookApp = null;
 var outlookNS = null;
 var COOKIE_PATH = "";  // computed at startup -> Cookie.txt next to this HTA
 var ERGO_BASE = "https://gpt.ergo.com/api";
-var MAX_PDFS = 3;
+var MAX_PDFS = 8;
 var MAX_PDF_MB = 20;
-var BODY_CAP = 6000;
+var BODY_CAP = 12000;
 var DRAIN_TIMEOUT_MS = 240000;
 
 var state = {
@@ -963,7 +963,8 @@ var EXCEL_HEADERS = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absend
                      "Vorgangstyp","Ist_Reminder","Klassifikation","Klassifikation_Grund",
                      "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
                      "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen","MV_Status",
-                     "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler","Reminder_Quelle"];
+                     "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler","Reminder_Quelle",
+                     "Mail_Zusammenfassung","Nicht_Neu_Grund"];
 
 // Reminder-Indikatoren - Schluesselwoerter die in Betreff oder Anhang-Namen
 // auf einen Reminder hindeuten. Match-case-insensitiv.
@@ -1136,6 +1137,8 @@ function writeResultRowToExcel(r) {
         sht.Cells(rowIdx, 37).Value = cellSafe(sg(d, "hinweis"));
         sht.Cells(rowIdx, 38).Value = r.ok ? "" : cellSafe(r.errMsg);
         sht.Cells(rowIdx, 39).Value = cellSafe(detectReminderSource(r));
+        sht.Cells(rowIdx, 40).Value = cellSafe(sg(d, "mail_zusammenfassung"));
+        sht.Cells(rowIdx, 41).Value = cellSafe(sg(d, "nicht_neuer_vorgang_grund"));
         // Highlights live anwenden (~6-10 zusaetzliche COM-Calls, vernachlaessigbar
         // weil Mail-Analyse-Tempo ~3-5s pro Mail).
         applyHighlightsToLiveRow(rowIdx, r);
@@ -1476,7 +1479,9 @@ function bulkWriteResultsToExcel(results) {
             cellSafeTsv(sg(d, "makler_namentlich_genannt")) + "\t" +
             cellSafeTsv(sg(d, "hinweis")) + "\t" +
             (r.ok ? "" : cellSafeTsv(r.errMsg)) + "\t" +
-            cellSafeTsv(detectReminderSource(r))
+            cellSafeTsv(detectReminderSource(r)) + "\t" +
+            cellSafeTsv(sg(d, "mail_zusammenfassung")) + "\t" +
+            cellSafeTsv(sg(d, "nicht_neuer_vorgang_grund"))
         );
         r._excelRow = startRow + i;
     }
@@ -1623,7 +1628,10 @@ function readResultsFromExcelLive() {
                     unterschrift_makler: String(state.excelSheet.Cells(r, 34).Value || ""),
                     auf_vn_ausgestellt: String(state.excelSheet.Cells(r, 35).Value || ""),
                     makler_namentlich_genannt: String(state.excelSheet.Cells(r, 36).Value || ""),
-                    hinweis: String(state.excelSheet.Cells(r, 37).Value || "")
+                    hinweis: String(state.excelSheet.Cells(r, 37).Value || ""),
+                    reminder_quelle: String(state.excelSheet.Cells(r, 39).Value || ""),
+                    mail_zusammenfassung: String(state.excelSheet.Cells(r, 40).Value || ""),
+                    nicht_neuer_vorgang_grund: String(state.excelSheet.Cells(r, 41).Value || "")
                 }
             };
             state.results.push(entry);
@@ -3030,7 +3038,45 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "   Bounce-Indizien: 'postmaster','mailer-daemon','noreply','Mail Delivery Failure','5.7.1','Relay access denied'.\n";
     p += "   Ergo-Outbound: Absender @ergo.de / @itergo.com / @ergo.com.\n\n";
 
-    p += "1) maklerpool - ergebnisoffen extrahiert. Pool/Maklergesellschaft so wie in Signatur, Briefkopf, From-Domain (z.B. 'Fonds Finanz Maklerservice GmbH', 'BCA AG', 'Mueller & Partner OHG').\n\n";
+    p += "1) maklerpool - extrahiert UND konsolidiert. Verwende die EINHEITLICHEN Schreibweisen aus der folgenden Liste, NICHT die Roh-Variante aus der Mail:\n";
+    p += "    KONSOLIDIERUNGS-MAP (linke Seite: gefundene Variante -> rechts: einheitlicher Name)\n";
+    p += "    - 'Jung, DMS', 'Jung DMS', 'JDC', 'Jung,DMS & Cie. Pool GmbH', 'jungdms', 'jdcgroup' -> 'JDC / Jung, DMS & Cie.'\n";
+    p += "    - 'Fonds Finanz', 'fondsfinanz', 'ff-makler', 'Fonds-Finanz' -> 'Fonds Finanz Maklerservice GmbH'\n";
+    p += "    - 'blau direkt', 'blau-direkt', 'blaudirekt' -> 'blau direkt GmbH'\n";
+    p += "    - 'DEMA', 'DEMMAK', 'Deutsche Versicherungsmakler' -> 'DEMA Deutsche Versicherungsmakler AG'\n";
+    p += "    - 'BCA AG', 'bca-ag' -> 'BCA AG'\n";
+    p += "    - 'Apella' -> 'Apella AG'\n";
+    p += "    - 'CHECK24', 'Check24' -> 'CHECK24 Vergleichsportal'\n";
+    p += "    - 'Maxpool' -> 'Maxpool Maklerkooperation GmbH'\n";
+    p += "    - 'Hypoport' -> 'Hypoport AG'\n";
+    p += "    - 'Verifox' -> 'Verifox GmbH'\n";
+    p += "    - 'Impuls Finanzmanagement', 'Impuls-FM' -> 'Impuls Finanzmanagement AG'\n";
+    p += "    - 'Securess' -> 'Securess Versicherungsmakler GmbH'\n";
+    p += "    - 'tecis' -> 'tecis Finanzdienstleistungen AG'\n";
+    p += "    - 'Qualitypool' -> 'Qualitypool GmbH'\n";
+    p += "    - 'Swiss Life Select', 'SwissLife' -> 'Swiss Life Select Deutschland GmbH'\n";
+    p += "    - 'MLP' -> 'MLP Finanzberatung SE'\n";
+    p += "    - 'FORMAXX' -> 'FORMAXX AG'\n";
+    p += "    - 'tauRes', 'TauRes' -> 'TauRes Gesellschaft fuer Investmentberatung mbH'\n";
+    p += "    - '[pma:]', 'pma:' -> '[pma:] Finanz- und Versicherungsmakler GmbH'\n";
+    p += "    - 'FG FINANZ', 'FGFinanz' -> 'FG FINANZ-SERVICE Aktiengesellschaft'\n";
+    p += "    - 'Fuhrmann' -> 'Fuhrmann Versicherungsmakler GmbH'\n";
+    p += "    - 'Finanzguru' -> 'Finanzguru Versicherungsservice GmbH'\n";
+    p += "    - '1:1 Assekuranz', '2:2 Assekuranz' -> exakt so beibehalten\n";
+    p += "    - 'Concordia Service' -> 'Concordia Service GmbH'\n";
+    p += "    - 'WIFO' -> 'WIFO Wirtschafts- und Finanzkontor'\n";
+    p += "    - 'aruna' -> 'aruna GmbH'\n";
+    p += "    - 'ROLAND' -> 'ROLAND Versicherungsmakler'\n";
+    p += "    - 'Invers' -> 'Invers GmbH'\n";
+    p += "    - 'BEST GRUPPE', 'BESTGRUPPE' -> 'BEST GRUPPE'\n";
+    p += "    - 'LEIMEISTER' -> 'LEIMEISTER Versicherungsmakler GmbH'\n";
+    p += "    - 'INCON' -> 'INCON GmbH & Co. Assekuranz KG'\n";
+    p += "    - 'DEUTUNA' -> 'DEUTUNA Finanzplanung GmbH'\n";
+    p += "    - 'DASG' -> 'DASG Deutsche Assekuranzservice GmbH'\n";
+    p += "    - 'vfm Service' -> 'vfm Service GmbH'\n";
+    p += "    - 'FondsKonzept' -> 'FondsKonzept Assekuranzmakler AG'\n";
+    p += "    - 'CLARUS AG' -> 'CLARUS AG'\n";
+    p += "    Wenn keine Konsolidierungs-Regel passt: Roh-Variante mit korrekter Rechtsform-Endung (GmbH/AG/etc).\n\n";
     p += "1z) auftrag_datum - Datum aus Maklerauftrag / Pool-Anschreiben (z.B. 'Grossaitingen, 28.11.2025'). NICHT das Mail-Eingangsdatum.\n\n";
     p += "2) makler_nachname / 3) makler_vorname - HANDELNDE Person beim Makler, NICHT der Kunde.\n\n";
     p += "3a) makler_nummer - Identifikator BEIM VERSICHERER. STRENGE Priorisierung:\n";
@@ -3053,9 +3099,20 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "   selten 'Anfrage-Ruecksprache' oder 'Antrag-Aenderung') und setze ist_reminder = 'ja' (Feld 17).\n";
     p += "4a) klassifikation_grund - kurze Begruendung (max 200 Z.), konkrete Indizien nennen.\n\n";
 
-    p += "5) geschaefts_typ - 'BUe einfacher Vertrag' / 'BUe Kundenverbindung' / 'Keine BUe'\n";
-    p += "   BUe-Indizien: 'Bestandsuebertragung','Maklerwechsel','BUe','Courtagezession', beigefuegte MV.\n";
-    p += "   'Kundenverbindung' wenn: 'gesamte Kundenverbindung','alle Vertraege','Kunde komplett'.\n\n";
+    p += "5) geschaefts_typ - GENAU einer von 'BUe einfacher Vertrag' / 'BUe Kundenverbindung' / 'Keine BUe'\n";
+    p += "   STRENGE Definition - Defaultwert 'BUe einfacher Vertrag' nur bei eindeutigem Einzelvertrags-Bezug:\n";
+    p += "   - 'BUe einfacher Vertrag': Mail/MV/Anschreiben benennt GENAU EINE Versicherungsnummer\n";
+    p += "     oder GENAU EINEN spezifischen Vertrag. KEINE Hinweise auf 'auch die anderen' / 'alle Vertraege'.\n";
+    p += "   - 'BUe Kundenverbindung' (= ganze Verbindung): TRIGGER (irgendwann zutreffend):\n";
+    p += "     (a) Im Anschreiben / MV-PDF werden MEHRERE konkrete Versicherungsnummern aufgefuehrt\n";
+    p += "         (egal ob ERGO oder fremd) ODER\n";
+    p += "     (b) Formulierungen wie 'gesamte Kundenverbindung','alle Vertraege','Kunde komplett',\n";
+    p += "         'alle bei Ihnen bestehenden Vertraege','samtliche Vertraege des VN' ODER\n";
+    p += "     (c) Anschreiben ist generisches Pool-Standardanschreiben ohne Vertragsnummer-Einschraenkung\n";
+    p += "         + MV ist umfassend ('alle Vertraege' / 'jeweilige Vertraege').\n";
+    p += "   - 'Keine BUe': nur wenn es technisch GAR KEINE Bestandsuebertragung ist (z.B. nur Anschriftsaenderung).\n";
+    p += "   WICHTIG: PDF-Anhaenge auswerten! Wenn das Anschreiben mehrere Vertraege auflistet, ist es\n";
+    p += "   Kundenverbindung, auch wenn die Mail-Subject nur EINE Nummer nennt.\n\n";
     p += "6) unterlagen_angefragt - 'ja' wenn Unterlagen fehlen / nachreichen / unvollstaendig. Sonst 'nein'.\n";
     p += "6a) unterlagen_liste - kommagetrennte Liste der fehlenden Unterlagen.\n\n";
     p += "7) sonderfall - 'Flottengeschaeft' / 'Sondertarif' / 'Kein Sonderfall'.\n";
@@ -3093,7 +3150,21 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "     Leer wenn ist_reminder != 'ja'.\n";
     p += "     WICHTIG: Sei genau - das ist die Grundlage fuer die Reminder-Validierungs-Statistik im Excel.\n\n";
 
-    p += "18) hinweis - EIN kurzer Satz (max 200 Z.) was an dem Vorgang auffaellig ist.\n";
+    p += "18a) mail_zusammenfassung - 1-2 Saetze NEUTRAL was die Mail inhaltlich macht.\n";
+    p += "     Format: 'Makler X bittet um Bestandsuebertragung fuer Vertrag Y (Sparte Z). MV liegt bei.'\n";
+    p += "     Max 250 Zeichen. NICHT mit Bewertung mischen - rein deskriptiv.\n\n";
+
+    p += "18b) nicht_neuer_vorgang_grund - leer wenn es ein neuer Erstvorgang ist. SONST EXPLIZIT erklaeren\n";
+    p += "     warum es KEIN neuer Erstvorgang ist (1 Satz, max 200 Z.). Beispiele:\n";
+    p += "     - 'Reminder zu BUe-Anfrage vom <Datum>, ursprgl. Anschreiben vom Pool als Anhang.'\n";
+    p += "     - '2. Mahnung zu noch offener BUe-Anfrage - Sachstandsanfrage.'\n";
+    p += "     - 'Wiedervorlage - Pool wartet auf Antwort zur ersten Anfrage.'\n";
+    p += "     - 'Nachreichung von Unterlagen zu bereits angefragter BUe.'\n";
+    p += "     - 'Mail bezieht sich auf laufenden Vorgang von <Datum> - keine neue Anfrage.'\n";
+    p += "     Bei ist_reminder=ja MUSS dieses Feld eine Begruendung enthalten. Quelle: Anhang-PDF-Inhalt,\n";
+    p += "     Mail-Body ('Erinnerung an unsere Anfrage vom...'), Mail-Betreff ('2. Mahnung','Sachstand').\n\n";
+
+    p += "19) hinweis - EIN kurzer Satz (max 200 Z.) was an dem Vorgang auffaellig ist.\n";
     p += "    BOILERPLATE NICHT erwaehnen: Folgende Formulierungen sind Standard-Textbausteine in Pool-BUe-Mails und gehoeren NICHT in den Hinweis:\n";
     p += "    - 'Sonderkonditionsvorbehalt' / 'Sonderkonditionen duerfen nicht verloren gehen' / 'falls Sonderkonditionen bestehen, bitten wir um Rueckmeldung'\n";
     p += "    - 'Wir bitten um Bestaetigung' / 'Vorlage der Maklervollmacht' (Standardtext)\n";
@@ -3101,7 +3172,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "    Erwaehne den Hinweis nur, wenn der Vorgang AUSSERGEWOEHNLICH ist (z.B. echte Sondertarife im Vertrag genannt, ungewoehnliche Anhaenge, Eskalations-Indikatoren, unklare MV, mehrere Vertraege).\n";
     p += "    Wenn nichts auffaellig: leerer String ''.\n\n";
 
-    p += "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 29 Schluessel):\n";
+    p += "AUSGABE-FORMAT (eine Zeile, gueltiges JSON, alle 31 Schluessel):\n";
     p += '{"vorgangstyp":"...","auftrag_datum":"...",';
     p += '"maklerpool":"...","makler_nachname":"...","makler_vorname":"...","makler_nummer":"...",';
     p += '"kunde_nachname":"...","kunde_vorname":"...","kunde_nummer":"...","versicherungsnummer":"...",';
@@ -3109,7 +3180,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += '"unterlagen_liste":"...","sonderfall":"...","sparte":"...","anhang_typen":"...","pdf_qualitaet":"...",';
     p += '"enthaelt_maklervollmacht":"...","mv_vollumfaenglich":"...","mv_einschraenkungen":"...",';
     p += '"unterschrift_kunde":"...","unterschrift_makler":"...","auf_vn_ausgestellt":"...","makler_namentlich_genannt":"...",';
-    p += '"ist_reminder":"...","reminder_quelle":"...","hinweis":"..."}\n\n';
+    p += '"ist_reminder":"...","reminder_quelle":"...","mail_zusammenfassung":"...","nicht_neuer_vorgang_grund":"...","hinweis":"..."}\n\n';
     p += "Antworte JETZT, nur das JSON-Objekt:\n";
 
     return p;
@@ -3148,7 +3219,8 @@ function exportToExcel() {
                        "Vorgangstyp","Ist_Reminder","Klassifikation","Klassifikation_Grund",
                        "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
                        "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen","MV_Status",
-                       "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler"];
+                       "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler","Reminder_Quelle",
+                       "Mail_Zusammenfassung","Nicht_Neu_Grund"];
         // Spalten-Konstanten (1-basiert) - nach MV_Status alles ab Spalte 33 +1 verschoben
         var COL_DATEI = 2, COL_HINWEIS = 37, COL_FEHLER = 38;
         var COL_MAKLERPOOL = 10, COL_MAKLER_NR = 13;
@@ -3254,7 +3326,10 @@ function exportToExcel() {
                 cellSafeTsv(sg(d, "auf_vn_ausgestellt")) + "\t" +
                 cellSafeTsv(sg(d, "makler_namentlich_genannt")) + "\t" +
                 cellSafeTsv(sg(d, "hinweis")) + "\t" +
-                (r.ok ? "" : cellSafeTsv(r.errMsg))
+                (r.ok ? "" : cellSafeTsv(r.errMsg)) + "\t" +
+                cellSafeTsv(detectReminderSource(r)) + "\t" +
+                cellSafeTsv(sg(d, "mail_zusammenfassung")) + "\t" +
+                cellSafeTsv(sg(d, "nicht_neuer_vorgang_grund"))
             );
         }
         var bigTsv = rowsTsv.join("\n");
@@ -3338,6 +3413,9 @@ function exportToExcel() {
                         sheet.Cells(row2, 36).Value = cellSafe(sg(d2, "makler_namentlich_genannt"));
                         sheet.Cells(row2, 37).Value = cellSafe(sg(d2, "hinweis"));
                         sheet.Cells(row2, 38).Value = r2.ok ? "" : cellSafe(r2.errMsg);
+                        sheet.Cells(row2, 39).Value = cellSafe(detectReminderSource(r2));
+                        sheet.Cells(row2, 40).Value = cellSafe(sg(d2, "mail_zusammenfassung"));
+                        sheet.Cells(row2, 41).Value = cellSafe(sg(d2, "nicht_neuer_vorgang_grund"));
                     } catch(eR2) {
                         bulkErrors.push("Zeile " + row2 + ": " + (eR2.message || "?"));
                     }
