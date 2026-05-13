@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.66 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.67 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.66</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.67</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.66"
+        VERSION="1.67"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.66 - Workshop-Modus integriert: Klick auf "ERGO" im Titel oeffnet ein minimalistisches weisses Overlay - Ordner waehlen, Play druecken, alle Mails werden analysiert, KI-Notiz als Anhang angefuegt, bei Reminder Betreff-Praefix, am Ende werden alle Mails in Outlook geoeffnet</div>
+            <div class="ver">v1.67 - Workshop-Modus arbeitet jetzt auf KOPIEN: Original-Mails bleiben unveraendert, modifizierte Mails landen in Unter-Ordner _Modified/. Plus detailliertes Step-Logging in der Fehlermeldung bei Outlook-Sicherheits-Bocks</div>
         </div>
 
         <!-- Cookie -->
@@ -7464,111 +7464,142 @@ function wsSendAnswerSync(convId, prompt, docIdsJson) {
 function wsProcessOneMail(msgPath) {
     var fileName = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
     var basename = fileName.replace(/\.msg$/i, "").replace(/[^a-zA-Z0-9_\-\.]/g, "_").substr(0, 60);
-    var mail = outlookApp.Session.OpenSharedItem(msgPath);
+    var step = "init";
+    var mail = null;
     var fso = new ActiveXObject("Scripting.FileSystemObject");
     var shell = new ActiveXObject("WScript.Shell");
 
-    // Properties
-    var datum = "", absName = "", absMail = "", betreff = "", body = "", anhangAlle = "", pdfPaths = [];
     try {
-        var dt = new Date(mail.ReceivedTime);
-        datum = pad(dt.getDate()) + "." + pad(dt.getMonth()+1) + "." + dt.getFullYear();
-    } catch(e) {}
-    try { absName = String(mail.SenderName || ""); } catch(e) {}
-    try { absMail = getSenderEmail(mail); } catch(e) {}
-    try { betreff = String(mail.Subject || ""); } catch(e) {}
-    try { body = String(mail.Body || ""); } catch(e) {}
-    if (body.length > 12000) body = body.substr(0, 12000) + "...[gekuerzt]";
+        // KOPIE-Ansatz: Original wird NICHT modifiziert. Wir kopieren das .msg in
+        // einen Unter-Ordner '_Modified' und arbeiten ausschliesslich auf der Kopie.
+        // Dadurch sind die Original-Mails sicher und wir umgehen das Outlook-
+        // Sicherheits-Risiko auf den Originalen.
+        step = "Kopie erstellen (_Modified)";
+        var modDir = state._wsFolder + "\\_Modified";
+        try { if (!fso.FolderExists(modDir)) fso.CreateFolder(modDir); } catch(eDir) {}
+        var copyPath = modDir + "\\" + fileName;
+        // Bei Wiederholtem Lauf: alte Kopie ueberschreiben
+        try { if (fso.FileExists(copyPath)) fso.DeleteFile(copyPath, true); } catch(eDel) {}
+        try { fso.CopyFile(msgPath, copyPath, true); }
+        catch(eCp) { throw new Error("Datei-Kopie fehlgeschlagen: " + eCp.message + " - Pfad: " + copyPath); }
 
-    var attCount = 0;
-    try { attCount = mail.Attachments.Count; } catch(e) {}
-    var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_ws_" + new Date().getTime();
-    try { if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir); } catch(e) {}
-    var pdfListe = "";
-    for (var a = 1; a <= attCount; a++) {
+        step = "OpenSharedItem (Kopie)";
+        mail = outlookApp.Session.OpenSharedItem(copyPath);
+
+        // Properties
+        step = "Properties lesen";
+        var datum = "", absName = "", absMail = "", betreff = "", body = "", anhangAlle = "", pdfListe = "";
         try {
-            var att = mail.Attachments.Item(a);
-            var fn = String(att.FileName || "");
-            if (fn.length === 0) continue;
-            anhangAlle += (anhangAlle ? "; " : "") + fn;
-            if (fn.toLowerCase().substr(-4) === ".pdf" &amp;&amp; pdfPaths.length < 20) {
-                var safe = sanitizeFilename(fn);
-                var outPath = tempDir + "\\" + safe;
-                att.SaveAsFile(outPath);
-                if (fso.FileExists(outPath)) {
-                    pdfPaths.push(outPath);
-                    pdfListe += (pdfListe ? "; " : "") + fn;
+            var dt = new Date(mail.ReceivedTime);
+            datum = pad(dt.getDate()) + "." + pad(dt.getMonth()+1) + "." + dt.getFullYear();
+        } catch(e) {}
+        try { absName = String(mail.SenderName || ""); } catch(e) {}
+        try { absMail = getSenderEmail(mail); } catch(e) {}
+        try { betreff = String(mail.Subject || ""); } catch(e) {}
+        try { body = String(mail.Body || ""); } catch(e) {}
+        if (body.length > 12000) body = body.substr(0, 12000) + "...[gekuerzt]";
+
+        // Anhaenge
+        step = "Anhaenge sammeln";
+        var attCount = 0;
+        try { attCount = mail.Attachments.Count; } catch(e) {}
+        var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_ws_" + new Date().getTime();
+        try { if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir); } catch(e) {}
+        var pdfPaths = [];
+        for (var a = 1; a <= attCount; a++) {
+            try {
+                var att = mail.Attachments.Item(a);
+                var fn = String(att.FileName || "");
+                if (fn.length === 0) continue;
+                anhangAlle += (anhangAlle ? "; " : "") + fn;
+                if (fn.toLowerCase().substr(-4) === ".pdf" &amp;&amp; pdfPaths.length < 20) {
+                    var safe = sanitizeFilename(fn);
+                    var outPath = tempDir + "\\" + safe;
+                    att.SaveAsFile(outPath);
+                    if (fso.FileExists(outPath)) {
+                        pdfPaths.push({path: outPath, name: fn});
+                        pdfListe += (pdfListe ? "; " : "") + fn;
+                    }
+                }
+            } catch(eAtt) {}
+        }
+
+        // Conversation + Upload + Answer
+        step = "ErgoGPT Conversation";
+        var convId = createConversationSync(wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfListe));
+
+        step = "PDF-Uploads (" + pdfPaths.length + ")";
+        var docIds = [];
+        for (var pi = 0; pi < pdfPaths.length; pi++) {
+            try {
+                var handle = uploadPdfStartAsync(convId, pdfPaths[pi].path, pdfPaths[pi].name);
+                // Sync warten via FileExists-Poll (max 60s)
+                var w0 = new Date().getTime();
+                while (!fso.FileExists(handle.resultPath) &amp;&amp; (new Date().getTime() - w0) < 60000) {
+                    var ww = new Date().getTime() + 200;
+                    while (new Date().getTime() < ww) {}
+                }
+                uploadPdfReadResult(handle);
+                if (handle.docId) docIds.push(handle.docId);
+            } catch(eUp) {}
+        }
+        var docIdsJson = docIds.length > 0 ? '["' + docIds.join('","') + '"]' : "[]";
+
+        step = "ErgoGPT Antwort";
+        var resp = wsSendAnswerSync(convId, wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfListe), docIdsJson);
+        var data = wsParseJson(jsonUnescape(extractAssistantFromNdjson(resp)).replace(/\\n/g, "\n"));
+        if (!data) throw new Error("JSON nicht parsebar - Antwort-Anfang: '" + String(resp).substr(0, 200) + "'");
+
+        // Notiz erzeugen + Mail modifizieren - HIER kommt ggf. Outlook-Security-Wall
+        step = "Notiz-HTML schreiben";
+        var notizPath = wsWriteNotizFile(wsBuildNotizHtml(data), basename);
+
+        step = "Notiz an Mail anhaengen (Attachments.Add)";
+        try {
+            mail.Attachments.Add(notizPath);
+        } catch(eA1) {
+            throw new Error("Outlook hat Attachments.Add blockiert: " + eA1.message +
+                            " - Falls eine Outlook-Sicherheitsabfrage aufpoppt, mit JA bestaetigen.");
+        }
+
+        step = "Reminder-Praefix im Betreff";
+        if (data.ist_reminder === "ja") {
+            if (betreff.toLowerCase().indexOf("reminder") !== 0) {
+                try { mail.Subject = "Reminder " + betreff; } catch(eSb) {
+                    throw new Error("Outlook hat Subject-Aenderung blockiert: " + eSb.message);
                 }
             }
-        } catch(eAtt) {}
-    }
+        }
 
-    var prompt = wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfListe);
-
-    // Conversation + PDFs + Answer (sync)
-    var convId;
-    try { convId = createConversationSync(prompt); }
-    catch(eC) { try { mail.Close(1); } catch(e) {} throw new Error("Conv-Create: " + eC.message); }
-
-    var docIdsJson = "[]";
-    if (pdfPaths.length > 0) {
+        step = "Mail speichern (mail.Save)";
         try {
-            var ids = [];
-            for (var pi = 0; pi < pdfPaths.length; pi++) {
-                var did = uploadPdfStartAsync(convId, pdfPaths[pi], fso.GetFileName(pdfPaths[pi]));
-                // warten bis result-file da ist
-                var maxWait = 60;
-                while (!fso.FileExists(did.resultPath) &amp;&amp; maxWait > 0) {
-                    var w = new Date().getTime() + 500;
-                    while (new Date().getTime() < w) {}
-                    maxWait--;
-                }
-                uploadPdfReadResult(did);
-                if (did.docId) ids.push(did.docId);
+            mail.Save();
+        } catch(eSv) {
+            throw new Error("Outlook hat mail.Save() blockiert: " + eSv.message +
+                            " - meist Outlook-Sicherheits-Pop-up. Bitte mit JA bestaetigen.");
+        }
+
+        // Cleanup
+        try {
+            for (var pi2 = 0; pi2 < pdfPaths.length; pi2++) {
+                try { fso.DeleteFile(pdfPaths[pi2].path, true); } catch(e) {}
             }
-            if (ids.length > 0) docIdsJson = '["' + ids.join('","') + '"]';
-        } catch(eUp) { /* weiter ohne PDFs */ }
+            if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true);
+        } catch(e) {}
+
+        try { fireDelete(convId); } catch(e) {}
+
+        return {
+            msgPath: msgPath,
+            isReminder: data.ist_reminder === "ja",
+            klassifikation: data.klassifikation || "",
+            summary: (data.zusammenfassung || "").substr(0, 100),
+            mailItem: mail
+        };
+    } catch(eMain) {
+        try { if (mail) mail.Close(1); } catch(e) {}
+        throw new Error("[Step: " + step + "] " + (eMain.message || "unbekannt"));
     }
-
-    var resp;
-    try { resp = wsSendAnswerSync(convId, prompt, docIdsJson); }
-    catch(eA) { try { mail.Close(1); } catch(e) {} throw new Error("Answer: " + eA.message); }
-
-    var answer = extractAssistantFromNdjson(resp);
-    var data = wsParseJson(jsonUnescape(answer).replace(/\\n/g, "\n"));
-    if (!data) { try { mail.Close(1); } catch(e) {} throw new Error("JSON nicht parsebar"); }
-
-    // Notiz erstellen + anhaengen
-    var notizPath = wsWriteNotizFile(wsBuildNotizHtml(data), basename);
-    try { mail.Attachments.Add(notizPath); } catch(eAtA) { /* weitermachen */ }
-
-    // Reminder-Praefix
-    if (data.ist_reminder === "ja") {
-        if (betreff.toLowerCase().indexOf("reminder") !== 0) {
-            try { mail.Subject = "Reminder " + betreff; } catch(eSb) {}
-        }
-    }
-
-    try { mail.Save(); } catch(eSv) {}
-
-    // Cleanup temp-pdfs
-    try {
-        for (var pi2 = 0; pi2 < pdfPaths.length; pi2++) {
-            try { fso.DeleteFile(pdfPaths[pi2], true); } catch(e) {}
-        }
-        if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true);
-    } catch(e) {}
-
-    // fireDelete der Conversation
-    try { fireDelete(convId); } catch(e) {}
-
-    return {
-        msgPath: msgPath,
-        isReminder: data.ist_reminder === "ja",
-        klassifikation: data.klassifikation || "",
-        summary: (data.zusammenfassung || "").substr(0, 100),
-        mailItem: mail
-    };
 }
 
 function wsRunDemo() {
@@ -7615,9 +7646,10 @@ function wsFinishDemo(processed) {
     document.getElementById("wsClose").disabled = false;
     wsProgress(state._wsMsgFiles.length, state._wsMsgFiles.length);
     wsShowSuccess("Fertig! <strong>" + processed.length + " von " + state._wsMsgFiles.length +
-                  "</strong> Mails analysiert. Werden jetzt in Outlook geoeffnet...");
+                  "</strong> Mails analysiert. Kopien liegen in <code>_Modified/</code> &amp;mdash; werden jetzt geoeffnet...");
     wsLog("");
-    wsLog("Oeffne " + processed.length + " Mails in Outlook...");
+    wsLog("Modifizierte Kopien: " + state._wsFolder + "\\_Modified\\");
+    wsLog("Oeffne " + processed.length + " Mail-Kopien in Outlook...");
     setTimeout(function() {
         for (var i = 0; i < processed.length; i++) {
             try {
@@ -7628,8 +7660,9 @@ function wsFinishDemo(processed) {
             }
         }
         wsLog("");
-        wsLog("Demo abgeschlossen. Schau in Outlook nach den geoeffneten Mails - jede sollte:");
-        wsLog("  - 'KI-Analyse_*.html' als zusaetzlichen Anhang haben");
+        wsLog("Demo abgeschlossen. Original-Mails bleiben unveraendert.");
+        wsLog("Die Kopien in _Modified/ haben:");
+        wsLog("  - 'KI-Analyse_*.html' als zusaetzlichen Anhang");
         wsLog("  - Bei Reminder: 'Reminder ' im Betreff vorgestellt");
     }, 200);
 }
