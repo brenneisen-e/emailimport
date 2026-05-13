@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.59"
+        VERSION="1.60"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.59 - reminder_quelle wird jetzt von der KI gemeldet (multi-source komma-getrennt: 'Mail-Betreff, Anhang-PDF-Inhalt' etc). Eigener Auswertung-Block REMINDER-QUELLEN mit atomarem Breakdown. Neuer Button "Reminder-Quellen" analysiert NUR die Reminder neu (Token-effizient)</div>
+            <div class="ver">v1.60 - Schneller Folder-Select: keine Auto-Open der grossen analyse.xlsx mehr. Drei explizite Buttons: 'Cache laden' (volle xlsx), 'Externes Excel laden' (Subset, z.B. Reminder-only), 'Start' (frische Analyse)</div>
         </div>
 
         <!-- Cookie -->
@@ -346,6 +346,11 @@
                     style="background: linear-gradient(135deg, #6366f1, #4338ca); color: white;"
                     title="Laedt eine externe .xlsx (z.B. dein manuell gefiltertes Reminder-Subset) als Excel-Cache. .msg-Dateien werden im aktuell gewaehlten Ordner gematcht. Alle Eintraege werden zur Neuanalyse markiert.">
                 &#128194; Externes Excel laden
+            </button>
+            <button class="btn" id="btnLoadXlsxCache" onclick="loadXlsxCache()"
+                    style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white;"
+                    title="Oeffnet die bestehende analyse.xlsx im _KI-Analyse-Ordner. Wurde frueher automatisch beim Folder-Select gemacht - jetzt nur auf Klick (dauert bei 5000 Vorgaengen ~30s).">
+                &#128196; Cache laden
             </button>
             <button class="btn btn-success" id="btnExcel" onclick="exportToExcel()" disabled>
                 &#128202; Excel-Export
@@ -666,7 +671,7 @@ function scanFolder() {
     state.msgFiles = [];
     state.results = [];
     state.pendingMap = {};
-    // Excel-Cache-State zuruecksetzen (wird ggf. neu geoeffnet)
+    // Excel-Cache-State zuruecksetzen (wird ggf. spaeter per Klick geoeffnet)
     state.excelApp = null; state.excelWb = null; state.excelSheet = null;
     state.excelLiveRowCount = 0;
     hideStatus();
@@ -679,18 +684,24 @@ function scanFolder() {
         }
         collectMsgFiles(fso, fso.GetFolder(state.folderPath));
 
-        // PREFERRED: wenn _KI-Analyse/analyse.xlsx existiert, daraus lesen.
-        // Das ist die neue Wahrheitsquelle (kein Partial-Read-Risiko wie bei json).
-        // FALLBACK: cache.json wenn xlsx noch nicht existiert (legacy / Migration).
+        // KEIN Auto-Open der xlsx mehr (das dauert bei 5000 Zeilen 20-60s!).
+        // Stattdessen: Info anzeigen, User entscheidet ob/wie Cache geladen werden soll.
         var xlsxPath = getXlsxCachePath();
         if (xlsxPath && fso.FileExists(xlsxPath)) {
-            if (ensureExcelCache()) {
-                var n = readResultsFromExcelLive();
-                showInfo("Excel-Cache geladen: <strong>" + n + "</strong> Vorgaenge aus <code>" + xlsxPath + "</code>. Diese .xlsx-Datei ist die Wahrheitsquelle - neue Vorgaenge werden direkt hineingeschrieben.");
-            }
+            var sz = 0;
+            try { sz = fso.GetFile(xlsxPath).Size; } catch(eS) {}
+            var sizeStr = Math.round(sz / 1024) + " KB";
+            showInfo("<strong>" + state.msgFiles.length + " .msg-Dateien</strong> gefunden. " +
+                     "Bestehende Analyse: <code>analyse.xlsx</code> (" + sizeStr + "). Du hast drei Optionen:<br>" +
+                     "&nbsp;&nbsp;1. <strong>'Cache laden'</strong> &rarr; oeffnet die volle xlsx (kann ~30s dauern)<br>" +
+                     "&nbsp;&nbsp;2. <strong>'Externes Excel laden'</strong> &rarr; nur ein Subset (z.B. nur Reminder, schnell)<br>" +
+                     "&nbsp;&nbsp;3. <strong>Start</strong> &rarr; ignoriert bestehende Analyse, faengt neu an");
         } else {
-            // Fallback: alte cache.json lesen (Migration)
+            // Legacy: cache.json laden falls vorhanden und keine xlsx da
             loadCache();
+            if (state.msgFiles.length > 0 && state.results.length === 0) {
+                showInfo(state.msgFiles.length + " .msg-Dateien gefunden. Keine bestehende Analyse - klick Start oder lade externes Excel.");
+            }
         }
 
         renderTable();
@@ -699,6 +710,32 @@ function scanFolder() {
         if (state.msgFiles.length === 0) showInfo("Keine .msg-Dateien gefunden.");
     } catch(e) {
         showError("Ordner-Scan fehlgeschlagen: " + e.message);
+    }
+}
+
+// Lazy: laed die analyse.xlsx erst auf User-Klick (war frueher Auto-Load in scanFolder).
+function loadXlsxCache() {
+    if (!state.folderPath) {
+        showError("Erst Mail-Ordner waehlen.");
+        return;
+    }
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var p = getXlsxCachePath();
+    if (!fso.FileExists(p)) {
+        showError("Keine analyse.xlsx im _KI-Analyse-Ordner: " + p);
+        return;
+    }
+    showInfo("Lade Excel-Cache... bei grossen Dateien ~10-60s.");
+    try {
+        if (ensureExcelCache()) {
+            var n = readResultsFromExcelLive();
+            renderTable();
+            refreshFolderStats();
+            refreshStartButton();
+            showSuccess("Excel-Cache geladen: <strong>" + n + "</strong> Vorgaenge. Klick Start fuer weitere Analyse oder 'Externes Excel laden' fuer Subset-Workflow.");
+        }
+    } catch(e) {
+        showError("Cache laden fehlgeschlagen: " + e.message);
     }
 }
 
