@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.65"
+        VERSION="1.66"
         WINDOWSTATE="normal"
     />
     <style>
@@ -195,11 +195,11 @@
             <div class="header-left">
                 <div class="logo">&#129302;</div>
                 <div>
-                    <h1>ERGO Vorgang-Analyse</h1>
+                    <h1><span style="cursor:pointer; user-select:none;" onclick="openWorkshopMode()" title="Klick fuer Workshop-Modus (Demo mit 5 Mails)">ERGO</span> Vorgang-Analyse</h1>
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.65 - Neuer Auswertung-Block PDF-QUALITAET (Text-PDF auto-tauglich / Scan = OCR-Pflichtfall / Mixed / Keine PDFs / nicht pruefbar) pro Postfach im Drilldown</div>
+            <div class="ver">v1.66 - Workshop-Modus integriert: Klick auf "ERGO" im Titel oeffnet ein minimalistisches weisses Overlay - Ordner waehlen, Play druecken, alle Mails werden analysiert, KI-Notiz als Anhang angefuegt, bei Reminder Betreff-Praefix, am Ende werden alle Mails in Outlook geoeffnet</div>
         </div>
 
         <!-- Cookie -->
@@ -7118,6 +7118,385 @@ function countRenameCandidates() {
     }
     return { toRename: toRename, alreadyOk: alreadyOk, noDate: noDate };
 }
+
+// ============================================================================
+// WORKSHOP-MODE (Klick auf "ERGO" im Header)
+// Minimalistische Demo-Oberflaeche fuer Workshops: Ordner waehlen, Play druecken.
+// Pro Mail: KI-Analyse -> HTML-Notiz als Attachment -> Reminder-Praefix im
+// Betreff -> Mail speichern -> am Ende alle Mails oeffnen.
+// ============================================================================
+function openWorkshopMode() {
+    var ov = document.getElementById("workshopOverlay");
+    if (!ov) return;
+    ov.style.display = "block";
+    // State zuruecksetzen
+    state._wsFolder = "";
+    state._wsMsgFiles = [];
+    state._wsRunning = false;
+    document.getElementById("wsFolderPath").innerText = "Noch kein Ordner gewaehlt";
+    document.getElementById("wsFolderPath").className = "ws-folder-path ws-empty";
+    document.getElementById("wsInfoGrid").style.display = "none";
+    document.getElementById("wsPlay").disabled = true;
+    document.getElementById("wsProgressWrap").style.display = "none";
+    document.getElementById("wsLog").style.display = "none";
+    document.getElementById("wsLog").innerText = "";
+    wsHideStatus();
+    if (!outlookApp) wsShowError("Outlook ist nicht verbunden - bitte erst in Hauptmodus die Verbindung pruefen.");
+    if (state.cookie.length < 50) wsShowError("Cookie fehlt - bitte erst im Hauptmodus eintragen.");
+}
+
+function closeWorkshopMode() {
+    var ov = document.getElementById("workshopOverlay");
+    if (ov) ov.style.display = "none";
+}
+
+function wsHideStatus() {
+    document.getElementById("wsStatusInfo").style.display = "none";
+    document.getElementById("wsStatusSuccess").style.display = "none";
+    document.getElementById("wsStatusError").style.display = "none";
+}
+function wsShowInfo(m)    { wsHideStatus(); document.getElementById("wsStatusInfo").innerHTML = m; document.getElementById("wsStatusInfo").style.display = "block"; }
+function wsShowSuccess(m) { wsHideStatus(); document.getElementById("wsStatusSuccess").innerHTML = m; document.getElementById("wsStatusSuccess").style.display = "block"; }
+function wsShowError(m)   { wsHideStatus(); document.getElementById("wsStatusError").innerHTML = m; document.getElementById("wsStatusError").style.display = "block"; }
+function wsLog(msg) {
+    var el = document.getElementById("wsLog");
+    el.style.display = "block";
+    el.innerText += (el.innerText ? "\n" : "") + msg;
+    el.scrollTop = el.scrollHeight;
+}
+function wsProgress(done, total) {
+    var pct = total > 0 ? Math.round(done * 100 / total) : 0;
+    document.getElementById("wsProgressFill").style.width = pct + "%";
+    document.getElementById("wsProgressText").innerText = done + " von " + total;
+}
+
+function wsPickFolder() {
+    try {
+        var shell = new ActiveXObject("Shell.Application");
+        var f = shell.BrowseForFolder(0, "Ordner mit Demo-Mails", 0);
+        if (f && f.Self && f.Self.Path) wsUseFolder(f.Self.Path);
+    } catch(e) {
+        var p = prompt("Ordner-Pfad:", state._wsFolder || "C:\\");
+        if (p) wsUseFolder(p);
+    }
+}
+
+function wsUseFolder(path) {
+    state._wsFolder = path;
+    state._wsMsgFiles = [];
+    document.getElementById("wsFolderPath").innerText = path;
+    document.getElementById("wsFolderPath").className = "ws-folder-path";
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        if (fso.FolderExists(path)) {
+            var folder = fso.GetFolder(path);
+            var en = new Enumerator(folder.Files);
+            for (; !en.atEnd(); en.moveNext()) {
+                var fi = en.item();
+                if (String(fi.Name).toLowerCase().substr(-4) === ".msg") {
+                    state._wsMsgFiles.push(fi.Path);
+                }
+            }
+        }
+    } catch(e) {}
+    document.getElementById("wsNumMsgs").innerText = state._wsMsgFiles.length;
+    document.getElementById("wsInfoGrid").style.display = "flex";
+    document.getElementById("wsPlay").disabled =
+        state._wsMsgFiles.length === 0 || !outlookApp || state.cookie.length < 50;
+    wsHideStatus();
+}
+
+// Workshop-spezifischer kompakter Prompt - eigene Antwort-Struktur fuer die Notiz
+function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsHochgeladen) {
+    var p = "";
+    p += "Du bist ERGO-Innendienst-Sachbearbeiter (SHUK). Analysiere die Mail + Anhaenge.\n\n";
+    p += "===== EMAIL =====\n";
+    p += "Datum: " + datum + "\nAbsender: " + absName + " <" + absMail + ">\nBetreff: " + betreff + "\n";
+    p += "Anhaenge: " + (anhangAlle || "(keine)") + "\n";
+    p += "Anhaenge als PDFs hochgeladen: " + (pdfsHochgeladen || "(keine)") + "\n";
+    p += "Body:\n<<<\n" + body + "\n>>>\n===== ENDE =====\n\n";
+    p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-Objekt (kein Markdown, keine Erklaerung):\n";
+    p += "{\n";
+    p += '  "klassifikation":"BUe-Vorgang|Anfrage-Ruecksprache|Antrag-Aenderung|Schadenmeldung|Nicht-Standard|Kein-Makler-Vorgang",\n';
+    p += '  "ist_reminder":"ja|nein",\n';
+    p += '  "reminder_quelle":"leer wenn nein, sonst eine oder mehrere komma-getrennt aus: Anhang-PDF-Inhalt, Anhang-Dateiname, Mail-Betreff, Mail-Body",\n';
+    p += '  "maklerpool":"Pool-Name konsolidiert (z.B. JDC / Jung, DMS & Cie. statt Jung,DMS & Cie. Pool GmbH)",\n';
+    p += '  "kunde_name":"Nachname, Vorname (oder leer)",\n';
+    p += '  "versicherungsnummer":"VNR aus Mail/PDF (oder leer)",\n';
+    p += '  "sparte":"Komposit|Leben|KV|Mehrere|Unbekannt",\n';
+    p += '  "geschaefts_typ":"BUe einfacher Vertrag|BUe Kundenverbindung|Keine BUe",\n';
+    p += '  "mv_status":"OK|MV unvollstaendig|MV fehlt|kein Anhang|nicht pruefbar",\n';
+    p += '  "zusammenfassung":"1-2 Saetze NEUTRAL was die Mail macht",\n';
+    p += '  "naechster_schritt":"konkrete Handlungsempfehlung fuer den Sachbearbeiter (1 Satz)"\n';
+    p += "}\n";
+    return p;
+}
+
+function wsParseJson(txt) {
+    if (!txt) return null;
+    var s = String(txt).replace(/^\s+|\s+$/g, "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+    try { return eval("(" + s + ")"); } catch(e) {}
+    var m = s.match(/\{[\s\S]*\}/);
+    if (m) { try { return eval("(" + m[0] + ")"); } catch(e2) {} }
+    return null;
+}
+
+function wsBuildNotizHtml(data) {
+    var d = data || {};
+    function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+    function rowFn(label, value) {
+        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val">' + esc(value || "-") + '</td></tr>';
+    }
+    var isRem = (d.ist_reminder === "ja");
+    var mvOk = d.mv_status === "OK";
+    var klassBadge = '<span class="badge badge-blue">' + esc(d.klassifikation || "(leer)") + '</span>';
+    var remBadge = isRem ? ' <span class="badge badge-amber">Reminder</span>' : "";
+    var mvBadge = '<span class="badge ' + (mvOk ? "badge-green" : "badge-red") + '">' + esc(d.mv_status || "-") + '</span>';
+
+    return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>KI-Analyse</title>' +
+'<style>body{font-family:"Segoe UI",sans-serif;color:#1f2937;background:#fff;margin:0;padding:40px;max-width:900px;}' +
+'h1{font-size:22px;color:#111827;margin-bottom:8px;border-bottom:2px solid #e5e7eb;padding-bottom:12px;}' +
+'.sub{color:#6b7280;font-size:13px;margin-bottom:24px;}' +
+'.badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;}' +
+'.badge-blue{background:#dbeafe;color:#1e40af;}' +
+'.badge-amber{background:#fef3c7;color:#92400e;}' +
+'.badge-green{background:#dcfce7;color:#15803d;}' +
+'.badge-red{background:#fee2e2;color:#b91c1c;}' +
+'h2{font-size:14px;color:#374151;margin-top:24px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;}' +
+'table{border-collapse:collapse;width:100%;font-size:13px;}' +
+'td{padding:8px 12px;border-bottom:1px solid #f3f4f6;}' +
+'td.lbl{color:#6b7280;width:200px;}td.val{color:#1f2937;font-weight:500;}' +
+'.next{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-top:20px;font-size:13px;color:#1e3a8a;}' +
+'.next strong{display:block;font-size:11px;color:#3b82f6;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;}' +
+'.footer{margin-top:32px;color:#9ca3af;font-size:11px;text-align:center;}</style></head><body>' +
+'<h1>KI-Vorgangs-Analyse</h1>' +
+'<div class="sub">' + klassBadge + remBadge + ' &nbsp;Maklervollmacht: ' + mvBadge + '</div>' +
+'<h2>Zusammenfassung</h2>' +
+'<p style="font-size:14px;line-height:1.5;color:#1f2937;">' + esc(d.zusammenfassung || "-") + '</p>' +
+'<div class="next"><strong>Naechster Schritt</strong>' + esc(d.naechster_schritt || "-") + '</div>' +
+'<h2>Stammdaten</h2><table>' +
+rowFn("Klassifikation", d.klassifikation) +
+rowFn("Vorgangstyp", isRem ? "Reminder / Wiedervorlage" : "Erstvorgang") +
+(isRem ? rowFn("Reminder-Quelle", d.reminder_quelle) : "") +
+rowFn("Maklerpool", d.maklerpool) +
+rowFn("Kunde", d.kunde_name) +
+rowFn("Versicherungsnummer", d.versicherungsnummer) +
+rowFn("Sparte", d.sparte) +
+rowFn("Geschaefts-Typ", d.geschaefts_typ) +
+rowFn("MV-Status", d.mv_status) +
+'</table>' +
+'<div class="footer">Erstellt durch ERGO Vorgang-Analyse Workshop-Demo &middot; ' + new Date().toLocaleString() + '</div>' +
+'</body></html>';
+}
+
+function wsWriteNotizFile(html, basename) {
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var shell = new ActiveXObject("WScript.Shell");
+    var tmp = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_notiz_" + new Date().getTime() + "_" + Math.floor(Math.random()*10000) + ".html";
+    try {
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "utf-8"; stm.Open();
+        stm.WriteText(html);
+        stm.SaveToFile(tmp, 2);
+        stm.Close();
+    } catch(e) {
+        var f = fso.CreateTextFile(tmp, true, false);
+        f.Write(html); f.Close();
+    }
+    var finalName = "KI-Analyse_" + basename + ".html";
+    var finalPath = tmp.substr(0, tmp.lastIndexOf("\\")) + "\\" + finalName;
+    try { if (fso.FileExists(finalPath)) fso.DeleteFile(finalPath, true); } catch(e) {}
+    try { fso.MoveFile(tmp, finalPath); } catch(e) { finalPath = tmp; }
+    return finalPath;
+}
+
+// Sync ergoGPT-Antwort (Workshop-Modus, einzeln pro Mail)
+function wsSendAnswerSync(convId, prompt, docIdsJson) {
+    var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
+    try { http.SetTimeouts(30000, 30000, 60000, 300000); } catch(e) {}
+    http.Open("PUT", ERGO_BASE + "/conversation/" + convId, false);  // sync
+    try { http.SetProxy(0); } catch(e) {}
+    setWinHttpHeaders(http);
+    http.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    http.SetRequestHeader("Accept", "*/*");
+    var payload = buildPayload(cleanForJson(prompt), docIdsJson || "[]");
+    var bodyBytes = stringToUtf8Bytes(payload);
+    if (bodyBytes) http.Send(bodyBytes); else http.Send(payload);
+    return String(http.ResponseText);
+}
+
+function wsProcessOneMail(msgPath) {
+    var fileName = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
+    var basename = fileName.replace(/\.msg$/i, "").replace(/[^a-zA-Z0-9_\-\.]/g, "_").substr(0, 60);
+    var mail = outlookApp.Session.OpenSharedItem(msgPath);
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var shell = new ActiveXObject("WScript.Shell");
+
+    // Properties
+    var datum = "", absName = "", absMail = "", betreff = "", body = "", anhangAlle = "", pdfPaths = [];
+    try {
+        var dt = new Date(mail.ReceivedTime);
+        datum = pad(dt.getDate()) + "." + pad(dt.getMonth()+1) + "." + dt.getFullYear();
+    } catch(e) {}
+    try { absName = String(mail.SenderName || ""); } catch(e) {}
+    try { absMail = getSenderEmail(mail); } catch(e) {}
+    try { betreff = String(mail.Subject || ""); } catch(e) {}
+    try { body = String(mail.Body || ""); } catch(e) {}
+    if (body.length > 12000) body = body.substr(0, 12000) + "...[gekuerzt]";
+
+    var attCount = 0;
+    try { attCount = mail.Attachments.Count; } catch(e) {}
+    var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_ws_" + new Date().getTime();
+    try { if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir); } catch(e) {}
+    var pdfListe = "";
+    for (var a = 1; a <= attCount; a++) {
+        try {
+            var att = mail.Attachments.Item(a);
+            var fn = String(att.FileName || "");
+            if (fn.length === 0) continue;
+            anhangAlle += (anhangAlle ? "; " : "") + fn;
+            if (fn.toLowerCase().substr(-4) === ".pdf" && pdfPaths.length < 20) {
+                var safe = sanitizeFilename(fn);
+                var outPath = tempDir + "\\" + safe;
+                att.SaveAsFile(outPath);
+                if (fso.FileExists(outPath)) {
+                    pdfPaths.push(outPath);
+                    pdfListe += (pdfListe ? "; " : "") + fn;
+                }
+            }
+        } catch(eAtt) {}
+    }
+
+    var prompt = wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfListe);
+
+    // Conversation + PDFs + Answer (sync)
+    var convId;
+    try { convId = createConversationSync(prompt); }
+    catch(eC) { try { mail.Close(1); } catch(e) {} throw new Error("Conv-Create: " + eC.message); }
+
+    var docIdsJson = "[]";
+    if (pdfPaths.length > 0) {
+        try {
+            var ids = [];
+            for (var pi = 0; pi < pdfPaths.length; pi++) {
+                var did = uploadPdfStartAsync(convId, pdfPaths[pi], fso.GetFileName(pdfPaths[pi]));
+                // warten bis result-file da ist
+                var maxWait = 60;
+                while (!fso.FileExists(did.resultPath) && maxWait > 0) {
+                    var w = new Date().getTime() + 500;
+                    while (new Date().getTime() < w) {}
+                    maxWait--;
+                }
+                uploadPdfReadResult(did);
+                if (did.docId) ids.push(did.docId);
+            }
+            if (ids.length > 0) docIdsJson = '["' + ids.join('","') + '"]';
+        } catch(eUp) { /* weiter ohne PDFs */ }
+    }
+
+    var resp;
+    try { resp = wsSendAnswerSync(convId, prompt, docIdsJson); }
+    catch(eA) { try { mail.Close(1); } catch(e) {} throw new Error("Answer: " + eA.message); }
+
+    var answer = extractAssistantFromNdjson(resp);
+    var data = wsParseJson(jsonUnescape(answer).replace(/\\n/g, "\n"));
+    if (!data) { try { mail.Close(1); } catch(e) {} throw new Error("JSON nicht parsebar"); }
+
+    // Notiz erstellen + anhaengen
+    var notizPath = wsWriteNotizFile(wsBuildNotizHtml(data), basename);
+    try { mail.Attachments.Add(notizPath); } catch(eAtA) { /* weitermachen */ }
+
+    // Reminder-Praefix
+    if (data.ist_reminder === "ja") {
+        if (betreff.toLowerCase().indexOf("reminder") !== 0) {
+            try { mail.Subject = "Reminder " + betreff; } catch(eSb) {}
+        }
+    }
+
+    try { mail.Save(); } catch(eSv) {}
+
+    // Cleanup temp-pdfs
+    try {
+        for (var pi2 = 0; pi2 < pdfPaths.length; pi2++) {
+            try { fso.DeleteFile(pdfPaths[pi2], true); } catch(e) {}
+        }
+        if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true);
+    } catch(e) {}
+
+    // fireDelete der Conversation
+    try { fireDelete(convId); } catch(e) {}
+
+    return {
+        msgPath: msgPath,
+        isReminder: data.ist_reminder === "ja",
+        klassifikation: data.klassifikation || "",
+        summary: (data.zusammenfassung || "").substr(0, 100),
+        mailItem: mail
+    };
+}
+
+function wsRunDemo() {
+    if (state._wsRunning) return;
+    if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
+    if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
+    if (!outlookApp) return wsShowError("Outlook nicht verbunden");
+
+    state._wsRunning = true;
+    document.getElementById("wsPlay").disabled = true;
+    document.getElementById("wsPick").disabled = true;
+    document.getElementById("wsClose").disabled = true;
+    document.getElementById("wsProgressWrap").style.display = "block";
+    document.getElementById("wsLog").innerText = "";
+    wsProgress(0, state._wsMsgFiles.length);
+    wsShowInfo("Analysiere " + state._wsMsgFiles.length + " Mails... das kann ein paar Minuten dauern.");
+
+    var processed = [];
+    var idx = 0;
+    function next() {
+        if (idx >= state._wsMsgFiles.length) { wsFinishDemo(processed); return; }
+        var msgPath = state._wsMsgFiles[idx];
+        var name = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
+        wsLog("[" + (idx+1) + "/" + state._wsMsgFiles.length + "] " + name);
+        wsProgress(idx, state._wsMsgFiles.length);
+        try {
+            var res = wsProcessOneMail(msgPath);
+            processed.push(res);
+            wsLog("   OK: " + (res.isReminder ? "[Reminder] " : "") + (res.klassifikation || "?") + " - " + res.summary);
+        } catch(e) {
+            wsLog("   FEHLER: " + e.message);
+        }
+        idx++;
+        wsProgress(idx, state._wsMsgFiles.length);
+        setTimeout(next, 50);
+    }
+    setTimeout(next, 100);
+}
+
+function wsFinishDemo(processed) {
+    state._wsRunning = false;
+    document.getElementById("wsPlay").disabled = state._wsMsgFiles.length === 0;
+    document.getElementById("wsPick").disabled = false;
+    document.getElementById("wsClose").disabled = false;
+    wsProgress(state._wsMsgFiles.length, state._wsMsgFiles.length);
+    wsShowSuccess("Fertig! <strong>" + processed.length + " von " + state._wsMsgFiles.length +
+                  "</strong> Mails analysiert. Werden jetzt in Outlook geoeffnet...");
+    wsLog("");
+    wsLog("Oeffne " + processed.length + " Mails in Outlook...");
+    setTimeout(function() {
+        for (var i = 0; i < processed.length; i++) {
+            try {
+                processed[i].mailItem.Display();
+                wsLog("   Geoeffnet: " + processed[i].msgPath.substr(processed[i].msgPath.lastIndexOf("\\")+1));
+            } catch(e) {
+                wsLog("   Display-Fehler: " + e.message);
+            }
+        }
+        wsLog("");
+        wsLog("Demo abgeschlossen. Schau in Outlook nach den geoeffneten Mails - jede sollte:");
+        wsLog("  - 'KI-Analyse_*.html' als zusaetzlichen Anhang haben");
+        wsLog("  - Bei Reminder: 'Reminder ' im Betreff vorgestellt");
+    }, 200);
+}
 </script>
 
 <script language="VBScript">
@@ -7212,6 +7591,153 @@ Function TsvToVbArray(tsv, sep)
     TsvToVbArray = Split(tsv, sep)
 End Function
 </script>
+
+<!-- ======================== WORKSHOP-OVERLAY ======================== -->
+<style>
+#workshopOverlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #ffffff;
+    z-index: 9999;
+    overflow-y: auto;
+    display: none;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+#workshopOverlay .ws-wrap {
+    max-width: 720px; margin: 0 auto; padding: 60px 40px;
+}
+#workshopOverlay .ws-close {
+    position: absolute; top: 20px; right: 24px;
+    background: #ffffff; border: 1px solid #e5e7eb; color: #6b7280;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 500; font-family: inherit;
+}
+#workshopOverlay .ws-close:hover { background: #f3f4f6; color: #1f2937; }
+#workshopOverlay .ws-header { text-align: center; margin-bottom: 50px; }
+#workshopOverlay .ws-logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 64px; height: 64px; background: #c8102e; border-radius: 16px;
+    margin-bottom: 24px; color: #fff; font-size: 22px; font-weight: 700;
+}
+#workshopOverlay .ws-header h1 { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 8px; }
+#workshopOverlay .ws-sub { font-size: 15px; color: #6b7280; }
+#workshopOverlay .ws-card {
+    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px;
+    padding: 32px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+#workshopOverlay .ws-step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; background: #f3f4f6; color: #4b5563;
+    border-radius: 50%; font-weight: 600; font-size: 13px; margin-right: 12px;
+}
+#workshopOverlay .ws-step-label {
+    font-size: 14px; font-weight: 600; color: #1f2937;
+    display: flex; align-items: center; margin-bottom: 16px;
+}
+#workshopOverlay .ws-folder-display {
+    display: flex; align-items: center; padding: 14px 16px;
+    background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+    font-size: 13px; color: #4b5563; margin-bottom: 12px; min-height: 50px;
+}
+#workshopOverlay .ws-folder-display .ws-icon { margin-right: 12px; font-size: 18px; color: #c8102e; }
+#workshopOverlay .ws-folder-path { flex: 1; word-break: break-all; }
+#workshopOverlay .ws-folder-path.ws-empty { color: #9ca3af; font-style: italic; }
+#workshopOverlay button.ws-btn-folder {
+    background: #ffffff; color: #1f2937; border: 1.5px solid #d1d5db;
+    padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+}
+#workshopOverlay button.ws-btn-folder:hover { background: #f3f4f6; border-color: #9ca3af; }
+#workshopOverlay button.ws-btn-play {
+    width: 100%; padding: 24px 32px; background: #c8102e; color: #fff;
+    border: none; border-radius: 14px; font-size: 18px; font-weight: 600;
+    cursor: pointer; font-family: inherit; margin-bottom: 24px;
+    display: flex; align-items: center; justify-content: center;
+}
+#workshopOverlay button.ws-btn-play:hover {
+    background: #a30d24;
+}
+#workshopOverlay button.ws-btn-play:disabled {
+    background: #d1d5db; cursor: not-allowed;
+}
+#workshopOverlay .ws-play-icon { margin-right: 12px; font-size: 22px; }
+#workshopOverlay .ws-info-grid { display: flex; gap: 12px; margin-top: 16px; }
+#workshopOverlay .ws-info-tile {
+    flex: 1; padding: 16px; background: #f9fafb; border-radius: 10px;
+    border: 1px solid #e5e7eb; text-align: center;
+}
+#workshopOverlay .ws-info-tile .ws-num {
+    font-size: 24px; font-weight: 700; color: #c8102e; display: block;
+}
+#workshopOverlay .ws-info-tile .ws-lbl { font-size: 12px; color: #6b7280; margin-top: 4px; }
+#workshopOverlay .ws-status {
+    padding: 16px 20px; border-radius: 10px; font-size: 14px;
+    margin-bottom: 16px; display: none;
+}
+#workshopOverlay .ws-status.ws-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; display: block; }
+#workshopOverlay .ws-status.ws-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; display: block; }
+#workshopOverlay .ws-status.ws-error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; display: block; }
+#workshopOverlay .ws-progress-wrap { display: none; margin-bottom: 16px; }
+#workshopOverlay .ws-progress-bar {
+    height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden;
+}
+#workshopOverlay .ws-progress-fill { height: 100%; background: #c8102e; width: 0%; }
+#workshopOverlay .ws-progress-text { font-size: 13px; color: #6b7280; margin-top: 8px; }
+#workshopOverlay .ws-log {
+    background: #fafafa; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 16px; font-family: 'Consolas','Courier New', monospace;
+    font-size: 12px; color: #4b5563; max-height: 200px; overflow-y: auto;
+    display: none; white-space: pre-wrap; margin-top: 16px;
+}
+#workshopOverlay .ws-footer { text-align: center; color: #9ca3af; font-size: 11px; margin-top: 40px; }
+</style>
+
+<div id="workshopOverlay">
+    <button id="wsClose" class="ws-close" onclick="closeWorkshopMode()">&larr; zurueck</button>
+    <div class="ws-wrap">
+        <div class="ws-header">
+            <div class="ws-logo">KI</div>
+            <h1>ERGO Vorgang-Analyse</h1>
+            <div class="ws-sub">Workshop-Demo &middot; Mails im Ordner analysieren und beschriften</div>
+        </div>
+
+        <div class="ws-card">
+            <div class="ws-step-label"><span class="ws-step-num">1</span>Ordner mit Demo-Mails waehlen</div>
+            <div class="ws-folder-display">
+                <span class="ws-icon">&#128193;</span>
+                <span class="ws-folder-path ws-empty" id="wsFolderPath">Noch kein Ordner gewaehlt</span>
+            </div>
+            <button class="ws-btn-folder" id="wsPick" onclick="wsPickFolder()">Ordner waehlen...</button>
+            <div class="ws-info-grid" id="wsInfoGrid" style="display:none;">
+                <div class="ws-info-tile">
+                    <span class="ws-num" id="wsNumMsgs">0</span>
+                    <div class="ws-lbl">.msg-Dateien gefunden</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ws-card">
+            <div class="ws-step-label"><span class="ws-step-num">2</span>Analyse starten</div>
+            <div id="wsStatusInfo" class="ws-status ws-info"></div>
+            <div id="wsStatusSuccess" class="ws-status ws-success"></div>
+            <div id="wsStatusError" class="ws-status ws-error"></div>
+            <div class="ws-progress-wrap" id="wsProgressWrap">
+                <div class="ws-progress-bar"><div class="ws-progress-fill" id="wsProgressFill"></div></div>
+                <div class="ws-progress-text" id="wsProgressText">0 von 0</div>
+            </div>
+            <button class="ws-btn-play" id="wsPlay" onclick="wsRunDemo()" disabled>
+                <span class="ws-play-icon">&#9654;</span><span>Analyse starten</span>
+            </button>
+            <div style="font-size: 11px; color: #9ca3af; text-align: center;">
+                Pro Mail wird Inhalt + Anhaenge via ErgoGPT analysiert. Eine strukturierte<br>
+                HTML-Notiz wird als Anhang an die Mail gehaengt. Bei Reminder wird "Reminder "<br>
+                im Betreff vorgestellt. Anschliessend werden alle Mails geoeffnet.
+            </div>
+            <div class="ws-log" id="wsLog"></div>
+        </div>
+
+        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.66</div>
+    </div>
+</div>
 
 </body>
 </html>
