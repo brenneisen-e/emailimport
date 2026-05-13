@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.60"
+        VERSION="1.61"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.60 - Schneller Folder-Select: keine Auto-Open der grossen analyse.xlsx mehr. Drei explizite Buttons: 'Cache laden' (volle xlsx), 'Externes Excel laden' (Subset, z.B. Reminder-only), 'Start' (frische Analyse)</div>
+            <div class="ver">v1.61 - 'Externes Excel laden' oeffnet jetzt File-Dialog (kein prompt-Pfad-Tippen mehr). HTA's input type=file liefert vollen Pfad nach Auswahl.</div>
         </div>
 
         <!-- Cookie -->
@@ -342,11 +342,12 @@
                     title="Analysiert NUR die als Reminder erkannten Vorgaenge nochmal - um die neue Spalte 'Reminder_Quelle' (Anhang-PDF / Anhang-Name / Betreff / Body) zu fuellen. Spart Tokens vs Komplett-Neulauf.">
                 &#128260; Reminder-Quellen
             </button>
-            <button class="btn" id="btnLoadExternalXlsx" onclick="loadExternalXlsx()"
+            <button class="btn" id="btnLoadExternalXlsx" onclick="openExternalXlsxPicker()"
                     style="background: linear-gradient(135deg, #6366f1, #4338ca); color: white;"
                     title="Laedt eine externe .xlsx (z.B. dein manuell gefiltertes Reminder-Subset) als Excel-Cache. .msg-Dateien werden im aktuell gewaehlten Ordner gematcht. Alle Eintraege werden zur Neuanalyse markiert.">
                 &#128194; Externes Excel laden
             </button>
+            <input type="file" id="externalXlsxFile" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="onExternalXlsxPicked(this)">
             <button class="btn" id="btnLoadXlsxCache" onclick="loadXlsxCache()"
                     style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white;"
                     title="Oeffnet die bestehende analyse.xlsx im _KI-Analyse-Ordner. Wurde frueher automatisch beim Folder-Select gemacht - jetzt nur auf Klick (dauert bei 5000 Vorgaengen ~30s).">
@@ -1223,16 +1224,42 @@ function applyHighlightsToLiveRows(startRow, endRow, results) {
 // Baut die Auswertung-Sheet neu im Excel-Live-Workbook. Loescht ein
 // existierendes Auswertung-Sheet und ruft die buildAuswertungSheet-Funktion
 // aus exportToExcel auf - die kennt die Stats-Logik (Postfach-Drilldown, MV-Status etc).
-// Externes Excel als Cache laden (z.B. manuell auf Reminder gefiltertes Subset).
-// Vorteil: nur ~700 Reminder im Cache statt 5000 Komplett-Daten.
-// Voraussetzung: Mail-Ordner ist schon gewaehlt (state.folderPath).
-function loadExternalXlsx() {
+// Oeffnet den File-Picker fuer das externe Excel. Triggert via Klick auf
+// das versteckte <input type="file">. onChange ruft onExternalXlsxPicked.
+function openExternalXlsxPicker() {
     if (!state.folderPath) {
         showError("Bitte zuerst den Mail-Ordner waehlen (Drop-Bereich oben). Dann externes Excel laden.");
         return;
     }
-    var path = prompt("Pfad zur externen Excel (z.B. C:\\Pfad\\reminders.xlsx):\n\nTipp: in Explorer Rechtsklick auf Datei -> 'Als Pfad kopieren' -> hier einfuegen.", state.excelXlsxPath || "");
-    if (!path) return;
+    var inp = document.getElementById("externalXlsxFile");
+    if (!inp) { showError("File-Picker nicht initialisiert"); return; }
+    // Reset value damit onChange auch bei gleicher Datei nochmal feuert
+    try { inp.value = ""; } catch(e) {}
+    inp.click();
+}
+
+// onChange-Handler vom File-Input. In HTA liefert input.value den vollen Pfad.
+function onExternalXlsxPicked(input) {
+    if (!input || !input.value) return;
+    var path = String(input.value);
+    if (path.length === 0) return;
+    loadExternalXlsx(path);
+}
+
+// Externes Excel als Cache laden (z.B. manuell auf Reminder gefiltertes Subset).
+// Vorteil: nur ~700 Reminder im Cache statt 5000 Komplett-Daten.
+// Voraussetzung: Mail-Ordner ist schon gewaehlt (state.folderPath).
+// path: optional - wenn nicht uebergeben, wird der File-Picker geoeffnet.
+function loadExternalXlsx(path) {
+    if (!state.folderPath) {
+        showError("Bitte zuerst den Mail-Ordner waehlen (Drop-Bereich oben). Dann externes Excel laden.");
+        return;
+    }
+    if (!path) {
+        // Kein Pfad uebergeben - File-Picker oeffnen
+        openExternalXlsxPicker();
+        return;
+    }
     path = String(path).replace(/^["']|["']$/g, "");   // Pfad-Anfuehrungszeichen weg
     var fso;
     try { fso = new ActiveXObject("Scripting.FileSystemObject"); } catch(eF) { showError("FSO nicht verfuegbar"); return; }
