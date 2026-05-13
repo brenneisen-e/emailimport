@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.64"
+        VERSION="1.65"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.64 - Token-Limits praktisch abgeschafft: MAX_PDFS 50 (war 3-8), BODY_CAP 50000 Zeichen (war 6-12k). Die KI sieht jetzt die volle Mail + alle Anhaenge. Uebersprungene Anhaenge werden in der Excel mit Tag '[uebersprungen]'/'[zu-gross-XMB]' markiert</div>
+            <div class="ver">v1.65 - Neuer Auswertung-Block PDF-QUALITAET (Text-PDF auto-tauglich / Scan = OCR-Pflichtfall / Mixed / Keine PDFs / nicht pruefbar) pro Postfach im Drilldown</div>
         </div>
 
         <!-- Cookie -->
@@ -3631,7 +3631,9 @@ function computeAuswertungStats(results) {
         einfacherVertragBue: 0,
         kundenverbindungBue: 0,
         bueTypUnklar: 0,
-        mvStatusBue: { "OK": 0, "MV unvollstaendig": 0, "MV fehlt": 0, "kein Anhang": 0, "nicht pruefbar": 0 }
+        mvStatusBue: { "OK": 0, "MV unvollstaendig": 0, "MV fehlt": 0, "kein Anhang": 0, "nicht pruefbar": 0 },
+        // PDF-Qualitaet in BU-Vorgaengen (Text-PDF = einfach, Scan = OCR noetig)
+        pdfQualitaetBue: { "Text-PDF": 0, "Scan": 0, "Mixed": 0, "Keine_PDFs": 0, "nicht_pruefbar": 0, "(sonstige)": 0 }
     };
     for (var i = 0; i < results.length; i++) {
         var r = results[i];
@@ -3672,6 +3674,10 @@ function computeAuswertungStats(results) {
             var mvs = computeMvStatus(r);
             if (mvs in st.mvStatusBue) st.mvStatusBue[mvs]++;
             else st.mvStatusBue[mvs] = (st.mvStatusBue[mvs] || 0) + 1;
+            // PDF-Qualitaet
+            var pq = sg(r.data, "pdf_qualitaet") || "(sonstige)";
+            if (pq in st.pdfQualitaetBue) st.pdfQualitaetBue[pq]++;
+            else st.pdfQualitaetBue["(sonstige)"]++;
         }
     }
     return st;
@@ -3815,6 +3821,27 @@ function buildAuswertungSheet(wb, excel) {
                 var inOrder = false;
                 for (var oi = 0; oi < mvOrder.length; oi++) if (mvOrder[oi] === emk) { inOrder = true; break; }
                 if (!inOrder && st.mvStatusBue[emk] > 0) dataRow(emk, st.mvStatusBue[emk], pct(st.mvStatusBue[emk], st.bueResults.length), true);
+            }
+            row++;
+
+            // PDF-Qualitaet-Block (Text-PDF = automatisierungstauglich, Scan = OCR-Pflichtfall)
+            header("PDF-QUALITAET (nur BU-Vorgaenge)", rgb(180, 83, 9));
+            var pqOrder = ["Text-PDF", "Mixed", "Scan", "Keine_PDFs", "nicht_pruefbar"];
+            var pqLabels = {
+                "Text-PDF":     "Text-PDF (auto-tauglich)",
+                "Mixed":        "Mixed (teilweise OCR)",
+                "Scan":         "Scan (OCR/manuell)",
+                "Keine_PDFs":   "Keine PDFs vorhanden",
+                "nicht_pruefbar":"nicht pruefbar"
+            };
+            for (var qi = 0; qi < pqOrder.length; qi++) {
+                var qk = pqOrder[qi];
+                var qv = st.pdfQualitaetBue[qk] || 0;
+                dataRow(pqLabels[qk] || qk, qv, pct(qv, st.bueResults.length), true);
+            }
+            // Sonstige
+            if (st.pdfQualitaetBue["(sonstige)"] > 0) {
+                dataRow("(sonstige Werte)", st.pdfQualitaetBue["(sonstige)"], pct(st.pdfQualitaetBue["(sonstige)"], st.bueResults.length), true);
             }
             row++;
 
