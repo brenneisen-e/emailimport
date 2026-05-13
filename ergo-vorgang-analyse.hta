@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.63"
+        VERSION="1.64"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.63 - Optimierter KI-Prompt: 8 PDFs (statt 3) + 12k Body-Limit, Pool-Konsolidierungs-Map direkt im Prompt (JDC-Varianten etc.), BUe-Typ-Praezisierung (einfacher Vertrag vs Kundenverbindung). 2 neue Spalten Mail_Zusammenfassung + Nicht_Neu_Grund (KI erklaert pro Vorgang)</div>
+            <div class="ver">v1.64 - Token-Limits praktisch abgeschafft: MAX_PDFS 50 (war 3-8), BODY_CAP 50000 Zeichen (war 6-12k). Die KI sieht jetzt die volle Mail + alle Anhaenge. Uebersprungene Anhaenge werden in der Excel mit Tag '[uebersprungen]'/'[zu-gross-XMB]' markiert</div>
         </div>
 
         <!-- Cookie -->
@@ -431,9 +431,14 @@ var outlookApp = null;
 var outlookNS = null;
 var COOKIE_PATH = "";  // computed at startup -> Cookie.txt next to this HTA
 var ERGO_BASE = "https://gpt.ergo.com/api";
-var MAX_PDFS = 8;
-var MAX_PDF_MB = 20;
-var BODY_CAP = 12000;
+// Limits absichtlich SEHR hoch - die KI soll die volle Mail + alle Anhaenge sehen.
+// MAX_PDFS war frueher 3 (Token-Sparen bei 5000er-Laeufen). Bei kleineren
+// Stichproben gibt es keinen Grund Anhaenge zu droppen.
+// MAX_PDF_MB schuetzt nur vor wirklich riesigen Files (z.B. 100MB-Scans).
+// BODY_CAP wird in der Praxis fast nie erreicht - typische Mails sind <5000 Zeichen.
+var MAX_PDFS = 50;        // praktisch unbegrenzt
+var MAX_PDF_MB = 25;      // einzelne PDFs > 25 MB sind unrealistisch + ErgoGPT-Risiko
+var BODY_CAP = 50000;     // ca. 12500 Tokens - normaler GPT-Kontext reicht easy
 var DRAIN_TIMEOUT_MS = 240000;
 
 var state = {
@@ -2245,18 +2250,27 @@ function prepareSlot(slot) {
                 if (fname.length > 0) {
                     if (slot.anhangAlle) slot.anhangAlle += "; ";
                     slot.anhangAlle += fname;
-                    if (fname.toLowerCase().substr(-4) === ".pdf" && pdfPaths.length < MAX_PDFS) {
-                        var safe = sanitizeFilename(fname);
-                        var outPath = tempDir + "\\" + safe;
-                        att.SaveAsFile(outPath);
-                        if (fso.FileExists(outPath)) {
-                            var sizeMb = fso.GetFile(outPath).Size / 1048576;
-                            if (sizeMb <= MAX_PDF_MB) {
-                                pdfPaths.push(outPath);
-                                if (slot.pdfListe) slot.pdfListe += "; ";
-                                slot.pdfListe += fname;
-                            } else {
-                                try { fso.DeleteFile(outPath, true); } catch(e) {}
+                    if (fname.toLowerCase().substr(-4) === ".pdf") {
+                        if (pdfPaths.length >= MAX_PDFS) {
+                            // Sehr selten - nur warnen
+                            if (slot.pdfListe) slot.pdfListe += "; ";
+                            slot.pdfListe += "[uebersprungen: " + fname + "]";
+                        } else {
+                            var safe = sanitizeFilename(fname);
+                            var outPath = tempDir + "\\" + safe;
+                            att.SaveAsFile(outPath);
+                            if (fso.FileExists(outPath)) {
+                                var sizeMb = fso.GetFile(outPath).Size / 1048576;
+                                if (sizeMb <= MAX_PDF_MB) {
+                                    pdfPaths.push(outPath);
+                                    if (slot.pdfListe) slot.pdfListe += "; ";
+                                    slot.pdfListe += fname;
+                                } else {
+                                    // Datei zu gross - vermerken aber nicht hochladen
+                                    if (slot.pdfListe) slot.pdfListe += "; ";
+                                    slot.pdfListe += "[zu-gross-" + Math.round(sizeMb) + "MB: " + fname + "]";
+                                    try { fso.DeleteFile(outPath, true); } catch(e) {}
+                                }
                             }
                         }
                     }
