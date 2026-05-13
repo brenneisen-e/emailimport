@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.57"
+        VERSION="1.58"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.57 - Live-Excel mit Farb-Highlights pro Zeile + Auswertung-Sheet automatisch (nach Migration + auf finishAnalysis). Plus neuer Button "Farben + Auswertung" um manuell nachzuziehen</div>
+            <div class="ver">v1.58 - Neue Spalte 39 "Reminder_Quelle" (Anhang / Betreff / Body-KI) - retrospektiv berechnet aus Anhang-Namen + Betreff. Auswertung zeigt Reminder-Breakdown nach Quelle. Refresh-Button schreibt's auch fuer alte Zeilen</div>
         </div>
 
         <!-- Cookie -->
@@ -915,7 +915,24 @@ var EXCEL_HEADERS = ["#","Datei","Datum","Auftrag_Datum","Absender Name","Absend
                      "Vorgangstyp","Ist_Reminder","Klassifikation","Klassifikation_Grund",
                      "Geschaefts_Typ","Unterlagen_Angefragt","Unterlagen_Liste","Sonderfall","Sparte",
                      "Anhang_Typen","PDF_Qualitaet","MV_Enthalten","MV_Vollumfaenglich","MV_Einschraenkungen","MV_Status",
-                     "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler"];
+                     "Unterschrift_Kunde","Unterschrift_Makler","Auf_VN","Makler_Namentlich","Hinweis","Fehler","Reminder_Quelle"];
+
+// Reminder-Indikatoren - Schluesselwoerter die in Betreff oder Anhang-Namen
+// auf einen Reminder hindeuten. Match-case-insensitiv.
+var REMINDER_RE = /\b(mahnung|reminder|erinnerung|wiedervorlage|\bWV\b|sachstandsanfrage|nachfass|2\.?\s*Mahnung)\b/i;
+
+// Heuristik: Wo kam die Reminder-Erkennung her? Wird retroaktiv aus den
+// gespeicherten Feldern berechnet (Betreff, Anhang-Namen). Mail-Body
+// haben wir nicht im Cache - "Body/KI" deckt diesen Fall ab.
+function detectReminderSource(r) {
+    if (!r || !r.data) return "";
+    if (sg(r.data, "ist_reminder") !== "ja") return "";
+    var anh = String(r.anhangAlle || "");
+    var bt = String(r.betreff || "");
+    if (REMINDER_RE.test(anh)) return "Anhang";
+    if (REMINDER_RE.test(bt)) return "Betreff";
+    return "Body/KI";   // Body-Keywords oder reine KI-Inferenz
+}
 
 // Stellt sicher dass state.excelApp / Wb / Sheet existieren und das xlsx
 // im _KI-Analyse-Ordner geoeffnet/erstellt ist. Returns true bei Erfolg.
@@ -1052,6 +1069,7 @@ function writeResultRowToExcel(r) {
         sht.Cells(rowIdx, 36).Value = cellSafe(sg(d, "makler_namentlich_genannt"));
         sht.Cells(rowIdx, 37).Value = cellSafe(sg(d, "hinweis"));
         sht.Cells(rowIdx, 38).Value = r.ok ? "" : cellSafe(r.errMsg);
+        sht.Cells(rowIdx, 39).Value = cellSafe(detectReminderSource(r));
         // Highlights live anwenden (~6-10 zusaetzliche COM-Calls, vernachlaessigbar
         // weil Mail-Analyse-Tempo ~3-5s pro Mail).
         applyHighlightsToLiveRow(rowIdx, r);
@@ -1078,7 +1096,7 @@ var LIVE_COL_VORGANGSTYP = 18, LIVE_COL_REMINDER = 19, LIVE_COL_KLASSIFIK = 20;
 var LIVE_COL_SONDERFALL = 25, LIVE_COL_PDF_QUAL = 28;
 var LIVE_COL_VM_VOLLST = 30, LIVE_COL_MV_STATUS = 32;
 var LIVE_COL_UNTERSCHR_K = 33, LIVE_COL_UNTERSCHR_M = 34;
-var LIVE_COL_MAKLERPOOL = 10, LIVE_COL_HINWEIS = 37, LIVE_COL_FEHLER = 38;
+var LIVE_COL_MAKLERPOOL = 10, LIVE_COL_HINWEIS = 37, LIVE_COL_FEHLER = 38, LIVE_COL_REMINDER_QUELLE = 39;
 
 // Wendet Highlight-Farben auf EINE Zeile im Live-Excel an. Wird sowohl per-Zeile
 // waehrend Analyse aufgerufen als auch im Bulk-Pass nach Migration.
@@ -1095,6 +1113,11 @@ function applyHighlightsToLiveRow(rowIdx, r) {
             state.excelSheet.Cells(rowIdx, LIVE_COL_VORGANGSTYP).Interior.Color = H_LIVE_ORANGE();
         }
         if (sg(d, "ist_reminder") === "ja") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER).Interior.Color = H_LIVE_ORANGE();
+        // Reminder_Quelle (Spalte 39) - farblich markieren je nach Quelle
+        var rq = detectReminderSource(r);
+        if (rq === "Anhang") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = rgb(167, 139, 250);   // Violett - Anhang
+        else if (rq === "Betreff") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = H_LIVE_ORANGE();   // Orange - Betreff
+        else if (rq === "Body/KI") state.excelSheet.Cells(rowIdx, LIVE_COL_REMINDER_QUELLE).Interior.Color = H_LIVE_GELB();      // Gelb - Body/KI
         var sond = sg(d, "sonderfall");
         if (sond === "Flottengeschaeft" || sond === "Sondertarif") state.excelSheet.Cells(rowIdx, LIVE_COL_SONDERFALL).Interior.Color = H_LIVE_ROT();
         var kl = sg(d, "klassifikation");
@@ -1151,6 +1174,9 @@ function refreshLiveExcelDecor() {
     for (var i = 0; i < state.results.length; i++) {
         var r = state.results[i];
         var rowIdx = r._excelRow || (i + 2);
+        // Reminder_Quelle-Spalte (39) jetzt auch befuellen - wichtig fuer
+        // alte Migrationen ohne diese Spalte
+        try { state.excelSheet.Cells(rowIdx, 39).Value = cellSafe(detectReminderSource(r)); } catch(eRq) {}
         applyHighlightsToLiveRow(rowIdx, r);
         done++;
     }
@@ -1232,7 +1258,8 @@ function bulkWriteResultsToExcel(results) {
             cellSafeTsv(sg(d, "auf_vn_ausgestellt")) + "\t" +
             cellSafeTsv(sg(d, "makler_namentlich_genannt")) + "\t" +
             cellSafeTsv(sg(d, "hinweis")) + "\t" +
-            (r.ok ? "" : cellSafeTsv(r.errMsg))
+            (r.ok ? "" : cellSafeTsv(r.errMsg)) + "\t" +
+            cellSafeTsv(detectReminderSource(r))
         );
         r._excelRow = startRow + i;
     }
@@ -3270,6 +3297,9 @@ function computeAuswertungStats(results) {
         bueResults: [],
         poolCountsBue: {},
         reminderInBue: 0,
+        reminderSrcAnhang: 0,
+        reminderSrcBetreff: 0,
+        reminderSrcBodyKi: 0,
         einfacherVertragBue: 0,
         kundenverbindungBue: 0,
         bueTypUnklar: 0,
@@ -3287,7 +3317,13 @@ function computeAuswertungStats(results) {
             st.bueResults.push(r);
             var pool = sg(r.data, "maklerpool") || "(kein Pool angegeben)";
             st.poolCountsBue[pool] = (st.poolCountsBue[pool] || 0) + 1;
-            if (sg(r.data, "ist_reminder") === "ja") st.reminderInBue++;
+            if (sg(r.data, "ist_reminder") === "ja") {
+                st.reminderInBue++;
+                var rqSrc = detectReminderSource(r);
+                if (rqSrc === "Anhang") st.reminderSrcAnhang++;
+                else if (rqSrc === "Betreff") st.reminderSrcBetreff++;
+                else st.reminderSrcBodyKi++;
+            }
             var gt = sg(r.data, "geschaefts_typ") || "";
             if (gt.indexOf("einfacher") >= 0 || gt.indexOf("einzeln") >= 0) st.einfacherVertragBue++;
             else if (gt.indexOf("Kundenverbindung") >= 0 || gt.indexOf("kundenverbindung") >= 0) st.kundenverbindungBue++;
@@ -3406,6 +3442,11 @@ function buildAuswertungSheet(wb, excel) {
             var erst = st.bueResults.length - st.reminderInBue;
             dataRow("Erstvorgang", erst, pct(erst, st.bueResults.length), true);
             dataRow("Reminder / Wiedervorlage", st.reminderInBue, pct(st.reminderInBue, st.bueResults.length), true);
+            if (st.reminderInBue > 0) {
+                dataRow("    davon via Anhang-Name", st.reminderSrcAnhang, pct(st.reminderSrcAnhang, st.reminderInBue), true);
+                dataRow("    davon via Betreff", st.reminderSrcBetreff, pct(st.reminderSrcBetreff, st.reminderInBue), true);
+                dataRow("    davon via Body/KI-Inferenz", st.reminderSrcBodyKi, pct(st.reminderSrcBodyKi, st.reminderInBue), true);
+            }
             row++;
             dataRow("einfacher Vertrag", st.einfacherVertragBue, pct(st.einfacherVertragBue, st.bueResults.length), true);
             dataRow("ganze Kundenverbindung", st.kundenverbindungBue, pct(st.kundenverbindungBue, st.bueResults.length), true);
