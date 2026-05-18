@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.71"
+        VERSION="1.72"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.71 - Workshop: volle Feldparitaet mit Hauptmodus (Makler-Nummer/Agentur-Nr, Makler-/Kundenname, Auftrag-Datum, Klassifikation-Grund, Anhang-/MV-Details, Hinweis - 39 Excel-Spalten). Deutsche Umlaute korrekt (UTF-8-Decode). Zeilenumbruch fuer Freitext-Spalten. Entwurfs-Mail zeigt alle Felder inkl. Maklernummer</div>
+            <div class="ver">v1.72 - Pool vs. eigentlicher Makler getrennt: laeuft ein Maklervertrag auf eine Firma die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS), bleibt Maklerpool = JDC / Jung, DMS & Cie. ABER Makler-Name = Finanzguru. v1.71 - Workshop volle Feldparitaet, deutsche Umlaute, Zeilenumbruch</div>
         </div>
 
         <!-- Cookie -->
@@ -3092,7 +3092,12 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "    - 'CLARUS AG' -> 'CLARUS AG'\n";
     p += "    Wenn keine Konsolidierungs-Regel passt: Roh-Variante mit korrekter Rechtsform-Endung (GmbH/AG/etc).\n\n";
     p += "1z) auftrag_datum - Datum aus Maklerauftrag / Pool-Anschreiben (z.B. 'Grossaitingen, 28.11.2025'). NICHT das Mail-Eingangsdatum.\n\n";
-    p += "2) makler_nachname / 3) makler_vorname - HANDELNDE Person beim Makler, NICHT der Kunde.\n\n";
+    p += "2) makler_nachname / 3) makler_vorname - HANDELNDE Person beim Makler, NICHT der Kunde.\n";
+    p += "   Wenn KEINE Einzelperson, sondern eine Makler-FIRMA handelt, gehoert der Firmenname in makler_nachname.\n";
+    p += "   WICHTIG Pool vs. zugrundeliegender Makler: Wenn der Maklervertrag / die Maklervollmacht auf eine\n";
+    p += "   Makler-Firma laeuft, die nur ueber einen Pool abwickelt (z.B. Finanzguru, abgewickelt ueber Jung DMS),\n";
+    p += "   dann bleibt maklerpool = 'JDC / Jung, DMS & Cie.' ABER makler_nachname = der eigentliche Makler\n";
+    p += "   (also z.B. 'Finanzguru'). Pool und tatsaechlicher Makler sind getrennt zu fuehren.\n\n";
     p += "3a) makler_nummer - Identifikator BEIM VERSICHERER. STRENGE Priorisierung:\n";
     p += "    1. 'Agentur-Nr.' / 'Vermittler-Nr.' im Briefkopf-Block (das ist die Wunsch-Nummer).\n";
     p += "    2. 'BD-Nummer' / 'Bestandsnummer' / 'Beraterzeichen'.\n";
@@ -7232,7 +7237,7 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
     p += '  "reminder_quelle":"leer wenn nein, sonst komma-getrennt aus: Anhang-PDF-Inhalt, Anhang-Dateiname, Mail-Betreff, Mail-Body",\n';
     p += '  "nicht_neuer_vorgang_grund":"leer wenn Erstvorgang, sonst warum kein neuer (Reminder/WV/Nachreichung)",\n';
     p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS & Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.)",\n';
-    p += '  "makler_nachname":"handelnde Person beim Makler (NICHT Kunde), oder leer",\n';
+    p += '  "makler_nachname":"handelnde Person ODER Makler-Firma beim Makler (NICHT Kunde). Wenn Maklervertrag auf eine Firma laeuft die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS): makler_nachname = eigentlicher Makler (Finanzguru), maklerpool bleibt JDC / Jung, DMS & Cie. Sonst leer",\n';
     p += '  "makler_vorname":"oder leer",\n';
     p += '  "makler_nummer":"Agentur-Nr / Vermittler-Nr / BD-Nr (Prioritaet siehe oben), oder leer",\n';
     p += '  "auftrag_datum":"Datum aus Maklerauftrag/Pool-Anschreiben (NICHT Mail-Eingang), oder leer",\n';
