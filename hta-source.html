@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.69 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.70 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.69</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.70</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.69"
+        VERSION="1.70"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.69 - Workshop: HTA-Zone blockt Datei-Schreiben (ADODB/FSO), Excel-Prozess nicht. Daher Ausgabe = Excel-Tabelle mit allen Mails + erste Mail als Outlook-Entwurf (CreateItem) mit KI-Notiz im Body + Original-.msg als Anhang. Keine Mail-Modifikation, kein File-Write in HTA-Zone</div>
+            <div class="ver">v1.70 - Workshop: alle Mails ECHT PARALLEL (async Slot-Pipeline CREATING_CONV-UPLOADING-READY-RUNNING-DONE wie Hauptmodus). Ausgabe Excel + erste Mail als Outlook-Entwurf. Statt sequenziell alle gleichzeitig in Bearbeitung</div>
         </div>
 
         <!-- Cookie -->
@@ -7461,129 +7461,73 @@ function wsSendAnswerSync(convId, prompt, docIdsJson) {
     return String(http.ResponseText);
 }
 
-function wsProcessOneMail(msgPath) {
+// Bereitet einen Slot vor: oeffnet Mail, liest Properties + extrahiert PDFs,
+// baut Prompt, feuert createConversationAsyncFire (ASYNC), schliesst Mail.
+// Returns slot-Objekt mit stage="CREATING_CONV".
+function wsPrepareSlot(msgPath) {
     var fileName = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
-    var basename = fileName.replace(/\.msg$/i, "").replace(/[^a-zA-Z0-9_\-\.]/g, "_").substr(0, 60);
-    var step = "init";
-    var mail = null;
     var fso = new ActiveXObject("Scripting.FileSystemObject");
     var shell = new ActiveXObject("WScript.Shell");
-
+    var mail = null;
+    var slot = { msgPath: msgPath, fileName: fileName, stage: "PREP", error: null,
+                 pdfPaths: [], docIds: [], uploadHandles: [] };
     try {
-        // OUTLOOK-SECURITY-BYPASS: Mails werden NICHT modifiziert (Attachments.Add,
-        // Subject-Set und mail.Save() loesen alle die Outlook-Objektmodell-Security
-        // aus, die unter corporate-GPO oft nicht abschaltbar ist).
-        // Stattdessen: HTML-Notiz pro Mail als SEPARATE Datei im _Modified-Ordner.
-        // Bei Reminder hat die HTML-Datei "REMINDER_" als Praefix im Dateinamen
-        // damit man sie auf einen Blick sieht. Am Ende werden alle Notizen im
-        // Browser geoeffnet + die Original-Mails read-only in Outlook angezeigt.
-        step = "_Modified-Ordner anlegen";
-        var modDir = state._wsFolder + "\\_Modified";
-        try { if (!fso.FolderExists(modDir)) fso.CreateFolder(modDir); } catch(eDir) {}
-
-        step = "OpenSharedItem (Original read-only)";
         mail = outlookApp.Session.OpenSharedItem(msgPath);
-
-        // Properties
-        step = "Properties lesen";
-        var datum = "", absName = "", absMail = "", betreff = "", body = "", anhangAlle = "", pdfListe = "";
+        slot.datum = ""; slot.absName = ""; slot.absMail = "";
+        slot.betreff = ""; slot.anhangAlle = "";
+        var body = "";
         try {
             var dt = new Date(mail.ReceivedTime);
-            datum = pad(dt.getDate()) + "." + pad(dt.getMonth()+1) + "." + dt.getFullYear();
+            slot.datum = pad(dt.getDate()) + "." + pad(dt.getMonth()+1) + "." + dt.getFullYear();
         } catch(e) {}
-        try { absName = String(mail.SenderName || ""); } catch(e) {}
-        try { absMail = getSenderEmail(mail); } catch(e) {}
-        try { betreff = String(mail.Subject || ""); } catch(e) {}
+        try { slot.absName = String(mail.SenderName || ""); } catch(e) {}
+        try { slot.absMail = getSenderEmail(mail); } catch(e) {}
+        try { slot.betreff = String(mail.Subject || ""); } catch(e) {}
         try { body = String(mail.Body || ""); } catch(e) {}
         if (body.length > 12000) body = body.substr(0, 12000) + "...[gekuerzt]";
 
-        // Anhaenge
-        step = "Anhaenge sammeln";
         var attCount = 0;
         try { attCount = mail.Attachments.Count; } catch(e) {}
-        var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_ws_" + new Date().getTime();
+        var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_ws_" + new Date().getTime() + "_" + Math.floor(Math.random()*100000);
         try { if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir); } catch(e) {}
-        var pdfPaths = [];
+        slot.tempDir = tempDir;
+        var pdfListe = "";
         for (var a = 1; a <= attCount; a++) {
             try {
                 var att = mail.Attachments.Item(a);
                 var fn = String(att.FileName || "");
                 if (fn.length === 0) continue;
-                anhangAlle += (anhangAlle ? "; " : "") + fn;
-                if (fn.toLowerCase().substr(-4) === ".pdf" &amp;&amp; pdfPaths.length < 20) {
+                slot.anhangAlle += (slot.anhangAlle ? "; " : "") + fn;
+                if (fn.toLowerCase().substr(-4) === ".pdf" &amp;&amp; slot.pdfPaths.length < 20) {
                     var safe = sanitizeFilename(fn);
                     var outPath = tempDir + "\\" + safe;
                     att.SaveAsFile(outPath);
                     if (fso.FileExists(outPath)) {
-                        pdfPaths.push({path: outPath, name: fn});
+                        slot.pdfPaths.push({ path: outPath, name: fn });
                         pdfListe += (pdfListe ? "; " : "") + fn;
                     }
                 }
             } catch(eAtt) {}
         }
-
-        // Conversation + Upload + Answer
-        step = "ErgoGPT Conversation";
-        var convId = createConversationSync(wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfListe));
-
-        step = "PDF-Uploads (" + pdfPaths.length + ")";
-        var docIds = [];
-        for (var pi = 0; pi < pdfPaths.length; pi++) {
-            try {
-                var handle = uploadPdfStartAsync(convId, pdfPaths[pi].path, pdfPaths[pi].name);
-                // Sync warten via FileExists-Poll (max 60s)
-                var w0 = new Date().getTime();
-                while (!fso.FileExists(handle.resultPath) &amp;&amp; (new Date().getTime() - w0) < 60000) {
-                    var ww = new Date().getTime() + 200;
-                    while (new Date().getTime() < ww) {}
-                }
-                uploadPdfReadResult(handle);
-                if (handle.docId) docIds.push(handle.docId);
-            } catch(eUp) {}
-        }
-        var docIdsJson = docIds.length > 0 ? '["' + docIds.join('","') + '"]' : "[]";
-
-        step = "ErgoGPT Antwort";
-        var resp = wsSendAnswerSync(convId, wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfListe), docIdsJson);
-        var data = wsParseJson(jsonUnescape(extractAssistantFromNdjson(resp)).replace(/\\n/g, "\n"));
-        if (!data) throw new Error("JSON nicht parsebar - Antwort-Anfang: '" + String(resp).substr(0, 200) + "'");
-
-        // KEINE Datei-Schreibung in der HTA-Zone (ADODB/FSO File-Write ist gesperrt).
-        // Ergebnis wird durchgereicht -> Ausgabe per EXCEL (laeuft im Excel-Prozess,
-        // nicht in der HTA-Zone) + Draft-Mail-Test in Outlook.
-        step = "Mail schliessen";
-        try { mail.Close(1); } catch(eCl) {}   // 1 = olDiscard
+        try { mail.Close(1); } catch(e) {}
         mail = null;
 
-        // Cleanup temp-pdfs
-        try {
-            for (var pi2 = 0; pi2 < pdfPaths.length; pi2++) {
-                try { fso.DeleteFile(pdfPaths[pi2].path, true); } catch(e) {}
-            }
-            if (fso.FolderExists(tempDir)) fso.DeleteFolder(tempDir, true);
-        } catch(e) {}
-
-        try { fireDelete(convId); } catch(e) {}
-
-        return {
-            msgPath: msgPath,
-            fileName: fileName,
-            datum: datum,
-            absName: absName,
-            absMail: absMail,
-            betreff: betreff,
-            anhangAlle: anhangAlle,
-            data: data,
-            isReminder: data.ist_reminder === "ja",
-            klassifikation: data.klassifikation || "",
-            summary: (data.zusammenfassung || "").substr(0, 200)
-        };
-    } catch(eMain) {
+        slot.prompt = wsBuildPrompt(slot.datum, slot.absName, slot.absMail,
+                                    slot.betreff, body, slot.anhangAlle, pdfListe);
+        // ASYNC Conversation-Create feuern
+        slot.convHttp = createConversationAsyncFire(slot.prompt);
+        slot.stage = "CREATING_CONV";
+        return slot;
+    } catch(ePrep) {
         try { if (mail) mail.Close(1); } catch(e) {}
-        throw new Error("[Step: " + step + "] " + (eMain.message || "unbekannt"));
+        slot.stage = "ERROR";
+        slot.error = "Prep: " + (ePrep.message || "unbekannt");
+        return slot;
     }
 }
 
+// Parallele Slot-Pipeline. Alle Mails gleichzeitig in Bearbeitung.
+// Stages: CREATING_CONV -> UPLOADING -> READY -> RUNNING -> DONE / ERROR
 function wsRunDemo() {
     if (state._wsRunning) return;
     if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
@@ -7597,28 +7541,151 @@ function wsRunDemo() {
     document.getElementById("wsProgressWrap").style.display = "block";
     document.getElementById("wsLog").innerText = "";
     wsProgress(0, state._wsMsgFiles.length);
-    wsShowInfo("Analysiere " + state._wsMsgFiles.length + " Mails... das kann ein paar Minuten dauern.");
+    wsShowInfo("Bereite " + state._wsMsgFiles.length + " Mails vor und analysiere ALLE parallel...");
 
-    var processed = [];
-    var idx = 0;
-    function next() {
-        if (idx >= state._wsMsgFiles.length) { wsFinishDemo(processed); return; }
-        var msgPath = state._wsMsgFiles[idx];
-        var name = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
-        wsLog("[" + (idx+1) + "/" + state._wsMsgFiles.length + "] " + name);
-        wsProgress(idx, state._wsMsgFiles.length);
-        try {
-            var res = wsProcessOneMail(msgPath);
-            processed.push(res);
-            wsLog("   OK: " + (res.isReminder ? "[Reminder] " : "") + (res.klassifikation || "?") + " - " + res.summary);
-        } catch(e) {
-            wsLog("   FEHLER: " + e.message);
-        }
-        idx++;
-        wsProgress(idx, state._wsMsgFiles.length);
-        setTimeout(next, 50);
+    // Phase 1: alle Slots vorbereiten (Outlook-Lesen ist sequenziell + schnell,
+    // Conversation-Create laeuft danach async fuer alle gleichzeitig)
+    var slots = [];
+    for (var i = 0; i < state._wsMsgFiles.length; i++) {
+        var mp = state._wsMsgFiles[i];
+        wsLog("[" + (i+1) + "/" + state._wsMsgFiles.length + "] Vorbereiten: " + mp.substr(mp.lastIndexOf("\\")+1));
+        var s = wsPrepareSlot(mp);
+        slots.push(s);
+        if (s.stage === "ERROR") wsLog("   PREP-FEHLER: " + s.error);
     }
-    setTimeout(next, 100);
+    state._wsSlots = slots;
+    wsLog("");
+    wsLog("Alle " + slots.length + " Conversations gestartet - analysiere parallel...");
+    setTimeout(wsTick, 200);
+}
+
+function wsTick() {
+    var slots = state._wsSlots || [];
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var doneCount = 0;
+
+    for (var i = 0; i < slots.length; i++) {
+        var s = slots[i];
+        if (s.stage === "DONE" || s.stage === "ERROR") { doneCount++; continue; }
+
+        try {
+            if (s.stage === "CREATING_CONV") {
+                var cd = false;
+                try { cd = s.convHttp.WaitForResponse(0); } catch(eW) {
+                    // Send-Race - kurz weiterversuchen
+                    if (!s._convRetry) s._convRetry = 0;
+                    s._convRetry++;
+                    if (s._convRetry > 10) { s.stage = "ERROR"; s.error = "Conv-Wait: " + eW.message; }
+                    continue;
+                }
+                if (!cd) continue;
+                var cstatus = 0, cresp = "";
+                try { cstatus = s.convHttp.Status; } catch(e) {}
+                try { cresp = s.convHttp.ResponseText; } catch(e) {}
+                if (cstatus !== 200) { s.stage = "ERROR"; s.error = "Conv HTTP " + cstatus; continue; }
+                s.convId = parseJsonStr(cresp, "id");
+                if (!s.convId) { s.stage = "ERROR"; s.error = "keine conversation_id"; continue; }
+                // PDF-Uploads feuern (fire-and-forget VBS)
+                if (s.pdfPaths.length > 0) {
+                    for (var pi = 0; pi < s.pdfPaths.length; pi++) {
+                        try {
+                            s.uploadHandles.push(uploadPdfStartAsync(s.convId, s.pdfPaths[pi].path, s.pdfPaths[pi].name));
+                        } catch(eU) {}
+                    }
+                    s.uploadStart = new Date().getTime();
+                    s.stage = "UPLOADING";
+                } else {
+                    s.docIdsJson = "[]";
+                    s.stage = "READY";
+                }
+            }
+
+            if (s.stage === "UPLOADING") {
+                var allUp = true;
+                for (var ui = 0; ui < s.uploadHandles.length; ui++) {
+                    if (!fso.FileExists(s.uploadHandles[ui].resultPath)) { allUp = false; break; }
+                }
+                var elapsed = new Date().getTime() - (s.uploadStart || 0);
+                if (!allUp &amp;&amp; elapsed < 90000) continue;   // weiter warten (max 90s)
+                // Result-Files lesen
+                for (var ri = 0; ri < s.uploadHandles.length; ri++) {
+                    try {
+                        uploadPdfReadResult(s.uploadHandles[ri]);
+                        if (s.uploadHandles[ri].docId) s.docIds.push(s.uploadHandles[ri].docId);
+                    } catch(e) {}
+                }
+                s.docIdsJson = s.docIds.length > 0 ? '["' + s.docIds.join('","') + '"]' : "[]";
+                s.stage = "READY";
+            }
+
+            if (s.stage === "READY") {
+                s.answerHttp = startAnswerAsync(s.convId, s.prompt, s.docIdsJson);
+                s.answerStart = new Date().getTime();
+                s.stage = "RUNNING";
+            }
+
+            if (s.stage === "RUNNING") {
+                var ad = false;
+                try { ad = s.answerHttp.WaitForResponse(0); } catch(eA) {
+                    if (!s._ansRetry) s._ansRetry = 0;
+                    s._ansRetry++;
+                    if (s._ansRetry > 10) { s.stage = "ERROR"; s.error = "Answer-Wait: " + eA.message; }
+                    continue;
+                }
+                if (!ad) continue;
+                var aresp = "";
+                try { aresp = s.answerHttp.ResponseText; } catch(e) {}
+                var data = wsParseJson(jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"));
+                if (!data) { s.stage = "ERROR"; s.error = "JSON nicht parsebar"; continue; }
+                s.data = data;
+                s.isReminder = data.ist_reminder === "ja";
+                s.klassifikation = data.klassifikation || "";
+                s.summary = (data.zusammenfassung || "").substr(0, 200);
+                // Cleanup temp-pdfs
+                try {
+                    for (var ci = 0; ci < s.pdfPaths.length; ci++) {
+                        try { fso.DeleteFile(s.pdfPaths[ci].path, true); } catch(e) {}
+                    }
+                    if (s.tempDir &amp;&amp; fso.FolderExists(s.tempDir)) fso.DeleteFolder(s.tempDir, true);
+                } catch(e) {}
+                try { fireDelete(s.convId); } catch(e) {}
+                s.stage = "DONE";
+                wsLog("   FERTIG: " + s.fileName + " -> " + (s.isReminder ? "[Reminder] " : "") +
+                      (s.klassifikation || "?"));
+            }
+        } catch(eTick) {
+            s.stage = "ERROR";
+            s.error = "Tick: " + (eTick.message || "?");
+        }
+    }
+
+    wsProgress(doneCount, slots.length);
+
+    if (doneCount >= slots.length) {
+        var processed = [];
+        for (var k = 0; k < slots.length; k++) {
+            if (slots[k].stage === "DONE") {
+                processed.push({
+                    msgPath: slots[k].msgPath,
+                    fileName: slots[k].fileName,
+                    datum: slots[k].datum,
+                    absName: slots[k].absName,
+                    absMail: slots[k].absMail,
+                    betreff: slots[k].betreff,
+                    anhangAlle: slots[k].anhangAlle,
+                    data: slots[k].data,
+                    isReminder: slots[k].isReminder,
+                    klassifikation: slots[k].klassifikation,
+                    summary: slots[k].summary
+                });
+            } else if (slots[k].stage === "ERROR") {
+                wsLog("   FEHLER " + slots[k].fileName + ": " + slots[k].error);
+            }
+        }
+        wsFinishDemo(processed);
+        return;
+    }
+    setTimeout(wsTick, 400);
 }
 
 function wsFinishDemo(processed) {
@@ -7961,8 +8028,8 @@ End Function
                 <span class="ws-play-icon">&amp;#9654;</span><span>Analyse starten</span>
             </button>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
-                Pro Mail wird Inhalt + Anhaenge via ErgoGPT analysiert. Ergebnis kommt in eine<br>
-                <strong>Excel-Tabelle</strong> (alle Mails). Zusaetzlich wird die erste Mail als<br>
+                Alle Mails werden <strong>parallel</strong> via ErgoGPT analysiert (Inhalt + Anhaenge).<br>
+                Ergebnis kommt in eine <strong>Excel-Tabelle</strong>. Zusaetzlich wird die erste Mail als<br>
                 <strong>Outlook-Entwurf</strong> mit KI-Notiz im Body + Original als Anhang geoeffnet.<br>
                 <strong>Original .msg-Dateien bleiben unveraendert.</strong>
             </div>
