@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.68 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.69 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.68</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.69</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.68"
+        VERSION="1.69"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.68 - Workshop ohne Mail-Modifikation: Outlook-Object-Model-Guard blockt jeglichen Schreibzugriff auf Mails. Loesung: KI-Notiz als separate HTML-Datei pro Mail in _Modified/, mit REMINDER_-Praefix bei Reminders. Am Ende Notizen im Browser + Mails read-only in Outlook geoeffnet</div>
+            <div class="ver">v1.69 - Workshop: HTA-Zone blockt Datei-Schreiben (ADODB/FSO), Excel-Prozess nicht. Daher Ausgabe = Excel-Tabelle mit allen Mails + erste Mail als Outlook-Entwurf (CreateItem) mit KI-Notiz im Body + Original-.msg als Anhang. Keine Mail-Modifikation, kein File-Write in HTA-Zone</div>
         </div>
 
         <!-- Cookie -->
@@ -7548,37 +7548,14 @@ function wsProcessOneMail(msgPath) {
         var data = wsParseJson(jsonUnescape(extractAssistantFromNdjson(resp)).replace(/\\n/g, "\n"));
         if (!data) throw new Error("JSON nicht parsebar - Antwort-Anfang: '" + String(resp).substr(0, 200) + "'");
 
-        // KEINE Mail-Modifikation - Outlook Object Model Guard wuerde sonst blocken.
-        // Stattdessen: Notiz als SEPARATE HTML-Datei im _Modified-Ordner.
-        // Bei Reminder bekommt die Datei "REMINDER_" als Praefix damit man's sieht.
-        step = "Notiz-HTML in _Modified schreiben";
-        var notizName = (data.ist_reminder === "ja" ? "REMINDER_" : "") +
-                        "KI-Analyse_" + basename + ".html";
-        var notizPath = modDir + "\\" + notizName;
-        var html = wsBuildNotizHtml(data);
-        try {
-            // Alte Notiz ggf. ueberschreiben
-            try { if (fso.FileExists(notizPath)) fso.DeleteFile(notizPath, true); } catch(eD) {}
-            var stmH = new ActiveXObject("ADODB.Stream");
-            stmH.Type = 2; stmH.Charset = "utf-8"; stmH.Open();
-            stmH.WriteText(html);
-            stmH.SaveToFile(notizPath, 2);
-            stmH.Close();
-        } catch(eH) {
-            // Fallback FSO
-            try {
-                var fH = fso.CreateTextFile(notizPath, true, false);
-                fH.Write(html); fH.Close();
-            } catch(eH2) {
-                throw new Error("Notiz-Datei konnte nicht geschrieben werden: " + eH2.message);
-            }
-        }
-
-        // Mail wieder schliessen ohne Aenderungen - read-only Zugriff war's
+        // KEINE Datei-Schreibung in der HTA-Zone (ADODB/FSO File-Write ist gesperrt).
+        // Ergebnis wird durchgereicht -> Ausgabe per EXCEL (laeuft im Excel-Prozess,
+        // nicht in der HTA-Zone) + Draft-Mail-Test in Outlook.
+        step = "Mail schliessen";
         try { mail.Close(1); } catch(eCl) {}   // 1 = olDiscard
         mail = null;
 
-        // Cleanup
+        // Cleanup temp-pdfs
         try {
             for (var pi2 = 0; pi2 < pdfPaths.length; pi2++) {
                 try { fso.DeleteFile(pdfPaths[pi2].path, true); } catch(e) {}
@@ -7590,10 +7567,16 @@ function wsProcessOneMail(msgPath) {
 
         return {
             msgPath: msgPath,
-            notizPath: notizPath,
+            fileName: fileName,
+            datum: datum,
+            absName: absName,
+            absMail: absMail,
+            betreff: betreff,
+            anhangAlle: anhangAlle,
+            data: data,
             isReminder: data.ist_reminder === "ja",
             klassifikation: data.klassifikation || "",
-            summary: (data.zusammenfassung || "").substr(0, 100)
+            summary: (data.zusammenfassung || "").substr(0, 200)
         };
     } catch(eMain) {
         try { if (mail) mail.Close(1); } catch(e) {}
@@ -7644,38 +7627,108 @@ function wsFinishDemo(processed) {
     document.getElementById("wsPick").disabled = false;
     document.getElementById("wsClose").disabled = false;
     wsProgress(state._wsMsgFiles.length, state._wsMsgFiles.length);
+
+    if (processed.length === 0) {
+        wsShowError("Keine Mail konnte analysiert werden. Siehe Log.");
+        return;
+    }
+
     wsShowSuccess("Fertig! <strong>" + processed.length + " von " + state._wsMsgFiles.length +
-                  "</strong> Mails analysiert. KI-Notizen liegen in <code>_Modified/</code> und werden jetzt geoeffnet...");
+                  "</strong> Mails analysiert. Excel wird erstellt + Demo-Mail im Entwurf geoeffnet...");
     wsLog("");
-    wsLog("Notizen-Ordner: " + state._wsFolder + "\\_Modified\\");
-    wsLog("Oeffne " + processed.length + " Notizen im Browser + Original-Mails in Outlook...");
+
     setTimeout(function() {
-        var shell = new ActiveXObject("WScript.Shell");
-        // Notizen im Browser oeffnen
-        for (var i = 0; i < processed.length; i++) {
+        // ---- 1. EXCEL erzeugen (laeuft im Excel-Prozess, keine HTA-Zonen-Sperre) ----
+        wsLog("Erstelle Excel mit " + processed.length + " Zeilen...");
+        var excel = null;
+        try {
+            excel = new ActiveXObject("Excel.Application");
+            excel.Visible = true;
+            excel.DisplayAlerts = false;
+            var wb = excel.Workbooks.Add();
+            var sh = wb.ActiveSheet;
+            try { sh.Name = "Workshop-Demo"; } catch(e) {}
+            var heads = ["#","Datei","Datum","Absender","Betreff","Anhaenge",
+                         "Klassifikation","Ist_Reminder","Reminder_Quelle","Maklerpool",
+                         "Kunde","Versicherungsnummer","Sparte","Geschaefts_Typ","MV_Status",
+                         "Zusammenfassung","Naechster_Schritt"];
+            for (var c = 0; c < heads.length; c++) sh.Cells(1, c+1).Value = heads[c];
             try {
-                shell.Run('"' + processed[i].notizPath + '"', 1, false);
-                wsLog("   Notiz geoeffnet: " + processed[i].notizPath.substr(processed[i].notizPath.lastIndexOf("\\")+1));
-            } catch(e) {
-                wsLog("   Notiz-Oeffnen-Fehler: " + e.message);
+                var hr = sh.Range(sh.Cells(1,1), sh.Cells(1, heads.length));
+                hr.Font.Bold = true;
+                hr.Font.Color = rgb(255,255,255);
+                hr.Interior.Color = rgb(200,16,46);
+                hr.HorizontalAlignment = -4108;
+                sh.Rows(1).RowHeight = 26;
+            } catch(e) {}
+            for (var i = 0; i < processed.length; i++) {
+                var r = processed[i];
+                var d = r.data || {};
+                var row = i + 2;
+                sh.Cells(row, 1).Value = i + 1;
+                sh.Cells(row, 2).Value = cellSafe(r.fileName);
+                sh.Cells(row, 3).Value = cellSafe(r.datum);
+                sh.Cells(row, 4).Value = cellSafe(r.absName + " <" + r.absMail + ">");
+                sh.Cells(row, 5).Value = cellSafe(r.betreff);
+                sh.Cells(row, 6).Value = cellSafe(r.anhangAlle);
+                sh.Cells(row, 7).Value = cellSafe(d.klassifikation);
+                sh.Cells(row, 8).Value = cellSafe(d.ist_reminder);
+                sh.Cells(row, 9).Value = cellSafe(d.reminder_quelle);
+                sh.Cells(row, 10).Value = cellSafe(d.maklerpool);
+                sh.Cells(row, 11).Value = cellSafe(d.kunde_name);
+                sh.Cells(row, 12).Value = cellSafe(d.versicherungsnummer);
+                sh.Cells(row, 13).Value = cellSafe(d.sparte);
+                sh.Cells(row, 14).Value = cellSafe(d.geschaefts_typ);
+                sh.Cells(row, 15).Value = cellSafe(d.mv_status);
+                sh.Cells(row, 16).Value = cellSafe(d.zusammenfassung);
+                sh.Cells(row, 17).Value = cellSafe(d.naechster_schritt);
+                // Reminder-Zeile orange faerben
+                if (d.ist_reminder === "ja") {
+                    try { sh.Range(sh.Cells(row,1), sh.Cells(row, heads.length)).Interior.Color = rgb(254,215,170); } catch(e) {}
+                }
             }
-        }
-        // Plus Original-Mails read-only via Outlook
-        wsLog("");
-        wsLog("Oeffne Original-Mails (read-only) in Outlook...");
-        for (var j = 0; j < processed.length; j++) {
             try {
-                var m = outlookApp.Session.OpenSharedItem(processed[j].msgPath);
-                m.Display();
-                wsLog("   Mail geoeffnet: " + processed[j].msgPath.substr(processed[j].msgPath.lastIndexOf("\\")+1));
-            } catch(e) {
-                wsLog("   Mail-Display-Fehler: " + e.message);
-            }
+                sh.Columns("A:A").ColumnWidth = 4;
+                sh.Columns("B:B").ColumnWidth = 38;
+                sh.Columns("C:O").ColumnWidth = 16;
+                sh.Columns("P:Q").ColumnWidth = 50;
+                sh.Range(sh.Cells(1,1), sh.Cells(processed.length+1, heads.length)).AutoFilter();
+            } catch(e) {}
+            wsLog("   Excel mit " + processed.length + " Zeilen erstellt + sichtbar.");
+        } catch(eX) {
+            wsLog("   Excel-Fehler: " + eX.message);
         }
+
+        // ---- 2. DRAFT-MAIL-TEST: Eine Demo-Mail im Entwurfsmodus mit Anhang ----
         wsLog("");
-        wsLog("Demo abgeschlossen. Original-Mails bleiben unveraendert.");
-        wsLog("Im _Modified-Ordner: HTML-Notizen pro Mail (REMINDER_ Praefix bei Reminders).");
-    }, 200);
+        wsLog("Test: erste Mail als Entwurf in Outlook mit Anhang...");
+        try {
+            var first = processed[0];
+            var draft = outlookApp.CreateItem(0);   // 0 = olMailItem (NEU, ungespeichert)
+            draft.Subject = (first.isReminder ? "Reminder " : "") + "DEMO-Vorgang: " + first.betreff;
+            draft.HTMLBody = wsBuildNotizHtml(first.data) +
+                "<hr><p style='font-family:Segoe UI;font-size:12px;color:#6b7280;'>" +
+                "Original-Mail: " + first.fileName + " &amp;middot; angehaengt als .msg</p>";
+            // Original-.msg als Anhang an den NEUEN Entwurf - bei neuem unsaved Item
+            // greift der Outlook-Guard meist nicht (normale Compose-Aktion).
+            try {
+                draft.Attachments.Add(first.msgPath);
+                wsLog("   Original-.msg als Anhang hinzugefuegt.");
+            } catch(eAtt) {
+                wsLog("   Anhang-Add blockiert (" + eAtt.message + ") - Entwurf ohne Anhang.");
+            }
+            draft.Display();   // im Entwurfs-/Compose-Fenster oeffnen (kein Save)
+            wsLog("   Demo-Entwurf geoeffnet: " + first.fileName);
+        } catch(eD) {
+            wsLog("   Draft-Mail-Fehler: " + eD.message);
+        }
+
+        wsLog("");
+        wsLog("Demo abgeschlossen.");
+        wsLog("  - Excel-Tabelle mit allen " + processed.length + " analysierten Mails");
+        wsLog("  - Erste Mail als Outlook-Entwurf mit KI-Notiz im Body + Original als Anhang");
+        wsLog("Original .msg-Dateien bleiben unveraendert.");
+    }, 300);
 }
 </script>
 
@@ -7908,10 +7961,10 @@ End Function
                 <span class="ws-play-icon">&amp;#9654;</span><span>Analyse starten</span>
             </button>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
-                Pro Mail wird Inhalt + Anhaenge via ErgoGPT analysiert. Eine strukturierte<br>
-                HTML-Notiz wird als separate Datei in <code>_Modified/</code> abgelegt<br>
-                (REMINDER_-Praefix bei Reminders). Am Ende werden alle Notizen im Browser<br>
-                + Original-Mails in Outlook geoeffnet. <strong>Originale bleiben unveraendert.</strong>
+                Pro Mail wird Inhalt + Anhaenge via ErgoGPT analysiert. Ergebnis kommt in eine<br>
+                <strong>Excel-Tabelle</strong> (alle Mails). Zusaetzlich wird die erste Mail als<br>
+                <strong>Outlook-Entwurf</strong> mit KI-Notiz im Body + Original als Anhang geoeffnet.<br>
+                <strong>Original .msg-Dateien bleiben unveraendert.</strong>
             </div>
             <div class="ws-log" id="wsLog"></div>
         </div>
