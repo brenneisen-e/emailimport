@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.70 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.71 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.70</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.71</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.70"
+        VERSION="1.71"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.70 - Workshop: alle Mails ECHT PARALLEL (async Slot-Pipeline CREATING_CONV-UPLOADING-READY-RUNNING-DONE wie Hauptmodus). Ausgabe Excel + erste Mail als Outlook-Entwurf. Statt sequenziell alle gleichzeitig in Bearbeitung</div>
+            <div class="ver">v1.71 - Workshop: volle Feldparitaet mit Hauptmodus (Makler-Nummer/Agentur-Nr, Makler-/Kundenname, Auftrag-Datum, Klassifikation-Grund, Anhang-/MV-Details, Hinweis - 39 Excel-Spalten). Deutsche Umlaute korrekt (UTF-8-Decode). Zeilenumbruch fuer Freitext-Spalten. Entwurfs-Mail zeigt alle Felder inkl. Maklernummer</div>
         </div>
 
         <!-- Cookie -->
@@ -7345,25 +7345,55 @@ function wsUseFolder(path) {
 // Workshop-spezifischer kompakter Prompt - eigene Antwort-Struktur fuer die Notiz
 function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsHochgeladen) {
     var p = "";
-    p += "Du bist ERGO-Innendienst-Sachbearbeiter (SHUK). Analysiere die Mail + Anhaenge.\n\n";
+    p += "Du bist ERGO-Innendienst-Sachbearbeiter (SHUK). Analysiere die Mail + ALLE Anhaenge gruendlich.\n\n";
     p += "===== EMAIL =====\n";
     p += "Datum: " + datum + "\nAbsender: " + absName + " <" + absMail + ">\nBetreff: " + betreff + "\n";
     p += "Anhaenge: " + (anhangAlle || "(keine)") + "\n";
     p += "Anhaenge als PDFs hochgeladen: " + (pdfsHochgeladen || "(keine)") + "\n";
     p += "Body:\n<<<\n" + body + "\n>>>\n===== ENDE =====\n\n";
-    p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-Objekt (kein Markdown, keine Erklaerung):\n";
+    p += "WICHTIG zu makler_nummer - STRENGE Priorisierung:\n";
+    p += "  1. 'Agentur-Nr.' / 'Vermittler-Nr.' im Briefkopf-Block (Wunsch-Nummer)\n";
+    p += "  2. 'BD-Nummer' / 'Bestandsnummer' / 'Beraterzeichen'\n";
+    p += "  3. NUR Fallback: Pool-IDs ('MAKID','DEMMAK','BCA-ID' - pool-intern, NICHT beim Versicherer)\n";
+    p += "Gib wenn moeglich beides an, Format z.B. 'Agentur 8903235 / Vermittler 811774'.\n\n";
+    p += "geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n";
+    p += "'BUe Kundenverbindung' wenn mehrere Vertragsnummern ODER 'alle Vertraege'/'gesamte Kundenverbindung'.\n\n";
+    p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-Objekt (kein Markdown, keine Erklaerung).\n";
+    p += "Verwende echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß) in Freitext-Feldern:\n";
     p += "{\n";
+    p += '  "vorgangstyp":"Makler-Vorgang|Bounce-NDR|Ergo-Outbound|System-Mail|Werbung-Spam|Unklar",\n';
     p += '  "klassifikation":"BUe-Vorgang|Anfrage-Ruecksprache|Antrag-Aenderung|Schadenmeldung|Nicht-Standard|Kein-Makler-Vorgang",\n';
+    p += '  "klassifikation_grund":"kurze Begruendung, konkrete Indizien (max 200 Z.)",\n';
     p += '  "ist_reminder":"ja|nein",\n';
-    p += '  "reminder_quelle":"leer wenn nein, sonst eine oder mehrere komma-getrennt aus: Anhang-PDF-Inhalt, Anhang-Dateiname, Mail-Betreff, Mail-Body",\n';
-    p += '  "maklerpool":"Pool-Name konsolidiert (z.B. JDC / Jung, DMS &amp; Cie. statt Jung,DMS &amp; Cie. Pool GmbH)",\n';
-    p += '  "kunde_name":"Nachname, Vorname (oder leer)",\n';
-    p += '  "versicherungsnummer":"VNR aus Mail/PDF (oder leer)",\n';
+    p += '  "reminder_quelle":"leer wenn nein, sonst komma-getrennt aus: Anhang-PDF-Inhalt, Anhang-Dateiname, Mail-Betreff, Mail-Body",\n';
+    p += '  "nicht_neuer_vorgang_grund":"leer wenn Erstvorgang, sonst warum kein neuer (Reminder/WV/Nachreichung)",\n';
+    p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS &amp; Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.)",\n';
+    p += '  "makler_nachname":"handelnde Person beim Makler (NICHT Kunde), oder leer",\n';
+    p += '  "makler_vorname":"oder leer",\n';
+    p += '  "makler_nummer":"Agentur-Nr / Vermittler-Nr / BD-Nr (Prioritaet siehe oben), oder leer",\n';
+    p += '  "auftrag_datum":"Datum aus Maklerauftrag/Pool-Anschreiben (NICHT Mail-Eingang), oder leer",\n';
+    p += '  "kunde_nachname":"VN / Vollmachtgeber, oder leer",\n';
+    p += '  "kunde_vorname":"oder leer",\n';
+    p += '  "kunde_nummer":"Partner-/Personennummer (NICHT Vers- oder Maklernummer), oder leer",\n';
+    p += '  "versicherungsnummer":"VNR / Vertragsnummer (z.B. LF060237653), oder leer",\n';
     p += '  "sparte":"Komposit|Leben|KV|Mehrere|Unbekannt",\n';
     p += '  "geschaefts_typ":"BUe einfacher Vertrag|BUe Kundenverbindung|Keine BUe",\n';
+    p += '  "unterlagen_angefragt":"ja|nein",\n';
+    p += '  "unterlagen_liste":"kommagetrennt fehlende Unterlagen, oder leer",\n';
+    p += '  "sonderfall":"Flottengeschaeft|Sondertarif|Kein Sonderfall",\n';
+    p += '  "anhang_typen":"kommagetrennt: Maklervollmacht,Police,Antrag,Schadenmeldung,Beitragsrechnung,Anschreiben,Kuendigung,Datenblatt,Sonstiges",\n';
+    p += '  "pdf_qualitaet":"Text-PDF|Scan|Mixed|Keine_PDFs|nicht_pruefbar",\n';
+    p += '  "enthaelt_maklervollmacht":"ja|nein",\n';
+    p += '  "mv_vollumfaenglich":"ja|teilweise|nein|nicht_pruefbar",\n';
+    p += '  "mv_einschraenkungen":"Klartext Einschraenkungen, oder leer",\n';
     p += '  "mv_status":"OK|MV unvollstaendig|MV fehlt|kein Anhang|nicht pruefbar",\n';
-    p += '  "zusammenfassung":"1-2 Saetze NEUTRAL was die Mail macht",\n';
-    p += '  "naechster_schritt":"konkrete Handlungsempfehlung fuer den Sachbearbeiter (1 Satz)"\n';
+    p += '  "unterschrift_kunde":"ja|nein|nicht_pruefbar",\n';
+    p += '  "unterschrift_makler":"ja|nein|nicht_pruefbar",\n';
+    p += '  "auf_vn_ausgestellt":"ja|nein|nicht_pruefbar",\n';
+    p += '  "makler_namentlich_genannt":"ja|nein|nicht_pruefbar",\n';
+    p += '  "zusammenfassung":"1-2 Saetze NEUTRAL was die Mail inhaltlich macht",\n';
+    p += '  "naechster_schritt":"konkrete Handlungsempfehlung fuer den Sachbearbeiter (1 Satz)",\n';
+    p += '  "hinweis":"1 Satz was auffaellig ist, oder leer (Standard-Boilerplate wie Sonderkonditionsvorbehalt NICHT erwaehnen)"\n';
     p += "}\n";
     return p;
 }
@@ -7383,11 +7413,17 @@ function wsBuildNotizHtml(data) {
     function rowFn(label, value) {
         return '<tr><td class="lbl">' + esc(label) + '</td><td class="val">' + esc(value || "-") + '</td></tr>';
     }
+    function combine(a, b) { return (String(a || "") + " " + String(b || "")).replace(/^\s+|\s+$/g, ""); }
     var isRem = (d.ist_reminder === "ja");
     var mvOk = d.mv_status === "OK";
+    var maklerName = combine(d.makler_vorname, d.makler_nachname);
+    var kundeName = combine(d.kunde_vorname, d.kunde_nachname) || d.kunde_name;
     var klassBadge = '<span class="badge badge-blue">' + esc(d.klassifikation || "(leer)") + '</span>';
     var remBadge = isRem ? ' <span class="badge badge-amber">Reminder</span>' : "";
     var mvBadge = '<span class="badge ' + (mvOk ? "badge-green" : "badge-red") + '">' + esc(d.mv_status || "-") + '</span>';
+    function rowHi(label, value) {
+        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val" style="background:#fff7ed;color:#9a3412;font-weight:700;">' + esc(value || "-") + '</td></tr>';
+    }
 
     return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>KI-Analyse</title>' +
 '<style>body{font-family:"Segoe UI",sans-serif;color:#1f2937;background:#fff;margin:0;padding:40px;max-width:900px;}' +
@@ -7410,17 +7446,43 @@ function wsBuildNotizHtml(data) {
 '<h2>Zusammenfassung</h2>' +
 '<p style="font-size:14px;line-height:1.5;color:#1f2937;">' + esc(d.zusammenfassung || "-") + '</p>' +
 '<div class="next"><strong>Naechster Schritt</strong>' + esc(d.naechster_schritt || "-") + '</div>' +
-'<h2>Stammdaten</h2><table>' +
-rowFn("Klassifikation", d.klassifikation) +
-rowFn("Vorgangstyp", isRem ? "Reminder / Wiedervorlage" : "Erstvorgang") +
-(isRem ? rowFn("Reminder-Quelle", d.reminder_quelle) : "") +
+'<h2>Makler</h2><table>' +
 rowFn("Maklerpool", d.maklerpool) +
-rowFn("Kunde", d.kunde_name) +
+rowFn("Makler (Name)", maklerName) +
+rowHi("Makler-Nummer (Agentur/Vermittler)", d.makler_nummer) +
+rowFn("Auftrag-Datum", d.auftrag_datum) +
+rowFn("Makler namentlich genannt", d.makler_namentlich_genannt) +
+'</table>' +
+'<h2>Kunde &amp;amp; Vertrag</h2><table>' +
+rowFn("Kunde (Name)", kundeName) +
+rowFn("Kunden-/Partnernummer", d.kunde_nummer) +
 rowFn("Versicherungsnummer", d.versicherungsnummer) +
 rowFn("Sparte", d.sparte) +
 rowFn("Geschaefts-Typ", d.geschaefts_typ) +
-rowFn("MV-Status", d.mv_status) +
+rowFn("Sonderfall", d.sonderfall) +
 '</table>' +
+'<h2>Vorgang</h2><table>' +
+rowFn("Vorgangstyp", d.vorgangstyp) +
+rowFn("Klassifikation", d.klassifikation) +
+rowFn("Klassifikation-Grund", d.klassifikation_grund) +
+rowFn("Reminder/Wiedervorlage", isRem ? "ja" : "nein") +
+(isRem ? rowFn("Reminder-Quelle", d.reminder_quelle) : "") +
+(d.nicht_neuer_vorgang_grund ? rowFn("Kein neuer Vorgang weil", d.nicht_neuer_vorgang_grund) : "") +
+'</table>' +
+'<h2>Anhaenge &amp;amp; Maklervollmacht</h2><table>' +
+rowFn("Anhang-Typen", d.anhang_typen) +
+rowFn("PDF-Qualitaet", d.pdf_qualitaet) +
+rowFn("Maklervollmacht enthalten", d.enthaelt_maklervollmacht) +
+rowFn("MV-Status", d.mv_status) +
+rowFn("MV vollumfaenglich", d.mv_vollumfaenglich) +
+(d.mv_einschraenkungen ? rowFn("MV-Einschraenkungen", d.mv_einschraenkungen) : "") +
+rowFn("Unterschrift Kunde", d.unterschrift_kunde) +
+rowFn("Unterschrift Makler", d.unterschrift_makler) +
+rowFn("Auf VN ausgestellt", d.auf_vn_ausgestellt) +
+rowFn("Unterlagen angefragt", d.unterlagen_angefragt) +
+(d.unterlagen_liste ? rowFn("Fehlende Unterlagen", d.unterlagen_liste) : "") +
+'</table>' +
+(d.hinweis ? '<div class="next" style="background:#fffbeb;border-color:#fde68a;color:#92400e;"><strong style="color:#d97706;">Hinweis</strong>' + esc(d.hinweis) + '</div>' : "") +
 '<div class="footer">Erstellt durch ERGO Vorgang-Analyse Workshop-Demo &amp;middot; ' + new Date().toLocaleString() + '</div>' +
 '</body></html>';
 }
@@ -7634,7 +7696,20 @@ function wsTick() {
                 }
                 if (!ad) continue;
                 var aresp = "";
-                try { aresp = s.answerHttp.ResponseText; } catch(e) {}
+                // UTF-8-Decode der Roh-Bytes - sonst werden Umlaute (ae oe ue ss)
+                // zu Mojibake weil WinHttp.ResponseText oft Latin-1 annimmt.
+                try {
+                    var rb = s.answerHttp.ResponseBody;
+                    var rs = new ActiveXObject("ADODB.Stream");
+                    rs.Type = 1; rs.Open();
+                    rs.Write(rb);
+                    rs.Position = 0;
+                    rs.Type = 2; rs.Charset = "utf-8";
+                    aresp = String(rs.ReadText());
+                    rs.Close();
+                } catch(eRb) {
+                    try { aresp = s.answerHttp.ResponseText; } catch(e) {}
+                }
                 var data = wsParseJson(jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"));
                 if (!data) { s.stage = "ERROR"; s.error = "JSON nicht parsebar"; continue; }
                 s.data = data;
@@ -7715,51 +7790,89 @@ function wsFinishDemo(processed) {
             var wb = excel.Workbooks.Add();
             var sh = wb.ActiveSheet;
             try { sh.Name = "Workshop-Demo"; } catch(e) {}
-            var heads = ["#","Datei","Datum","Absender","Betreff","Anhaenge",
-                         "Klassifikation","Ist_Reminder","Reminder_Quelle","Maklerpool",
-                         "Kunde","Versicherungsnummer","Sparte","Geschaefts_Typ","MV_Status",
-                         "Zusammenfassung","Naechster_Schritt"];
-            for (var c = 0; c < heads.length; c++) sh.Cells(1, c+1).Value = heads[c];
+            // Spalten-Definition: gleiche Felder wie das grosse Tool.
+            // w = Spaltenbreite, wrap = Zeilenumbruch fuer lange Freitexte.
+            var colDefs = [
+                { h:"#",                   w:4,  wrap:false, v:function(r,d,i){ return i+1; } },
+                { h:"Datei",               w:34, wrap:false, v:function(r,d){ return cellSafe(r.fileName); } },
+                { h:"Datum",               w:16, wrap:false, v:function(r,d){ return cellSafe(r.datum); } },
+                { h:"Absender",            w:28, wrap:false, v:function(r,d){ return cellSafe(r.absName + " <" + r.absMail + ">"); } },
+                { h:"Betreff",             w:40, wrap:true,  v:function(r,d){ return cellSafe(r.betreff); } },
+                { h:"Anhaenge",            w:30, wrap:true,  v:function(r,d){ return cellSafe(r.anhangAlle); } },
+                { h:"Vorgangstyp",         w:16, wrap:false, v:function(r,d){ return cellSafe(d.vorgangstyp); } },
+                { h:"Klassifikation",      w:18, wrap:false, v:function(r,d){ return cellSafe(d.klassifikation); } },
+                { h:"Klassifikation_Grund",w:45, wrap:true,  v:function(r,d){ return cellSafe(d.klassifikation_grund); } },
+                { h:"Ist_Reminder",        w:11, wrap:false, v:function(r,d){ return cellSafe(d.ist_reminder); } },
+                { h:"Reminder_Quelle",     w:20, wrap:false, v:function(r,d){ return cellSafe(d.reminder_quelle); } },
+                { h:"Nicht_Neu_Grund",     w:35, wrap:true,  v:function(r,d){ return cellSafe(d.nicht_neuer_vorgang_grund); } },
+                { h:"Maklerpool",          w:28, wrap:false, v:function(r,d){ return cellSafe(d.maklerpool); } },
+                { h:"Makler_Nachname",     w:18, wrap:false, v:function(r,d){ return cellSafe(d.makler_nachname); } },
+                { h:"Makler_Vorname",      w:16, wrap:false, v:function(r,d){ return cellSafe(d.makler_vorname); } },
+                { h:"Makler_Nummer",       w:24, wrap:false, v:function(r,d){ return cellSafe(d.makler_nummer); } },
+                { h:"Auftrag_Datum",       w:14, wrap:false, v:function(r,d){ return cellSafe(d.auftrag_datum); } },
+                { h:"Kunde_Nachname",      w:18, wrap:false, v:function(r,d){ return cellSafe(d.kunde_nachname); } },
+                { h:"Kunde_Vorname",       w:16, wrap:false, v:function(r,d){ return cellSafe(d.kunde_vorname); } },
+                { h:"Kunde_Nummer",        w:16, wrap:false, v:function(r,d){ return cellSafe(d.kunde_nummer); } },
+                { h:"Versicherungsnummer", w:18, wrap:false, v:function(r,d){ return cellSafe(d.versicherungsnummer); } },
+                { h:"Sparte",              w:12, wrap:false, v:function(r,d){ return cellSafe(d.sparte); } },
+                { h:"Geschaefts_Typ",      w:20, wrap:false, v:function(r,d){ return cellSafe(d.geschaefts_typ); } },
+                { h:"Unterlagen_Angefragt",w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterlagen_angefragt); } },
+                { h:"Unterlagen_Liste",    w:35, wrap:true,  v:function(r,d){ return cellSafe(d.unterlagen_liste); } },
+                { h:"Sonderfall",          w:16, wrap:false, v:function(r,d){ return cellSafe(d.sonderfall); } },
+                { h:"Anhang_Typen",        w:28, wrap:true,  v:function(r,d){ return cellSafe(d.anhang_typen); } },
+                { h:"PDF_Qualitaet",       w:13, wrap:false, v:function(r,d){ return cellSafe(d.pdf_qualitaet); } },
+                { h:"Enthaelt_MV",         w:11, wrap:false, v:function(r,d){ return cellSafe(d.enthaelt_maklervollmacht); } },
+                { h:"MV_Vollumfaenglich",  w:13, wrap:false, v:function(r,d){ return cellSafe(d.mv_vollumfaenglich); } },
+                { h:"MV_Einschraenkungen", w:35, wrap:true,  v:function(r,d){ return cellSafe(d.mv_einschraenkungen); } },
+                { h:"MV_Status",           w:16, wrap:false, v:function(r,d){ return cellSafe(d.mv_status); } },
+                { h:"Unterschrift_Kunde",  w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterschrift_kunde); } },
+                { h:"Unterschrift_Makler", w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterschrift_makler); } },
+                { h:"Auf_VN_Ausgestellt",  w:13, wrap:false, v:function(r,d){ return cellSafe(d.auf_vn_ausgestellt); } },
+                { h:"Makler_Namentlich",   w:13, wrap:false, v:function(r,d){ return cellSafe(d.makler_namentlich_genannt); } },
+                { h:"Zusammenfassung",     w:55, wrap:true,  v:function(r,d){ return cellSafe(d.zusammenfassung); } },
+                { h:"Naechster_Schritt",   w:50, wrap:true,  v:function(r,d){ return cellSafe(d.naechster_schritt); } },
+                { h:"Hinweis",             w:40, wrap:true,  v:function(r,d){ return cellSafe(d.hinweis); } }
+            ];
+            var nCols = colDefs.length;
+            for (var c = 0; c < nCols; c++) sh.Cells(1, c+1).Value = colDefs[c].h;
             try {
-                var hr = sh.Range(sh.Cells(1,1), sh.Cells(1, heads.length));
+                var hr = sh.Range(sh.Cells(1,1), sh.Cells(1, nCols));
                 hr.Font.Bold = true;
                 hr.Font.Color = rgb(255,255,255);
                 hr.Interior.Color = rgb(200,16,46);
                 hr.HorizontalAlignment = -4108;
-                sh.Rows(1).RowHeight = 26;
+                hr.VerticalAlignment = -4108;
+                hr.WrapText = true;
+                sh.Rows(1).RowHeight = 32;
             } catch(e) {}
             for (var i = 0; i < processed.length; i++) {
                 var r = processed[i];
                 var d = r.data || {};
                 var row = i + 2;
-                sh.Cells(row, 1).Value = i + 1;
-                sh.Cells(row, 2).Value = cellSafe(r.fileName);
-                sh.Cells(row, 3).Value = cellSafe(r.datum);
-                sh.Cells(row, 4).Value = cellSafe(r.absName + " <" + r.absMail + ">");
-                sh.Cells(row, 5).Value = cellSafe(r.betreff);
-                sh.Cells(row, 6).Value = cellSafe(r.anhangAlle);
-                sh.Cells(row, 7).Value = cellSafe(d.klassifikation);
-                sh.Cells(row, 8).Value = cellSafe(d.ist_reminder);
-                sh.Cells(row, 9).Value = cellSafe(d.reminder_quelle);
-                sh.Cells(row, 10).Value = cellSafe(d.maklerpool);
-                sh.Cells(row, 11).Value = cellSafe(d.kunde_name);
-                sh.Cells(row, 12).Value = cellSafe(d.versicherungsnummer);
-                sh.Cells(row, 13).Value = cellSafe(d.sparte);
-                sh.Cells(row, 14).Value = cellSafe(d.geschaefts_typ);
-                sh.Cells(row, 15).Value = cellSafe(d.mv_status);
-                sh.Cells(row, 16).Value = cellSafe(d.zusammenfassung);
-                sh.Cells(row, 17).Value = cellSafe(d.naechster_schritt);
+                for (var c = 0; c < nCols; c++) {
+                    try { sh.Cells(row, c+1).Value = colDefs[c].v(r, d, i); } catch(eCell) {}
+                }
                 // Reminder-Zeile orange faerben
                 if (d.ist_reminder === "ja") {
-                    try { sh.Range(sh.Cells(row,1), sh.Cells(row, heads.length)).Interior.Color = rgb(254,215,170); } catch(e) {}
+                    try { sh.Range(sh.Cells(row,1), sh.Cells(row, nCols)).Interior.Color = rgb(254,215,170); } catch(e) {}
                 }
             }
             try {
-                sh.Columns("A:A").ColumnWidth = 4;
-                sh.Columns("B:B").ColumnWidth = 38;
-                sh.Columns("C:O").ColumnWidth = 16;
-                sh.Columns("P:Q").ColumnWidth = 50;
-                sh.Range(sh.Cells(1,1), sh.Cells(processed.length+1, heads.length)).AutoFilter();
+                for (var c = 0; c < nCols; c++) {
+                    var col = sh.Columns(c+1);
+                    col.ColumnWidth = colDefs[c].w;
+                    if (colDefs[c].wrap) {
+                        col.WrapText = true;
+                        col.VerticalAlignment = -4160; // xlTop
+                    }
+                }
+                sh.Range(sh.Cells(1,1), sh.Cells(processed.length+1, nCols)).AutoFilter();
+                try { sh.Rows("2:" + (processed.length + 1)).AutoFit(); } catch(eAf) {}
+                try {
+                    excel.ActiveWindow.SplitColumn = 0;
+                    excel.ActiveWindow.SplitRow = 1;
+                    excel.ActiveWindow.FreezePanes = true;
+                } catch(eFr) {}
             } catch(e) {}
             wsLog("   Excel mit " + processed.length + " Zeilen erstellt + sichtbar.");
         } catch(eX) {
