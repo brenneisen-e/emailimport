@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.72 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.73 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.72</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.73</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.72"
+        VERSION="1.73"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.72 - Pool vs. eigentlicher Makler getrennt: laeuft ein Maklervertrag auf eine Firma die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS), bleibt Maklerpool = JDC / Jung, DMS &amp; Cie. ABER Makler-Name = Finanzguru. v1.71 - Workshop volle Feldparitaet, deutsche Umlaute, Zeilenumbruch</div>
+            <div class="ver">v1.73 - Entwurfs-Mail: "Naechster Schritt"/"Hinweis"-Label jetzt mit Abstand zum Text (Outlook-feste Inline-Styles). Leere Felder ("leer"/"-" etc.) werden gefiltert -> kein "leer Finanzguru" mehr. Umlaute ae oe ue ss als numerische HTML-Entities -> korrekt in Outlook unabhaengig vom Charset. v1.72 - Pool vs. eigentlicher Makler getrennt (Finanzguru via Jung DMS)</div>
         </div>
 
         <!-- Cookie -->
@@ -7415,22 +7415,27 @@ function wsParseJson(txt) {
 function wsBuildNotizHtml(data) {
     var d = data || {};
     function esc(s) { return String(s == null ? "" : s).replace(/&amp;/g, "&amp;amp;").replace(/</g, "&amp;lt;").replace(/>/g, "&amp;gt;").replace(/"/g, "&amp;quot;"); }
-    function rowFn(label, value) {
-        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val">' + esc(value || "-") + '</td></tr>';
+    function clean(v) {
+        var s = String(v == null ? "" : v).replace(/^\s+|\s+$/g, "");
+        if (/^(leer|-|k\.?\s?a\.?|n\/a|na|none|null|undefined|nicht[ _]pruefbar|keine?)$/i.test(s)) return "";
+        return s;
     }
-    function combine(a, b) { return (String(a || "") + " " + String(b || "")).replace(/^\s+|\s+$/g, ""); }
+    function rowFn(label, value) {
+        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val">' + esc(clean(value) || "-") + '</td></tr>';
+    }
+    function combine(a, b) { return (clean(a) + " " + clean(b)).replace(/\s+/g, " ").replace(/^\s+|\s+$/g, ""); }
     var isRem = (d.ist_reminder === "ja");
     var mvOk = d.mv_status === "OK";
     var maklerName = combine(d.makler_vorname, d.makler_nachname);
-    var kundeName = combine(d.kunde_vorname, d.kunde_nachname) || d.kunde_name;
+    var kundeName = combine(d.kunde_vorname, d.kunde_nachname) || clean(d.kunde_name);
     var klassBadge = '<span class="badge badge-blue">' + esc(d.klassifikation || "(leer)") + '</span>';
     var remBadge = isRem ? ' <span class="badge badge-amber">Reminder</span>' : "";
     var mvBadge = '<span class="badge ' + (mvOk ? "badge-green" : "badge-red") + '">' + esc(d.mv_status || "-") + '</span>';
     function rowHi(label, value) {
-        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val" style="background:#fff7ed;color:#9a3412;font-weight:700;">' + esc(value || "-") + '</td></tr>';
+        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val" style="background:#fff7ed;color:#9a3412;font-weight:700;">' + esc(clean(value) || "-") + '</td></tr>';
     }
 
-    return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>KI-Analyse</title>' +
+    var _h = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>KI-Analyse</title>' +
 '<style>body{font-family:"Segoe UI",sans-serif;color:#1f2937;background:#fff;margin:0;padding:40px;max-width:900px;}' +
 'h1{font-size:22px;color:#111827;margin-bottom:8px;border-bottom:2px solid #e5e7eb;padding-bottom:12px;}' +
 '.sub{color:#6b7280;font-size:13px;margin-bottom:24px;}' +
@@ -7450,7 +7455,7 @@ function wsBuildNotizHtml(data) {
 '<div class="sub">' + klassBadge + remBadge + ' &amp;nbsp;Maklervollmacht: ' + mvBadge + '</div>' +
 '<h2>Zusammenfassung</h2>' +
 '<p style="font-size:14px;line-height:1.5;color:#1f2937;">' + esc(d.zusammenfassung || "-") + '</p>' +
-'<div class="next"><strong>Naechster Schritt</strong>' + esc(d.naechster_schritt || "-") + '</div>' +
+'<div class="next"><strong style="display:block;font-size:11px;color:#3b82f6;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Naechster Schritt</strong><span>' + esc(clean(d.naechster_schritt) || "-") + '</span></div>' +
 '<h2>Makler</h2><table>' +
 rowFn("Maklerpool", d.maklerpool) +
 rowFn("Makler (Name)", maklerName) +
@@ -7487,9 +7492,12 @@ rowFn("Auf VN ausgestellt", d.auf_vn_ausgestellt) +
 rowFn("Unterlagen angefragt", d.unterlagen_angefragt) +
 (d.unterlagen_liste ? rowFn("Fehlende Unterlagen", d.unterlagen_liste) : "") +
 '</table>' +
-(d.hinweis ? '<div class="next" style="background:#fffbeb;border-color:#fde68a;color:#92400e;"><strong style="color:#d97706;">Hinweis</strong>' + esc(d.hinweis) + '</div>' : "") +
+(clean(d.hinweis) ? '<div class="next" style="background:#fffbeb;border-color:#fde68a;color:#92400e;"><strong style="display:block;font-size:11px;color:#d97706;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Hinweis</strong><span>' + esc(clean(d.hinweis)) + '</span></div>' : "") +
 '<div class="footer">Erstellt durch ERGO Vorgang-Analyse Workshop-Demo &amp;middot; ' + new Date().toLocaleString() + '</div>' +
 '</body></html>';
+    // Alle Nicht-ASCII-Zeichen (Umlaute ae oe ue ss etc.) als numerische HTML-Entities -
+    // dann ist die Darstellung in Outlook unabhaengig von der Charset-Interpretation korrekt.
+    return _h.replace(new RegExp('[\\u0080-\\uFFFF]','g'), function(ch){ return '&amp;#' + ch.charCodeAt(0) + ';'; });
 }
 
 function wsWriteNotizFile(html, basename) {
