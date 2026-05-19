@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v2.04 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v2.05 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v2.04</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v2.05</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.04"
+        VERSION="2.05"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.04 - CRASH-FIX Kombi-Streaming: (1) Log wird sofort in Workshop-Log_*.txt geschrieben (uebersteht HTA-Absturz, danach oeffenbar); (2) Stream-Subprozess nutzt WinHttp statt MSXML (Cookie/Origin-Header erlaubt) und schreibt die Antwort EINMAL; (3) HTA parst NICHT mehr die wachsende Datei jede Sekunde (das war der mshta-Crash) - liest+parst genau einmal wenn fertig. v2.03 - DIAG bei Parse-Fehler</div>
+            <div class="ver">v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -8242,10 +8242,31 @@ function wsRestoreUi() {
 }
 
 // Liest eine Mail aus (Properties + PDFs in TEMP), OHNE Conversation zu starten.
-// Ist die Scan-Ueberspringen-Option aktiv? (Checkbox im Workshop)
+// Ist die Scan-Ueberspringen-Option aktiv? (Custom-Checkbox im Workshop)
 function wsSkipScansOn() {
     var c = document.getElementById("wsSkipScans");
     return c ? !!c.checked : true;   // Default: ueberspringen (Tempo)
+}
+function wsToggleSkip() {
+    var c = document.getElementById("wsSkipScans");
+    if (!c) return;
+    c.checked = !c.checked;
+    wsSkipPaint();
+}
+function wsSkipPaint() {
+    var c = document.getElementById("wsSkipScans");
+    var b = document.getElementById("wsSkipBox");
+    var r = document.getElementById("wsSkipRow");
+    if (!c || !b) return;
+    if (c.checked) {
+        b.innerHTML = "&amp;#10003;"; b.style.background = "#16a34a";
+        b.style.borderColor = "#15803d"; b.style.color = "#ffffff";
+        if (r) { r.style.background = "#f0fdf4"; r.style.borderColor = "#bbf7d0"; }
+    } else {
+        b.innerHTML = "&amp;nbsp;"; b.style.background = "#ffffff";
+        b.style.borderColor = "#9ca3af";
+        if (r) { r.style.background = "#f9fafb"; r.style.borderColor = "#e5e7eb"; }
+    }
 }
 
 // Heuristik (ohne PDF-Lib): erkennt Scan-/Foto-PDFs ohne echte Textebene.
@@ -8285,7 +8306,7 @@ function wsExtractMail(msgPath) {
     var shell = new ActiveXObject("WScript.Shell");
     var info = { msgPath: msgPath, fileName: fileName, datum: "", absName: "", absMail: "",
                  betreff: "", body: "", anhangAlle: "", pdfPaths: [], pdfListe: "",
-                 skippedScans: [], tempDir: "", error: null };
+                 skippedScans: [], skipMailScan: false, tempDir: "", error: null };
     var skipScans = wsSkipScansOn();
     var mail = null;
     try {
@@ -8344,6 +8365,25 @@ function wsExtractMail(msgPath) {
             } catch(eAtt) {}
         }
         try { mail.Close(1); } catch(e) {}
+        // Mail-Level-Skip: Enthaelt die Mail AUCH NUR EINE Foto-/Scan-PDF,
+        // wird die GESAMTE Mail nicht analysiert (auch evtl. vorhandene
+        // Text-PDFs nicht). Die Mail laeuft nur noch ueber den Body
+        // (guenstig); der Prompt markiert sie als manuell zu pruefen.
+        if (skipScans &amp;&amp; info.skippedScans &amp;&amp; info.skippedScans.length > 0
+            &amp;&amp; info.pdfPaths.length > 0) {
+            try {
+                for (var _sp = 0; _sp < info.pdfPaths.length; _sp++) {
+                    try { fso.DeleteFile(info.pdfPaths[_sp].path, true); } catch(eSpD) {}
+                }
+            } catch(eSpAll) {}
+            info.skipMailScan = true;
+            info.pdfPaths = [];
+            info.pdfListe = "";
+            try { wsLog("Mail komplett uebersprungen (enthaelt Foto-/Scan-PDF): " +
+                  String(info.fileName).substr(0, 50), "muted"); } catch(eSpL) {}
+        } else if (skipScans &amp;&amp; info.skippedScans &amp;&amp; info.skippedScans.length > 0) {
+            info.skipMailScan = true;
+        }
         return info;
     } catch(eEx) {
         try { if (mail) mail.Close(1); } catch(e) {}
@@ -8521,12 +8561,16 @@ function wsBatchTick() {
                 for (var nmI = 0; nmI < bs.mails.length; nmI++) if (!bs.mails[nmI].error) nm++;
                 bs._nMails = nm;
                 bs._seen = {}; bs._used = []; bs.streamProcessed = []; bs._objCount = 0;
-                bs.streamHandle = wsStreamAnswerStart(ERGO_BASE + "/conversation/" + bs.convId, bs.prompt, bs.docIdsJson);
+                try {
+                    bs.streamHandle = wsStreamAnswerStart(ERGO_BASE + "/conversation/" + bs.convId, bs.prompt, bs.docIdsJson);
+                } catch(eStr) {
+                    return wsBatchFail(bs, "Stream-Start fehlgeschlagen: " + (eStr.message || eStr));
+                }
                 bs.answerStart = new Date().getTime();
                 bs._hbAt = 0; bs._lastPartLen = 0;
                 bs.stage = "STREAMING";
                 wsProgress(0, bs._nMails);
-                wsLog("Prompt gesendet (Subprozess-Stream) - Vorgaenge werden einzeln verwertet, sobald sie fertig sind...", "head");
+                wsLog("Prompt gesendet (Subprozess-Stream) - Antwort wird empfangen...", "head");
             } else {
                 // Batch-Antwort dauert laenger -> 15 min Receive-Timeout statt 180s.
                 bs.answerHttp = startAnswerAsync(bs.convId, bs.prompt, bs.docIdsJson, 900000);
@@ -8779,9 +8823,11 @@ function wsStreamAnswerStart(answerUrl, prompt, docIdsJson) {
         errFile:     tmp + "\\ergo_str_" + st + "_err.txt",
         vbsPath:     tmp + "\\ergo_str_" + st + ".vbs"
     };
+    wsLog("Stream-Start: schreibe Cookie...", "muted");
     try { var cf = fso.CreateTextFile(h.cookieFile, true, false); cf.Write(state.cookie); cf.Close(); } catch(e) {}
-    // Payload als UTF-8-Bytes in Datei
+    wsLog("Stream-Start: baue Payload...", "muted");
     var payload = buildPayload(cleanForJson(prompt), docIdsJson || "[]");
+    wsLog("Stream-Start: Payload " + Math.round(payload.length/1024) + " KB -> Datei...", "muted");
     try {
         var pstm = new ActiveXObject("ADODB.Stream");
         pstm.Type = 2; pstm.Charset = "utf-8"; pstm.Open(); pstm.WriteText(payload);
@@ -8789,11 +8835,14 @@ function wsStreamAnswerStart(answerUrl, prompt, docIdsJson) {
         var pb = pstm.Read(); pstm.Close();
         var ws = new ActiveXObject("ADODB.Stream");
         ws.Type = 1; ws.Open(); ws.Write(pb); ws.SaveToFile(h.payloadFile, 2); ws.Close();
-    } catch(eP) {}
-    try { var vf = fso.CreateTextFile(h.vbsPath, true, false); vf.Write(wsBuildStreamVbs()); vf.Close(); } catch(e) {}
+    } catch(eP) { wsLog("Stream-Start: Payload-Datei FEHLER: " + (eP.message||eP), "err"); }
+    wsLog("Stream-Start: schreibe VBS-Worker...", "muted");
+    try { var vf = fso.CreateTextFile(h.vbsPath, true, false); vf.Write(wsBuildStreamVbs()); vf.Close(); } catch(e) { wsLog("Stream-Start: VBS FEHLER: " + (e.message||e), "err"); }
     var cmd = 'wscript.exe //NoLogo //B "' + h.vbsPath + '" "' + h.cookieFile + '" "' +
               answerUrl + '" "' + h.payloadFile + '" "' + h.partFile + '" "' + h.doneFile + '" "' + h.errFile + '"';
+    wsLog("Stream-Start: starte Subprozess...", "muted");
     shell.Run(cmd, 0, false);
+    wsLog("Stream-Start: Subprozess laeuft.", "muted");
     return h;
 }
 
@@ -9762,12 +9811,17 @@ End Function
                 <div class="ws-progress-bar"><div class="ws-progress-fill" id="wsProgressFill"></div></div>
                 <div class="ws-progress-text" id="wsProgressText">0 von 0</div>
             </div>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#1f2937;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;margin-bottom:12px;cursor:pointer;">
-                <input type="checkbox" id="wsSkipScans" checked style="width:16px;height:16px;">
-                <span><strong>Scan-/Foto-PDFs &amp;uuml;berspringen (schnell)</strong> &amp;mdash; PDFs ohne Textebene
-                werden nicht analysiert, sondern als <em>&amp;bdquo;Scan &amp;ndash; manuell pr&amp;uuml;fen&amp;ldquo;</em>
-                markiert. Massiv schneller (kein Word-Reflow / kein OCR-Upload f&amp;uuml;r Scans).</span>
-            </label>
+            <div id="wsSkipRow" onclick="wsToggleSkip()" style="display:table;width:100%;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;margin-bottom:12px;cursor:pointer;font-size:13px;color:#1f2937;box-sizing:border-box;">
+                <div style="display:table-cell;width:34px;vertical-align:top;">
+                    <span id="wsSkipBox" style="display:inline-block;width:22px;height:22px;border-radius:5px;background:#16a34a;border:1px solid #15803d;color:#fff;text-align:center;line-height:21px;font-weight:700;font-size:15px;">&amp;#10003;</span>
+                </div>
+                <div style="display:table-cell;vertical-align:top;line-height:1.5;">
+                    <strong>Scan-/Foto-PDFs &amp;uuml;berspringen (schnell)</strong> &amp;mdash; PDFs ohne Textebene
+                    werden nicht analysiert, sondern als <em>&amp;bdquo;Scan &amp;ndash; manuell pr&amp;uuml;fen&amp;ldquo;</em>
+                    markiert. Massiv schneller (kein Word-Reflow / kein OCR-Upload f&amp;uuml;r Scans).
+                </div>
+            </div>
+            <input type="checkbox" id="wsSkipScans" checked style="display:none;">
             <button class="ws-btn-play" id="wsPlay" onclick="wsRunDemo()" disabled>
                 <span class="ws-play-icon">&amp;#9654;</span><span>Analyse starten (Parallel)</span>
             </button>
@@ -9808,7 +9862,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.04</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.05</div>
     </div>
 </div>
 
