@@ -3,115 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.78 - HTA Quellcode</title>
+<title>ERGO Workshop v1.78 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    color: #f1f5f9;
-    min-height: 100vh;
-    padding: 1.5rem;
-}
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
 .container { max-width: 1400px; margin: 0 auto; }
-.card {
-    background: rgba(30, 41, 59, 0.85);
-    border-radius: 14px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    margin-bottom: 1rem;
-}
+.card { background: rgba(30,41,59,0.85); border-radius: 14px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.4); margin-bottom: 1rem; }
 h1 { font-size: 22px; margin-bottom: 0.5rem; }
 .subtitle { color: #94a3b8; font-size: 13px; }
-.info {
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid #3b82f6;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 1rem 0;
-    font-size: 13px;
-    color: #cbd5e1;
-}
-.info strong { color: #93c5fd; }
+.info { background: rgba(200,16,46,0.12); border: 1px solid #c8102e; border-radius: 8px; padding: 1rem; margin: 1rem 0; font-size: 13px; color: #cbd5e1; }
+.info strong { color: #fca5a5; }
 .info ol { margin-left: 1.25rem; margin-top: 0.5rem; }
-.info code {
-    background: rgba(0,0,0,0.3);
-    padding: 1px 6px;
-    border-radius: 3px;
-    color: #fbbf24;
-    font-family: 'Consolas', monospace;
-}
-.actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    align-items: center;
-    margin: 1rem 0;
-}
-button {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
+.info code { background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 3px; color: #fbbf24; font-family: 'Consolas', monospace; }
+.actions { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0; }
+button { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; }
 .btn-copy { background: linear-gradient(135deg, #10b981, #059669); color: white; }
 .btn-copy:hover { background: linear-gradient(135deg, #34d399, #10b981); transform: translateY(-1px); }
 .btn-copy.copied { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-.btn-download { background: linear-gradient(135deg, #d97706, #b45309); color: white; }
-.btn-download:hover { background: linear-gradient(135deg, #f59e0b, #d97706); transform: translateY(-1px); }
-.btn-icon {
-    background: #475569; color: #f1f5f9;
-    padding: 12px 16px;
-}
-#status {
-    font-size: 13px;
-    color: #6ee7b7;
-    font-weight: 500;
-    margin-left: 0.5rem;
-}
-.meta {
-    font-size: 12px;
-    color: #94a3b8;
-    margin: 0.5rem 0 1rem;
-}
+.btn-download { background: linear-gradient(135deg, #c8102e, #a30d24); color: white; }
+.btn-download:hover { background: linear-gradient(135deg, #e11d48, #c8102e); transform: translateY(-1px); }
+.btn-icon { background: #475569; color: #f1f5f9; padding: 12px 16px; }
+#status { font-size: 13px; color: #6ee7b7; font-weight: 500; margin-left: 0.5rem; }
+.meta { font-size: 12px; color: #94a3b8; margin: 0.5rem 0 1rem; }
 .meta strong { color: #f1f5f9; }
-textarea#code {
-    width: 100%;
-    height: 70vh;
-    background: #0f172a;
-    color: #e2e8f0;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 1rem;
-    font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 11px;
-    line-height: 1.4;
-    resize: vertical;
-    white-space: pre;
-}
-textarea#code:focus { outline: 2px solid #ef4444; }
+textarea#code { width: 100%; height: 70vh; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; padding: 1rem; font-family: 'Consolas','Courier New',monospace; font-size: 11px; line-height: 1.4; resize: vertical; white-space: pre; }
+textarea#code:focus { outline: 2px solid #c8102e; }
 svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 </style>
 </head>
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.78</strong> &mdash; HTA Quellcode</h1>
-<p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
+<h1>ERGO Workshop <strong>v1.78</strong> &mdash; HTA Quellcode</h1>
+<p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
 <strong>Wie nutze ich diese Seite?</strong>
 <ol>
 <li>Klicke auf <strong>&quot;Code kopieren&quot;</strong> oder <strong>&quot;Als .hta herunterladen&quot;</strong></li>
-<li>Beim Kopieren: oeffne Notepad / Notepad++ und fuege ein (<code>Strg+V</code>)</li>
-<li>Speichern als <code>ergo-vorgang-analyse.hta</code> (Encoding <strong>UTF-8</strong>)</li>
-<li>Doppelklick auf die Datei &rarr; HTA startet</li>
+<li>Beim Kopieren: Notepad / Notepad++ oeffnen und einfuegen (<code>Strg+V</code>)</li>
+<li>Speichern als <code>ergo-workshop.hta</code> (Encoding <strong>UTF-8</strong>)</li>
+<li>Doppelklick &rarr; HTA startet direkt im Workshop-Modus</li>
 </ol>
 </div>
 
@@ -139,10 +71,10 @@ Alles markieren
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=11">
-    <title>ERGO Vorgang-Analyse</title>
+    <title>ERGO Workshop</title>
     <HTA:APPLICATION
         ID="ERGO_Vorgang_Analyse"
-        APPLICATIONNAME="ERGO Vorgang-Analyse"
+        APPLICATIONNAME="ERGO Workshop"
         BORDER="dialog"
         BORDERSTYLE="normal"
         CAPTION="yes"
@@ -644,6 +576,7 @@ window.onload = function() {
 
     // Drag-drop
     setupDragDrop();
+    try { setTimeout(function(){ openWorkshopMode(); }, 350); } catch(e) {}
 };
 
 function setupDragDrop() {
@@ -8624,30 +8557,20 @@ End Function
 <script>
 function copyCode() {
     var ta = document.getElementById('code');
-    var btn = document.getElementById('btnCopy');
     var status = document.getElementById('status');
     try {
-        ta.focus();
-        ta.select();
-        ta.setSelectionRange(0, ta.value.length);
+        ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(ta.value).then(function() {
-                showCopied();
-            }).catch(function() {
-                var ok = document.execCommand('copy');
-                if (ok) showCopied();
+            navigator.clipboard.writeText(ta.value).then(showCopied).catch(function() {
+                if (document.execCommand('copy')) showCopied();
                 else status.innerText = 'Kopieren fehlgeschlagen - bitte manuell markieren + Strg+C';
             });
         } else {
-            var ok = document.execCommand('copy');
-            if (ok) showCopied();
+            if (document.execCommand('copy')) showCopied();
             else status.innerText = 'Kopieren fehlgeschlagen - bitte manuell markieren + Strg+C';
         }
-    } catch(e) {
-        status.innerText = 'Kopieren fehlgeschlagen: ' + e.message;
-    }
+    } catch(e) { status.innerText = 'Kopieren fehlgeschlagen: ' + e.message; }
 }
-
 function showCopied() {
     var btn = document.getElementById('btnCopy');
     var status = document.getElementById('status');
@@ -8660,39 +8583,27 @@ function showCopied() {
         status.innerText = '';
     }, 3000);
 }
-
 function downloadCode() {
     var content = document.getElementById('code').value;
     var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url;
-    a.download = 'ergo-vorgang-analyse.hta';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
+    a.href = url; a.download = 'ergo-workshop.hta';
+    document.body.appendChild(a); a.click();
+    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
     document.getElementById('status').innerText = 'Download gestartet.';
     setTimeout(function() { document.getElementById('status').innerText = ''; }, 3000);
 }
-
 function selectAll() {
     var ta = document.getElementById('code');
-    ta.focus();
-    ta.select();
-    ta.setSelectionRange(0, ta.value.length);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
     document.getElementById('status').innerText = 'Markiert - jetzt Strg+C druecken.';
     setTimeout(function() { document.getElementById('status').innerText = ''; }, 3000);
 }
-
 (function() {
-    var ta = document.getElementById('code');
-    var v = ta.value;
+    var v = document.getElementById('code').value;
     document.getElementById('meta-size').innerText = Math.round(v.length / 1024) + ' KB';
-    var lines = v.split('\n').length;
-    document.getElementById('meta-lines').innerText = lines;
+    document.getElementById('meta-lines').innerText = v.split('\n').length;
 })();
 </script>
 </body>
