@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.80"
+        VERSION="1.81"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.80 - Cookie-Auto-Helfer komplett entfernt (Cookie kommt nur noch aus Cookie.txt). PDF-Notiz: Label und Text durch Block-Divs sauber getrennt (kein zusammenlaufendes "NAECHSTER SCHRITTBestands...") + echte Umlaute in Labels (Naechster Schritt, Geschaefts-Typ usw.). Excel wird mit in den _KI-Vorgaenge-Ordner gespeichert. v1.79 - Original-Mail fuehrend, KI-Notiz als PDF</div>
+            <div class="ver">v1.81 - Workshop: neuer BATCH-Modus (alle Mails + PDFs in EINER Conversation/EINEM Prompt, JSON-Array, Mapping per Dateiname) per Knopf, sowie TESTMODUS (erst Parallel, dann Batch, schreibt Vergleichsdatei Parallel-vs-Batch je Feld zum Hochladen bei einer KI). v1.80 - Cookie nur aus Cookie.txt, PDF-Notiz-Fix, Excel in Vorgangs-Ordner</div>
         </div>
 
         <!-- Cookie -->
@@ -7142,6 +7142,9 @@ function openWorkshopMode() {
     document.getElementById("wsFolderPath").className = "ws-folder-path ws-empty";
     document.getElementById("wsInfoGrid").style.display = "none";
     document.getElementById("wsPlay").disabled = true;
+    var wb0;
+    if ((wb0 = document.getElementById("wsBatch"))) wb0.disabled = true;
+    if ((wb0 = document.getElementById("wsTest")))  wb0.disabled = true;
     document.getElementById("wsProgressWrap").style.display = "none";
     document.getElementById("wsLog").style.display = "none";
     document.getElementById("wsLog").innerText = "";
@@ -7219,8 +7222,11 @@ function wsUseFolder(path) {
     } catch(e) {}
     document.getElementById("wsNumMsgs").innerText = state._wsMsgFiles.length;
     document.getElementById("wsInfoGrid").style.display = "flex";
-    document.getElementById("wsPlay").disabled =
-        state._wsMsgFiles.length === 0 || !outlookApp || state.cookie.length < 50;
+    var dis = state._wsMsgFiles.length === 0 || !outlookApp || state.cookie.length < 50;
+    document.getElementById("wsPlay").disabled = dis;
+    var bb;
+    if ((bb = document.getElementById("wsBatch"))) bb.disabled = dis;
+    if ((bb = document.getElementById("wsTest")))  bb.disabled = dis;
     wsHideStatus();
 }
 
@@ -7242,7 +7248,13 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
     p += "'BUe Kundenverbindung' wenn mehrere Vertragsnummern ODER 'alle Vertraege'/'gesamte Kundenverbindung'.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-Objekt (kein Markdown, keine Erklaerung).\n";
     p += "Verwende echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß) in Freitext-Feldern:\n";
-    p += "{\n";
+    p += "{\n" + wsFieldLines() + "}\n";
+    return p;
+}
+
+// Gemeinsames Feld-Schema (Einzel- und Batch-Prompt nutzen es identisch).
+function wsFieldLines() {
+    var p = "";
     p += '  "vorgangstyp":"Makler-Vorgang|Bounce-NDR|Ergo-Outbound|System-Mail|Werbung-Spam|Unklar",\n';
     p += '  "klassifikation":"BUe-Vorgang|Anfrage-Ruecksprache|Antrag-Aenderung|Schadenmeldung|Nicht-Standard|Kein-Makler-Vorgang",\n';
     p += '  "klassifikation_grund":"kurze Begruendung, konkrete Indizien (max 200 Z.)",\n';
@@ -7276,7 +7288,39 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
     p += '  "zusammenfassung":"1-2 Saetze NEUTRAL was die Mail inhaltlich macht",\n';
     p += '  "naechster_schritt":"konkrete Handlungsempfehlung fuer den Sachbearbeiter (1 Satz)",\n';
     p += '  "hinweis":"1 Satz was auffaellig ist, oder leer (Standard-Boilerplate wie Sonderkonditionsvorbehalt NICHT erwaehnen)"\n';
-    p += "}\n";
+    return p;
+}
+
+// Ein Prompt fuer MEHRERE Mails (Batch). Erwartet JSON-ARRAY zurueck, ein
+// Objekt pro Mail, jedes zusaetzlich mit "datei" (exakter Dateiname) zum Mappen.
+function wsBuildBatchPrompt(mails) {
+    var p = "";
+    p += "Du bist ERGO-Innendienst-Sachbearbeiter (SHUK). Du erhaeltst MEHRERE Makler-Mails ";
+    p += "in EINEM Durchlauf plus ALLE zugehoerigen PDF-Anhaenge (hochgeladen).\n";
+    p += "Analysiere JEDE Mail EINZELN und unabhaengig. Ordne hochgeladene PDFs der Mail zu, ";
+    p += "zu der sie laut Dateiname/Inhalt gehoeren. Vermische Vorgaenge NICHT.\n\n";
+    for (var i = 0; i < mails.length; i++) {
+        var m = mails[i];
+        p += "========== MAIL " + (i+1) + " von " + mails.length + " ==========\n";
+        p += "datei: " + m.fileName + "\n";
+        p += "Datum: " + m.datum + "\nAbsender: " + m.absName + " <" + m.absMail + ">\n";
+        p += "Betreff: " + m.betreff + "\n";
+        p += "Anhaenge: " + (m.anhangAlle || "(keine)") + "\n";
+        p += "Anhaenge als PDFs hochgeladen: " + (m.pdfListe || "(keine)") + "\n";
+        p += "Body:\n<<<\n" + m.body + "\n>>>\n";
+    }
+    p += "\n========== ENDE ==========\n\n";
+    p += "WICHTIG zu makler_nummer - STRENGE Priorisierung: 1. Agentur-/Vermittler-Nr. ";
+    p += "im Briefkopf  2. BD-/Bestandsnummer/Beraterzeichen  3. NUR Fallback Pool-IDs.\n";
+    p += "geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n\n";
+    p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown, keine ";
+    p += "Erklaerung), GENAU " + mails.length + " Objekte, in derselben Reihenfolge wie die Mails.\n";
+    p += "Jedes Objekt hat ZUSAETZLICH als erstes Feld \"datei\" mit dem EXAKTEN Dateinamen.\n";
+    p += "Verwende echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß) in Freitext-Feldern:\n";
+    p += "[\n  {\n";
+    p += '  "datei":"exakter Dateiname der zugehoerigen Mail",\n';
+    p += wsFieldLines();
+    p += "  }\n  /* ... weitere Objekte, eines pro Mail ... */\n]\n";
     return p;
 }
 
@@ -7482,18 +7526,21 @@ function wsPrepareSlot(msgPath) {
 
 // Parallele Slot-Pipeline. Alle Mails gleichzeitig in Bearbeitung.
 // Stages: CREATING_CONV -> UPLOADING -> READY -> RUNNING -> DONE / ERROR
-function wsRunDemo() {
+function wsRunDemo() { wsStartParallel(null); }
+
+function wsStartParallel(onDone) {
     if (state._wsRunning) return;
     if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
     if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
     if (!outlookApp) return wsShowError("Outlook nicht verbunden");
 
     state._wsRunning = true;
+    state._wsOnDone = onDone || null;
     document.getElementById("wsPlay").disabled = true;
     document.getElementById("wsPick").disabled = true;
     document.getElementById("wsClose").disabled = true;
     document.getElementById("wsProgressWrap").style.display = "block";
-    document.getElementById("wsLog").innerText = "";
+    if (!onDone) document.getElementById("wsLog").innerText = "";
     wsProgress(0, state._wsMsgFiles.length);
     wsShowInfo("Bereite " + state._wsMsgFiles.length + " Mails vor und analysiere ALLE parallel...");
 
@@ -7649,7 +7696,12 @@ function wsTick() {
                 wsLog("   FEHLER " + slots[k].fileName + ": " + slots[k].error);
             }
         }
-        wsFinishDemo(processed);
+        if (state._wsOnDone) {
+            var cb = state._wsOnDone; state._wsOnDone = null;
+            cb(processed);
+        } else {
+            wsFinishDemo(processed);
+        }
         return;
     }
     setTimeout(wsTick, 400);
@@ -7911,6 +7963,356 @@ function wsLfdNr(i) {
     return n;
 }
 
+// ============================================================================
+// BATCH-MODUS: alle Mails in EINER Conversation / EINEM Prompt (nicht parallel)
+// + TESTMODUS: parallel UND batch, dann Ergebnis-Vergleichsdatei schreiben
+// ============================================================================
+function wsRestoreUi() {
+    state._wsRunning = false;
+    var b;
+    if ((b = document.getElementById("wsPlay"))) b.disabled = state._wsMsgFiles.length === 0;
+    if ((b = document.getElementById("wsBatch"))) b.disabled = state._wsMsgFiles.length === 0;
+    if ((b = document.getElementById("wsTest")))  b.disabled = state._wsMsgFiles.length === 0;
+    if ((b = document.getElementById("wsPick")))  b.disabled = false;
+    if ((b = document.getElementById("wsClose"))) b.disabled = false;
+    wsProgress(state._wsMsgFiles.length, state._wsMsgFiles.length);
+}
+
+// Liest eine Mail aus (Properties + PDFs in TEMP), OHNE Conversation zu starten.
+function wsExtractMail(msgPath) {
+    var fileName = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var shell = new ActiveXObject("WScript.Shell");
+    var info = { msgPath: msgPath, fileName: fileName, datum: "", absName: "", absMail: "",
+                 betreff: "", body: "", anhangAlle: "", pdfPaths: [], pdfListe: "", tempDir: "", error: null };
+    var mail = null;
+    try {
+        mail = outlookApp.Session.OpenSharedItem(msgPath);
+        try { var dt = new Date(mail.ReceivedTime);
+              info.datum = pad(dt.getDate()) + "." + pad(dt.getMonth()+1) + "." + dt.getFullYear(); } catch(e) {}
+        try { info.absName = String(mail.SenderName || ""); } catch(e) {}
+        try { info.absMail = getSenderEmail(mail); } catch(e) {}
+        try { info.betreff = String(mail.Subject || ""); } catch(e) {}
+        try { info.body = String(mail.Body || ""); } catch(e) {}
+        if (info.body.length > 12000) info.body = info.body.substr(0, 12000) + "...[gekuerzt]";
+        var attCount = 0;
+        try { attCount = mail.Attachments.Count; } catch(e) {}
+        var tempDir = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_wsb_" + new Date().getTime() + "_" + Math.floor(Math.random()*100000);
+        try { if (!fso.FolderExists(tempDir)) fso.CreateFolder(tempDir); } catch(e) {}
+        info.tempDir = tempDir;
+        for (var a = 1; a <= attCount; a++) {
+            try {
+                var att = mail.Attachments.Item(a);
+                var fn = String(att.FileName || "");
+                if (fn.length === 0) continue;
+                info.anhangAlle += (info.anhangAlle ? "; " : "") + fn;
+                if (fn.toLowerCase().substr(-4) === ".pdf" && info.pdfPaths.length < 20) {
+                    var outPath = tempDir + "\\" + sanitizeFilename(fn);
+                    att.SaveAsFile(outPath);
+                    if (fso.FileExists(outPath)) {
+                        info.pdfPaths.push({ path: outPath, name: fn });
+                        info.pdfListe += (info.pdfListe ? "; " : "") + fn;
+                    }
+                }
+            } catch(eAtt) {}
+        }
+        try { mail.Close(1); } catch(e) {}
+        return info;
+    } catch(eEx) {
+        try { if (mail) mail.Close(1); } catch(e) {}
+        info.error = "Extract: " + (eEx.message || "unbekannt");
+        return info;
+    }
+}
+
+function wsParseJsonArray(txt) {
+    if (!txt) return null;
+    var s = String(txt).replace(/^\s+|\s+$/g, "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+    try { var v = eval("(" + s + ")"); if (v && v.length != null) return v; } catch(e) {}
+    var m = s.match(/\[[\s\S]*\]/);
+    if (m) { try { var v2 = eval("(" + m[0] + ")"); if (v2 && v2.length != null) return v2; } catch(e2) {} }
+    return null;
+}
+
+function wsRunBatch() {
+    if (state._wsRunning) return;
+    wsStartBatch(null);
+}
+
+function wsStartBatch(onDone) {
+    if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
+    if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
+    if (!outlookApp) return wsShowError("Outlook nicht verbunden");
+
+    state._wsRunning = true;
+    var b;
+    if ((b = document.getElementById("wsPlay")))  b.disabled = true;
+    if ((b = document.getElementById("wsBatch"))) b.disabled = true;
+    if ((b = document.getElementById("wsTest")))  b.disabled = true;
+    if ((b = document.getElementById("wsPick")))  b.disabled = true;
+    if ((b = document.getElementById("wsClose"))) b.disabled = true;
+    document.getElementById("wsProgressWrap").style.display = "block";
+    if (!onDone) document.getElementById("wsLog").innerText = "";
+    wsProgress(0, state._wsMsgFiles.length);
+    wsShowInfo("BATCH: " + state._wsMsgFiles.length + " Mails in EINEM Prompt / EINER Conversation...");
+
+    var mails = [], allPdfs = [];
+    for (var i = 0; i < state._wsMsgFiles.length; i++) {
+        var mp = state._wsMsgFiles[i];
+        wsLog("[" + (i+1) + "/" + state._wsMsgFiles.length + "] Lese: " + mp.substr(mp.lastIndexOf("\\")+1));
+        var info = wsExtractMail(mp);
+        mails.push(info);
+        if (info.error) { wsLog("   FEHLER: " + info.error); continue; }
+        for (var pj = 0; pj < info.pdfPaths.length; pj++) allPdfs.push(info.pdfPaths[pj]);
+    }
+    var prompt = wsBuildBatchPrompt(mails);
+    wsLog("");
+    wsLog("Starte 1 Conversation, lade " + allPdfs.length + " PDFs (alle Mails) hoch...");
+    var bs = {
+        stage: "CREATING_CONV", mails: mails, allPdfs: allPdfs, prompt: prompt,
+        convHttp: createConversationAsyncFire(prompt), convId: null,
+        uploadHandles: [], docIds: [], docIdsJson: "[]",
+        answerHttp: null, startedAt: new Date().getTime(), onDone: onDone || null
+    };
+    state._wsBatch = bs;
+    setTimeout(wsBatchTick, 200);
+}
+
+function wsBatchTick() {
+    var bs = state._wsBatch;
+    if (!bs) return;
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    try {
+        if (bs.stage === "CREATING_CONV") {
+            var cd = false;
+            try { cd = bs.convHttp.WaitForResponse(0); } catch(eW) {
+                bs._cr = (bs._cr||0)+1; if (bs._cr > 12) return wsBatchFail(bs, "Conv-Wait: " + eW.message);
+                return setTimeout(wsBatchTick, 400);
+            }
+            if (!cd) return setTimeout(wsBatchTick, 400);
+            var cs = 0, cr = "";
+            try { cs = bs.convHttp.Status; } catch(e) {}
+            try { cr = bs.convHttp.ResponseText; } catch(e) {}
+            if (cs !== 200) return wsBatchFail(bs, "Conv HTTP " + cs);
+            bs.convId = parseJsonStr(cr, "id");
+            if (!bs.convId) return wsBatchFail(bs, "keine conversation_id");
+            if (bs.allPdfs.length > 0) {
+                for (var pi = 0; pi < bs.allPdfs.length; pi++) {
+                    try { bs.uploadHandles.push(uploadPdfStartAsync(bs.convId, bs.allPdfs[pi].path, bs.allPdfs[pi].name)); } catch(eU) {}
+                }
+                bs.uploadStart = new Date().getTime();
+                bs.stage = "UPLOADING";
+                wsProgress(1, state._wsMsgFiles.length + 2);
+            } else { bs.docIdsJson = "[]"; bs.stage = "READY"; }
+        }
+
+        if (bs.stage === "UPLOADING") {
+            var allUp = true;
+            for (var ui = 0; ui < bs.uploadHandles.length; ui++) {
+                if (!fso.FileExists(bs.uploadHandles[ui].resultPath)) { allUp = false; break; }
+            }
+            var el = new Date().getTime() - (bs.uploadStart || 0);
+            if (!allUp && el < 150000) return setTimeout(wsBatchTick, 500);
+            for (var ri = 0; ri < bs.uploadHandles.length; ri++) {
+                try { uploadPdfReadResult(bs.uploadHandles[ri]); if (bs.uploadHandles[ri].docId) bs.docIds.push(bs.uploadHandles[ri].docId); } catch(e) {}
+            }
+            bs.docIdsJson = bs.docIds.length > 0 ? '["' + bs.docIds.join('","') + '"]' : "[]";
+            wsLog("   " + bs.docIds.length + " PDFs hochgeladen. Sende Batch-Prompt...");
+            bs.stage = "READY";
+        }
+
+        if (bs.stage === "READY") {
+            bs.answerHttp = startAnswerAsync(bs.convId, bs.prompt, bs.docIdsJson);
+            bs.answerStart = new Date().getTime();
+            bs.stage = "RUNNING";
+            wsProgress(2, state._wsMsgFiles.length + 2);
+        }
+
+        if (bs.stage === "RUNNING") {
+            var ad = false;
+            try { ad = bs.answerHttp.WaitForResponse(0); } catch(eA) {
+                bs._ar = (bs._ar||0)+1; if (bs._ar > 12) return wsBatchFail(bs, "Answer-Wait: " + eA.message);
+                return setTimeout(wsBatchTick, 500);
+            }
+            if (!ad) return setTimeout(wsBatchTick, 500);
+            var aresp = "";
+            try {
+                var rb = bs.answerHttp.ResponseBody;
+                var rstm = new ActiveXObject("ADODB.Stream");
+                rstm.Type = 1; rstm.Open(); rstm.Write(rb); rstm.Position = 0;
+                rstm.Type = 2; rstm.Charset = "utf-8"; aresp = String(rstm.ReadText()); rstm.Close();
+            } catch(eRb) { try { aresp = bs.answerHttp.ResponseText; } catch(e) {} }
+            var arr = wsParseJsonArray(jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"));
+            if (!arr) return wsBatchFail(bs, "JSON-Array nicht parsebar");
+            bs.rawAnswer = aresp;
+
+            // Array -> Mails mappen (per datei, sonst per Index)
+            var processed = [];
+            for (var mi = 0; mi < bs.mails.length; mi++) {
+                var m = bs.mails[mi];
+                if (m.error) continue;
+                var d = null, fnLow = String(m.fileName).toLowerCase();
+                for (var qi = 0; qi < arr.length; qi++) {
+                    var cand = String((arr[qi] && arr[qi].datei) || "").toLowerCase();
+                    if (cand && (cand === fnLow || cand.indexOf(fnLow) >= 0 || fnLow.indexOf(cand) >= 0)) { d = arr[qi]; break; }
+                }
+                if (!d) d = arr[mi] || null;
+                if (!d) continue;
+                processed.push({
+                    msgPath: m.msgPath, fileName: m.fileName, datum: m.datum,
+                    absName: m.absName, absMail: m.absMail, betreff: m.betreff,
+                    anhangAlle: m.anhangAlle, data: d,
+                    isReminder: d.ist_reminder === "ja",
+                    klassifikation: d.klassifikation || "",
+                    summary: (d.zusammenfassung || "").substr(0, 200)
+                });
+            }
+            // Cleanup TEMP-PDFs + Conversation
+            for (var ci = 0; ci < bs.mails.length; ci++) {
+                try {
+                    var mm = bs.mails[ci];
+                    for (var cp = 0; cp < mm.pdfPaths.length; cp++) { try { fso.DeleteFile(mm.pdfPaths[cp].path, true); } catch(e) {} }
+                    if (mm.tempDir && fso.FolderExists(mm.tempDir)) fso.DeleteFolder(mm.tempDir, true);
+                } catch(e) {}
+            }
+            try { fireDelete(bs.convId); } catch(e) {}
+            wsProgress(state._wsMsgFiles.length + 2, state._wsMsgFiles.length + 2);
+            wsLog("BATCH fertig: " + processed.length + " Vorgaenge erkannt.");
+            var cb = bs.onDone; state._wsBatch = null;
+            if (cb) cb(processed); else wsFinishDemo(processed);
+            return;
+        }
+    } catch(eT) {
+        return wsBatchFail(bs, "Tick: " + (eT.message || "?"));
+    }
+    setTimeout(wsBatchTick, 400);
+}
+
+function wsBatchFail(bs, msg) {
+    state._wsBatch = null;
+    wsLog("BATCH-FEHLER: " + msg);
+    if (bs && bs.onDone) { bs.onDone([]); return; }
+    wsShowError("Batch-Analyse fehlgeschlagen: " + msg);
+    wsRestoreUi();
+}
+
+// TESTMODUS: erst parallel, dann batch, dann Vergleichsdatei schreiben
+function wsRunTest() {
+    if (state._wsRunning) return;
+    if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
+    if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
+    if (!outlookApp) return wsShowError("Outlook nicht verbunden");
+    document.getElementById("wsLog").innerText = "";
+    wsLog("=== TESTMODUS: 1/2 PARALLEL ===");
+    wsStartParallel(function(par) {
+        wsLog("");
+        wsLog("=== TESTMODUS: 2/2 BATCH ===");
+        state._wsRunning = false;   // Guard fuer den naechsten Lauf freigeben
+        wsStartBatch(function(bat) {
+            wsLog("");
+            wsLog("Schreibe Vergleichsdatei...");
+            wsWriteComparison(par, bat);
+            wsRestoreUi();
+        });
+    });
+}
+
+// Vergleichsdatei (parallel vs. batch) - zum Hochladen bei einer KI
+function wsWriteComparison(par, bat) {
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var shell = new ActiveXObject("WScript.Shell");
+    var outDir = "";
+    try {
+        if (state._wsFolder) {
+            outDir = state._wsFolder.replace(/\\+$/, "") + "\\_KI-Vorgaenge";
+            if (!fso.FolderExists(outDir)) fso.CreateFolder(outDir);
+        }
+    } catch(e) { outDir = ""; }
+    if (!outDir) { try { outDir = shell.ExpandEnvironmentStrings("%TEMP%"); } catch(e) {} }
+
+    function idx(arr) { var o = {}; for (var i=0;i<arr.length;i++) o[String(arr[i].fileName).toLowerCase()] = arr[i]; return o; }
+    var pIdx = idx(par || []), bIdx = idx(bat || []);
+    var files = {}, k;
+    for (k in pIdx) if (pIdx.hasOwnProperty(k)) files[k] = true;
+    for (k in bIdx) if (bIdx.hasOwnProperty(k)) files[k] = true;
+    var fields = ["vorgangstyp","klassifikation","klassifikation_grund","ist_reminder","reminder_quelle",
+        "nicht_neuer_vorgang_grund","maklerpool","makler_nachname","makler_vorname","makler_nummer",
+        "auftrag_datum","kunde_nachname","kunde_vorname","kunde_nummer","versicherungsnummer","sparte",
+        "geschaefts_typ","unterlagen_angefragt","unterlagen_liste","sonderfall","anhang_typen",
+        "pdf_qualitaet","enthaelt_maklervollmacht","mv_vollumfaenglich","mv_einschraenkungen","mv_status",
+        "unterschrift_kunde","unterschrift_makler","auf_vn_ausgestellt","makler_namentlich_genannt",
+        "zusammenfassung","naechster_schritt","hinweis"];
+
+    var t = "ERGO Vorgang-Analyse - VERGLEICH PARALLEL vs. BATCH\r\n";
+    t += "Erstellt: " + new Date().toLocaleString() + "\r\n";
+    t += "Mails: " + (function(){var c=0,x;for(x in files)if(files.hasOwnProperty(x))c++;return c;})() +
+         " | Parallel-Treffer: " + (par?par.length:0) + " | Batch-Treffer: " + (bat?bat.length:0) + "\r\n";
+    t += "Frage an die pruefende KI: Wo unterscheiden sich PARALLEL und BATCH inhaltlich? " +
+         "Welche Variante ist je Feld plausibler und warum? Gibt es Vermischungen (falsche Mail-Zuordnung im Batch)?\r\n";
+    t += "============================================================\r\n\r\n";
+
+    var totalDiff = 0;
+    for (k in files) {
+        if (!files.hasOwnProperty(k)) continue;
+        var pr = pIdx[k], br = bIdx[k];
+        var name = (pr && pr.fileName) || (br && br.fileName) || k;
+        t += "##### DATEI: " + name + " #####\r\n";
+        if (!pr) t += "  (in PARALLEL nicht vorhanden)\r\n";
+        if (!br) t += "  (in BATCH nicht vorhanden)\r\n";
+        var pd = (pr && pr.data) || {}, bd = (br && br.data) || {};
+        for (var fi = 0; fi < fields.length; fi++) {
+            var f = fields[fi];
+            var pv = pd[f] == null ? "" : String(pd[f]);
+            var bv = bd[f] == null ? "" : String(bd[f]);
+            var diff = (pv.replace(/\s+/g," ").replace(/^\s+|\s+$/g,"") !==
+                        bv.replace(/\s+/g," ").replace(/^\s+|\s+$/g,""));
+            if (diff) totalDiff++;
+            t += (diff ? " * " : "   ") + f + "\r\n";
+            t += "      P: " + pv + "\r\n";
+            t += "      B: " + bv + "\r\n";
+        }
+        t += "\r\n";
+    }
+    t += "============================================================\r\n";
+    t += "ROH-JSON PARALLEL:\r\n";
+    for (var a1 = 0; a1 < (par||[]).length; a1++) t += par[a1].fileName + ": " + jsonStringifySafe(par[a1].data) + "\r\n";
+    t += "\r\nROH-JSON BATCH:\r\n";
+    for (var a2 = 0; a2 < (bat||[]).length; a2++) t += bat[a2].fileName + ": " + jsonStringifySafe(bat[a2].data) + "\r\n";
+
+    var dt = new Date();
+    function p2(n){ n=String(n); return n.length<2?"0"+n:n; }
+    var stamp = String(dt.getFullYear()) + p2(dt.getMonth()+1) + p2(dt.getDate()) + "_" +
+                p2(dt.getHours()) + p2(dt.getMinutes()) + p2(dt.getSeconds());
+    var path = outDir.replace(/\\+$/, "") + "\\KI-Vergleich_Parallel-vs-Batch_" + stamp + ".txt";
+    try {
+        var f = fso.CreateTextFile(path, true, false); // ASCII (Umlaute bleiben lesbar genug)
+        f.Write(t);
+        f.Close();
+        wsLog("Vergleichsdatei: " + path + " (" + totalDiff + " abweichende Felder gesamt)");
+        wsShowSuccess("Testmodus fertig. <strong>" + totalDiff + "</strong> abweichende Felder. " +
+            "Vergleichsdatei gespeichert &mdash; bei einer KI hochladen, um Unterschiede pruefen zu lassen.");
+        try { shell.Run('notepad.exe "' + path + '"', 1, false); } catch(eN) {}
+    } catch(eW) {
+        wsShowError("Vergleichsdatei konnte nicht geschrieben werden: " + (eW.message || eW));
+    }
+}
+
+// Minimaler, robuster JSON-Stringifier (IE-JScript hat kein JSON.stringify)
+function jsonStringifySafe(o) {
+    if (o == null) return "null";
+    var t = typeof o;
+    if (t === "number" || t === "boolean") return String(o);
+    if (t === "string") return '"' + o.replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/[\r\n]+/g," ") + '"';
+    if (o.length != null && t !== "string") {
+        var a = [];
+        for (var i=0;i<o.length;i++) a.push(jsonStringifySafe(o[i]));
+        return "[" + a.join(",") + "]";
+    }
+    var parts = [];
+    for (var k in o) if (o.hasOwnProperty(k)) parts.push('"' + k + '":' + jsonStringifySafe(o[k]));
+    return "{" + parts.join(",") + "}";
+}
+
 </script>
 
 <script language="VBScript">
@@ -8140,14 +8542,25 @@ End Function
                 <div class="ws-progress-text" id="wsProgressText">0 von 0</div>
             </div>
             <button class="ws-btn-play" id="wsPlay" onclick="wsRunDemo()" disabled>
-                <span class="ws-play-icon">&#9654;</span><span>Analyse starten</span>
+                <span class="ws-play-icon">&#9654;</span><span>Analyse starten (Parallel)</span>
             </button>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <button class="ws-btn-folder" id="wsBatch" onclick="wsRunBatch()" disabled
+                        style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
+                    &#128230; Batch: alle in 1 Prompt
+                </button>
+                <button class="ws-btn-folder" id="wsTest" onclick="wsRunTest()" disabled
+                        style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
+                    &#129514; Testmodus: Parallel vs. Batch
+                </button>
+            </div>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
-                Alle Mails werden <strong>parallel</strong> via ErgoGPT analysiert (Inhalt + Anhaenge).<br>
-                Ergebnis: <strong>Excel-Tabelle</strong> mit Spalte <strong>Lfd_Nr</strong>. Je Vorgang wird die<br>
-                <strong>Original-Mail als .msg</strong> gespeichert (fuehrend) und die <strong>KI-Notiz als PDF</strong><br>
-                zusaetzlich angehaengt. Die Lfd-Nr steht auch in der KI-Notiz &mdash; so mappt man Excel &harr; Vorgang.<br>
-                <strong>Original .msg-Dateien im Quellordner bleiben unveraendert.</strong>
+                <strong>Parallel:</strong> jede Mail eigene Conversation (Default). <strong>Batch:</strong> alle Mails +
+                PDFs in EINER Conversation/EINEM Prompt (weniger Overhead, Mapping per Dateiname).<br>
+                <strong>Testmodus:</strong> erst Parallel, dann Batch &mdash; schreibt eine <strong>Vergleichsdatei</strong>
+                (Parallel vs. Batch je Feld) zum Hochladen bei einer KI; <em>kein</em> .msg/Excel-Export.<br>
+                Parallel/Batch: <strong>Excel</strong> (Spalte Lfd_Nr) + je Vorgang die <strong>Original-Mail als .msg</strong>
+                mit <strong>KI-Notiz als PDF</strong>. Original-Dateien im Quellordner bleiben unveraendert.
             </div>
             <div class="ws-log" id="wsLog"></div>
         </div>
