@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v2.02 - HTA Quellcode</title>
+<title>ERGO Workshop v2.03 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v2.02</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v2.03</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.02"
+        VERSION="2.03"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.02 - FIX Scan-Skip griff nicht: Groessenpruefung lief erst NACH dem fragilen Byte-Read (warf bei 5,8 MB -> Catch "behalten"). Jetzt Groesse ZUERST + Skip schon VOR dem Speichern anhand Outlook-Anhangsgroesse (grosse Foto-PDF wird gar nicht erst auf Platte geschrieben). v2.01 - Scan-Erkennung verschaerft</div>
+            <div class="ver">v2.03 - Batch-Abbruch "JSON-Array nicht parsebar": jetzt DIAG-Ausgabe im Log (HTTP-Status, Antwortlaenge, erste 300 Zeichen) -> Ursache (leere/HTML-/Fehlerantwort) wird sichtbar. v2.02 - Scan-Skip-Fix (Groesse zuerst + Pre-Save-Skip)</div>
         </div>
 
         <!-- Cookie -->
@@ -8468,8 +8468,18 @@ function wsBatchTick() {
                 rstm.Type = 1; rstm.Open(); rstm.Write(rb); rstm.Position = 0;
                 rstm.Type = 2; rstm.Charset = "utf-8"; aresp = String(rstm.ReadText()); rstm.Close();
             } catch(eRb) { try { aresp = bs.answerHttp.ResponseText; } catch(e) {} }
-            var arr = wsParseJsonArray(jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"));
-            if (!arr) return wsBatchFail(bs, "JSON-Array nicht parsebar");
+            var _asm = "";
+            try { _asm = jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"); } catch(eAsm) { _asm = aresp; }
+            var arr = wsParseJsonArray(_asm);
+            if (!arr) {
+                // Diagnose: HTTP-Status + Laenge + Anfang der Antwort ins Log,
+                // damit die Ursache (leere/HTML/Fehler-Antwort) sichtbar wird.
+                wsLog("DIAG Batch-Antwort: HTTP " + astatus + ", roh " + aresp.length +
+                      " Z., assembled " + _asm.length + " Z.", "err");
+                wsLog("DIAG Anfang: " + String(_asm || aresp).substr(0, 300).replace(/\s+/g, " "), "muted");
+                return wsBatchFail(bs, "JSON-Array nicht parsebar (HTTP " + astatus + ", " +
+                      (_asm.length ? _asm.length + " Z. Text" : "leere Antwort") + ") - siehe DIAG im Log");
+            }
             bs.rawAnswer = aresp;
 
             // Array -> Mails mappen (per datei, sonst per Index)
@@ -9710,7 +9720,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.02</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.03</div>
     </div>
 </div>
 
