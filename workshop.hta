@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.78"
+        VERSION="1.79"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.78 - Workshop speichert jetzt JEDEN Vorgang als .msg (neues ungespeichertes MailItem + SaveAs umgeht Outlook-Guard; KI-Notiz als ASCII-HTML via FSO + Original als Anhang). Excel-Spalte Lfd_Nr, gleiche Nr in der KI-Notiz (Mapping Excel<->Vorgang). Eigenstaendiges Workshop-HTA + Copy-Paste-Seite. v1.77 - Cookie-Helfer Edge/Chrome-DB</div>
+            <div class="ver">v1.79 - Original-Mail ist fuehrend (gespeicherte .msg = Original via OpenSharedItem), KI-Notiz wird als PDF (Word HTML->PDF, eigener Prozess) zusaetzlich angehaengt; HTML-Fallback ohne Word. Excel-Spalte Lfd_Nr = Nr in der KI-Notiz (Mapping Excel<->Vorgang). v1.78 - .msg-Speichern + Standalone-Workshop-HTA</div>
         </div>
 
         <!-- Cookie -->
@@ -7765,17 +7765,17 @@ function wsFinishDemo(processed) {
             wsLog("   Excel-Fehler: " + eX.message);
         }
 
-        // ---- 2. JEDE Mail als .msg-Vorgang speichern (KI-Notiz + Original als Anhang) ----
-        // Warum das geht (frueher scheiterte es): Wir AENDERN NICHT die empfangene
-        // Original-Mail (das blockt der Outlook-Object-Model-Guard). Stattdessen:
-        //   - NEUES, ungespeichertes MailItem via CreateItem(0)  -> Guard-"clean"
-        //   - Attachments.Add(Dateipfad) + SaveAs laufen IM Outlook-Prozess
-        //     -> umgeht die HTA-Internet-Zonen-Sperre (wie Excel.Application)
-        //   - Notiz-Datei via FSO.CreateTextFile (erlaubt; Notiz ist reines ASCII,
-        //     Umlaute sind numerische HTML-Entities) statt ADODB.Stream (das war
-        //     der frühere Fehler).
+        // ---- 2. ORIGINAL-Mail ist fuehrend, KI-Notiz wird als PDF angehaengt ----
+        // Die gespeicherte .msg IST die Original-Mail (Betreff/Absender/Body/
+        // Original-Anhaenge bleiben). Vorgehen ohne Guard-Block:
+        //   - Original via Session.OpenSharedItem(.msg) oeffnen (losgeloeste
+        //     Kopie aus der Datei, NICHT das Postfach-Item)
+        //   - KI-Notiz: ASCII-HTML (FSO) -> per Word.Application zu PDF
+        //     (Word laeuft im eigenen Prozess wie Excel -> keine Zonensperre)
+        //   - PDF an die Original-Mail anhaengen, dann SaveAs als neue .msg
+        //   - Fallback ohne Word: KI-Notiz als HTML anhaengen
         wsLog("");
-        wsLog("Speichere " + processed.length + " Vorgaenge als .msg (KI-Notiz + Original als Anhang)...");
+        wsLog("Speichere " + processed.length + " Vorgaenge: Original-Mail fuehrend, KI-Notiz als PDF angehaengt...");
         var fsoS = null, shellS = null;
         try { fsoS = new ActiveXObject("Scripting.FileSystemObject"); shellS = new ActiveXObject("WScript.Shell"); } catch(eF) {}
 
@@ -7795,59 +7795,87 @@ function wsFinishDemo(processed) {
         }
         wsLog("   Zielordner: " + outDir);
 
+        // Word einmalig fuer HTML->PDF (im eigenen Prozess, keine Zonensperre)
+        var word = null;
+        try {
+            word = new ActiveXObject("Word.Application");
+            word.Visible = false;
+            try { word.DisplayAlerts = 0; } catch(eW1) {}
+            try { word.AutomationSecurity = 3; } catch(eW2) {}
+            wsLog("   Word fuer PDF-Erzeugung bereit.");
+        } catch(eW) {
+            word = null;
+            wsLog("   Word nicht verfuegbar - KI-Notiz wird ersatzweise als HTML angehaengt.");
+        }
+
         var saved = 0, failed = 0;
         for (var pi = 0; pi < processed.length; pi++) {
             var p = processed[pi];
             var lfd = wsLfdNr(pi);
-            var notePath = "";
+            var notePath = "", pdfPath = "", item = null;
             try {
-                // 2a) KI-Notiz als ASCII-HTML in TEMP schreiben (FSO erlaubt)
+                // 2a) KI-Notiz als ASCII-HTML in TEMP (FSO erlaubt; Umlaute = Entities)
                 var noteHtml = wsBuildNotizHtml(p.data, lfd);
-                notePath = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\KI-Notiz_" + lfd + "_" +
-                           new Date().getTime() + ".html";
+                var stampN = lfd + "_" + new Date().getTime() + "_" + Math.floor(Math.random()*100000);
+                notePath = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\KI-Notiz_" + stampN + ".html";
                 var nf = fsoS.CreateTextFile(notePath, true, false); // ASCII
                 nf.Write(noteHtml);
                 nf.Close();
 
-                // 2b) NEUES MailItem (ungespeichert -> Guard greift nicht)
-                var m = outlookApp.CreateItem(0);
-                m.Subject = "[" + lfd + "] " + (p.isReminder ? "Reminder " : "") +
-                            "Vorgang: " + (p.betreff || p.fileName);
-                m.HTMLBody = wsBuildNotizHtml(p.data, lfd) +
-                    "<hr><p style='font-family:Segoe UI;font-size:12px;color:#6b7280;'>" +
-                    "Lfd-Nr " + lfd + " &middot; Original-Mail: " + cellSafe(p.fileName) +
-                    " (als .msg angehaengt) &middot; KI-Notiz ebenfalls als HTML angehaengt.</p>";
+                // 2b) HTML -> PDF via Word
+                if (word) {
+                    try {
+                        pdfPath = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\KI-Notiz_" + stampN + ".pdf";
+                        var doc = word.Documents.Open(notePath, false, true); // ConfirmConversions=false, ReadOnly=true
+                        doc.SaveAs2(pdfPath, 17);   // 17 = wdFormatPDF
+                        doc.Close(0);               // 0 = wdDoNotSaveChanges
+                    } catch(ePdf) {
+                        pdfPath = "";
+                        wsLog("   [" + lfd + "] PDF-Erzeugung fehlgeschlagen (" + ePdf.message + ") - HTML-Fallback.");
+                    }
+                }
 
-                // 2c) KI-Notiz + Original-.msg als ANHAENGE
-                try { m.Attachments.Add(notePath, 1, 1, "KI-Notiz_" + lfd + ".html"); }
-                catch(eN) { wsLog("   [" + lfd + "] Notiz-Anhang fehlgeschlagen: " + eN.message); }
-                try { m.Attachments.Add(p.msgPath, 1, 2, "Original_" + cellSafe(p.fileName)); }
-                catch(eO) { wsLog("   [" + lfd + "] Original-Anhang fehlgeschlagen: " + eO.message); }
+                // 2c) ORIGINAL-Mail oeffnen (fuehrend) und Notiz als Anhang ergaenzen
+                item = outlookApp.Session.OpenSharedItem(p.msgPath);
+                if (pdfPath && fsoS.FileExists(pdfPath)) {
+                    item.Attachments.Add(pdfPath, 1, 1, "KI-Notiz_" + lfd + ".pdf");
+                } else {
+                    item.Attachments.Add(notePath, 1, 1, "KI-Notiz_" + lfd + ".html");
+                }
 
-                // 2d) Als .msg speichern (Outlook-Prozess -> keine Zonensperre)
+                // 2d) Als neue .msg speichern (Outlook-Prozess -> keine Zonensperre).
+                //     Original-Subject bleibt unveraendert (Mail bleibt fuehrend).
                 var safeBetreff = String(p.betreff || p.fileName || "Vorgang")
                                     .replace(/[\\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").substring(0, 60);
                 var target = outDir.replace(/\\+$/, "") + "\\Vorgang_" + lfd + "_" + safeBetreff + ".msg";
-                m.SaveAs(target, 9);   // 9 = olMSGUnicode
+                item.SaveAs(target, 9);   // 9 = olMSGUnicode
+                try { item.Close(1); } catch(eC) {}   // 1 = olDiscard (Original nicht zurueckschreiben)
+                item = null;
                 saved++;
-                wsLog("   [" + lfd + "] gespeichert: " + target);
+                wsLog("   [" + lfd + "] gespeichert: " + target +
+                      (pdfPath ? " (Notiz als PDF)" : " (Notiz als HTML)"));
 
                 try { fsoS.DeleteFile(notePath, true); } catch(eDel) {}
+                try { if (pdfPath) fsoS.DeleteFile(pdfPath, true); } catch(eDel3) {}
             } catch(eSave) {
                 failed++;
                 wsLog("   [" + lfd + "] FEHLER: " + (eSave.message || eSave) +
                       " (evtl. Outlook-Sicherheitsabfrage 'Zugriff zulassen' bestaetigen)");
+                try { if (item) item.Close(1); } catch(eC2) {}
                 try { if (notePath) fsoS.DeleteFile(notePath, true); } catch(eDel2) {}
+                try { if (pdfPath) fsoS.DeleteFile(pdfPath, true); } catch(eDel4) {}
             }
         }
 
+        try { if (word) word.Quit(0); } catch(eWq) {}
+
         wsLog("");
-        wsLog("Fertig: " + saved + " Vorgaenge als .msg gespeichert" +
+        wsLog("Fertig: " + saved + " Vorgaenge gespeichert" +
               (failed ? ", " + failed + " fehlgeschlagen" : "") + ".");
-        wsShowSuccess("Fertig! <strong>" + saved + "</strong> Vorgaenge als .msg gespeichert" +
+        wsShowSuccess("Fertig! <strong>" + saved + "</strong> Original-Mails als .msg gespeichert" +
                       (failed ? " (" + failed + " Fehler)" : "") +
-                      ". Excel mit Spalte <strong>Lfd_Nr</strong> erstellt &mdash; gleiche Nummer " +
-                      "steht in jeder KI-Notiz (Mapping Excel &harr; Vorgang).");
+                      " &mdash; KI-Notiz je Mail als <strong>PDF</strong> angehaengt. Excel-Spalte " +
+                      "<strong>Lfd_Nr</strong> = Nummer in der KI-Notiz (Mapping Excel &harr; Vorgang).");
 
         // Zielordner im Explorer zeigen
         try { if (saved > 0 && outDir) shellS.Run('explorer.exe "' + outDir + '"', 1, false); } catch(eExp) {}
@@ -8467,9 +8495,9 @@ End Function
             </button>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
                 Alle Mails werden <strong>parallel</strong> via ErgoGPT analysiert (Inhalt + Anhaenge).<br>
-                Ergebnis: <strong>Excel-Tabelle</strong> mit Spalte <strong>Lfd_Nr</strong> und je Vorgang<br>
-                eine <strong>.msg-Datei</strong> (KI-Notiz + Original als Anhang). Die Lfd-Nr steht auch<br>
-                in der KI-Notiz &mdash; so mappt man Excel-Zeile &harr; Vorgang.<br>
+                Ergebnis: <strong>Excel-Tabelle</strong> mit Spalte <strong>Lfd_Nr</strong>. Je Vorgang wird die<br>
+                <strong>Original-Mail als .msg</strong> gespeichert (fuehrend) und die <strong>KI-Notiz als PDF</strong><br>
+                zusaetzlich angehaengt. Die Lfd-Nr steht auch in der KI-Notiz &mdash; so mappt man Excel &harr; Vorgang.<br>
                 <strong>Original .msg-Dateien im Quellordner bleiben unveraendert.</strong>
             </div>
             <div class="ws-log" id="wsLog"></div>
