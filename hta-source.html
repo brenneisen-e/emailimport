@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.75 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.76 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.75</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.76</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.75"
+        VERSION="1.76"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.75 - "Cookie automatisch holen" jetzt als Schritt 1 IM Workshop-Frontend (weisses ERGO-Design) statt separatem Fenster: anmelden + Cookie inkl. HttpOnly via InternetGetCookieEx uebernehmen, dann Ordner + Analyse. v1.73 - Entwurfs-Mail Label-Abstand, leere Felder gefiltert, Umlaute fix</div>
+            <div class="ver">v1.76 - Cookie-Login oeffnet jetzt den ECHTEN Standard-Browser statt der HTA/IE-Engine (die moderne SSO nicht rendern kann -> "laedt ewig"). Eingebetteten Frame + Extra-Fenster-Button entfernt. v1.75 - Cookie-Holen als Schritt 1 im Workshop-Frontend. v1.73 - Entwurfs-Mail Fixes</div>
         </div>
 
         <!-- Cookie -->
@@ -7293,8 +7293,6 @@ function openWorkshopMode() {
 }
 
 function closeWorkshopMode() {
-    var fr = document.getElementById("caFrame");
-    if (fr) fr.src = "about:blank";
     var ov = document.getElementById("workshopOverlay");
     if (ov) ov.style.display = "none";
 }
@@ -7942,8 +7940,6 @@ function caResetCard() {
     caLog("", true);
     var b = document.getElementById("caStep2Btn");
     if (b) b.disabled = true;
-    var fr = document.getElementById("caFrame");
-    if (fr) { fr.style.display = "none"; fr.src = "about:blank"; }
 }
 
 function caResetStatus() {
@@ -7968,33 +7964,37 @@ function caLog(msg, reset) {
     el.scrollTop = el.scrollHeight;
 }
 
-// Schritt 1: ErgoGPT-Login im eingebetteten Frame oeffnen (laeuft in der
-// WinINET-Zone, die InternetGetCookieEx spaeter ausliest). Falls die Seite
-// X-Frame-Options setzt, gibt es den Fallback "in eigenem Fenster".
+// Schritt 1: ErgoGPT-Login im ECHTEN Standard-Browser oeffnen (NICHT im
+// HTA/IE-Engine - die kann moderne SSO-Seiten nicht rendern -> "laedt ewig").
 function caOpenLogin() {
-    caStatus("info", "ErgoGPT wird geoeffnet. Bitte ganz normal anmelden (SSO laeuft automatisch). " +
-                     "Wenn die Seite geladen / du angemeldet bist, auf <strong>Schritt 2</strong> klicken.");
+    caStatus("info", "ErgoGPT wird im <strong>Standard-Browser</strong> geoeffnet. Bitte dort normal " +
+                     "anmelden. Danach hier auf <strong>Schritt 2</strong> klicken.<br>" +
+                     "<span style='font-size:12px;'>Hinweis: Das automatische Auslesen klappt nur, wenn der " +
+                     "Login im Windows-Speicher (Internet Explorer / Edge im IE-Modus) landet. Bei einem " +
+                     "reinen Chrome/Edge-Login bleibt der manuelle Weg (Cookie einfuegen im Hauptfenster).</span>");
     caLog("", true);
-    caLog("Schritt 1: oeffne " + ERGO_SITE + " ...");
+    caLog("Schritt 1: oeffne " + ERGO_SITE + " im Standard-Browser ...");
+    var ok = false;
     try {
-        var fr = document.getElementById("caFrame");
-        fr.style.display = "block";
-        fr.src = ERGO_SITE + "/";
-        caLog("Login-Frame geladen. Falls leer/blockiert -> Button 'In eigenem Fenster oeffnen'.");
+        var shell = new ActiveXObject("WScript.Shell");
+        shell.Run('cmd /c start "" "' + ERGO_SITE + '/"', 0, false);
+        ok = true;
+        caLog("Standard-Browser gestartet.");
     } catch (e) {
-        caLog("Frame-Fehler: " + e.message);
+        caLog("Start ueber cmd fehlgeschlagen: " + e.message);
+        try {
+            new ActiveXObject("WScript.Shell").Run('explorer.exe "' + ERGO_SITE + '/"', 1, false);
+            ok = true;
+            caLog("Ueber explorer.exe gestartet.");
+        } catch (e2) {
+            caLog("explorer.exe fehlgeschlagen: " + e2.message);
+        }
+    }
+    if (!ok) {
+        caStatus("error", "Browser liess sich nicht starten. Bitte " + ERGO_SITE +
+                          " manuell oeffnen, anmelden, dann Schritt 2.");
     }
     document.getElementById("caStep2Btn").disabled = false;
-}
-
-function caOpenLoginWindow() {
-    try {
-        window.open(ERGO_SITE + "/", "_blank", "width=1100,height=820,scrollbars=yes,resizable=yes");
-        caLog("ErgoGPT in eigenem Fenster geoeffnet (gleicher WinINET-Cookie-Speicher).");
-        document.getElementById("caStep2Btn").disabled = false;
-    } catch (e) {
-        caLog("window.open-Fehler: " + e.message);
-    }
 }
 
 // Schritt 2: PowerShell-Helfer schreiben + ausfuehren. Liest den Cookie
@@ -8315,10 +8315,6 @@ End Function
     font-size: 12px; color: #4b5563; max-height: 200px; overflow-y: auto;
     display: none; white-space: pre-wrap; margin-top: 16px;
 }
-#workshopOverlay .ws-ca-frame {
-    width: 100%; height: 420px; border: 1px solid #e5e7eb; border-radius: 10px;
-    margin-top: 16px; display: none; background: #fafafa;
-}
 #workshopOverlay .ws-footer { text-align: center; color: #9ca3af; font-size: 11px; margin-top: 40px; }
 </style>
 
@@ -8334,18 +8330,17 @@ End Function
         <div class="ws-card">
             <div class="ws-step-label"><span class="ws-step-num">1</span>Bei ErgoGPT anmelden &amp;amp; Cookie holen</div>
             <div style="font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.55;">
-                ErgoGPT oeffnen und normal anmelden (SSO laeuft i.&amp;nbsp;d.&amp;nbsp;R. automatisch mit der
-                Windows-Anmeldung). Danach wird der Cookie automatisch uebernommen &amp;mdash; kein manuelles
-                Kopieren mehr noetig. <em>Prototyp: funktioniert nur, wenn die Anmeldung in diesem Fenster
-                laeuft (nicht separat in Chrome/Edge); je nach GPO kann PowerShell gesperrt sein.</em>
+                ErgoGPT im <strong>Standard-Browser</strong> oeffnen und normal anmelden (SSO laeuft
+                i.&amp;nbsp;d.&amp;nbsp;R. automatisch). Danach "Cookie uebernehmen". <em>Prototyp: das
+                automatische Auslesen klappt nur, wenn der Login im Windows-/WinINET-Speicher landet
+                (Internet Explorer / Edge im IE-Modus). Bei reinem Chrome/Edge bleibt der manuelle Weg
+                im Hauptfenster; je nach GPO kann PowerShell gesperrt sein.</em>
             </div>
             <div id="caStatusInfo" class="ws-status ws-info"></div>
             <div id="caStatusSuccess" class="ws-status ws-success"></div>
             <div id="caStatusError" class="ws-status ws-error"></div>
-            <button class="ws-btn-folder" style="margin-right:8px;margin-bottom:8px;" onclick="caOpenLogin()">1. ErgoGPT-Login oeffnen</button>
-            <button class="ws-btn-folder" style="margin-right:8px;margin-bottom:8px;" onclick="caOpenLoginWindow()">in eigenem Fenster</button>
+            <button class="ws-btn-folder" style="margin-right:8px;margin-bottom:8px;" onclick="caOpenLogin()">1. ErgoGPT-Login oeffnen (Browser)</button>
             <button class="ws-btn-folder" id="caStep2Btn" onclick="caFetchCookie()" disabled style="margin-bottom:8px;border-color:#c8102e;color:#c8102e;font-weight:600;">2. Cookie uebernehmen</button>
-            <iframe id="caFrame" class="ws-ca-frame" src="about:blank"></iframe>
             <div class="ws-log" id="caLog"></div>
         </div>
 
