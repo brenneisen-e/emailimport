@@ -23,9 +23,12 @@ echo "Building $HTA_OUT + $OUT (Workshop, Basis HTA v$VER)..."
 # 1) Standalone-HTA ableiten:
 #    - eigener Titel/APPLICATIONNAME (sonst SINGLEINSTANCE-Kollision mit Haupttool)
 #    - nach setupDragDrop() automatisch das Workshop-Overlay oeffnen
+#    - die grosse Hauptmaske KOMPLETT ausblenden (nur Workshop-Frontend),
+#      Zurueck-Button entfernen, Overlay immer sichtbar (kein Flash/Rueckweg)
 sed -e 's|<title>ERGO Vorgang-Analyse</title>|<title>ERGO Workshop</title>|' \
     -e 's|APPLICATIONNAME="ERGO Vorgang-Analyse"|APPLICATIONNAME="ERGO Workshop"|' \
-    -e 's|    setupDragDrop();|    setupDragDrop();\n    try { setTimeout(function(){ openWorkshopMode(); }, 350); } catch(e) {}|' \
+    -e 's|    setupDragDrop();|    setupDragDrop();\n    try { setTimeout(function(){ openWorkshopMode(); }, 200); } catch(e) {}|' \
+    -e '/^<body>$/a <style id="ws-standalone">body > .container{display:none !important;} #wsClose{display:none !important;} #workshopOverlay{display:block !important;}</style>' \
     "$HTA_SRC" > "$HTA_OUT"
 
 echo "OK - $HTA_OUT gebaut ($(wc -c < "$HTA_OUT") bytes)"

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v1.83 - HTA Quellcode</title>
+<title>ERGO Workshop v1.84 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v1.83</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v1.84</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.83"
+        VERSION="1.84"
         WINDOWSTATE="normal"
     />
     <style>
@@ -251,6 +251,7 @@ Alles markieren
     </style>
 </head>
 <body>
+<style id="ws-standalone">body > .container{display:none !important;} #wsClose{display:none !important;} #workshopOverlay{display:block !important;}</style>
 <div class="container">
 
     <!-- UNC/MOTW-Banner sind ab v1.10 entfernt: der VBScript-Subprozess
@@ -267,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.83 - Batch-Prompt verschaerft (nur Batch, Parallel unveraendert): Reminder bleibt 'BUe-Vorgang' (nicht 'Anfrage-Ruecksprache'), makler_nummer-Format 'Agentur X / Vermittler Y', auftrag_datum TT.MM.JJJJ, Pool vs. eigentlicher Makler (Finanzguru/JDC, CHECK24/Fonds Finanz), Firmenkunde kunde_vorname leer. v1.82 - Vergleichsdatei als Unicode</div>
+            <div class="ver">v1.84 - Felder agentur_nummer + vermittler_nummer getrennt (reine Werte ohne Wort-Label), auftrag_datum erzwungen TT.MM.JJJJ (Parallel+Batch konsistent). Excel: eigene Spalten Agentur_Nummer/Vermittler_Nummer + Header-Farblogik nach Spaltengruppe (Meta/Klassifikation/Makler/Kunde/Unterlagen/MV/Ergebnis). v1.83 - Batch-Prompt verschaerft</div>
         </div>
 
         <!-- Cookie -->
@@ -575,7 +576,7 @@ window.onload = function() {
 
     // Drag-drop
     setupDragDrop();
-    try { setTimeout(function(){ openWorkshopMode(); }, 350); } catch(e) {}
+    try { setTimeout(function(){ openWorkshopMode(); }, 200); } catch(e) {}
 };
 
 function setupDragDrop() {
@@ -7333,8 +7334,10 @@ function wsFieldLines() {
     p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS &amp; Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.)",\n';
     p += '  "makler_nachname":"handelnde Person ODER Makler-Firma beim Makler (NICHT Kunde). Wenn Maklervertrag auf eine Firma laeuft die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS): makler_nachname = eigentlicher Makler (Finanzguru), maklerpool bleibt JDC / Jung, DMS &amp; Cie. Sonst leer",\n';
     p += '  "makler_vorname":"oder leer",\n';
-    p += '  "makler_nummer":"Agentur-Nr / Vermittler-Nr / BD-Nr (Prioritaet siehe oben), oder leer",\n';
-    p += '  "auftrag_datum":"Datum aus Maklerauftrag/Pool-Anschreiben (NICHT Mail-Eingang), oder leer",\n';
+    p += '  "agentur_nummer":"NUR der reine Agentur-Nummern-Wert OHNE das Wort Agentur (z.B. 8903235); leer wenn keine",\n';
+    p += '  "vermittler_nummer":"NUR der reine Vermittler-/BD-Nummern-Wert OHNE das Wort Vermittler (z.B. 811774 oder 898-0003); leer wenn keine",\n';
+    p += '  "makler_nummer":"Kombi-Anzeige aus den beiden Nummern, EXAKT Format \\"Agentur <nr> / Vermittler <nr>\\" (Agentur zuerst); fehlt eine, nur die vorhandene; sonst leer",\n';
+    p += '  "auftrag_datum":"Datum aus Maklerauftrag/Pool-Anschreiben (NICHT Mail-Eingang). IMMER Format TT.MM.JJJJ (z.B. 06.04.2026), niemals ISO/JJJJ-MM-TT; leer wenn keins",\n';
     p += '  "kunde_nachname":"VN / Vollmachtgeber, oder leer",\n';
     p += '  "kunde_vorname":"oder leer",\n';
     p += '  "kunde_nummer":"Partner-/Personennummer (NICHT Vers- oder Maklernummer), oder leer",\n';
@@ -7465,7 +7468,9 @@ function wsBuildNotizHtml(data, lfdNr) {
 '<h2>Makler</h2><table>' +
 rowFn("Maklerpool", d.maklerpool) +
 rowFn("Makler (Name)", maklerName) +
-rowHi("Makler-Nummer (Agentur/Vermittler)", d.makler_nummer) +
+rowHi("Agentur-Nummer", d.agentur_nummer) +
+rowHi("Vermittler-Nummer", d.vermittler_nummer) +
+rowFn("Makler-Nummer (kombiniert)", d.makler_nummer) +
 rowFn("Auftrag-Datum", d.auftrag_datum) +
 rowFn("Makler namentlich genannt", d.makler_namentlich_genannt) +
 '</table>' +
@@ -7841,58 +7846,74 @@ function wsFinishDemo(processed) {
             try { sh.Name = "Workshop-Demo"; } catch(e) {}
             // Spalten-Definition: gleiche Felder wie das grosse Tool.
             // w = Spaltenbreite, wrap = Zeilenumbruch fuer lange Freitexte.
+            // g = Spaltengruppe (Header-Farbe). Gruppiert: Meta / Klassifikation /
+            // Makler / Kunde+Vertrag / Unterlagen+Anhang / Maklervollmacht / Ergebnis
             var colDefs = [
-                { h:"Lfd_Nr",              w:8,  wrap:false, v:function(r,d,i){ return wsLfdNr(i); } },
-                { h:"Datei",               w:34, wrap:false, v:function(r,d){ return cellSafe(r.fileName); } },
-                { h:"Datum",               w:16, wrap:false, v:function(r,d){ return cellSafe(r.datum); } },
-                { h:"Absender",            w:28, wrap:false, v:function(r,d){ return cellSafe(r.absName + " <" + r.absMail + ">"); } },
-                { h:"Betreff",             w:40, wrap:true,  v:function(r,d){ return cellSafe(r.betreff); } },
-                { h:"Anhaenge",            w:30, wrap:true,  v:function(r,d){ return cellSafe(r.anhangAlle); } },
-                { h:"Vorgangstyp",         w:16, wrap:false, v:function(r,d){ return cellSafe(d.vorgangstyp); } },
-                { h:"Klassifikation",      w:18, wrap:false, v:function(r,d){ return cellSafe(d.klassifikation); } },
-                { h:"Klassifikation_Grund",w:45, wrap:true,  v:function(r,d){ return cellSafe(d.klassifikation_grund); } },
-                { h:"Ist_Reminder",        w:11, wrap:false, v:function(r,d){ return cellSafe(d.ist_reminder); } },
-                { h:"Reminder_Quelle",     w:20, wrap:false, v:function(r,d){ return cellSafe(d.reminder_quelle); } },
-                { h:"Nicht_Neu_Grund",     w:35, wrap:true,  v:function(r,d){ return cellSafe(d.nicht_neuer_vorgang_grund); } },
-                { h:"Maklerpool",          w:28, wrap:false, v:function(r,d){ return cellSafe(d.maklerpool); } },
-                { h:"Makler_Nachname",     w:18, wrap:false, v:function(r,d){ return cellSafe(d.makler_nachname); } },
-                { h:"Makler_Vorname",      w:16, wrap:false, v:function(r,d){ return cellSafe(d.makler_vorname); } },
-                { h:"Makler_Nummer",       w:24, wrap:false, v:function(r,d){ return cellSafe(d.makler_nummer); } },
-                { h:"Auftrag_Datum",       w:14, wrap:false, v:function(r,d){ return cellSafe(d.auftrag_datum); } },
-                { h:"Kunde_Nachname",      w:18, wrap:false, v:function(r,d){ return cellSafe(d.kunde_nachname); } },
-                { h:"Kunde_Vorname",       w:16, wrap:false, v:function(r,d){ return cellSafe(d.kunde_vorname); } },
-                { h:"Kunde_Nummer",        w:16, wrap:false, v:function(r,d){ return cellSafe(d.kunde_nummer); } },
-                { h:"Versicherungsnummer", w:18, wrap:false, v:function(r,d){ return cellSafe(d.versicherungsnummer); } },
-                { h:"Sparte",              w:12, wrap:false, v:function(r,d){ return cellSafe(d.sparte); } },
-                { h:"Geschaefts_Typ",      w:20, wrap:false, v:function(r,d){ return cellSafe(d.geschaefts_typ); } },
-                { h:"Unterlagen_Angefragt",w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterlagen_angefragt); } },
-                { h:"Unterlagen_Liste",    w:35, wrap:true,  v:function(r,d){ return cellSafe(d.unterlagen_liste); } },
-                { h:"Sonderfall",          w:16, wrap:false, v:function(r,d){ return cellSafe(d.sonderfall); } },
-                { h:"Anhang_Typen",        w:28, wrap:true,  v:function(r,d){ return cellSafe(d.anhang_typen); } },
-                { h:"PDF_Qualitaet",       w:13, wrap:false, v:function(r,d){ return cellSafe(d.pdf_qualitaet); } },
-                { h:"Enthaelt_MV",         w:11, wrap:false, v:function(r,d){ return cellSafe(d.enthaelt_maklervollmacht); } },
-                { h:"MV_Vollumfaenglich",  w:13, wrap:false, v:function(r,d){ return cellSafe(d.mv_vollumfaenglich); } },
-                { h:"MV_Einschraenkungen", w:35, wrap:true,  v:function(r,d){ return cellSafe(d.mv_einschraenkungen); } },
-                { h:"MV_Status",           w:16, wrap:false, v:function(r,d){ return cellSafe(d.mv_status); } },
-                { h:"Unterschrift_Kunde",  w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterschrift_kunde); } },
-                { h:"Unterschrift_Makler", w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterschrift_makler); } },
-                { h:"Auf_VN_Ausgestellt",  w:13, wrap:false, v:function(r,d){ return cellSafe(d.auf_vn_ausgestellt); } },
-                { h:"Makler_Namentlich",   w:13, wrap:false, v:function(r,d){ return cellSafe(d.makler_namentlich_genannt); } },
-                { h:"Zusammenfassung",     w:55, wrap:true,  v:function(r,d){ return cellSafe(d.zusammenfassung); } },
-                { h:"Naechster_Schritt",   w:50, wrap:true,  v:function(r,d){ return cellSafe(d.naechster_schritt); } },
-                { h:"Hinweis",             w:40, wrap:true,  v:function(r,d){ return cellSafe(d.hinweis); } }
+                { h:"Lfd_Nr",              g:"meta",  w:8,  wrap:false, v:function(r,d,i){ return wsLfdNr(i); } },
+                { h:"Datei",               g:"meta",  w:34, wrap:false, v:function(r,d){ return cellSafe(r.fileName); } },
+                { h:"Datum",               g:"meta",  w:16, wrap:false, v:function(r,d){ return cellSafe(r.datum); } },
+                { h:"Absender",            g:"meta",  w:28, wrap:false, v:function(r,d){ return cellSafe(r.absName + " <" + r.absMail + ">"); } },
+                { h:"Betreff",             g:"meta",  w:40, wrap:true,  v:function(r,d){ return cellSafe(r.betreff); } },
+                { h:"Anhaenge",            g:"meta",  w:30, wrap:true,  v:function(r,d){ return cellSafe(r.anhangAlle); } },
+                { h:"Vorgangstyp",         g:"klass", w:16, wrap:false, v:function(r,d){ return cellSafe(d.vorgangstyp); } },
+                { h:"Klassifikation",      g:"klass", w:18, wrap:false, v:function(r,d){ return cellSafe(d.klassifikation); } },
+                { h:"Klassifikation_Grund",g:"klass", w:45, wrap:true,  v:function(r,d){ return cellSafe(d.klassifikation_grund); } },
+                { h:"Ist_Reminder",        g:"klass", w:11, wrap:false, v:function(r,d){ return cellSafe(d.ist_reminder); } },
+                { h:"Reminder_Quelle",     g:"klass", w:20, wrap:false, v:function(r,d){ return cellSafe(d.reminder_quelle); } },
+                { h:"Nicht_Neu_Grund",     g:"klass", w:35, wrap:true,  v:function(r,d){ return cellSafe(d.nicht_neuer_vorgang_grund); } },
+                { h:"Maklerpool",          g:"makler",w:28, wrap:false, v:function(r,d){ return cellSafe(d.maklerpool); } },
+                { h:"Makler_Nachname",     g:"makler",w:18, wrap:false, v:function(r,d){ return cellSafe(d.makler_nachname); } },
+                { h:"Makler_Vorname",      g:"makler",w:16, wrap:false, v:function(r,d){ return cellSafe(d.makler_vorname); } },
+                { h:"Agentur_Nummer",      g:"makler",w:14, wrap:false, v:function(r,d){ return cellSafe(d.agentur_nummer); } },
+                { h:"Vermittler_Nummer",   g:"makler",w:14, wrap:false, v:function(r,d){ return cellSafe(d.vermittler_nummer); } },
+                { h:"Makler_Nummer",       g:"makler",w:24, wrap:false, v:function(r,d){ return cellSafe(d.makler_nummer); } },
+                { h:"Auftrag_Datum",       g:"makler",w:14, wrap:false, v:function(r,d){ return cellSafe(d.auftrag_datum); } },
+                { h:"Makler_Namentlich",   g:"makler",w:13, wrap:false, v:function(r,d){ return cellSafe(d.makler_namentlich_genannt); } },
+                { h:"Kunde_Nachname",      g:"kunde", w:18, wrap:false, v:function(r,d){ return cellSafe(d.kunde_nachname); } },
+                { h:"Kunde_Vorname",       g:"kunde", w:16, wrap:false, v:function(r,d){ return cellSafe(d.kunde_vorname); } },
+                { h:"Kunde_Nummer",        g:"kunde", w:16, wrap:false, v:function(r,d){ return cellSafe(d.kunde_nummer); } },
+                { h:"Versicherungsnummer", g:"kunde", w:18, wrap:false, v:function(r,d){ return cellSafe(d.versicherungsnummer); } },
+                { h:"Sparte",              g:"kunde", w:12, wrap:false, v:function(r,d){ return cellSafe(d.sparte); } },
+                { h:"Geschaefts_Typ",      g:"kunde", w:20, wrap:false, v:function(r,d){ return cellSafe(d.geschaefts_typ); } },
+                { h:"Unterlagen_Angefragt",g:"unter", w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterlagen_angefragt); } },
+                { h:"Unterlagen_Liste",    g:"unter", w:35, wrap:true,  v:function(r,d){ return cellSafe(d.unterlagen_liste); } },
+                { h:"Sonderfall",          g:"unter", w:16, wrap:false, v:function(r,d){ return cellSafe(d.sonderfall); } },
+                { h:"Anhang_Typen",        g:"unter", w:28, wrap:true,  v:function(r,d){ return cellSafe(d.anhang_typen); } },
+                { h:"PDF_Qualitaet",       g:"unter", w:13, wrap:false, v:function(r,d){ return cellSafe(d.pdf_qualitaet); } },
+                { h:"Enthaelt_MV",         g:"mv",    w:11, wrap:false, v:function(r,d){ return cellSafe(d.enthaelt_maklervollmacht); } },
+                { h:"MV_Vollumfaenglich",  g:"mv",    w:13, wrap:false, v:function(r,d){ return cellSafe(d.mv_vollumfaenglich); } },
+                { h:"MV_Einschraenkungen", g:"mv",    w:35, wrap:true,  v:function(r,d){ return cellSafe(d.mv_einschraenkungen); } },
+                { h:"MV_Status",           g:"mv",    w:16, wrap:false, v:function(r,d){ return cellSafe(d.mv_status); } },
+                { h:"Unterschrift_Kunde",  g:"mv",    w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterschrift_kunde); } },
+                { h:"Unterschrift_Makler", g:"mv",    w:13, wrap:false, v:function(r,d){ return cellSafe(d.unterschrift_makler); } },
+                { h:"Auf_VN_Ausgestellt",  g:"mv",    w:13, wrap:false, v:function(r,d){ return cellSafe(d.auf_vn_ausgestellt); } },
+                { h:"Zusammenfassung",     g:"erg",   w:55, wrap:true,  v:function(r,d){ return cellSafe(d.zusammenfassung); } },
+                { h:"Naechster_Schritt",   g:"erg",   w:50, wrap:true,  v:function(r,d){ return cellSafe(d.naechster_schritt); } },
+                { h:"Hinweis",             g:"erg",   w:40, wrap:true,  v:function(r,d){ return cellSafe(d.hinweis); } }
             ];
+            var grpColor = {
+                meta:   rgb(55,65,81),    // Schiefer
+                klass:  rgb(200,16,46),   // ERGO-Rot
+                makler: rgb(15,118,110),  // Petrol
+                kunde:  rgb(30,64,175),   // Blau
+                unter:  rgb(154,52,18),   // Braun
+                mv:     rgb(109,40,217),  // Violett
+                erg:    rgb(21,128,61)    // Gruen
+            };
             var nCols = colDefs.length;
             for (var c = 0; c < nCols; c++) sh.Cells(1, c+1).Value = colDefs[c].h;
             try {
                 var hr = sh.Range(sh.Cells(1,1), sh.Cells(1, nCols));
                 hr.Font.Bold = true;
                 hr.Font.Color = rgb(255,255,255);
-                hr.Interior.Color = rgb(200,16,46);
                 hr.HorizontalAlignment = -4108;
                 hr.VerticalAlignment = -4108;
                 hr.WrapText = true;
-                sh.Rows(1).RowHeight = 32;
+                sh.Rows(1).RowHeight = 34;
+                // Pro Spalte die Gruppenfarbe in den Header
+                for (var hc = 0; hc < nCols; hc++) {
+                    try { sh.Cells(1, hc+1).Interior.Color = grpColor[colDefs[hc].g] || rgb(55,65,81); } catch(eHc) {}
+                }
             } catch(e) {}
             for (var i = 0; i < processed.length; i++) {
                 var r = processed[i];
