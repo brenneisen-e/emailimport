@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.84"
+        VERSION="1.85"
         WINDOWSTATE="normal"
     />
     <style>
@@ -200,7 +200,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.84 - Felder agentur_nummer + vermittler_nummer getrennt (reine Werte ohne Wort-Label), auftrag_datum erzwungen TT.MM.JJJJ (Parallel+Batch konsistent). Excel: eigene Spalten Agentur_Nummer/Vermittler_Nummer + Header-Farblogik nach Spaltengruppe (Meta/Klassifikation/Makler/Kunde/Unterlagen/MV/Ergebnis). v1.83 - Batch-Prompt verschaerft</div>
+            <div class="ver">v1.85 - Workshop-Frontend: echte Umlaute statt ae/oe/ue (waehlen->w&auml;hlen, zurueck->zur&uuml;ck, gewaehlt, unveraendert, angehaengt, pruefen) als HTML-Entities. v1.84 - agentur_nummer/vermittler_nummer getrennt, Datum TT.MM.JJJJ, Excel Header-Farblogik + Spalten</div>
         </div>
 
         <!-- Cookie -->
@@ -7165,7 +7165,7 @@ function openWorkshopMode() {
                            "(im Hauptmodus Cookie einfuegen + speichern) und Workshop neu oeffnen.";
         }
     }
-    if (!outlookApp) wsShowError("Outlook ist nicht verbunden - bitte erst in Hauptmodus die Verbindung pruefen.");
+    if (!outlookApp) wsShowError("Outlook ist nicht verbunden - bitte erst in Hauptmodus die Verbindung pr&uuml;fen.");
 }
 
 function closeWorkshopMode() {
@@ -7980,7 +7980,7 @@ function wsFinishDemo(processed) {
               (failed ? ", " + failed + " fehlgeschlagen" : "") + ".");
         wsShowSuccess("Fertig! <strong>" + saved + "</strong> Original-Mails als .msg gespeichert" +
                       (failed ? " (" + failed + " Fehler)" : "") +
-                      " &mdash; KI-Notiz je Mail als <strong>PDF</strong> angehaengt. " +
+                      " &mdash; KI-Notiz je Mail als <strong>PDF</strong> angeh&auml;ngt. " +
                       "<strong>Excel</strong> liegt im selben Ordner; Spalte <strong>Lfd_Nr</strong> = " +
                       "Nummer in der KI-Notiz (Mapping Excel &harr; Vorgang).");
 
@@ -8328,7 +8328,7 @@ function wsWriteComparison(par, bat) {
         f.Close();
         wsLog("Vergleichsdatei: " + path + " (" + totalDiff + " abweichende Felder gesamt)");
         wsShowSuccess("Testmodus fertig. <strong>" + totalDiff + "</strong> abweichende Felder. " +
-            "Vergleichsdatei gespeichert &mdash; bei einer KI hochladen, um Unterschiede pruefen zu lassen.");
+            "Vergleichsdatei gespeichert &mdash; bei einer KI hochladen, um Unterschiede pr&uuml;fen zu lassen.");
         try { shell.Run('notepad.exe "' + path + '"', 1, false); } catch(eN) {}
     } catch(eW) {
         wsShowError("Vergleichsdatei konnte nicht geschrieben werden: " + (eW.message || eW));
@@ -8546,7 +8546,7 @@ End Function
 </style>
 
 <div id="workshopOverlay">
-    <button id="wsClose" class="ws-close" onclick="closeWorkshopMode()">&larr; zurueck</button>
+    <button id="wsClose" class="ws-close" onclick="closeWorkshopMode()">&larr; zur&uuml;ck</button>
     <div class="ws-wrap">
         <div class="ws-header">
             <div class="ws-logo">KI</div>
@@ -8555,13 +8555,13 @@ End Function
         </div>
 
         <div class="ws-card">
-            <div class="ws-step-label"><span class="ws-step-num">1</span>Ordner mit Demo-Mails waehlen</div>
+            <div class="ws-step-label"><span class="ws-step-num">1</span>Ordner mit Demo-Mails w&auml;hlen</div>
             <div id="wsCookieState" class="ws-status" style="display:none;"></div>
             <div class="ws-folder-display">
                 <span class="ws-icon">&#128193;</span>
-                <span class="ws-folder-path ws-empty" id="wsFolderPath">Noch kein Ordner gewaehlt</span>
+                <span class="ws-folder-path ws-empty" id="wsFolderPath">Noch kein Ordner gew&auml;hlt</span>
             </div>
-            <button class="ws-btn-folder" id="wsPick" onclick="wsPickFolder()">Ordner waehlen...</button>
+            <button class="ws-btn-folder" id="wsPick" onclick="wsPickFolder()">Ordner w&auml;hlen...</button>
             <div class="ws-info-grid" id="wsInfoGrid" style="display:none;">
                 <div class="ws-info-tile">
                     <span class="ws-num" id="wsNumMsgs">0</span>
@@ -8598,7 +8598,7 @@ End Function
                 <strong>Testmodus:</strong> erst Parallel, dann Batch &mdash; schreibt eine <strong>Vergleichsdatei</strong>
                 (Parallel vs. Batch je Feld) zum Hochladen bei einer KI; <em>kein</em> .msg/Excel-Export.<br>
                 Parallel/Batch: <strong>Excel</strong> (Spalte Lfd_Nr) + je Vorgang die <strong>Original-Mail als .msg</strong>
-                mit <strong>KI-Notiz als PDF</strong>. Original-Dateien im Quellordner bleiben unveraendert.
+                mit <strong>KI-Notiz als PDF</strong>. Original-Dateien im Quellordner bleiben unver&auml;ndert.
             </div>
             <div class="ws-log" id="wsLog"></div>
         </div>
