@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v1.86 - HTA Quellcode</title>
+<title>ERGO Workshop v1.87 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v1.86</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v1.87</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.86"
+        VERSION="1.87"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.86 - Batch-Fix: Receive-Timeout fuer Batch-Antwort 180s->15min (laengerer v1.83-Prompt sprengte 180s), Lebenszeichen alle 15s im Log, HTTP-Status-Check, harte Notbremse nach 18min - kein "haengt bei 2/7" mehr. v1.85 - Workshop-Frontend echte Umlaute</div>
+            <div class="ver">v1.87 - Experiment: Knopf "Batch (1 kombinierte PDF)" - Word baut aus ALLEN Mails+PDFs EINE PDF mit Dokument-Trennern (##### DOKUMENT-START ##### datei: ...), nur diese eine wird hochgeladen + 1 Prompt (JSON-Array). Skaliert auf viele Mails (nicht auf 5 begrenzt), inkrementeller Aufbau. v1.86 - Batch-Timeout/Heartbeat-Fix</div>
         </div>
 
         <!-- Cookie -->
@@ -7216,6 +7216,7 @@ function openWorkshopMode() {
     document.getElementById("wsPlay").disabled = true;
     var wb0;
     if ((wb0 = document.getElementById("wsBatch"))) wb0.disabled = true;
+    if ((wb0 = document.getElementById("wsCombined"))) wb0.disabled = true;
     if ((wb0 = document.getElementById("wsTest")))  wb0.disabled = true;
     document.getElementById("wsProgressWrap").style.display = "none";
     document.getElementById("wsLog").style.display = "none";
@@ -7298,6 +7299,7 @@ function wsUseFolder(path) {
     document.getElementById("wsPlay").disabled = dis;
     var bb;
     if ((bb = document.getElementById("wsBatch"))) bb.disabled = dis;
+    if ((bb = document.getElementById("wsCombined"))) bb.disabled = dis;
     if ((bb = document.getElementById("wsTest")))  bb.disabled = dis;
     wsHideStatus();
 }
@@ -8078,6 +8080,7 @@ function wsRestoreUi() {
     var b;
     if ((b = document.getElementById("wsPlay"))) b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsBatch"))) b.disabled = state._wsMsgFiles.length === 0;
+    if ((b = document.getElementById("wsCombined"))) b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsTest")))  b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsPick")))  b.disabled = false;
     if ((b = document.getElementById("wsClose"))) b.disabled = false;
@@ -8298,9 +8301,10 @@ function wsBatchTick() {
                     if (mm.tempDir &amp;&amp; fso.FolderExists(mm.tempDir)) fso.DeleteFolder(mm.tempDir, true);
                 } catch(e) {}
             }
+            try { if (bs.combinedPdf &amp;&amp; fso.FileExists(bs.combinedPdf)) fso.DeleteFile(bs.combinedPdf, true); } catch(e) {}
             try { fireDelete(bs.convId); } catch(e) {}
             wsProgress(state._wsMsgFiles.length + 2, state._wsMsgFiles.length + 2);
-            wsLog("BATCH fertig: " + processed.length + " Vorgaenge erkannt.");
+            wsLog((bs.combinedPdf ? "KOMBI-PDF" : "BATCH") + " fertig: " + processed.length + " Vorgaenge erkannt.");
             var cb = bs.onDone; state._wsBatch = null;
             if (cb) cb(processed); else wsFinishDemo(processed);
             return;
@@ -8313,10 +8317,196 @@ function wsBatchTick() {
 
 function wsBatchFail(bs, msg) {
     state._wsBatch = null;
+    try {
+        if (bs &amp;&amp; bs.combinedPdf) {
+            var fsoF = new ActiveXObject("Scripting.FileSystemObject");
+            if (fsoF.FileExists(bs.combinedPdf)) fsoF.DeleteFile(bs.combinedPdf, true);
+        }
+    } catch(e) {}
     wsLog("BATCH-FEHLER: " + msg);
     if (bs &amp;&amp; bs.onDone) { bs.onDone([]); return; }
     wsShowError("Batch-Analyse fehlgeschlagen: " + msg);
     wsRestoreUi();
+}
+
+// ============================================================================
+// EXPERIMENT: ALLE Mails+PDFs in EINE kombinierte PDF (Word) mit klaren
+// Dokument-Trennern, dann nur DIESE eine PDF hochladen + 1 Prompt (JSON-Array).
+// Skaliert auf viele Mails (nicht auf 5 begrenzt). Word-PDF-Reflow ist bei
+// Text-PDFs gut, bei Scans verlustbehaftet - daher als Experiment markiert.
+// ============================================================================
+function wsRunCombined() {
+    if (state._wsRunning) return;
+    wsStartCombined(null);
+}
+
+function wsBuildCombinedPrompt(mails) {
+    var p = "";
+    p += "Du bist ERGO-Innendienst-Sachbearbeiter (SHUK). Es wurde EINE einzige PDF ";
+    p += "hochgeladen, die MEHRERE Vorgaenge nacheinander enthaelt.\n";
+    p += "Jeder Vorgang ist klar markiert: er BEGINNT mit einer Zeile\n";
+    p += "  '##### DOKUMENT-START ##### datei: <Dateiname>'\n";
+    p += "und ENDET mit\n";
+    p += "  '##### DOKUMENT-ENDE: <Dateiname> #####'.\n";
+    p += "Dazwischen stehen Mail-Kopf, Mail-Text und die Anhaenge (jeweils zwischen ";
+    p += "'----- ANHANG-START: <name> -----' und '----- ANHANG-ENDE: <name> -----').\n";
+    p += "Behandle jeden Abschnitt als EIGENEN, unabhaengigen Vorgang. Vermische NICHTS ";
+    p += "ueber die DOKUMENT-Grenzen hinweg.\n\n";
+    p += "Reihenfolge der " + mails.length + " Dokumente in der PDF:\n";
+    for (var i = 0; i < mails.length; i++) p += "  " + (i+1) + ". " + mails[i].fileName + "\n";
+    p += "\nREGELN (strikt):\n";
+    p += "1. Genau " + mails.length + " Objekte, Reihenfolge wie oben, Feld \"datei\" = EXAKTER Dateiname.\n";
+    p += "2. Reminder/Erinnerung/Mahnung: NICHT 'Anfrage-Ruecksprache' - nach zugrunde ";
+    p += "liegendem Vorgang klassifizieren (Bestandsuebertragung -> 'BUe-Vorgang'), ist_reminder='ja'.\n";
+    p += "3. makler_nummer Format EXAKT 'Agentur <nr> / Vermittler <nr>' (Agentur zuerst).\n";
+    p += "4. auftrag_datum IMMER TT.MM.JJJJ (nie ISO).\n";
+    p += "5. maklerpool vs. eigentlicher Makler trennen (Finanzguru ueber Jung DMS -> ";
+    p += "maklerpool='JDC / Jung, DMS &amp; Cie.', makler_nachname='Finanzguru'; CHECK24 ueber ";
+    p += "Fonds Finanz analog; Pool nur wenn wirklich belegt, sonst leer).\n";
+    p += "6. geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n";
+    p += "7. Firmenkunde: kunde_vorname leer (nicht 'Firma').\n\n";
+    p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown), GENAU ";
+    p += mails.length + " Objekte. Echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß):\n";
+    p += "[\n  {\n";
+    p += '  "datei":"exakter Dateiname des Dokuments",\n';
+    p += wsFieldLines();
+    p += "  }\n  /* ... eines pro Dokument ... */\n]\n";
+    return p;
+}
+
+function wsStartCombined(onDone) {
+    if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
+    if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
+    if (!outlookApp) return wsShowError("Outlook nicht verbunden");
+
+    state._wsRunning = true;
+    var b;
+    if ((b = document.getElementById("wsPlay")))     b.disabled = true;
+    if ((b = document.getElementById("wsBatch")))    b.disabled = true;
+    if ((b = document.getElementById("wsCombined"))) b.disabled = true;
+    if ((b = document.getElementById("wsTest")))     b.disabled = true;
+    if ((b = document.getElementById("wsPick")))     b.disabled = true;
+    if ((b = document.getElementById("wsClose")))    b.disabled = true;
+    document.getElementById("wsProgressWrap").style.display = "block";
+    if (!onDone) document.getElementById("wsLog").innerText = "";
+    wsProgress(0, state._wsMsgFiles.length + 4);
+    wsShowInfo("KOMBI-PDF: " + state._wsMsgFiles.length + " Mails werden in EINE PDF gebuendelt (Word)...");
+
+    var mails = [];
+    for (var i = 0; i < state._wsMsgFiles.length; i++) {
+        var mp = state._wsMsgFiles[i];
+        wsLog("[" + (i+1) + "/" + state._wsMsgFiles.length + "] Lese: " + mp.substr(mp.lastIndexOf("\\")+1));
+        var info = wsExtractMail(mp);
+        mails.push(info);
+        if (info.error) wsLog("   FEHLER: " + info.error);
+    }
+
+    var shell = new ActiveXObject("WScript.Shell");
+    var stamp = String(new Date().getTime());
+    var combinedPdf = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_sammeldok_" + stamp + ".pdf";
+
+    var word = null, doc = null;
+    try {
+        word = new ActiveXObject("Word.Application");
+        word.Visible = false;
+        try { word.DisplayAlerts = 0; } catch(eW1) {}
+        try { word.AutomationSecurity = 3; } catch(eW2) {}
+        doc = word.Documents.Add();
+    } catch(eW) {
+        try { if (word) word.Quit(0); } catch(e) {}
+        state._wsRunning = false;
+        return wsShowError("Word nicht verfuegbar - Kombi-PDF nicht moeglich. (" + (eW.message||eW) + ")");
+    }
+
+    state._wsCombined = {
+        word: word, doc: doc, mails: mails, idx: 0,
+        combinedPdf: combinedPdf, onDone: onDone || null
+    };
+    wsLog("");
+    wsLog("Baue Sammel-PDF mit " + mails.length + " Dokumenten (Word, kann dauern)...");
+    setTimeout(wsCombinedBuildTick, 100);
+}
+
+// Baut die Sammel-PDF inkrementell (1 Mail pro Tick -> UI bleibt ansprechbar)
+function wsCombinedBuildTick() {
+    var cb = state._wsCombined;
+    if (!cb) return;
+    try {
+        if (cb.idx < cb.mails.length) {
+            var m = cb.mails[cb.idx];
+            var sel = cb.word.Selection;
+            sel.EndKey(6);  // 6 = wdStory (ans Ende)
+            if (cb.idx > 0) { try { sel.InsertBreak(7); } catch(eB) {} } // 7 = wdPageBreak
+            sel.TypeText("##### DOKUMENT-START ##### datei: " + m.fileName + "\r");
+            sel.TypeText("Mail " + (cb.idx+1) + " von " + cb.mails.length +
+                         " | Datum: " + m.datum + " | Absender: " + m.absName + " <" + m.absMail + ">\r");
+            sel.TypeText("Betreff: " + m.betreff + "\r");
+            sel.TypeText("----- MAIL-TEXT -----\r");
+            sel.TypeText(String(m.body || "(kein Text)") + "\r");
+            for (var pi = 0; pi < m.pdfPaths.length; pi++) {
+                var pdf = m.pdfPaths[pi];
+                sel.EndKey(6);
+                sel.TypeText("----- ANHANG-START: " + pdf.name + " -----\r");
+                var src = null;
+                try {
+                    // Word-PDF-Reflow: PDF wird beim Open in editierbaren Text gewandelt
+                    src = cb.word.Documents.Open(pdf.path, false, true); // ConfirmConversions=false, ReadOnly=true
+                    src.Content.Copy();
+                    src.Close(0);
+                    src = null;
+                    cb.word.Selection.EndKey(6);
+                    cb.word.Selection.Paste();
+                    cb.word.Selection.TypeText("\r");
+                } catch(ePdf) {
+                    try { if (src) src.Close(0); } catch(e) {}
+                    cb.word.Selection.EndKey(6);
+                    cb.word.Selection.TypeText("(Anhang konnte nicht eingelesen werden: " + (ePdf.message||ePdf) + ")\r");
+                    wsLog("   [" + m.fileName + "] PDF '" + pdf.name + "' nicht konvertierbar: " + (ePdf.message||ePdf));
+                }
+                cb.word.Selection.EndKey(6);
+                cb.word.Selection.TypeText("----- ANHANG-ENDE: " + pdf.name + " -----\r");
+            }
+            cb.word.Selection.EndKey(6);
+            cb.word.Selection.TypeText("##### DOKUMENT-ENDE: " + m.fileName + " #####\r");
+            cb.idx++;
+            wsProgress(cb.idx, cb.mails.length + 4);
+            wsLog("   Dokument " + cb.idx + "/" + cb.mails.length + " im Sammel-PDF.");
+            return setTimeout(wsCombinedBuildTick, 50);
+        }
+
+        // Fertig: als eine PDF exportieren
+        wsLog("Exportiere Sammel-PDF...");
+        try { cb.doc.SaveAs2(cb.combinedPdf, 17); } catch(eSv) {  // 17 = wdFormatPDF
+            try { cb.doc.ExportAsFixedFormat(cb.combinedPdf, 17); } catch(eEx) {
+                throw new Error("PDF-Export fehlgeschlagen: " + (eSv.message||eSv));
+            }
+        }
+        try { cb.doc.Close(0); } catch(e) {}
+        try { cb.word.Quit(0); } catch(e) {}
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        if (!fso.FileExists(cb.combinedPdf)) throw new Error("Sammel-PDF wurde nicht erzeugt");
+        wsLog("Sammel-PDF erstellt: " + cb.combinedPdf);
+
+        // -> selbe Netzwerk-Pipeline wie Batch, aber nur 1 PDF + Kombi-Prompt
+        var prompt = wsBuildCombinedPrompt(cb.mails);
+        var bs = {
+            stage: "CREATING_CONV", mails: cb.mails,
+            allPdfs: [{ path: cb.combinedPdf, name: "Sammeldokument.pdf" }],
+            combinedPdf: cb.combinedPdf, prompt: prompt,
+            convHttp: createConversationAsyncFire(prompt), convId: null,
+            uploadHandles: [], docIds: [], docIdsJson: "[]",
+            answerHttp: null, startedAt: new Date().getTime(), onDone: cb.onDone
+        };
+        state._wsCombined = null;
+        state._wsBatch = bs;
+        wsLog("Lade Sammel-PDF hoch, 1 Conversation...");
+        setTimeout(wsBatchTick, 200);
+    } catch(eT) {
+        try { if (cb.word) cb.word.Quit(0); } catch(e) {}
+        state._wsCombined = null;
+        wsShowError("Kombi-PDF fehlgeschlagen: " + (eT.message || eT));
+        wsRestoreUi();
+    }
 }
 
 // TESTMODUS: erst parallel, dann batch, dann Vergleichsdatei schreiben
@@ -8674,6 +8864,10 @@ End Function
                         style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
                     &amp;#128230; Batch: alle in 1 Prompt
                 </button>
+                <button class="ws-btn-folder" id="wsCombined" onclick="wsRunCombined()" disabled
+                        style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
+                    &amp;#128196; Batch (1 kombinierte PDF)
+                </button>
                 <button class="ws-btn-folder" id="wsTest" onclick="wsRunTest()" disabled
                         style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
                     &amp;#129514; Testmodus: Parallel vs. Batch
@@ -8681,10 +8875,13 @@ End Function
             </div>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
                 <strong>Parallel:</strong> jede Mail eigene Conversation (Default). <strong>Batch:</strong> alle Mails +
-                PDFs in EINER Conversation/EINEM Prompt (weniger Overhead, Mapping per Dateiname).<br>
+                PDFs in EINER Conversation/EINEM Prompt (Mapping per Dateiname).<br>
+                <strong>Batch (1 kombinierte PDF):</strong> Word baut aus ALLEN Mails+PDFs <em>eine</em> PDF mit
+                klaren Dokument-Trennern (<code>##### DOKUMENT-START ##### datei: ...</code>) und l&amp;auml;dt nur
+                diese eine hoch &amp;mdash; skaliert auf viele Mails. <em>Experimentell</em>: bei Scan-PDFs verlustbehaftet.<br>
                 <strong>Testmodus:</strong> erst Parallel, dann Batch &amp;mdash; schreibt eine <strong>Vergleichsdatei</strong>
                 (Parallel vs. Batch je Feld) zum Hochladen bei einer KI; <em>kein</em> .msg/Excel-Export.<br>
-                Parallel/Batch: <strong>Excel</strong> (Spalte Lfd_Nr) + je Vorgang die <strong>Original-Mail als .msg</strong>
+                Parallel/Batch/Kombi: <strong>Excel</strong> (Spalte Lfd_Nr) + je Vorgang die <strong>Original-Mail als .msg</strong>
                 mit <strong>KI-Notiz als PDF</strong>. Original-Dateien im Quellordner bleiben unver&amp;auml;ndert.
             </div>
             <div class="ws-log" id="wsLog"></div>
