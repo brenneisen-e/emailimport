@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.93"
+        VERSION="1.94"
         WINDOWSTATE="normal"
     />
     <style>
@@ -200,7 +200,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.93 - Prompt-Schaerfung aus P/B/K-Vergleich (alle Modi): sonderfall nur bei AUSDRUECKLICHER Nennung - Sonderkonditions-Vorbehalt ist KEIN Sondertarif (behebt Kombi-PDF-Fehler); maklerpool LEER wenn nicht aus Mail/PDF/Signatur belegt - nicht aus Absender-Domain raten (behebt Parallel-Halluzination). v1.92 - Chunked-Batch + JSON-Repair</div>
+            <div class="ver">v1.94 - Kombi-PDF jetzt SCHNELL: paralleler Bau ueber mehrere Word-Worker-Subprozesse (Map: je Block PDF-Reflow->Teil-.docx parallel), danach ein billiges, verlustfreies Zusammenfuegen per InsertFile -> EINE PDF (kein erneuter Reflow); HTA bleibt ansprechbar. v1.93 - Prompt-Schaerfung sonderfall/maklerpool</div>
         </div>
 
         <!-- Cookie -->
@@ -8366,6 +8366,7 @@ function wsBatchFail(bs, msg) {
 // "Lost in the Middle"), Parallel-Durchsatz, native PDFs (kein Word-Verlust).
 // ============================================================================
 var WS_CHUNK = 4;
+var WS_KOMBI_WORKERS = 4;   // parallele Word-Worker fuer den Kombi-PDF-Bau
 
 function wsRunChunked() {
     if (state._wsRunning) return;
@@ -8599,6 +8600,95 @@ function wsBuildCombinedPrompt(mails) {
     return p;
 }
 
+// ============================================================================
+// KOMBI-PDF SCHNELL: parallele Word-Worker (Map) + ein billiges Reduce.
+// Phase 1 (parallel): K Worker-Subprozesse konvertieren je ihren Mail-Block
+//   Word-PDF-Reflow -> .docx (der teure Teil, jetzt K-fach parallel, eigener
+//   Word-Prozess je Worker; HTA bleibt waehrenddessen ansprechbar).
+// Phase 2 (einmalig, billig): ein Word fuegt die .docx-Teile per InsertFile
+//   verlustfrei zusammen -> EINE PDF (kein erneuter Reflow). Danach normale
+//   Batch-Netzwerk-Pipeline (1 Upload + Kombi-Prompt).
+// ============================================================================
+function wsKombiSan(x) { return String(x == null ? "" : x).replace(/[\t\r\n]+/g, " "); }
+
+function wsBuildKombiWorkerVbs() {
+    var v = [];
+    v.push("Dim args, fso, wd, doc, sel, ts, line, parts, src, bts, first, jobPath, outDocx, okPath, failMsg");
+    v.push("Set args = WScript.Arguments");
+    v.push("jobPath = args(0) : outDocx = args(1) : okPath = args(2) : failMsg = \"\"");
+    v.push("Set fso = CreateObject(\"Scripting.FileSystemObject\")");
+    v.push("On Error Resume Next");
+    v.push("Set wd = CreateObject(\"Word.Application\")");
+    v.push("If Err.Number <> 0 Then");
+    v.push("    WriteOk fso, okPath, \"ERR:Word: \" & Err.Description");
+    v.push("    WScript.Quit");
+    v.push("End If");
+    v.push("wd.Visible = False");
+    v.push("wd.DisplayAlerts = 0");
+    v.push("wd.AutomationSecurity = 3");
+    v.push("Set doc = wd.Documents.Add()");
+    v.push("Set sel = wd.Selection");
+    v.push("Set ts = fso.OpenTextFile(jobPath, 1, False, -1)");
+    v.push("first = True");
+    v.push("Do While Not ts.AtEndOfStream");
+    v.push("    line = ts.ReadLine");
+    v.push("    If Len(line) > 0 Then");
+    v.push("        parts = Split(line, vbTab)");
+    v.push("        Select Case parts(0)");
+    v.push("        Case \"META\"");
+    v.push("            sel.EndKey 6");
+    v.push("            If Not first Then sel.InsertBreak 7");
+    v.push("            first = False");
+    v.push("            sel.TypeText \"##### DOKUMENT-START ##### datei: \" & parts(1) & vbCr");
+    v.push("            sel.TypeText \"Datum: \" & parts(2) & \" | Absender: \" & parts(3) & \" <\" & parts(4) & \"> | Betreff: \" & parts(5) & vbCr");
+    v.push("            sel.TypeText \"----- MAIL-TEXT -----\" & vbCr");
+    v.push("            If fso.FileExists(parts(6)) Then");
+    v.push("                Set bts = fso.OpenTextFile(parts(6), 1, False, -1)");
+    v.push("                If Not bts.AtEndOfStream Then sel.TypeText bts.ReadAll");
+    v.push("                bts.Close");
+    v.push("            End If");
+    v.push("            sel.TypeText vbCr");
+    v.push("        Case \"PDF\"");
+    v.push("            sel.EndKey 6");
+    v.push("            sel.TypeText \"----- ANHANG-START: \" & parts(2) & \" -----\" & vbCr");
+    v.push("            Err.Clear");
+    v.push("            Set src = wd.Documents.Open(parts(1), False, True)");
+    v.push("            If Err.Number = 0 Then");
+    v.push("                src.Content.Copy");
+    v.push("                src.Close 0");
+    v.push("                sel.EndKey 6");
+    v.push("                sel.Paste");
+    v.push("                sel.TypeText vbCr");
+    v.push("            Else");
+    v.push("                Err.Clear");
+    v.push("                sel.EndKey 6");
+    v.push("                sel.TypeText \"(Anhang konnte nicht eingelesen werden)\" & vbCr");
+    v.push("            End If");
+    v.push("            sel.EndKey 6");
+    v.push("            sel.TypeText \"----- ANHANG-ENDE: \" & parts(2) & \" -----\" & vbCr");
+    v.push("        Case \"ENDDOC\"");
+    v.push("            sel.EndKey 6");
+    v.push("            sel.TypeText \"##### DOKUMENT-ENDE: \" & parts(1) & \" #####\" & vbCr");
+    v.push("        End Select");
+    v.push("    End If");
+    v.push("Loop");
+    v.push("ts.Close");
+    v.push("Err.Clear");
+    v.push("doc.SaveAs2 outDocx, 16");
+    v.push("If Err.Number <> 0 Then failMsg = \"SaveAs: \" & Err.Description");
+    v.push("doc.Close 0");
+    v.push("wd.Quit 0");
+    v.push("If failMsg = \"\" Then WriteOk fso, okPath, \"OK\" Else WriteOk fso, okPath, \"ERR:\" & failMsg");
+    v.push("");
+    v.push("Sub WriteOk(f, p, txt)");
+    v.push("    Dim o");
+    v.push("    Set o = f.CreateTextFile(p, True, False)");
+    v.push("    o.Write txt");
+    v.push("    o.Close");
+    v.push("End Sub");
+    return v.join("\r\n");
+}
+
 function wsStartCombined(onDone) {
     if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
     if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
@@ -8609,170 +8699,200 @@ function wsStartCombined(onDone) {
     if ((b = document.getElementById("wsPlay")))     b.disabled = true;
     if ((b = document.getElementById("wsBatch")))    b.disabled = true;
     if ((b = document.getElementById("wsCombined"))) b.disabled = true;
-    if ((b = document.getElementById("wsChunked"))) b.disabled = true;
+    if ((b = document.getElementById("wsChunked")))  b.disabled = true;
     if ((b = document.getElementById("wsTest")))     b.disabled = true;
     if ((b = document.getElementById("wsPick")))     b.disabled = true;
     if ((b = document.getElementById("wsClose")))    b.disabled = true;
     document.getElementById("wsProgressWrap").style.display = "block";
     if (!onDone) document.getElementById("wsLog").innerText = "";
-    wsProgress(0, state._wsMsgFiles.length + 4);
-    wsShowInfo("KOMBI-PDF: " + state._wsMsgFiles.length + " Mails werden in EINE PDF geb&uuml;ndelt (Word)...");
+    wsProgress(0, state._wsMsgFiles.length + 2);
+    wsShowInfo("KOMBI-PDF (parallel): " + state._wsMsgFiles.length + " Mails ueber mehrere Word-Worker buendeln...");
 
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var shell = new ActiveXObject("WScript.Shell");
+    var tmp = shell.ExpandEnvironmentStrings("%TEMP%");
+    var stamp = String(new Date().getTime()) + "_" + Math.floor(Math.random()*100000);
+
+    // Mails auslesen (sequenziell, schnell - nur Outlook-Lesen + PDFs in TEMP)
     var mails = [];
     for (var i = 0; i < state._wsMsgFiles.length; i++) {
         var mp = state._wsMsgFiles[i];
         wsLog("[" + (i+1) + "/" + state._wsMsgFiles.length + "] Lese: " + mp.substr(mp.lastIndexOf("\\")+1));
         var info = wsExtractMail(mp);
         mails.push(info);
-        if (info.error) wsLog("   FEHLER: " + info.error);
+        if (info.error) wsLog("   FEHLER: " + info.error, "err");
     }
 
-    var shell = new ActiveXObject("WScript.Shell");
-    var fsoC = new ActiveXObject("Scripting.FileSystemObject");
-    var stamp = String(new Date().getTime());
-    // Sammel-PDF im SELBEN Ordner wie Excel/.msg ablegen (nicht TEMP), bleibt liegen
+    // Ziel-Ordner (wie Excel/.msg), Sammel-PDF bleibt dort liegen
     var cOut = "";
     try {
         if (state._wsFolder) {
             cOut = state._wsFolder.replace(/\\+$/, "") + "\\_KI-Vorgaenge";
-            if (!fsoC.FolderExists(cOut)) fsoC.CreateFolder(cOut);
+            if (!fso.FolderExists(cOut)) fso.CreateFolder(cOut);
         }
     } catch(eCo) { cOut = ""; }
     if (!cOut) {
-        try {
-            cOut = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ERGO-KI-Vorgaenge";
-            if (!fsoC.FolderExists(cOut)) fsoC.CreateFolder(cOut);
-        } catch(eCo2) { cOut = shell.ExpandEnvironmentStrings("%TEMP%"); }
+        try { cOut = tmp + "\\ERGO-KI-Vorgaenge"; if (!fso.FolderExists(cOut)) fso.CreateFolder(cOut); }
+        catch(eCo2) { cOut = tmp; }
     }
     var combinedPdf = cOut.replace(/\\+$/, "") + "\\Sammeldokument_" + stamp + ".pdf";
 
-    var word = null, doc = null;
-    try {
-        word = new ActiveXObject("Word.Application");
-        word.Visible = false;
-        try { word.DisplayAlerts = 0; } catch(eW1) {}
-        try { word.AutomationSecurity = 3; } catch(eW2) {}
-        doc = word.Documents.Add();
-    } catch(eW) {
-        try { if (word) word.Quit(0); } catch(e) {}
-        state._wsRunning = false;
-        return wsShowError("Word nicht verf&uuml;gbar - Kombi-PDF nicht m&ouml;glich. (" + (eW.message||eW) + ")");
+    // Worker-VBS einmal schreiben
+    var vbsPath = tmp + "\\ergo_kombi_" + stamp + ".vbs";
+    try { var vf = fso.CreateTextFile(vbsPath, true, false); vf.Write(wsBuildKombiWorkerVbs()); vf.Close(); }
+    catch(eVbs) { state._wsRunning = false; return wsShowError("Worker-Skript nicht schreibbar: " + eVbs.message); }
+
+    var nMails = mails.length;
+    var nWorkers = Math.min(WS_KOMBI_WORKERS, nMails);
+    if (nWorkers < 1) nWorkers = 1;
+    var per = Math.ceil(nMails / nWorkers);
+    var parts = [];
+    for (var w = 0; w < nWorkers; w++) {
+        var from = w * per, to = Math.min(from + per, nMails);
+        if (from >= to) break;
+        var jobPath = tmp + "\\ergo_kombi_" + stamp + "_job" + w + ".txt";
+        var docxPath = tmp + "\\ergo_kombi_" + stamp + "_part" + w + ".docx";
+        var okPath = tmp + "\\ergo_kombi_" + stamp + "_part" + w + ".ok";
+        try { fso.DeleteFile(okPath, true); } catch(e) {}
+        var bodyFiles = [];
+        var jobLines = [];
+        for (var mi = from; mi < to; mi++) {
+            var m = mails[mi];
+            if (m.error) continue;
+            var bodyPath = tmp + "\\ergo_kombi_" + stamp + "_b" + mi + ".txt";
+            try { var bf = fso.CreateTextFile(bodyPath, true, true); bf.Write(String(m.body || "(kein Text)")); bf.Close(); }
+            catch(eB) { bodyPath = ""; }
+            bodyFiles.push(bodyPath);
+            jobLines.push(["META", wsKombiSan(m.fileName), wsKombiSan(m.datum), wsKombiSan(m.absName),
+                           wsKombiSan(m.absMail), wsKombiSan(m.betreff), bodyPath].join("\t"));
+            for (var pj = 0; pj < m.pdfPaths.length; pj++) {
+                jobLines.push(["PDF", m.pdfPaths[pj].path, wsKombiSan(m.pdfPaths[pj].name)].join("\t"));
+            }
+            jobLines.push(["ENDDOC", wsKombiSan(m.fileName)].join("\t"));
+        }
+        try { var jf = fso.CreateTextFile(jobPath, true, true); jf.Write(jobLines.join("\r\n")); jf.Close(); }
+        catch(eJ) { continue; }
+        var cmd = 'wscript.exe //NoLogo //B "' + vbsPath + '" "' + jobPath + '" "' + docxPath + '" "' + okPath + '"';
+        shell.Run(cmd, 0, false);   // fire-and-forget, eigener Word-Prozess
+        parts.push({ w: w, jobPath: jobPath, docxPath: docxPath, okPath: okPath,
+                     bodyFiles: bodyFiles, from: from, to: to, status: null });
     }
 
-    var totalPdfs = 0;
-    for (var u = 0; u < mails.length; u++) totalPdfs += mails[u].pdfPaths.length;
-    state._wsCombined = {
-        word: word, doc: doc, mails: mails,
-        idx: 0, step: "head", pdfIdx: 0,
-        unitsDone: 0, unitsTotal: mails.length * 2 + totalPdfs + 1,
-        combinedPdf: combinedPdf, onDone: onDone || null
+    state._wsKombi = {
+        mails: mails, parts: parts, combinedPdf: combinedPdf, onDone: onDone || null,
+        vbsPath: vbsPath, startAt: new Date().getTime(), _hbAt: 0
     };
     wsLog("");
-    wsLog("Baue Sammel-PDF mit " + mails.length + " Dokumenten (" + totalPdfs +
-          " Anhänge, Word - läuft schrittweise)...", "head");
-    setTimeout(wsCombinedBuildTick, 60);
+    wsLog(parts.length + " Word-Worker parallel gestartet (je ~" + per + " Mails) - HTA bleibt ansprechbar...", "head");
+    setTimeout(wsKombiPoll, 600);
 }
 
-// Baut die Sammel-PDF in KLEINEN Schritten: pro Tick genau EINE Einheit
-// (Kopf ODER ein einzelnes PDF ODER Endmarke) -> die UI wird zwischen jedem
-// Schritt neu gezeichnet, kein "haengt sich auf".
-function wsCombinedBuildTick() {
-    var cb = state._wsCombined;
-    if (!cb) return;
+function wsKombiPoll() {
+    var kb = state._wsKombi;
+    if (!kb) return;
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var done = 0;
+    for (var i = 0; i < kb.parts.length; i++) {
+        var p = kb.parts[i];
+        if (p.status) { done++; continue; }
+        if (fso.FileExists(p.okPath)) {
+            var txt = "OK";
+            try { var ts = fso.OpenTextFile(p.okPath, 1, false, 0); txt = ts.AtEndOfStream ? "OK" : ts.ReadAll(); ts.Close(); } catch(e) {}
+            p.status = (String(txt).substr(0,3) === "ERR") ? "err" : "ok";
+            if (p.status === "err") wsLog("Worker " + (p.w+1) + " Fehler: " + txt, "err");
+            else wsLog("Worker " + (p.w+1) + " fertig (" + (p.to - p.from) + " Mails -> Teil-Docx).", "ok");
+            done++;
+        }
+    }
+    wsProgress(done, kb.parts.length + 1);
+
+    var el = new Date().getTime() - kb.startAt;
+    if (el - kb._hbAt >= 15000 && done < kb.parts.length) {
+        kb._hbAt = el;
+        wsLog("... Worker laufen (" + done + "/" + kb.parts.length + ", " + Math.round(el/1000) + "s)", "muted");
+    }
+    if (done < kb.parts.length) {
+        if (el > 1200000) {   // 20 min Notbremse
+            wsLog("Kombi-Worker-Timeout (>20min) - fahre mit fertigen Teilen fort.", "err");
+        } else {
+            return setTimeout(wsKombiPoll, 800);
+        }
+    }
+    setTimeout(wsKombiReduce, 50);
+}
+
+function wsKombiReduce() {
+    var kb = state._wsKombi;
+    if (!kb) return;
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    wsLog("Fuege Teil-Dokumente zu EINER PDF zusammen (verlustfrei, kein Reflow)...", "head");
+    var rw = null;
     try {
-        if (cb.idx < cb.mails.length) {
-            var m = cb.mails[cb.idx];
-            var sel = cb.word.Selection;
-
-            if (cb.step === "head") {
-                sel.EndKey(6);  // 6 = wdStory
-                if (cb.idx > 0) { try { sel.InsertBreak(7); } catch(eB) {} } // 7 = wdPageBreak
-                sel.TypeText("##### DOKUMENT-START ##### datei: " + m.fileName + "\r");
-                sel.TypeText("Mail " + (cb.idx+1) + " von " + cb.mails.length +
-                             " | Datum: " + m.datum + " | Absender: " + m.absName + " <" + m.absMail + ">\r");
-                sel.TypeText("Betreff: " + m.betreff + "\r");
-                sel.TypeText("----- MAIL-TEXT -----\r");
-                sel.TypeText(String(m.body || "(kein Text)") + "\r");
-                cb.step = "pdf"; cb.pdfIdx = 0; cb.unitsDone++;
-                wsProgress(cb.unitsDone, cb.unitsTotal);
-                wsLog("Dokument " + (cb.idx+1) + "/" + cb.mails.length + ": Kopf + Mailtext (" +
-                      m.pdfPaths.length + " Anhänge folgen)");
-                return setTimeout(wsCombinedBuildTick, 30);
-            }
-
-            if (cb.step === "pdf") {
-                if (cb.pdfIdx < m.pdfPaths.length) {
-                    var pdf = m.pdfPaths[cb.pdfIdx];
-                    cb.word.Selection.EndKey(6);
-                    cb.word.Selection.TypeText("----- ANHANG-START: " + pdf.name + " -----\r");
-                    var src = null;
-                    try {
-                        src = cb.word.Documents.Open(pdf.path, false, true); // ConfirmConversions=false, ReadOnly=true
-                        src.Content.Copy();
-                        src.Close(0); src = null;
-                        cb.word.Selection.EndKey(6);
-                        cb.word.Selection.Paste();
-                        cb.word.Selection.TypeText("\r");
-                    } catch(ePdf) {
-                        try { if (src) src.Close(0); } catch(e) {}
-                        cb.word.Selection.EndKey(6);
-                        cb.word.Selection.TypeText("(Anhang konnte nicht eingelesen werden)\r");
-                        wsLog("Dok " + (cb.idx+1) + " Anhang '" + pdf.name + "' nicht konvertierbar: " +
-                              (ePdf.message||ePdf), "err");
-                    }
-                    cb.word.Selection.EndKey(6);
-                    cb.word.Selection.TypeText("----- ANHANG-ENDE: " + pdf.name + " -----\r");
-                    cb.pdfIdx++; cb.unitsDone++;
-                    wsProgress(cb.unitsDone, cb.unitsTotal);
-                    wsLog("Dok " + (cb.idx+1) + "/" + cb.mails.length + ": Anhang " +
-                          cb.pdfIdx + "/" + m.pdfPaths.length + " (" + pdf.name + ") eingefügt");
-                    return setTimeout(wsCombinedBuildTick, 30);
-                }
-                cb.step = "end";
-                return setTimeout(wsCombinedBuildTick, 15);
-            }
-
-            if (cb.step === "end") {
-                cb.word.Selection.EndKey(6);
-                cb.word.Selection.TypeText("##### DOKUMENT-ENDE: " + m.fileName + " #####\r");
-                cb.idx++; cb.step = "head"; cb.pdfIdx = 0; cb.unitsDone++;
-                wsProgress(cb.unitsDone, cb.unitsTotal);
-                return setTimeout(wsCombinedBuildTick, 30);
-            }
+        rw = new ActiveXObject("Word.Application");
+        rw.Visible = false;
+        try { rw.DisplayAlerts = 0; } catch(e) {}
+        try { rw.AutomationSecurity = 3; } catch(e) {}
+        var rdoc = rw.Documents.Add();
+        var rsel = rw.Selection;
+        var firstPart = true, added = 0;
+        for (var i = 0; i < kb.parts.length; i++) {
+            var p = kb.parts[i];
+            if (p.status !== "ok" || !fso.FileExists(p.docxPath)) continue;
+            rsel.EndKey(6);
+            if (!firstPart) { try { rsel.InsertBreak(7); } catch(eBr) {} }
+            rsel.InsertFile(p.docxPath);
+            firstPart = false; added++;
         }
-
-        // Fertig: als eine PDF exportieren
-        wsLog("Exportiere Sammel-PDF...", "head");
-        try { cb.doc.SaveAs2(cb.combinedPdf, 17); } catch(eSv) {  // 17 = wdFormatPDF
-            try { cb.doc.ExportAsFixedFormat(cb.combinedPdf, 17); } catch(eEx) {
-                throw new Error("PDF-Export fehlgeschlagen: " + (eSv.message||eSv));
-            }
-        }
-        try { cb.doc.Close(0); } catch(e) {}
-        try { cb.word.Quit(0); } catch(e) {}
-        var fso = new ActiveXObject("Scripting.FileSystemObject");
-        if (!fso.FileExists(cb.combinedPdf)) throw new Error("Sammel-PDF wurde nicht erzeugt");
-        wsLog("Sammel-PDF erstellt: " + cb.combinedPdf);
-
-        // -> selbe Netzwerk-Pipeline wie Batch, aber nur 1 PDF + Kombi-Prompt
-        var prompt = wsBuildCombinedPrompt(cb.mails);
-        var bs = {
-            stage: "CREATING_CONV", mails: cb.mails,
-            allPdfs: [{ path: cb.combinedPdf, name: "Sammeldokument.pdf" }],
-            combinedPdf: cb.combinedPdf, prompt: prompt,
-            convHttp: createConversationAsyncFire(prompt), convId: null,
-            uploadHandles: [], docIds: [], docIdsJson: "[]",
-            answerHttp: null, startedAt: new Date().getTime(), onDone: cb.onDone
-        };
-        state._wsCombined = null;
-        state._wsBatch = bs;
-        wsLog("Lade Sammel-PDF hoch, 1 Conversation...");
-        setTimeout(wsBatchTick, 200);
-    } catch(eT) {
-        try { if (cb.word) cb.word.Quit(0); } catch(e) {}
-        state._wsCombined = null;
-        wsShowError("Kombi-PDF fehlgeschlagen: " + (eT.message || eT));
+        if (added === 0) throw new Error("Kein Teil-Dokument erzeugt (alle Worker fehlgeschlagen?)");
+        rdoc.SaveAs2(kb.combinedPdf, 17);   // 17 = wdFormatPDF
+        rdoc.Close(0);
+        rw.Quit(0); rw = null;
+        if (!fso.FileExists(kb.combinedPdf)) throw new Error("Sammel-PDF wurde nicht erzeugt");
+        wsLog("Sammel-PDF fertig (" + added + " Teile): " + kb.combinedPdf, "ok");
+    } catch(eR) {
+        try { if (rw) rw.Quit(0); } catch(e) {}
+        wsKombiCleanup(kb);
+        state._wsKombi = null;
+        if (kb.onDone) { kb.onDone([]); return; }
+        wsShowError("Kombi-PDF (Zusammenfuegen) fehlgeschlagen: " + (eR.message || eR));
         wsRestoreUi();
+        return;
+    }
+    wsKombiCleanup(kb);
+
+    // -> normale Batch-Netzwerk-Pipeline (1 Upload + Kombi-Prompt)
+    var prompt = wsBuildCombinedPrompt(kb.mails);
+    var bs = {
+        stage: "CREATING_CONV", mails: kb.mails,
+        allPdfs: [{ path: kb.combinedPdf, name: "Sammeldokument.pdf" }],
+        combinedPdf: kb.combinedPdf, prompt: prompt,
+        convHttp: createConversationAsyncFire(prompt), convId: null,
+        uploadHandles: [], docIds: [], docIdsJson: "[]",
+        answerHttp: null, startedAt: new Date().getTime(), onDone: kb.onDone
+    };
+    state._wsKombi = null;
+    state._wsBatch = bs;
+    wsLog("Lade Sammel-PDF hoch, 1 Conversation...");
+    setTimeout(wsBatchTick, 200);
+}
+
+function wsKombiCleanup(kb) {
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    try { fso.DeleteFile(kb.vbsPath, true); } catch(e) {}
+    for (var i = 0; i < kb.parts.length; i++) {
+        var p = kb.parts[i];
+        try { fso.DeleteFile(p.jobPath, true); } catch(e) {}
+        try { fso.DeleteFile(p.okPath, true); } catch(e) {}
+        try { fso.DeleteFile(p.docxPath, true); } catch(e) {}
+        for (var bf = 0; bf < p.bodyFiles.length; bf++) { try { if (p.bodyFiles[bf]) fso.DeleteFile(p.bodyFiles[bf], true); } catch(e) {} }
+    }
+    // TEMP-PDFs der Mails aufraeumen
+    for (var mi = 0; mi < kb.mails.length; mi++) {
+        try {
+            var mm = kb.mails[mi];
+            for (var cp = 0; cp < mm.pdfPaths.length; cp++) { try { fso.DeleteFile(mm.pdfPaths[cp].path, true); } catch(e) {} }
+            if (mm.tempDir && fso.FolderExists(mm.tempDir)) fso.DeleteFolder(mm.tempDir, true);
+        } catch(e) {}
     }
 }
 
