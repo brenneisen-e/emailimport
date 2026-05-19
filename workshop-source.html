@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v1.91 - HTA Quellcode</title>
+<title>ERGO Workshop v1.92 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v1.91</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v1.92</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.91"
+        VERSION="1.92"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.91 - Testmodus-Knopf-Text korrigiert ("alle 3 Modi (P/B/K)" statt "Parallel vs. Batch"), Ordner-Platzhalter mit echtem ü ("gewählt"). v1.90 - Makler_Nummer entfernt, Excel-Layout (Header ohne _, einzeilig, links/oben, kein Ueberlauf), PDFs im Ergebnis-Ordner, Testmodus alle 3 Modi</div>
+            <div class="ver">v1.92 - Neuer Modus "Chunked-Batch" (4er-Chunks, alle Chunks parallel - 2026-Best-Practice gegen Lost-in-the-Middle, empfohlen fuer viele Mails) + robuste JSON-Repair-Schicht (Codefences/Kommentare/Trailing-Kommas/Smart-Quotes/Steuerzeichen, notfalls Objekte einzeln per Brace-Matching - rettet auch abgeschnittene Antworten). v1.91 - Testmodus-Text + Umlaut-Fix</div>
         </div>
 
         <!-- Cookie -->
@@ -7217,6 +7217,7 @@ function openWorkshopMode() {
     var wb0;
     if ((wb0 = document.getElementById("wsBatch"))) wb0.disabled = true;
     if ((wb0 = document.getElementById("wsCombined"))) wb0.disabled = true;
+    if ((wb0 = document.getElementById("wsChunked"))) wb0.disabled = true;
     if ((wb0 = document.getElementById("wsTest")))  wb0.disabled = true;
     document.getElementById("wsProgressWrap").style.display = "none";
     document.getElementById("wsLog").style.display = "none";
@@ -7318,6 +7319,7 @@ function wsUseFolder(path) {
     var bb;
     if ((bb = document.getElementById("wsBatch"))) bb.disabled = dis;
     if ((bb = document.getElementById("wsCombined"))) bb.disabled = dis;
+    if ((bb = document.getElementById("wsChunked"))) bb.disabled = dis;
     if ((bb = document.getElementById("wsTest")))  bb.disabled = dis;
     wsHideStatus();
 }
@@ -8112,6 +8114,7 @@ function wsRestoreUi() {
     if ((b = document.getElementById("wsPlay"))) b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsBatch"))) b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsCombined"))) b.disabled = state._wsMsgFiles.length === 0;
+    if ((b = document.getElementById("wsChunked"))) b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsTest")))  b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsPick")))  b.disabled = false;
     if ((b = document.getElementById("wsClose"))) b.disabled = false;
@@ -8165,12 +8168,77 @@ function wsExtractMail(msgPath) {
     }
 }
 
+// Holt aus Text einzelne Top-Level-{...}-Objekte heraus (Brace-Matching,
+// String-aware) - rettet auch abgeschnittene/teils kaputte JSON-Arrays.
+function wsExtractObjects(s) {
+    var objs = [], depth = 0, start = -1, inStr = false, q = "", esc = false;
+    for (var i = 0; i < s.length; i++) {
+        var c = s.charAt(i);
+        if (inStr) {
+            if (esc) { esc = false; }
+            else if (c === "\\") { esc = true; }
+            else if (c === q) { inStr = false; }
+            continue;
+        }
+        if (c === '"' || c === "'") { inStr = true; q = c; continue; }
+        if (c === "{") { if (depth === 0) start = i; depth++; }
+        else if (c === "}") {
+            depth--;
+            if (depth === 0 &amp;&amp; start >= 0) { objs.push(s.substring(start, i + 1)); start = -1; }
+            if (depth < 0) depth = 0;
+        }
+    }
+    return objs;
+}
+
+// Robuster JSON-Array-Parser mit Repair-Schicht (2026-Best-Practice: nicht
+// blind eval, sondern reparieren). Schritte: direkt -> getrimmt -> grosses
+// [..]-Segment -> Reparatur (Codefences, Kommentare, Trailing-Kommas, Smart-
+// Quotes, Steuerzeichen) -> notfalls Objekte einzeln einsammeln.
 function wsParseJsonArray(txt) {
     if (!txt) return null;
-    var s = String(txt).replace(/^\s+|\s+$/g, "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
-    try { var v = eval("(" + s + ")"); if (v &amp;&amp; v.length != null) return v; } catch(e) {}
-    var m = s.match(/\[[\s\S]*\]/);
-    if (m) { try { var v2 = eval("(" + m[0] + ")"); if (v2 &amp;&amp; v2.length != null) return v2; } catch(e2) {} }
+    function tryEval(x) { try { var v = eval("(" + x + ")"); if (v &amp;&amp; v.length != null) return v; } catch(e) {} return null; }
+    var s = String(txt);
+    var r = tryEval(s); if (r) return r;
+
+    s = s.replace(/^﻿/, "")
+         .replace(/^[\s\S]*?```(?:json)?\s*/i, function(m){ return m.indexOf("[") >= 0 || m.indexOf("{") >= 0 ? m : ""; })
+         .replace(/```[\s\S]*$/i, "")
+         .replace(/^\s+|\s+$/g, "");
+    r = tryEval(s); if (r) return r;
+
+    // Grosses [ ... ]-Segment
+    var a = s.indexOf("["), b = s.lastIndexOf("]");
+    if (a >= 0 &amp;&amp; b > a) {
+        var seg = s.substring(a, b + 1);
+        r = tryEval(seg); if (r) return r;
+        var rep = seg
+            .replace(/\/\*[\s\S]*?\*\//g, "")            // Blockkommentare
+            .replace(/(^|[^:])\/\/[^\n\r]*/g, "$1")        // Zeilenkommentare
+            .replace(new RegExp("[\\u201C\\u201D\\u201E]","g"), '"')   // typografische Doppel-Quotes
+            .replace(new RegExp("[\\u2018\\u2019\\u201A]","g"), "'")   // typografische Einzel-Quotes
+            .replace(/,\s*([}\]])/g, "$1")                  // Trailing-Kommas
+            .replace(new RegExp("[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]","g"), " "); // Steuerzeichen
+        r = tryEval(rep); if (r) return r;
+    }
+
+    // Notfall: einzelne Objekte einsammeln (auch bei abgeschnittenem Array)
+    var objs = wsExtractObjects(s);
+    if (objs.length) {
+        var assembled = "[" + objs.join(",") + "]";
+        r = tryEval(assembled); if (r) return r;
+        // Objekte einzeln parsen, defekte ueberspringen
+        var out = [];
+        for (var i = 0; i < objs.length; i++) {
+            var o = tryEval("[" + objs[i] + "]");
+            if (o &amp;&amp; o.length) out.push(o[0]);
+            else {
+                var o2 = tryEval("[" + objs[i].replace(/,\s*}/g, "}").replace(new RegExp("[\\u201C\\u201D]","g"), '"') + "]");
+                if (o2 &amp;&amp; o2.length) out.push(o2[0]);
+            }
+        }
+        if (out.length) return out;
+    }
     return null;
 }
 
@@ -8357,6 +8425,198 @@ function wsBatchFail(bs, msg) {
 }
 
 // ============================================================================
+// CHUNKED-BATCH: N Mails in kleine Chunks (Default 4) splitten, jeder Chunk
+// als kompakter Batch-Prompt in EINER eigenen Conversation, ALLE Chunks
+// PARALLEL. 2026-Best-Practice-Kompromiss: begrenzter Kontext (kein
+// "Lost in the Middle"), Parallel-Durchsatz, native PDFs (kein Word-Verlust).
+// ============================================================================
+var WS_CHUNK = 4;
+
+function wsRunChunked() {
+    if (state._wsRunning) return;
+    wsStartChunked(null);
+}
+
+function wsStartChunked(onDone) {
+    if (state._wsMsgFiles.length === 0) return wsShowError("Keine Mails im Ordner");
+    if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
+    if (!outlookApp) return wsShowError("Outlook nicht verbunden");
+
+    state._wsRunning = true;
+    var b;
+    if ((b = document.getElementById("wsPlay")))     b.disabled = true;
+    if ((b = document.getElementById("wsBatch")))    b.disabled = true;
+    if ((b = document.getElementById("wsChunked")))  b.disabled = true;
+    if ((b = document.getElementById("wsCombined"))) b.disabled = true;
+    if ((b = document.getElementById("wsChunked"))) b.disabled = true;
+    if ((b = document.getElementById("wsTest")))     b.disabled = true;
+    if ((b = document.getElementById("wsPick")))     b.disabled = true;
+    if ((b = document.getElementById("wsClose")))    b.disabled = true;
+    document.getElementById("wsProgressWrap").style.display = "block";
+    if (!onDone) document.getElementById("wsLog").innerText = "";
+    wsProgress(0, state._wsMsgFiles.length);
+
+    var nMails = state._wsMsgFiles.length;
+    var nChunks = Math.ceil(nMails / WS_CHUNK);
+    wsShowInfo("CHUNKED-BATCH: " + nMails + " Mails in " + nChunks + " Chunks (je " +
+               WS_CHUNK + "), alle Chunks PARALLEL...");
+    wsLog("=== CHUNKED-BATCH: " + nMails + " Mails / " + nChunks + " Chunks a " + WS_CHUNK + " ===", "head");
+
+    var slots = [];
+    for (var ci = 0; ci < nChunks; ci++) {
+        var from = ci * WS_CHUNK, to = Math.min(from + WS_CHUNK, nMails);
+        var mails = [], allPdfs = [];
+        for (var i = from; i < to; i++) {
+            var mp = state._wsMsgFiles[i];
+            wsLog("[Chunk " + (ci+1) + "] Lese: " + mp.substr(mp.lastIndexOf("\\")+1));
+            var info = wsExtractMail(mp);
+            mails.push(info);
+            if (info.error) { wsLog("   FEHLER: " + info.error, "err"); continue; }
+            for (var pj = 0; pj < info.pdfPaths.length; pj++) allPdfs.push(info.pdfPaths[pj]);
+        }
+        var prompt = wsBuildBatchPrompt(mails);
+        slots.push({
+            cidx: ci + 1, stage: "CREATING_CONV", mails: mails, allPdfs: allPdfs,
+            prompt: prompt, convHttp: createConversationAsyncFire(prompt), convId: null,
+            uploadHandles: [], docIds: [], docIdsJson: "[]",
+            answerHttp: null, answerStart: 0, _hbAt: 0, error: null, processed: []
+        });
+    }
+    state._wsChunkSlots = slots;
+    state._wsChunkOnDone = onDone || null;
+    state._wsChunkTotalMails = nMails;
+    wsLog("Alle " + nChunks + " Chunk-Conversations gestartet - laufen parallel...");
+    setTimeout(wsChunkTick, 250);
+}
+
+function wsChunkTick() {
+    var slots = state._wsChunkSlots || [];
+    if (!slots.length) return;
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var doneCount = 0, doneMails = 0;
+
+    for (var k = 0; k < slots.length; k++) {
+        var s = slots[k];
+        if (s.stage === "DONE" || s.stage === "ERROR") { doneCount++; doneMails += s.mails.length; continue; }
+        try {
+            if (s.stage === "CREATING_CONV") {
+                var cd = false;
+                try { cd = s.convHttp.WaitForResponse(0); } catch(eW) {
+                    s._cr = (s._cr||0)+1; if (s._cr > 12) { s.stage = "ERROR"; s.error = "Conv-Wait"; }
+                    continue;
+                }
+                if (!cd) continue;
+                var cs = 0, cr = "";
+                try { cs = s.convHttp.Status; } catch(e) {}
+                try { cr = s.convHttp.ResponseText; } catch(e) {}
+                if (cs !== 200) { s.stage = "ERROR"; s.error = "Conv HTTP " + cs; continue; }
+                s.convId = parseJsonStr(cr, "id");
+                if (!s.convId) { s.stage = "ERROR"; s.error = "keine conversation_id"; continue; }
+                if (s.allPdfs.length > 0) {
+                    for (var pi = 0; pi < s.allPdfs.length; pi++) {
+                        try { s.uploadHandles.push(uploadPdfStartAsync(s.convId, s.allPdfs[pi].path, s.allPdfs[pi].name)); } catch(eU) {}
+                    }
+                    s.uploadStart = new Date().getTime();
+                    s.stage = "UPLOADING";
+                } else { s.docIdsJson = "[]"; s.stage = "READY"; }
+            }
+            if (s.stage === "UPLOADING") {
+                var allUp = true;
+                for (var ui = 0; ui < s.uploadHandles.length; ui++) {
+                    if (!fso.FileExists(s.uploadHandles[ui].resultPath)) { allUp = false; break; }
+                }
+                var el = new Date().getTime() - (s.uploadStart || 0);
+                if (!allUp &amp;&amp; el < 150000) continue;
+                for (var ri = 0; ri < s.uploadHandles.length; ri++) {
+                    try { uploadPdfReadResult(s.uploadHandles[ri]); if (s.uploadHandles[ri].docId) s.docIds.push(s.uploadHandles[ri].docId); } catch(e) {}
+                }
+                s.docIdsJson = s.docIds.length > 0 ? '["' + s.docIds.join('","') + '"]' : "[]";
+                s.stage = "READY";
+            }
+            if (s.stage === "READY") {
+                s.answerHttp = startAnswerAsync(s.convId, s.prompt, s.docIdsJson, 900000);
+                s.answerStart = new Date().getTime();
+                s.stage = "RUNNING";
+                wsLog("Chunk " + s.cidx + ": Prompt gesendet (" + s.mails.length + " Mails)...");
+            }
+            if (s.stage === "RUNNING") {
+                var elAns = new Date().getTime() - (s.answerStart || 0);
+                if (elAns - (s._hbAt || 0) >= 20000) {
+                    s._hbAt = elAns;
+                    wsLog("Chunk " + s.cidx + ": warte (" + Math.round(elAns/1000) + "s)", "muted");
+                }
+                if (elAns > 1080000) { s.stage = "ERROR"; s.error = "Timeout >18min"; continue; }
+                var ad = false;
+                try { ad = s.answerHttp.WaitForResponse(0); } catch(eA) {
+                    s._ar = (s._ar||0)+1; if (s._ar > 12) { s.stage = "ERROR"; s.error = "Answer-Wait"; }
+                    continue;
+                }
+                if (!ad) continue;
+                var ast = 0;
+                try { ast = s.answerHttp.Status; } catch(e) {}
+                if (ast &amp;&amp; ast !== 200) { s.stage = "ERROR"; s.error = "HTTP " + ast; continue; }
+                var aresp = "";
+                try {
+                    var rb = s.answerHttp.ResponseBody;
+                    var rstm = new ActiveXObject("ADODB.Stream");
+                    rstm.Type = 1; rstm.Open(); rstm.Write(rb); rstm.Position = 0;
+                    rstm.Type = 2; rstm.Charset = "utf-8"; aresp = String(rstm.ReadText()); rstm.Close();
+                } catch(eRb) { try { aresp = s.answerHttp.ResponseText; } catch(e) {} }
+                var arr = wsParseJsonArray(jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"));
+                if (!arr) { s.stage = "ERROR"; s.error = "JSON-Array nicht parsebar"; continue; }
+                for (var mi = 0; mi < s.mails.length; mi++) {
+                    var m = s.mails[mi];
+                    if (m.error) continue;
+                    var d = null, fnLow = String(m.fileName).toLowerCase();
+                    for (var qi = 0; qi < arr.length; qi++) {
+                        var cand = String((arr[qi] &amp;&amp; arr[qi].datei) || "").toLowerCase();
+                        if (cand &amp;&amp; (cand === fnLow || cand.indexOf(fnLow) >= 0 || fnLow.indexOf(cand) >= 0)) { d = arr[qi]; break; }
+                    }
+                    if (!d) d = arr[mi] || null;
+                    if (!d) continue;
+                    s.processed.push({
+                        msgPath: m.msgPath, fileName: m.fileName, datum: m.datum,
+                        absName: m.absName, absMail: m.absMail, betreff: m.betreff,
+                        anhangAlle: m.anhangAlle, data: d,
+                        isReminder: d.ist_reminder === "ja",
+                        klassifikation: d.klassifikation || "",
+                        summary: (d.zusammenfassung || "").substr(0, 200)
+                    });
+                }
+                for (var ci2 = 0; ci2 < s.mails.length; ci2++) {
+                    try {
+                        var mm = s.mails[ci2];
+                        for (var cp = 0; cp < mm.pdfPaths.length; cp++) { try { fso.DeleteFile(mm.pdfPaths[cp].path, true); } catch(e) {} }
+                        if (mm.tempDir &amp;&amp; fso.FolderExists(mm.tempDir)) fso.DeleteFolder(mm.tempDir, true);
+                    } catch(e) {}
+                }
+                try { fireDelete(s.convId); } catch(e) {}
+                s.stage = "DONE";
+                wsLog("Chunk " + s.cidx + " fertig: " + s.processed.length + " Vorgaenge.", "ok");
+            }
+        } catch(eT) {
+            s.stage = "ERROR"; s.error = "Tick: " + (eT.message || "?");
+        }
+    }
+
+    wsProgress(doneMails, state._wsChunkTotalMails || slots.length);
+
+    if (doneCount >= slots.length) {
+        var processed = [];
+        for (var z = 0; z < slots.length; z++) {
+            if (slots[z].stage === "ERROR") wsLog("Chunk " + slots[z].cidx + " FEHLER: " + slots[z].error, "err");
+            for (var pz = 0; pz < slots[z].processed.length; pz++) processed.push(slots[z].processed[pz]);
+        }
+        var cb = state._wsChunkOnDone;
+        state._wsChunkSlots = null; state._wsChunkOnDone = null;
+        wsLog("CHUNKED-BATCH fertig: " + processed.length + " Vorgaenge gesamt.", "ok");
+        if (cb) cb(processed); else wsFinishDemo(processed);
+        return;
+    }
+    setTimeout(wsChunkTick, 500);
+}
+
+// ============================================================================
 // EXPERIMENT: ALLE Mails+PDFs in EINE kombinierte PDF (Word) mit klaren
 // Dokument-Trennern, dann nur DIESE eine PDF hochladen + 1 Prompt (JSON-Array).
 // Skaliert auf viele Mails (nicht auf 5 begrenzt). Word-PDF-Reflow ist bei
@@ -8411,6 +8671,7 @@ function wsStartCombined(onDone) {
     if ((b = document.getElementById("wsPlay")))     b.disabled = true;
     if ((b = document.getElementById("wsBatch")))    b.disabled = true;
     if ((b = document.getElementById("wsCombined"))) b.disabled = true;
+    if ((b = document.getElementById("wsChunked"))) b.disabled = true;
     if ((b = document.getElementById("wsTest")))     b.disabled = true;
     if ((b = document.getElementById("wsPick")))     b.disabled = true;
     if ((b = document.getElementById("wsClose")))    b.disabled = true;
@@ -8967,6 +9228,10 @@ End Function
                         style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
                     &amp;#128230; Batch: alle in 1 Prompt
                 </button>
+                <button class="ws-btn-folder" id="wsChunked" onclick="wsRunChunked()" disabled
+                        style="flex:1;border-color:#16a34a;color:#15803d;font-weight:600;">
+                    &amp;#9889; Chunked-Batch (4er, parallel)
+                </button>
                 <button class="ws-btn-folder" id="wsCombined" onclick="wsRunCombined()" disabled
                         style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
                     &amp;#128196; Batch (1 kombinierte PDF)
@@ -8977,11 +9242,14 @@ End Function
                 </button>
             </div>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
-                <strong>Parallel:</strong> jede Mail eigene Conversation (Default). <strong>Batch:</strong> alle Mails +
-                PDFs in EINER Conversation/EINEM Prompt (Mapping per Dateiname).<br>
+                <strong>Parallel:</strong> jede Mail eigene Conversation (Default, h&amp;ouml;chste Genauigkeit).
+                <strong>Batch:</strong> alle Mails + PDFs in EINER Conversation/EINEM Prompt (Mapping per Dateiname).<br>
+                <strong>Chunked-Batch (empfohlen f&amp;uuml;r viele Mails):</strong> Mails in 4er-Chunks, jeder Chunk
+                eigener Prompt, alle Chunks <em>parallel</em> &amp;mdash; begrenzter Kontext (kein
+                &amp;quot;Lost in the Middle&amp;quot;) + Parallel-Durchsatz + native PDFs.<br>
                 <strong>Batch (1 kombinierte PDF):</strong> Word baut aus ALLEN Mails+PDFs <em>eine</em> PDF mit
                 klaren Dokument-Trennern (<code>##### DOKUMENT-START ##### datei: ...</code>) und l&amp;auml;dt nur
-                diese eine hoch &amp;mdash; skaliert auf viele Mails. <em>Experimentell</em>: bei Scan-PDFs verlustbehaftet.<br>
+                diese eine hoch. <em>Experimentell</em>: bei Scan-PDFs verlustbehaftet.<br>
                 <strong>Testmodus:</strong> Parallel + Batch + Kombi-PDF nacheinander &amp;mdash; schreibt EINE
                 <strong>Vergleichsdatei</strong> (P/B/K je Feld) in den Ergebnis-Ordner, oeffnet sie zum Pruefen.<br>
                 Parallel/Batch/Kombi: <strong>Excel</strong> (Spalte Lfd_Nr) + je Vorgang die <strong>Original-Mail als .msg</strong>
