@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.87"
+        VERSION="1.88"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.87 - Experiment: Knopf "Batch (1 kombinierte PDF)" - Word baut aus ALLEN Mails+PDFs EINE PDF mit Dokument-Trennern (##### DOKUMENT-START ##### datei: ...), nur diese eine wird hochgeladen + 1 Prompt (JSON-Array). Skaliert auf viele Mails (nicht auf 5 begrenzt), inkrementeller Aufbau. v1.86 - Batch-Timeout/Heartbeat-Fix</div>
+            <div class="ver">v1.88 - Kombi-PDF-Bau in Kleinst-Schritten (1 Kopf/1 PDF/1 Endmarke pro Tick) -> UI haengt nicht mehr, Progress+Log laufen sichtbar mit. Workshop-Log jetzt als schoenes HTML-Log (farbcodierte Zeilen + Zeitstempel) statt Klartext. Echte Umlaute (gebündelt, Anhänge, läuft, eingefügt). v1.87 - Experiment Kombi-PDF-Knopf</div>
         </div>
 
         <!-- Cookie -->
@@ -7182,10 +7182,28 @@ function wsHideStatus() {
 function wsShowInfo(m)    { wsHideStatus(); document.getElementById("wsStatusInfo").innerHTML = m; document.getElementById("wsStatusInfo").style.display = "block"; }
 function wsShowSuccess(m) { wsHideStatus(); document.getElementById("wsStatusSuccess").innerHTML = m; document.getElementById("wsStatusSuccess").style.display = "block"; }
 function wsShowError(m)   { wsHideStatus(); document.getElementById("wsStatusError").innerHTML = m; document.getElementById("wsStatusError").style.display = "block"; }
-function wsLog(msg) {
+function wsEsc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function wsLog(msg, kind) {
     var el = document.getElementById("wsLog");
+    if (!el) return;
     el.style.display = "block";
-    el.innerText += (el.innerText ? "\n" : "") + msg;
+    var s = String(msg == null ? "" : msg);
+    if (!kind) {
+        if (/FEHLER|fehlgeschlagen|Timeout|nicht verf|nicht möglich|blockiert/i.test(s)) kind = "err";
+        else if (/FERTIG|fertig|erstellt|gespeichert|^\s*OK|hochgeladen|erkannt|bereit/i.test(s)) kind = "ok";
+        else if (/^\s*\.\.\.|warte|Lebenszeichen/i.test(s)) kind = "muted";
+        else if (/^\s*(=====|#####|-----)|TESTMODUS|BATCH|KOMBI/i.test(s)) kind = "head";
+        else kind = "info";
+    }
+    var t = new Date();
+    function p2(n){ n = String(n); return n.length < 2 ? "0" + n : n; }
+    var ts = p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds());
+    var isBlank = s.replace(/\s+/g, "") === "";
+    el.innerHTML += '<div class="ws-ll ws-ll-' + kind + '">' +
+        (isBlank ? '' : '<span class="ws-llt">' + ts + '</span>') +
+        '<span class="ws-llm">' + (isBlank ? '&nbsp;' : wsEsc(s)) + '</span></div>';
     el.scrollTop = el.scrollHeight;
 }
 function wsProgress(done, total) {
@@ -8320,7 +8338,7 @@ function wsStartCombined(onDone) {
     document.getElementById("wsProgressWrap").style.display = "block";
     if (!onDone) document.getElementById("wsLog").innerText = "";
     wsProgress(0, state._wsMsgFiles.length + 4);
-    wsShowInfo("KOMBI-PDF: " + state._wsMsgFiles.length + " Mails werden in EINE PDF gebuendelt (Word)...");
+    wsShowInfo("KOMBI-PDF: " + state._wsMsgFiles.length + " Mails werden in EINE PDF geb&uuml;ndelt (Word)...");
 
     var mails = [];
     for (var i = 0; i < state._wsMsgFiles.length; i++) {
@@ -8345,19 +8363,26 @@ function wsStartCombined(onDone) {
     } catch(eW) {
         try { if (word) word.Quit(0); } catch(e) {}
         state._wsRunning = false;
-        return wsShowError("Word nicht verfuegbar - Kombi-PDF nicht moeglich. (" + (eW.message||eW) + ")");
+        return wsShowError("Word nicht verf&uuml;gbar - Kombi-PDF nicht m&ouml;glich. (" + (eW.message||eW) + ")");
     }
 
+    var totalPdfs = 0;
+    for (var u = 0; u < mails.length; u++) totalPdfs += mails[u].pdfPaths.length;
     state._wsCombined = {
-        word: word, doc: doc, mails: mails, idx: 0,
+        word: word, doc: doc, mails: mails,
+        idx: 0, step: "head", pdfIdx: 0,
+        unitsDone: 0, unitsTotal: mails.length * 2 + totalPdfs + 1,
         combinedPdf: combinedPdf, onDone: onDone || null
     };
     wsLog("");
-    wsLog("Baue Sammel-PDF mit " + mails.length + " Dokumenten (Word, kann dauern)...");
-    setTimeout(wsCombinedBuildTick, 100);
+    wsLog("Baue Sammel-PDF mit " + mails.length + " Dokumenten (" + totalPdfs +
+          " Anhänge, Word - läuft schrittweise)...", "head");
+    setTimeout(wsCombinedBuildTick, 60);
 }
 
-// Baut die Sammel-PDF inkrementell (1 Mail pro Tick -> UI bleibt ansprechbar)
+// Baut die Sammel-PDF in KLEINEN Schritten: pro Tick genau EINE Einheit
+// (Kopf ODER ein einzelnes PDF ODER Endmarke) -> die UI wird zwischen jedem
+// Schritt neu gezeichnet, kein "haengt sich auf".
 function wsCombinedBuildTick() {
     var cb = state._wsCombined;
     if (!cb) return;
@@ -8365,47 +8390,66 @@ function wsCombinedBuildTick() {
         if (cb.idx < cb.mails.length) {
             var m = cb.mails[cb.idx];
             var sel = cb.word.Selection;
-            sel.EndKey(6);  // 6 = wdStory (ans Ende)
-            if (cb.idx > 0) { try { sel.InsertBreak(7); } catch(eB) {} } // 7 = wdPageBreak
-            sel.TypeText("##### DOKUMENT-START ##### datei: " + m.fileName + "\r");
-            sel.TypeText("Mail " + (cb.idx+1) + " von " + cb.mails.length +
-                         " | Datum: " + m.datum + " | Absender: " + m.absName + " <" + m.absMail + ">\r");
-            sel.TypeText("Betreff: " + m.betreff + "\r");
-            sel.TypeText("----- MAIL-TEXT -----\r");
-            sel.TypeText(String(m.body || "(kein Text)") + "\r");
-            for (var pi = 0; pi < m.pdfPaths.length; pi++) {
-                var pdf = m.pdfPaths[pi];
-                sel.EndKey(6);
-                sel.TypeText("----- ANHANG-START: " + pdf.name + " -----\r");
-                var src = null;
-                try {
-                    // Word-PDF-Reflow: PDF wird beim Open in editierbaren Text gewandelt
-                    src = cb.word.Documents.Open(pdf.path, false, true); // ConfirmConversions=false, ReadOnly=true
-                    src.Content.Copy();
-                    src.Close(0);
-                    src = null;
-                    cb.word.Selection.EndKey(6);
-                    cb.word.Selection.Paste();
-                    cb.word.Selection.TypeText("\r");
-                } catch(ePdf) {
-                    try { if (src) src.Close(0); } catch(e) {}
-                    cb.word.Selection.EndKey(6);
-                    cb.word.Selection.TypeText("(Anhang konnte nicht eingelesen werden: " + (ePdf.message||ePdf) + ")\r");
-                    wsLog("   [" + m.fileName + "] PDF '" + pdf.name + "' nicht konvertierbar: " + (ePdf.message||ePdf));
-                }
-                cb.word.Selection.EndKey(6);
-                cb.word.Selection.TypeText("----- ANHANG-ENDE: " + pdf.name + " -----\r");
+
+            if (cb.step === "head") {
+                sel.EndKey(6);  // 6 = wdStory
+                if (cb.idx > 0) { try { sel.InsertBreak(7); } catch(eB) {} } // 7 = wdPageBreak
+                sel.TypeText("##### DOKUMENT-START ##### datei: " + m.fileName + "\r");
+                sel.TypeText("Mail " + (cb.idx+1) + " von " + cb.mails.length +
+                             " | Datum: " + m.datum + " | Absender: " + m.absName + " <" + m.absMail + ">\r");
+                sel.TypeText("Betreff: " + m.betreff + "\r");
+                sel.TypeText("----- MAIL-TEXT -----\r");
+                sel.TypeText(String(m.body || "(kein Text)") + "\r");
+                cb.step = "pdf"; cb.pdfIdx = 0; cb.unitsDone++;
+                wsProgress(cb.unitsDone, cb.unitsTotal);
+                wsLog("Dokument " + (cb.idx+1) + "/" + cb.mails.length + ": Kopf + Mailtext (" +
+                      m.pdfPaths.length + " Anhänge folgen)");
+                return setTimeout(wsCombinedBuildTick, 30);
             }
-            cb.word.Selection.EndKey(6);
-            cb.word.Selection.TypeText("##### DOKUMENT-ENDE: " + m.fileName + " #####\r");
-            cb.idx++;
-            wsProgress(cb.idx, cb.mails.length + 4);
-            wsLog("   Dokument " + cb.idx + "/" + cb.mails.length + " im Sammel-PDF.");
-            return setTimeout(wsCombinedBuildTick, 50);
+
+            if (cb.step === "pdf") {
+                if (cb.pdfIdx < m.pdfPaths.length) {
+                    var pdf = m.pdfPaths[cb.pdfIdx];
+                    cb.word.Selection.EndKey(6);
+                    cb.word.Selection.TypeText("----- ANHANG-START: " + pdf.name + " -----\r");
+                    var src = null;
+                    try {
+                        src = cb.word.Documents.Open(pdf.path, false, true); // ConfirmConversions=false, ReadOnly=true
+                        src.Content.Copy();
+                        src.Close(0); src = null;
+                        cb.word.Selection.EndKey(6);
+                        cb.word.Selection.Paste();
+                        cb.word.Selection.TypeText("\r");
+                    } catch(ePdf) {
+                        try { if (src) src.Close(0); } catch(e) {}
+                        cb.word.Selection.EndKey(6);
+                        cb.word.Selection.TypeText("(Anhang konnte nicht eingelesen werden)\r");
+                        wsLog("Dok " + (cb.idx+1) + " Anhang '" + pdf.name + "' nicht konvertierbar: " +
+                              (ePdf.message||ePdf), "err");
+                    }
+                    cb.word.Selection.EndKey(6);
+                    cb.word.Selection.TypeText("----- ANHANG-ENDE: " + pdf.name + " -----\r");
+                    cb.pdfIdx++; cb.unitsDone++;
+                    wsProgress(cb.unitsDone, cb.unitsTotal);
+                    wsLog("Dok " + (cb.idx+1) + "/" + cb.mails.length + ": Anhang " +
+                          cb.pdfIdx + "/" + m.pdfPaths.length + " (" + pdf.name + ") eingefügt");
+                    return setTimeout(wsCombinedBuildTick, 30);
+                }
+                cb.step = "end";
+                return setTimeout(wsCombinedBuildTick, 15);
+            }
+
+            if (cb.step === "end") {
+                cb.word.Selection.EndKey(6);
+                cb.word.Selection.TypeText("##### DOKUMENT-ENDE: " + m.fileName + " #####\r");
+                cb.idx++; cb.step = "head"; cb.pdfIdx = 0; cb.unitsDone++;
+                wsProgress(cb.unitsDone, cb.unitsTotal);
+                return setTimeout(wsCombinedBuildTick, 30);
+            }
         }
 
         // Fertig: als eine PDF exportieren
-        wsLog("Exportiere Sammel-PDF...");
+        wsLog("Exportiere Sammel-PDF...", "head");
         try { cb.doc.SaveAs2(cb.combinedPdf, 17); } catch(eSv) {  // 17 = wdFormatPDF
             try { cb.doc.ExportAsFixedFormat(cb.combinedPdf, 17); } catch(eEx) {
                 throw new Error("PDF-Export fehlgeschlagen: " + (eSv.message||eSv));
@@ -8744,11 +8788,32 @@ End Function
 #workshopOverlay .ws-progress-fill { height: 100%; background: #c8102e; width: 0%; }
 #workshopOverlay .ws-progress-text { font-size: 13px; color: #6b7280; margin-top: 8px; }
 #workshopOverlay .ws-log {
-    background: #fafafa; border: 1px solid #e5e7eb; border-radius: 10px;
-    padding: 16px; font-family: 'Consolas','Courier New', monospace;
-    font-size: 12px; color: #4b5563; max-height: 200px; overflow-y: auto;
-    display: none; white-space: pre-wrap; margin-top: 16px;
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; color: #cbd5e1;
+    max-height: 260px; overflow-y: auto; display: none; margin-top: 16px;
 }
+#workshopOverlay .ws-ll {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 3px 8px; border-radius: 5px; border-left: 3px solid transparent;
+    margin: 1px 0; line-height: 1.45;
+}
+#workshopOverlay .ws-ll .ws-llt {
+    color: #64748b; font-family: 'Consolas','Courier New',monospace;
+    font-size: 11px; flex: 0 0 auto; padding-top: 1px;
+}
+#workshopOverlay .ws-ll .ws-llm {
+    font-family: 'Segoe UI', Tahoma, sans-serif; white-space: pre-wrap;
+    word-break: break-word; flex: 1;
+}
+#workshopOverlay .ws-ll-info  { background: rgba(255,255,255,0.02); }
+#workshopOverlay .ws-ll-info  .ws-llm { color: #e2e8f0; }
+#workshopOverlay .ws-ll-ok    { background: rgba(34,197,94,0.10);  border-left-color: #22c55e; }
+#workshopOverlay .ws-ll-ok    .ws-llm { color: #86efac; }
+#workshopOverlay .ws-ll-err   { background: rgba(239,68,68,0.12);  border-left-color: #ef4444; }
+#workshopOverlay .ws-ll-err   .ws-llm { color: #fca5a5; font-weight: 600; }
+#workshopOverlay .ws-ll-muted .ws-llm { color: #64748b; font-style: italic; }
+#workshopOverlay .ws-ll-head  { background: rgba(200,16,46,0.14); border-left-color: #c8102e; }
+#workshopOverlay .ws-ll-head  .ws-llm { color: #fda4af; font-weight: 700; letter-spacing: .03em; }
 #workshopOverlay .ws-footer { text-align: center; color: #9ca3af; font-size: 11px; margin-top: 40px; }
 </style>
 

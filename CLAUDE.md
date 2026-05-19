@@ -134,3 +134,33 @@ das HTA-Tool mit ErgoGPT.
 Versionierung: VERSION in der Inline-Header-Zeile (`Browser-KI v1.X`) hochzaehlen.
 Kein ZIP, kein Build-Skript - die Datei wird direkt aus dem Repo serviert.
 In `index.html` verlinkt die Tile `claude-analyse.html` (ERGO-Kategorie).
+
+### 6. ECHTE deutsche Umlaute im sichtbaren Workshop-Frontend (PFLICHT)
+
+Im Workshop-Overlay (`#workshopOverlay`) und in allen fuer den Anwender
+sichtbaren Texten/Logs/Statusmeldungen MUESSEN **echte deutsche Umlaute**
+stehen (ä ö ü ß) — NICHT die ae/oe/ue/ss-Transliteration. Der Anwender will
+ausdruecklich „ü" sehen, kein „ue".
+
+Regeln:
+- **Statisches Overlay-HTML** + Strings, die via `innerHTML` gesetzt werden
+  (`wsShowInfo/wsShowSuccess/wsShowError`, `wsCookieState`): HTML-Entities
+  verwenden (`&auml; &ouml; &uuml; &szlig; &Auml; &Ouml; &Uuml;`) — encoding-
+  sicher unabhaengig davon, wie die Datei uebertragen wird.
+- **Log-Ausgaben** via `wsLog(...)`: `wsLog` setzt `innerHTML` und escaped via
+  `wsEsc` (`&`→`&amp;`). Deshalb dort **echte Umlaut-ZEICHEN** (ü, ä, ö, ß) im
+  String-Literal verwenden — KEINE Entities (die wuerden doppelt escaped und
+  woertlich als `&uuml;` erscheinen). Die HTA ist UTF-8 (`<meta charset>`),
+  literale Umlaute sind sicher.
+- Der `wsLog`-Bereich ist ein **HTML-Log** (farbcodierte Zeilen je Typ:
+  info/ok/err/muted/head, Zeitstempel), kein reiner Text. Neue Log-Aufrufe
+  koennen optional `wsLog(msg, "ok"|"err"|"head"|"muted"|"info")` setzen;
+  ohne Angabe wird der Typ heuristisch aus dem Text erkannt.
+- Ausnahmen, die ASCII bleiben: ErgoGPT-Prompttexte, JSON-Feldnamen,
+  Datei-/Pfadoperationen, der grosse Hauptmodus (dort ist Transliteration aus
+  historischen Encoding-Gruenden teils noetig). Es geht NUR um sichtbaren
+  Workshop-Text.
+- Lange, synchron blockierende COM-Schleifen (Word/Excel/Outlook) im Workshop
+  in **kleine Einheiten pro `setTimeout`-Tick** zerlegen (eine Einheit = ein
+  PDF / eine Mail), damit die HTA nicht „haengt" und Progress/Log sichtbar
+  weiterlaufen.
