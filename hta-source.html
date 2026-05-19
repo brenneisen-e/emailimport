@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.90 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.91 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.90</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.91</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.90"
+        VERSION="1.91"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.90 - Makler_Nummer entfernt (nur Agentur/Vermittler getrennt). Excel: Header ohne "_" + einzeilig (Spalte breit genug), alle Zellen links+oben, Datenzeilen Umlauf (kein Ueberlauf). KI-Notiz-PDF + Sammel-PDF im Ergebnis-Ordner (nicht TEMP) und bleiben liegen. Testmodus faehrt jetzt ALLE 3 Modi (Parallel/Batch/Kombi-PDF) und schreibt EINE P-B-K-Vergleichsdatei. v1.88 - Kombi-PDF Kleinst-Schritte, HTML-Log</div>
+            <div class="ver">v1.91 - Testmodus-Knopf-Text korrigiert ("alle 3 Modi (P/B/K)" statt "Parallel vs. Batch"), Ordner-Platzhalter mit echtem ü ("gewählt"). v1.90 - Makler_Nummer entfernt, Excel-Layout (Header ohne _, einzeilig, links/oben, kein Ueberlauf), PDFs im Ergebnis-Ordner, Testmodus alle 3 Modi</div>
         </div>
 
         <!-- Cookie -->
@@ -7276,7 +7276,7 @@ function openWorkshopMode() {
     state._wsFolder = "";
     state._wsMsgFiles = [];
     state._wsRunning = false;
-    document.getElementById("wsFolderPath").innerText = "Noch kein Ordner gewaehlt";
+    document.getElementById("wsFolderPath").innerText = "Noch kein Ordner gewählt";
     document.getElementById("wsFolderPath").className = "ws-folder-path ws-empty";
     document.getElementById("wsInfoGrid").style.display = "none";
     document.getElementById("wsPlay").disabled = true;
@@ -9039,7 +9039,7 @@ End Function
                 </button>
                 <button class="ws-btn-folder" id="wsTest" onclick="wsRunTest()" disabled
                         style="flex:1;border-color:#c8102e;color:#c8102e;font-weight:600;">
-                    &amp;#129514; Testmodus: Parallel vs. Batch
+                    &amp;#129514; Testmodus: alle 3 Modi (P/B/K)
                 </button>
             </div>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
