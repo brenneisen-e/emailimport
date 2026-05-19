@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.05"
+        VERSION="2.06"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -8540,12 +8540,10 @@ function wsBatchTick() {
             // Fertig -> Antwort EINMAL lesen (UTF-8) und parsen
             var part = "";
             try {
-                if (fso.FileExists(sh2.partFile)) {
-                    var pstm = new ActiveXObject("ADODB.Stream");
-                    pstm.Type = 2; pstm.Charset = "utf-8"; pstm.Open();
-                    pstm.LoadFromFile(sh2.partFile);
-                    part = String(pstm.ReadText()); pstm.Close();
-                }
+                // FSO statt ADODB.Stream: vom Netzlaufwerk gestartet ist
+                // ADODB.Stream im HTA-Prozess gesperrt. Der VBS-Subprozess
+                // schreibt die .part-Datei jetzt als FSO-Unicode (UTF-16 LE).
+                if (fso.FileExists(sh2.partFile)) part = String(readTextFile(sh2.partFile) || "");
             } catch(ePr) { part = ""; }
             var objs = null, _asm2 = "";
             try {
@@ -8632,9 +8630,17 @@ function wsBuildStreamVbs() {
     v.push("Set re = CreateObject(\"VBScript.RegExp\")");
     v.push("re.Pattern = \"(?:XSRF-TOKEN|CSRF-TOKEN|csrfToken|_csrf)=([^;]+)\" : re.IgnoreCase = True");
     v.push("If re.Test(cookie) Then xsrf = re.Execute(cookie)(0).SubMatches(0)");
-    v.push("Dim bs2 : Set bs2 = CreateObject(\"ADODB.Stream\")");
-    v.push("bs2.Type = 1 : bs2.Open : bs2.LoadFromFile payloadFile");
-    v.push("Dim body : body = bs2.Read : bs2.Close");
+    // Payload kommt jetzt als FSO-Unicode (UTF-16 LE + BOM) aus der HTA, weil
+    // die HTA in der UNC-/Internet-Zone kein ADODB.Stream darf. Hier (lokaler
+    // wscript-Prozess) ist ADODB.Stream erlaubt: UTF-16 lesen -> UTF-8-Bytes.
+    v.push("Dim rdS : Set rdS = CreateObject(\"ADODB.Stream\")");
+    v.push("rdS.Type = 2 : rdS.Charset = \"unicode\" : rdS.Open : rdS.LoadFromFile payloadFile");
+    v.push("Dim pTxt : pTxt = rdS.ReadText : rdS.Close");
+    v.push("If Len(pTxt) > 0 Then If AscW(Left(pTxt, 1)) = -257 Then pTxt = Mid(pTxt, 2)");
+    v.push("Dim enS : Set enS = CreateObject(\"ADODB.Stream\")");
+    v.push("enS.Type = 2 : enS.Charset = \"utf-8\" : enS.Open : enS.WriteText pTxt");
+    v.push("enS.Position = 0 : enS.Type = 1 : If enS.Size >= 3 Then enS.Read 3");
+    v.push("Dim body : body = enS.Read : enS.Close");
     // WinHttp (NICHT MSXML.XMLHTTP): erlaubt Cookie/Origin/Referer-Header
     // (XMLHTTP blockt diese als 'restricted' -> Worker scheiterte). Synchron,
     // EINMAL die volle Antwort schreiben - kein 350ms-Overwrite-Loop, der
@@ -8663,8 +8669,17 @@ function wsBuildStreamVbs() {
     // Antwort als UTF-8 schreiben (Bytes -> Datei), dann done-Marker
     v.push("Dim rb : rb = x.ResponseBody");
     v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"body: \" & Err.Description : WScript.Quit");
-    v.push("Dim w : Set w = CreateObject(\"ADODB.Stream\")");
-    v.push("w.Type = 1 : w.Open : w.Write rb : w.SaveToFile partFile, 2 : w.Close");
+    // Antwort-Bytes (UTF-8 vom Server) -> Text dekodieren, dann via FSO-Unicode
+    // (UTF-16 LE + BOM) schreiben. Die HTA liest die .part-Datei mit FSO
+    // (readTextFile) - in der UNC-/Internet-Zone ist dort kein ADODB.Stream
+    // erlaubt; ADODB nur hier im lokalen wscript-Prozess.
+    v.push("Dim dcS : Set dcS = CreateObject(\"ADODB.Stream\")");
+    v.push("dcS.Type = 1 : dcS.Open : dcS.Write rb : dcS.Position = 0");
+    v.push("dcS.Type = 2 : dcS.Charset = \"utf-8\"");
+    v.push("Dim respTxt : respTxt = dcS.ReadText : dcS.Close");
+    v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"decode: \" & Err.Description : WScript.Quit");
+    v.push("Dim w : Set w = fso.CreateTextFile(partFile, True, True)");
+    v.push("w.Write respTxt : w.Close");
     v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"write: \" & Err.Description : WScript.Quit");
     v.push("Dim df : Set df = fso.CreateTextFile(doneFile, True, False) : df.Write \"OK \" & st : df.Close");
     v.push("");
@@ -8693,12 +8708,12 @@ function wsStreamAnswerStart(answerUrl, prompt, docIdsJson) {
     var payload = buildPayload(cleanForJson(prompt), docIdsJson || "[]");
     wsLog("Stream-Start: Payload " + Math.round(payload.length/1024) + " KB -> Datei...", "muted");
     try {
-        var pstm = new ActiveXObject("ADODB.Stream");
-        pstm.Type = 2; pstm.Charset = "utf-8"; pstm.Open(); pstm.WriteText(payload);
-        pstm.Position = 0; pstm.Type = 1; if (pstm.Size >= 3) pstm.Read(3); // BOM weg
-        var pb = pstm.Read(); pstm.Close();
-        var ws = new ActiveXObject("ADODB.Stream");
-        ws.Type = 1; ws.Open(); ws.Write(pb); ws.SaveToFile(h.payloadFile, 2); ws.Close();
+        // KEIN ADODB.Stream im HTA-Prozess: vom Netzlaufwerk (\\...) gestartet
+        // liegt die HTA in der Internet-/UNC-Zone - dort ist ADODB.Stream als
+        // "Datenquelle in einer anderen Domaene" gesperrt (FSO nicht). Payload
+        // als FSO-Unicode (UTF-16 LE + BOM) schreiben; der VBS-Subprozess
+        // (lokale Zone, ADODB erlaubt) liest UTF-16 und re-encodet nach UTF-8.
+        writeTextFile(h.payloadFile, payload);
     } catch(eP) { wsLog("Stream-Start: Payload-Datei FEHLER: " + (eP.message||eP), "err"); }
     wsLog("Stream-Start: schreibe VBS-Worker...", "muted");
     try { var vf = fso.CreateTextFile(h.vbsPath, true, false); vf.Write(wsBuildStreamVbs()); vf.Close(); } catch(e) { wsLog("Stream-Start: VBS FEHLER: " + (e.message||e), "err"); }
