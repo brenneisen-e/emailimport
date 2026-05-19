@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.99"
+        VERSION="2.00"
         WINDOWSTATE="normal"
     />
     <style>
@@ -200,7 +200,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.99 - FIX Skriptfehler "'per' ist undefiniert" (verwaiste Variable aus dem v1.98-LPT-Umbau brach den Kombi-Start ab). v1.98 - Kombi-Worker-Last nach PDF-Bytes (LPT) + gestaffelter Start + Streaming-Schleife abgehaertet</div>
+            <div class="ver">v2.00 - Option "Scan-/Foto-PDFs ueberspringen" (Default an): PDFs ohne Textebene werden per Heuristik erkannt und NICHT analysiert (kein Word-Reflow / kein OCR-Upload) -> massiv schneller; markiert als "Scan - manuell pruefen", KI setzt pdf_qualitaet=Scan + Hinweis. v1.99 - Fix 'per'-Skriptfehler</div>
         </div>
 
         <!-- Cookie -->
@@ -7271,7 +7271,9 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
     p += "  2. 'BD-Nummer' / 'Bestandsnummer' / 'Beraterzeichen'\n";
     p += "  3. NUR Fallback: Pool-IDs ('MAKID','DEMMAK','BCA-ID' - pool-intern, NICHT beim Versicherer)\n\n";
     p += "geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n";
-    p += "'BUe Kundenverbindung' wenn mehrere Vertragsnummern ODER 'alle Vertraege'/'gesamte Kundenverbindung'.\n\n";
+    p += "'BUe Kundenverbindung' wenn mehrere Vertragsnummern ODER 'alle Vertraege'/'gesamte Kundenverbindung'.\n";
+    p += "Anhaenge mit '[Scan - NICHT analysiert]' wurden bewusst nicht hochgeladen: pdf_qualitaet='Scan', ";
+    p += "hinweis 'Scan-Anhang nicht analysiert - manuell pruefen', Felder die nur daraus kaemen leer/nicht_pruefbar.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-Objekt (kein Markdown, keine Erklaerung).\n";
     p += "Verwende echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß) in Freitext-Feldern:\n";
     p += "{\n" + wsFieldLines() + "}\n";
@@ -7356,7 +7358,10 @@ function wsBuildBatchPrompt(mails) {
     p += "7. Firmenkunde: kunde_vorname bleibt leer (NICHT 'Firma'), Firmenname in kunde_nachname.\n";
     p += "8. sonderfall: NUR Flottengeschaeft/Sondertarif wenn AUSDRUECKLICH so benannt. Ein ";
     p += "Sonderkonditions-Vorbehalt ist KEIN Sondertarif -> Kein Sonderfall. Vorbehalt gehoert in mv_einschraenkungen.\n";
-    p += "9. maklerpool LEER, wenn nicht eindeutig aus Mail/PDF/Signatur belegt - NICHT aus Absender-Domain raten.\n\n";
+    p += "9. maklerpool LEER, wenn nicht eindeutig aus Mail/PDF/Signatur belegt - NICHT aus Absender-Domain raten.\n";
+    p += "10. Anhaenge mit '[Scan - NICHT analysiert]' wurden bewusst NICHT hochgeladen: ";
+    p += "pdf_qualitaet='Scan', hinweis enthaelt 'Scan-Anhang nicht analysiert - manuell pruefen', ";
+    p += "Felder die nur aus diesem Scan kaemen = leer/nicht_pruefbar (nicht raten).\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown, keine ";
     p += "Erklaerung), GENAU " + mails.length + " Objekte, in derselben Reihenfolge wie die Mails.\n";
     p += "Jedes Objekt hat ZUSAETZLICH als erstes Feld \"datei\" mit dem EXAKTEN Dateinamen.\n";
@@ -8072,12 +8077,45 @@ function wsRestoreUi() {
 }
 
 // Liest eine Mail aus (Properties + PDFs in TEMP), OHNE Conversation zu starten.
+// Ist die Scan-Ueberspringen-Option aktiv? (Checkbox im Workshop)
+function wsSkipScansOn() {
+    var c = document.getElementById("wsSkipScans");
+    return c ? !!c.checked : true;   // Default: ueberspringen (Tempo)
+}
+
+// Heuristik (ohne PDF-Lib): erkennt Scan-/Foto-PDFs ohne echte Textebene.
+// Liest die Datei als ISO-8859-1 (1:1 Bytes) und prueft auf Font-Marker vs.
+// Bild-Filter/Groesse. Konservativ: nur als Scan einstufen, wenn KEINE
+// Font-Marker UND (Bild-Filter ODER auffaellig gross). Fehlklassifikation
+// = kein Datenverlust (wird als "manuell pruefen" markiert).
+function wsIsLikelyScanPdf(path, fso) {
+    try {
+        var size = 0;
+        try { size = fso.GetFile(path).Size; } catch(eS) { size = 0; }
+        var stm = new ActiveXObject("ADODB.Stream");
+        stm.Type = 2; stm.Charset = "iso-8859-1"; stm.Open();
+        stm.LoadFromFile(path);
+        var sample = String(stm.ReadText(600000));   // erste ~600 KB reichen
+        stm.Close();
+        var hasFont  = /\/(BaseFont|FontFile2?|FontFile3|Type0|TrueType)\b/.test(sample) ||
+                       /\/Font\s*[<\/\[]/.test(sample);
+        var hasImg   = /\/(DCTDecode|CCITTFaxDecode|JPXDecode|JBIG2Decode)\b/.test(sample) ||
+                       /\/Subtype\s*\/Image\b/.test(sample);
+        if (hasFont) return false;                 // echte Textebene -> behalten
+        if (hasImg) return true;                   // Bild-Codec, kein Font -> Scan
+        if (size > 350000) return true;            // gross + kein Font -> Scan
+        return false;
+    } catch(e) { return false; }                   // im Zweifel NICHT ueberspringen
+}
+
 function wsExtractMail(msgPath) {
     var fileName = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
     var fso = new ActiveXObject("Scripting.FileSystemObject");
     var shell = new ActiveXObject("WScript.Shell");
     var info = { msgPath: msgPath, fileName: fileName, datum: "", absName: "", absMail: "",
-                 betreff: "", body: "", anhangAlle: "", pdfPaths: [], pdfListe: "", tempDir: "", error: null };
+                 betreff: "", body: "", anhangAlle: "", pdfPaths: [], pdfListe: "",
+                 skippedScans: [], tempDir: "", error: null };
+    var skipScans = wsSkipScansOn();
     var mail = null;
     try {
         mail = outlookApp.Session.OpenSharedItem(msgPath);
@@ -8098,14 +8136,26 @@ function wsExtractMail(msgPath) {
                 var att = mail.Attachments.Item(a);
                 var fn = String(att.FileName || "");
                 if (fn.length === 0) continue;
-                info.anhangAlle += (info.anhangAlle ? "; " : "") + fn;
                 if (fn.toLowerCase().substr(-4) === ".pdf" && info.pdfPaths.length < 20) {
                     var outPath = tempDir + "\\" + sanitizeFilename(fn);
                     att.SaveAsFile(outPath);
                     if (fso.FileExists(outPath)) {
-                        info.pdfPaths.push({ path: outPath, name: fn });
-                        info.pdfListe += (info.pdfListe ? "; " : "") + fn;
+                        if (skipScans && wsIsLikelyScanPdf(outPath, fso)) {
+                            // Scan-/Foto-PDF: NICHT Word-reflowen / NICHT hochladen
+                            // (Hauptursache der langen Laufzeit). Markiert -> manuell.
+                            info.skippedScans.push(fn);
+                            info.anhangAlle += (info.anhangAlle ? "; " : "") + fn + " [Scan - NICHT analysiert]";
+                            try { fso.DeleteFile(outPath, true); } catch(eD) {}
+                        } else {
+                            info.pdfPaths.push({ path: outPath, name: fn });
+                            info.pdfListe += (info.pdfListe ? "; " : "") + fn;
+                            info.anhangAlle += (info.anhangAlle ? "; " : "") + fn;
+                        }
+                    } else {
+                        info.anhangAlle += (info.anhangAlle ? "; " : "") + fn;
                     }
+                } else {
+                    info.anhangAlle += (info.anhangAlle ? "; " : "") + fn;
                 }
             } catch(eAtt) {}
         }
@@ -8802,7 +8852,9 @@ function wsBuildCombinedPrompt(mails) {
     p += "7. Firmenkunde: kunde_vorname leer (nicht 'Firma').\n";
     p += "8. sonderfall: NUR Flottengeschaeft/Sondertarif wenn AUSDRUECKLICH so benannt. Ein ";
     p += "Sonderkonditions-Vorbehalt ist KEIN Sondertarif -> Kein Sonderfall (Vorbehalt -> mv_einschraenkungen).\n";
-    p += "9. maklerpool LEER, wenn nicht eindeutig aus Mail/PDF/Signatur belegt - NICHT aus Absender-Domain raten.\n\n";
+    p += "9. maklerpool LEER, wenn nicht eindeutig aus Mail/PDF/Signatur belegt - NICHT aus Absender-Domain raten.\n";
+    p += "10. Anhaenge mit '[Scan - NICHT analysiert]': pdf_qualitaet='Scan', hinweis ";
+    p += "'Scan-Anhang nicht analysiert - manuell pruefen', Felder die nur daraus kaemen leer/nicht_pruefbar.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown), GENAU ";
     p += mails.length + " Objekte. Echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß):\n";
     p += "[\n  {\n";
@@ -9525,6 +9577,12 @@ End Function
                 <div class="ws-progress-bar"><div class="ws-progress-fill" id="wsProgressFill"></div></div>
                 <div class="ws-progress-text" id="wsProgressText">0 von 0</div>
             </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#1f2937;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;margin-bottom:12px;cursor:pointer;">
+                <input type="checkbox" id="wsSkipScans" checked style="width:16px;height:16px;">
+                <span><strong>Scan-/Foto-PDFs &uuml;berspringen (schnell)</strong> &mdash; PDFs ohne Textebene
+                werden nicht analysiert, sondern als <em>&bdquo;Scan &ndash; manuell pr&uuml;fen&ldquo;</em>
+                markiert. Massiv schneller (kein Word-Reflow / kein OCR-Upload f&uuml;r Scans).</span>
+            </label>
             <button class="ws-btn-play" id="wsPlay" onclick="wsRunDemo()" disabled>
                 <span class="ws-play-icon">&#9654;</span><span>Analyse starten (Parallel)</span>
             </button>
@@ -9565,7 +9623,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.99</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v2.00</div>
     </div>
 </div>
 
