@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v2.00 - HTA Quellcode</title>
+<title>ERGO Workshop v2.01 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v2.00</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v2.01</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.00"
+        VERSION="2.01"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.00 - Option "Scan-/Foto-PDFs ueberspringen" (Default an): PDFs ohne Textebene werden per Heuristik erkannt und NICHT analysiert (kein Word-Reflow / kein OCR-Upload) -> massiv schneller; markiert als "Scan - manuell pruefen", KI setzt pdf_qualitaet=Scan + Hinweis. v1.99 - Fix 'per'-Skriptfehler</div>
+            <div class="ver">v2.01 - Scan-Erkennung verschaerft: Dateien > 2,5 MB gelten immer als Foto-/Scan-PDF (z.B. 5,8 MB) und werden uebersprungen, auch wenn ein Deckblatt eine Schrift einbettet; uebersprungene Scans erscheinen jetzt im Log inkl. MB-Groesse. v2.00 - Option "Scan-/Foto-PDFs ueberspringen"</div>
         </div>
 
         <!-- Cookie -->
@@ -8169,6 +8169,9 @@ function wsIsLikelyScanPdf(path, fso) {
                        /\/Font\s*[<\/\[]/.test(sample);
         var hasImg   = /\/(DCTDecode|CCITTFaxDecode|JPXDecode|JBIG2Decode)\b/.test(sample) ||
                        /\/Subtype\s*\/Image\b/.test(sample);
+        // Sehr grosse Datei = quasi sicher Foto-/Scan-PDF (z.B. 5.8 MB) ->
+        // ueberspringen, selbst wenn ein Deckblatt eine Schrift einbettet.
+        if (size > 2500000) return true;
         if (hasFont) return false;                 // echte Textebene -> behalten
         if (hasImg) return true;                   // Bild-Codec, kein Font -> Scan
         if (size > 350000) return true;            // gross + kein Font -> Scan
@@ -8211,9 +8214,12 @@ function wsExtractMail(msgPath) {
                         if (skipScans &amp;&amp; wsIsLikelyScanPdf(outPath, fso)) {
                             // Scan-/Foto-PDF: NICHT Word-reflowen / NICHT hochladen
                             // (Hauptursache der langen Laufzeit). Markiert -> manuell.
+                            var _mb = 0; try { _mb = Math.round(fso.GetFile(outPath).Size/104857.6)/10; } catch(eMb) {}
                             info.skippedScans.push(fn);
                             info.anhangAlle += (info.anhangAlle ? "; " : "") + fn + " [Scan - NICHT analysiert]";
                             try { fso.DeleteFile(outPath, true); } catch(eD) {}
+                            try { wsLog("Scan/Foto-PDF uebersprungen: " + fn + " (" + _mb + " MB) - " +
+                                  info.fileName.substr(0, 40), "muted"); } catch(eL) {}
                         } else {
                             info.pdfPaths.push({ path: outPath, name: fn });
                             info.pdfListe += (info.pdfListe ? "; " : "") + fn;
@@ -9691,7 +9697,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.00</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.01</div>
     </div>
 </div>
 
