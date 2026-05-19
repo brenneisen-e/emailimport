@@ -1,148 +1,12 @@
 <!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.78 - HTA Quellcode</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    color: #f1f5f9;
-    min-height: 100vh;
-    padding: 1.5rem;
-}
-.container { max-width: 1400px; margin: 0 auto; }
-.card {
-    background: rgba(30, 41, 59, 0.85);
-    border-radius: 14px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    margin-bottom: 1rem;
-}
-h1 { font-size: 22px; margin-bottom: 0.5rem; }
-.subtitle { color: #94a3b8; font-size: 13px; }
-.info {
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid #3b82f6;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 1rem 0;
-    font-size: 13px;
-    color: #cbd5e1;
-}
-.info strong { color: #93c5fd; }
-.info ol { margin-left: 1.25rem; margin-top: 0.5rem; }
-.info code {
-    background: rgba(0,0,0,0.3);
-    padding: 1px 6px;
-    border-radius: 3px;
-    color: #fbbf24;
-    font-family: 'Consolas', monospace;
-}
-.actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    align-items: center;
-    margin: 1rem 0;
-}
-button {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-.btn-copy { background: linear-gradient(135deg, #10b981, #059669); color: white; }
-.btn-copy:hover { background: linear-gradient(135deg, #34d399, #10b981); transform: translateY(-1px); }
-.btn-copy.copied { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-.btn-download { background: linear-gradient(135deg, #d97706, #b45309); color: white; }
-.btn-download:hover { background: linear-gradient(135deg, #f59e0b, #d97706); transform: translateY(-1px); }
-.btn-icon {
-    background: #475569; color: #f1f5f9;
-    padding: 12px 16px;
-}
-#status {
-    font-size: 13px;
-    color: #6ee7b7;
-    font-weight: 500;
-    margin-left: 0.5rem;
-}
-.meta {
-    font-size: 12px;
-    color: #94a3b8;
-    margin: 0.5rem 0 1rem;
-}
-.meta strong { color: #f1f5f9; }
-textarea#code {
-    width: 100%;
-    height: 70vh;
-    background: #0f172a;
-    color: #e2e8f0;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 1rem;
-    font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 11px;
-    line-height: 1.4;
-    resize: vertical;
-    white-space: pre;
-}
-textarea#code:focus { outline: 2px solid #ef4444; }
-svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
-</style>
-</head>
-<body>
-<div class="container">
-<div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.78</strong> &mdash; HTA Quellcode</h1>
-<p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
-
-<div class="info">
-<strong>Wie nutze ich diese Seite?</strong>
-<ol>
-<li>Klicke auf <strong>&quot;Code kopieren&quot;</strong> oder <strong>&quot;Als .hta herunterladen&quot;</strong></li>
-<li>Beim Kopieren: oeffne Notepad / Notepad++ und fuege ein (<code>Strg+V</code>)</li>
-<li>Speichern als <code>ergo-vorgang-analyse.hta</code> (Encoding <strong>UTF-8</strong>)</li>
-<li>Doppelklick auf die Datei &rarr; HTA startet</li>
-</ol>
-</div>
-
-<div class="meta">Dateigroesse: <strong id="meta-size">...</strong> | Zeilen: <strong id="meta-lines">...</strong></div>
-
-<div class="actions">
-<button class="btn-copy" id="btnCopy" onclick="copyCode()">
-<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-Code kopieren
-</button>
-<button class="btn-download" onclick="downloadCode()">
-<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-Als .hta herunterladen
-</button>
-<button class="btn-icon" onclick="selectAll()" title="Gesamten Text markieren">
-<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 7v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7"/><path d="M22 7l-10 5L2 7"/></svg>
-Alles markieren
-</button>
-<span id="status"></span>
-</div>
-
-<textarea id="code" readonly spellcheck="false">
-<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=11">
-    <title>ERGO Vorgang-Analyse</title>
+    <title>ERGO Workshop</title>
     <HTA:APPLICATION
         ID="ERGO_Vorgang_Analyse"
-        APPLICATIONNAME="ERGO Vorgang-Analyse"
+        APPLICATIONNAME="ERGO Workshop"
         BORDER="dialog"
         BORDERSTYLE="normal"
         CAPTION="yes"
@@ -329,10 +193,10 @@ Alles markieren
     <div class="card">
         <div class="header">
             <div class="header-left">
-                <div class="logo">&amp;#129302;</div>
+                <div class="logo">&#129302;</div>
                 <div>
                     <h1><span style="cursor:pointer; user-select:none;" onclick="openWorkshopMode()" title="Klick fuer Workshop-Modus (Demo mit 5 Mails)">ERGO</span> Vorgang-Analyse</h1>
-                    <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
+                    <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
             <div class="ver">v1.78 - Workshop speichert jetzt JEDEN Vorgang als .msg (neues ungespeichertes MailItem + SaveAs umgeht Outlook-Guard; KI-Notiz als ASCII-HTML via FSO + Original als Anhang). Excel-Spalte Lfd_Nr, gleiche Nr in der KI-Notiz (Mapping Excel<->Vorgang). Eigenstaendiges Workshop-HTA + Copy-Paste-Seite. v1.77 - Cookie-Helfer Edge/Chrome-DB</div>
@@ -344,9 +208,9 @@ Alles markieren
             <div style="margin-top: 0.5rem;">
                 <div class="cookie-bar">
                     <input type="password" id="cookieInput" placeholder="Cookie hier einfuegen (langer String mit XSRF-TOKEN, ai_session, ...)">
-                    <button class="btn btn-secondary" onclick="toggleCookieVis()" title="Sichtbarkeit umschalten">&amp;#128065;</button>
+                    <button class="btn btn-secondary" onclick="toggleCookieVis()" title="Sichtbarkeit umschalten">&#128065;</button>
                     <button class="btn btn-success" onclick="saveCookie()">Speichern</button>
-                    <button class="btn btn-secondary" onclick="loadCookieFromFile()" title="Cookie.txt erneut von der Platte laden">&amp;#128260; Neu laden</button>
+                    <button class="btn btn-secondary" onclick="loadCookieFromFile()" title="Cookie.txt erneut von der Platte laden">&#128260; Neu laden</button>
                     <span id="cookieStatus" class="cookie-status missing">Cookie fehlt</span>
                 </div>
                 <div class="info-box" style="margin-top: 0.4rem;">
@@ -362,7 +226,7 @@ Alles markieren
             <summary>2. Ordner mit .msg-Dateien</summary>
             <div style="margin-top: 0.5rem;">
                 <div class="drop-area" id="dropArea" onclick="pickFolder()">
-                    <div class="big">&amp;#128194;</div>
+                    <div class="big">&#128194;</div>
                     <div><strong>Ordner waehlen</strong> (oder Ordner hier hereinziehen)</div>
                     <div class="hint">Tool scannt rekursiv nach .msg-Dateien</div>
                 </div>
@@ -372,7 +236,7 @@ Alles markieren
                     <button class="btn btn-secondary" id="btnRenameWithDate" onclick="renameMsgFilesWithDate()" disabled
                             style="padding: 6px 12px; font-size: 12px;"
                             title="Benennt alle .msg-Dateien im Ordner um zu YYYY-MM-DD_HHMM_<Originalname>.msg. Datum wird aus dem Mail-Header gelesen (kein Outlook noetig).">
-                        &amp;#128221; Datei-Datum als Praefix hinzufuegen (fuer Zeitraum-Filter)
+                        &#128221; Datei-Datum als Praefix hinzufuegen (fuer Zeitraum-Filter)
                     </button>
                 </div>
             </div>
@@ -405,12 +269,12 @@ Alles markieren
                     <button class="btn" id="btnCollectByDate" onclick="copyZeitraumToNewFolder()" disabled
                             style="background: linear-gradient(135deg, #0891b2, #155e75); color: white; font-size: 12px; padding: 8px 14px;"
                             title="Kopiert alle Mails im gewaehlten Zeitraum aus dem Ordner (rekursiv durch Unterordner) in einen neuen Ziel-Ordner. Der neue Ordner wird automatisch zum Analyse-Ordner.">
-                        &amp;#128193; Mails aus Zeitraum in neuen Ordner sammeln
+                        &#128193; Mails aus Zeitraum in neuen Ordner sammeln
                     </button>
                     <button class="btn" id="btnRandomSample" onclick="copyRandomSampleToNewFolder()" disabled
                             style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white; font-size: 12px; padding: 8px 14px; margin-left: 6px;"
                             title="Zieht eine zufaellige Stichprobe (z.B. 1000 Mails) aus dem aktuellen Ordner / Filter und kopiert sie in einen neuen Ordner fuer's Sampling.">
-                        &amp;#127922; Zufallsstichprobe in neuen Ordner kopieren
+                        &#127922; Zufallsstichprobe in neuen Ordner kopieren
                     </button>
                     <div style="font-size:11px; color: #94a3b8; margin-top:4px;">
                         <strong>Sammeln:</strong> alle Mails im Zeitraum (Filter wird angewendet).<br>
@@ -446,54 +310,54 @@ Alles markieren
     <div class="card">
         <div class="action-bar">
             <button class="btn btn-primary" id="btnStart" onclick="startAnalysis()" disabled>
-                &amp;#9658; Analyse starten (mit KI)
+                &#9658; Analyse starten (mit KI)
             </button>
             <button class="btn" id="btnQuickPool" onclick="runQuickPoolOverview()" disabled
                     style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white;"
                     title="Schnelle Pool-Uebersicht ohne KI - reine Heuristik aus Domain/Subject/Signatur (~1s/Mail, mit Outlook)">
-                &amp;#9889; Pool-Uebersicht (Outlook)
+                &#9889; Pool-Uebersicht (Outlook)
             </button>
             <button class="btn" id="btnQuickPoolXxl" onclick="runQuickPoolOverviewXxl()" disabled
                     style="background: linear-gradient(135deg, #0d9488, #064e3b); color: white;"
                     title="XXL: parsed .msg-Dateien direkt ohne Outlook, fuer grosse Sets (1000+ Mails). ~20-50x schneller.">
-                &amp;#128640; Pool-XXL (ohne Outlook)
+                &#128640; Pool-XXL (ohne Outlook)
             </button>
             <button class="btn" id="btnBulkTriage" onclick="runBulkTriage()" disabled
                     style="background: linear-gradient(135deg, #d97706, #92400e); color: white;"
                     title="Stufe 1: Bulk-KI-Triage. Sendet 30-40 Mails (Subject+Body) pro KI-Call. Kein PDF-Upload. Setzt Pool-XXL voraus.">
-                &amp;#129302; Bulk-Triage (Stufe 1, KI ohne PDF)
+                &#129302; Bulk-Triage (Stufe 1, KI ohne PDF)
             </button>
             <button class="btn btn-warning" id="btnCancel" onclick="cancelAnalysis()" disabled
                     title="Pausiert die Analyse, schreibt den Cache und oeffnet Excel mit den bisherigen Ergebnissen. Beim naechsten Klick auf Start wird automatisch nahtlos weitergemacht - schon analysierte Mails werden uebersprungen.">
-                &amp;#9208; Pause (Excel + Resume)
+                &#9208; Pause (Excel + Resume)
             </button>
             <div style="flex:1;"></div>
             <button class="btn" id="btnRefreshLive" onclick="refreshLiveExcelDecor()" disabled
                     style="background: linear-gradient(135deg, #0d9488, #115e59); color: white;"
                     title="Wendet Farb-Highlights auf ALLE Zeilen im Live-Excel an und baut Auswertung-Sheet neu.">
-                &amp;#127912; Farben + Auswertung
+                &#127912; Farben + Auswertung
             </button>
             <button class="btn" id="btnReReminders" onclick="reAnalyzeReminders()" disabled
                     style="background: linear-gradient(135deg, #b45309, #92400e); color: white;"
                     title="Analysiert NUR die als Reminder erkannten Vorgaenge nochmal - um die neue Spalte 'Reminder_Quelle' (Anhang-PDF / Anhang-Name / Betreff / Body) zu fuellen. Spart Tokens vs Komplett-Neulauf.">
-                &amp;#128260; Reminder-Quellen
+                &#128260; Reminder-Quellen
             </button>
             <button class="btn" id="btnLoadExternalXlsx" onclick="openExternalXlsxPicker()"
                     style="background: linear-gradient(135deg, #6366f1, #4338ca); color: white;"
                     title="Laedt eine externe .xlsx (z.B. dein manuell gefiltertes Reminder-Subset) als Excel-Cache. .msg-Dateien werden im aktuell gewaehlten Ordner gematcht. Alle Eintraege werden zur Neuanalyse markiert.">
-                &amp;#128194; Externes Excel laden
+                &#128194; Externes Excel laden
             </button>
             <input type="file" id="externalXlsxFile" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="onExternalXlsxPicked(this)">
             <button class="btn" id="btnLoadXlsxCache" onclick="loadXlsxCache()"
                     style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white;"
                     title="Oeffnet die bestehende analyse.xlsx im _KI-Analyse-Ordner. Wurde frueher automatisch beim Folder-Select gemacht - jetzt nur auf Klick (dauert bei 5000 Vorgaengen ~30s).">
-                &amp;#128196; Cache laden
+                &#128196; Cache laden
             </button>
             <button class="btn btn-success" id="btnExcel" onclick="exportToExcel()" disabled>
-                &amp;#128202; Excel-Export
+                &#128202; Excel-Export
             </button>
             <button class="btn btn-secondary" id="btnJson" onclick="exportToJson()" disabled>
-                &amp;#128190; JSON-Export
+                &#128190; JSON-Export
             </button>
         </div>
 
@@ -644,6 +508,7 @@ window.onload = function() {
 
     // Drag-drop
     setupDragDrop();
+    try { setTimeout(function(){ openWorkshopMode(); }, 350); } catch(e) {}
 };
 
 function setupDragDrop() {
@@ -656,7 +521,7 @@ function setupDragDrop() {
         area.className = "drop-area";
         try {
             var dt = e.dataTransfer;
-            if (dt &amp;&amp; dt.files &amp;&amp; dt.files.length > 0) {
+            if (dt && dt.files && dt.files.length > 0) {
                 // HTA-Hack: in IE11 mode the File object often has .path
                 var first = dt.files[0];
                 var p = first.path;
@@ -717,7 +582,7 @@ function loadCookieFromFile() {
             raw = trim(String(raw));
             if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
             if (raw.length > best.length) { best = raw; bestName = attempts[i].name; }
-            if (raw.length >= 50 &amp;&amp; raw.indexOf("=") >= 0) {
+            if (raw.length >= 50 && raw.indexOf("=") >= 0) {
                 state.cookie = raw;
                 document.getElementById("cookieInput").value = raw;
                 updateCookieStatus(true, "Geladen via FSO/" + attempts[i].name + " (" + raw.length + " Zeichen)");
@@ -793,7 +658,7 @@ function pickFolder() {
     try {
         var shell = new ActiveXObject("Shell.Application");
         var f = shell.BrowseForFolder(0, "Ordner mit .msg-Dateien waehlen", 0);
-        if (f &amp;&amp; f.Self &amp;&amp; f.Self.Path) {
+        if (f && f.Self && f.Self.Path) {
             useFolder(f.Self.Path);
         }
     } catch(e) {
@@ -830,19 +695,19 @@ function scanFolder() {
         // KEIN Auto-Open der xlsx mehr (das dauert bei 5000 Zeilen 20-60s!).
         // Stattdessen: Info anzeigen, User entscheidet ob/wie Cache geladen werden soll.
         var xlsxPath = getXlsxCachePath();
-        if (xlsxPath &amp;&amp; fso.FileExists(xlsxPath)) {
+        if (xlsxPath && fso.FileExists(xlsxPath)) {
             var sz = 0;
             try { sz = fso.GetFile(xlsxPath).Size; } catch(eS) {}
             var sizeStr = Math.round(sz / 1024) + " KB";
             showInfo("<strong>" + state.msgFiles.length + " .msg-Dateien</strong> gefunden. " +
                      "Bestehende Analyse: <code>analyse.xlsx</code> (" + sizeStr + "). Du hast drei Optionen:<br>" +
-                     "&amp;nbsp;&amp;nbsp;1. <strong>'Cache laden'</strong> &amp;rarr; oeffnet die volle xlsx (kann ~30s dauern)<br>" +
-                     "&amp;nbsp;&amp;nbsp;2. <strong>'Externes Excel laden'</strong> &amp;rarr; nur ein Subset (z.B. nur Reminder, schnell)<br>" +
-                     "&amp;nbsp;&amp;nbsp;3. <strong>Start</strong> &amp;rarr; ignoriert bestehende Analyse, faengt neu an");
+                     "&nbsp;&nbsp;1. <strong>'Cache laden'</strong> &rarr; oeffnet die volle xlsx (kann ~30s dauern)<br>" +
+                     "&nbsp;&nbsp;2. <strong>'Externes Excel laden'</strong> &rarr; nur ein Subset (z.B. nur Reminder, schnell)<br>" +
+                     "&nbsp;&nbsp;3. <strong>Start</strong> &rarr; ignoriert bestehende Analyse, faengt neu an");
         } else {
             // Legacy: cache.json laden falls vorhanden und keine xlsx da
             loadCache();
-            if (state.msgFiles.length > 0 &amp;&amp; state.results.length === 0) {
+            if (state.msgFiles.length > 0 && state.results.length === 0) {
                 showInfo(state.msgFiles.length + " .msg-Dateien gefunden. Keine bestehende Analyse - klick Start oder lade externes Excel.");
             }
         }
@@ -1005,7 +870,7 @@ function loadCache() {
     }
 
     // BOM strippen (ADODB.unicode strippt BOM normalerweise selbst, aber sicher ist sicher)
-    if (raw.length > 0 &amp;&amp; raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
+    if (raw.length > 0 && raw.charCodeAt(0) === 0xFEFF) raw = raw.substr(1);
 
     // File-Modification-Time einlesen - User sieht ob sich Datei aendert zwischen Loads
     var lastMod = "";
@@ -1035,15 +900,15 @@ function loadCache() {
     var dataJson = null, dataEval = null;
     var parseErr = "";
     try {
-        if (typeof JSON !== "undefined" &amp;&amp; JSON.parse) dataJson = JSON.parse(raw);
+        if (typeof JSON !== "undefined" && JSON.parse) dataJson = JSON.parse(raw);
     } catch(eJP) { parseErr += "JSON.parse: " + eJP.message + ". "; }
     try {
         dataEval = eval("(" + raw + ")");
     } catch(eEv) { parseErr += "eval: " + eEv.message + ". "; }
 
     // Welcher Parser hat mehr Eintraege?
-    var jsonCount = (dataJson &amp;&amp; dataJson.results &amp;&amp; dataJson.results.length) || 0;
-    var evalCount = (dataEval &amp;&amp; dataEval.results &amp;&amp; dataEval.results.length) || 0;
+    var jsonCount = (dataJson && dataJson.results && dataJson.results.length) || 0;
+    var evalCount = (dataEval && dataEval.results && dataEval.results.length) || 0;
     var data = (evalCount > jsonCount) ? dataEval : dataJson;
     if (!data) data = dataEval || dataJson;
     var parserUsed = (evalCount > jsonCount) ? "eval(" + evalCount + ")" : "JSON.parse(" + jsonCount + ")";
@@ -1120,7 +985,7 @@ function detectReminderSource(r) {
     if (sg(r.data, "ist_reminder") !== "ja") return "";
     // KI-Antwort (neue Analysen ab v1.59) - bevorzugt, kann schon Komma-Liste sein
     var kiQuelle = sg(r.data, "reminder_quelle");
-    if (kiQuelle &amp;&amp; kiQuelle.length > 0) return kiQuelle;
+    if (kiQuelle && kiQuelle.length > 0) return kiQuelle;
     // Fallback fuer alte Caches: Heuristik (kann Mail-Body / PDF-Inhalt nicht sehen)
     var parts = [];
     if (REMINDER_RE.test(String(r.anhangAlle || ""))) parts.push("Anhang-Dateiname");
@@ -1231,7 +1096,7 @@ function writeResultRowToExcel(r) {
     if (!state.excelSheet) return;
     try {
         var rowIdx;
-        if (r._excelRow &amp;&amp; r._excelRow >= 2) {
+        if (r._excelRow && r._excelRow >= 2) {
             rowIdx = r._excelRow;
         } else {
             state.excelLiveRowCount++;
@@ -1319,7 +1184,7 @@ function applyHighlightsToLiveRow(rowIdx, r) {
             state.excelSheet.Cells(rowIdx, LIVE_COL_FEHLER).Interior.Color = H_LIVE_ROT();
         }
         var vt = sg(d, "vorgangstyp");
-        if (vt &amp;&amp; vt !== "Makler-Vorgang" &amp;&amp; vt !== "") {
+        if (vt && vt !== "Makler-Vorgang" && vt !== "") {
             state.excelSheet.Range(state.excelSheet.Cells(rowIdx, LIVE_COL_MAKLERPOOL), state.excelSheet.Cells(rowIdx, LIVE_COL_HINWEIS)).Interior.Color = H_LIVE_GRAU();
             state.excelSheet.Cells(rowIdx, LIVE_COL_VORGANGSTYP).Interior.Color = H_LIVE_ORANGE();
         }
@@ -1448,11 +1313,11 @@ function loadExternalXlsx(path) {
         var missingList = [];
         for (var i = 0; i < state.results.length; i++) {
             var p = state.results[i].msgPath || "";
-            if (p &amp;&amp; fso.FileExists(p) &amp;&amp; !seenPath[p.toLowerCase()]) {
+            if (p && fso.FileExists(p) && !seenPath[p.toLowerCase()]) {
                 matchedPaths.push(p);
                 seenPath[p.toLowerCase()] = true;
                 matched++;
-            } else if (p &amp;&amp; !fso.FileExists(p)) {
+            } else if (p && !fso.FileExists(p)) {
                 missing++;
                 if (missingList.length < 5) missingList.push(state.results[i].msgFile || p);
             }
@@ -1475,7 +1340,7 @@ function loadExternalXlsx(path) {
         if (missingList.length > 0) msg += " (z.B.: " + missingList.join(", ") + "). ";
         else msg += ". ";
         msg += "Work-Queue ist auf diese " + matched + " Vorgaenge beschraenkt. " +
-               "<strong>Klick Start</strong> &amp;rarr; nur diese werden (re-)analysiert.";
+               "<strong>Klick Start</strong> &rarr; nur diese werden (re-)analysiert.";
         showSuccess(msg);
     } catch(e) {
         showError("Externes Excel laden fehlgeschlagen: " + (e.message || "unbekannt"));
@@ -1498,7 +1363,7 @@ function reAnalyzeReminders() {
     var reminders = [];
     for (var i = 0; i < state.results.length; i++) {
         var r = state.results[i];
-        if (r &amp;&amp; r.data &amp;&amp; sg(r.data, "ist_reminder") === "ja") reminders.push(r);
+        if (r && r.data && sg(r.data, "ist_reminder") === "ja") reminders.push(r);
     }
     if (reminders.length === 0) {
         showInfo("Keine Reminder-Vorgaenge gefunden - nichts zu tun.");
@@ -1647,7 +1512,7 @@ function bulkWriteResultsToExcel(results) {
         var midR = startRow + Math.floor(nRows / 2);
         var sM = String(state.excelSheet.Cells(midR, 2).Value || "");
         var sE = String(state.excelSheet.Cells(startRow + nRows - 1, 2).Value || "");
-        if (s1.length > 0 &amp;&amp; sM.length > 0 &amp;&amp; sE.length > 0) {
+        if (s1.length > 0 && sM.length > 0 && sE.length > 0) {
             state.excelLiveRowCount += nRows;
             ok = true;
             method = "FillRangeFromTsv";
@@ -1673,7 +1538,7 @@ function bulkWriteResultsToExcel(results) {
             var c1 = String(state.excelSheet.Cells(startRow, 2).Value || "");
             var cM = String(state.excelSheet.Cells(startRow + Math.floor(nRows / 2), 2).Value || "");
             var cE = String(state.excelSheet.Cells(startRow + nRows - 1, 2).Value || "");
-            if (c1.length > 0 &amp;&amp; cM.length > 0 &amp;&amp; cE.length > 0) {
+            if (c1.length > 0 && cM.length > 0 && cE.length > 0) {
                 state.excelLiveRowCount += nRows;
                 ok = true;
                 method = "Clipboard-Paste";
@@ -1862,23 +1727,23 @@ function clearCache() {
 // ANALYSIS - MAIN
 // ============================================================================
 function refreshStartButton() {
-    var canStart = !state.running &amp;&amp;
-                   state.cookie.length > 50 &amp;&amp;
-                   state.folderPath.length > 0 &amp;&amp;
-                   state.msgFiles.length > 0 &amp;&amp;
+    var canStart = !state.running &&
+                   state.cookie.length > 50 &&
+                   state.folderPath.length > 0 &&
+                   state.msgFiles.length > 0 &&
                    outlookApp !== null;
-    var canQuick = !state.running &amp;&amp;
-                   state.folderPath.length > 0 &amp;&amp;
-                   state.msgFiles.length > 0 &amp;&amp;
+    var canQuick = !state.running &&
+                   state.folderPath.length > 0 &&
+                   state.msgFiles.length > 0 &&
                    outlookApp !== null;
     // XXL braucht KEIN Outlook, nur Ordner + Mails
-    var canXxl = !state.running &amp;&amp;
-                 state.folderPath.length > 0 &amp;&amp;
+    var canXxl = !state.running &&
+                 state.folderPath.length > 0 &&
                  state.msgFiles.length > 0;
     // Bulk-Triage: braucht Cookie + Folder + Mails (Outlook nicht zwingend)
-    var canBulk = !state.running &amp;&amp;
-                  state.cookie.length > 50 &amp;&amp;
-                  state.folderPath.length > 0 &amp;&amp;
+    var canBulk = !state.running &&
+                  state.cookie.length > 50 &&
+                  state.folderPath.length > 0 &&
                   state.msgFiles.length > 0;
     document.getElementById("btnStart").disabled = !canStart;
     document.getElementById("btnQuickPool").disabled = !canQuick;
@@ -1896,7 +1761,7 @@ function refreshStartButton() {
     if (btnRn) btnRn.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0;
     // Collect-Button: braucht Ordner + Mails + min. 1 Datum
     var btnCl = document.getElementById("btnCollectByDate");
-    if (btnCl) btnCl.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0 || (!state.dateFrom &amp;&amp; !state.dateTo);
+    if (btnCl) btnCl.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0 || (!state.dateFrom && !state.dateTo);
     // Random-Sample-Button: braucht nur Ordner + Mails (Datum optional)
     var btnRs = document.getElementById("btnRandomSample");
     if (btnRs) btnRs.disabled = state.running || state.folderPath.length === 0 || state.msgFiles.length === 0;
@@ -1932,7 +1797,7 @@ function startAnalysis() {
     // alle bisherigen Eintraege ins Excel migrieren - VIA BULK-WRITE, NICHT zellweise!
     // Bei 1100+ Vorgaengen wuerde zellweise 41800 sync COM-Calls bedeuten -> Long-Running-
     // Script-Dialog + Excel-Hang. Bulk-Write via VBScript FillRangeFromTsv = 1 Call.
-    if (state.results.length > 0 &amp;&amp; state.excelLiveRowCount === 0) {
+    if (state.results.length > 0 && state.excelLiveRowCount === 0) {
         appendAiLog("OK", "", "Excel-Migration (Bulk): " + state.results.length + " Vorgaenge aus cache.json -> xlsx");
         showInfo("Migriere " + state.results.length + " Vorgaenge in Excel (Bulk-Write)...");
         if (bulkWriteResultsToExcel(state.results)) {
@@ -1995,7 +1860,7 @@ function cancelAnalysis() {
         if (!state.slots.hasOwnProperty(k)) continue;
         var sl = state.slots[k];
         sl.cancelled = true;
-        if (sl.stage === "RUNNING" &amp;&amp; sl.http) {
+        if (sl.stage === "RUNNING" && sl.http) {
             try { sl.http.Abort(); } catch(e) {}
         }
     }
@@ -2010,7 +1875,7 @@ function workerTick() {
         // 10 Slots in EINEM Tick prepa-ren, blockiert man 20-30s und Windows zeigt
         // den Long-Running-Script-Dialog. Stattdessen: pro Tick ein Slot, naechster
         // Tick laeuft nach 30ms - Ramp-up auf 10 Slots dauert ~300ms, dann steady-state.
-        if (countSlots() < state.parallelN &amp;&amp; state.nextIdx < state.workQueue.length &amp;&amp; !state.cancelled &amp;&amp; !state.abortReason) {
+        if (countSlots() < state.parallelN && state.nextIdx < state.workQueue.length && !state.cancelled && !state.abortReason) {
             var msgPath = state.workQueue[state.nextIdx];
             state.nextIdx++;
 
@@ -2047,8 +1912,8 @@ function workerTick() {
 
             // --- Cancelled: stille Entfernung (alle Stages) ---
             if (s.cancelled) {
-                if (s.stage === "CREATING_CONV" &amp;&amp; s.convHttp) { try { s.convHttp.Abort(); } catch(eA) {} }
-                if (s.stage === "RUNNING" &amp;&amp; s.http) { try { s.http.Abort(); } catch(eA) {} }
+                if (s.stage === "CREATING_CONV" && s.convHttp) { try { s.convHttp.Abort(); } catch(eA) {} }
+                if (s.stage === "RUNNING" && s.http) { try { s.http.Abort(); } catch(eA) {} }
                 if (s.stage === "UPLOADING" || s.stage === "CREATING_CONV") cleanupSlotTempFiles(s);
                 if (s.convId) fireDelete(s.convId);
                 toRemove.push(key);
@@ -2073,7 +1938,7 @@ function workerTick() {
                     var cMsg = (convWinErr.message || "").toString();
                     var cIsSendRace = cMsg.indexOf("Send") >= 0 || cMsg.indexOf("send") >= 0;
                     if (!s.convRetries) s.convRetries = 0;
-                    if (cIsSendRace &amp;&amp; s.convRetries < 8) {
+                    if (cIsSendRace && s.convRetries < 8) {
                         s.convRetries++;
                         setSlotPhase(s, "Conv-Wait retry " + s.convRetries + "/8");
                     } else {
@@ -2109,7 +1974,7 @@ function workerTick() {
                     continue;
                 }
                 // PDF-Uploads feuern oder direkt READY
-                if (s.tempPdfPaths &amp;&amp; s.tempPdfPaths.length > 0) {
+                if (s.tempPdfPaths && s.tempPdfPaths.length > 0) {
                     s.uploadHandles = [];
                     try {
                         var fsoU = new ActiveXObject("Scripting.FileSystemObject");
@@ -2199,7 +2064,7 @@ function workerTick() {
                     var msg = (winErr.message || "").toString();
                     var isSendRace = msg.indexOf("Send") >= 0 || msg.indexOf("send") >= 0;
                     if (!s.waitRetries) s.waitRetries = 0;
-                    if (isSendRace &amp;&amp; s.waitRetries < 8) {
+                    if (isSendRace && s.waitRetries < 8) {
                         s.waitRetries++;
                         setSlotPhase(s, "warte (retry " + s.waitRetries + "/8)");
                         // bleibt im Slot, naechster Tick erneut
@@ -2272,7 +2137,7 @@ function workerTick() {
                 finishAnalysis(state.abortReason);
                 return;
             }
-        } else if (state.nextIdx >= state.workQueue.length &amp;&amp; countSlots() === 0) {
+        } else if (state.nextIdx >= state.workQueue.length && countSlots() === 0) {
             finishAnalysis("OK");
             return;
         }
@@ -2289,7 +2154,7 @@ function workerTick() {
     // - 200ms wenn keine Mails mehr - workerTick wartet auf die letzten Inflights.
     var hasFreeSlot = countSlots() < state.parallelN;
     var hasMoreWork = state.nextIdx < state.workQueue.length;
-    var delay = (hasFreeSlot &amp;&amp; hasMoreWork) ? 0 : 200;
+    var delay = (hasFreeSlot && hasMoreWork) ? 0 : 200;
     setTimeout(workerTick, delay);
 }
 
@@ -2322,7 +2187,7 @@ function finishAnalysis(reason) {
             showInfo(msg);
             // Auto-Excel-Export mit aktuellen Ergebnissen (inkl. Stats)
             try {
-                if (state.results &amp;&amp; state.results.length > 0) {
+                if (state.results && state.results.length > 0) {
                     exportToExcel();
                 }
             } catch(eExp) {
@@ -2492,7 +2357,7 @@ function cleanupSlotTempFiles(slot) {
                 try { fso.DeleteFile(slot.tempPdfPaths[i], true); } catch(e) {}
             }
         }
-        if (slot.tempDir &amp;&amp; fso.FolderExists(slot.tempDir)) {
+        if (slot.tempDir && fso.FolderExists(slot.tempDir)) {
             try { fso.DeleteFolder(slot.tempDir, true); } catch(e) {}
         }
     } catch(e) {}
@@ -2568,7 +2433,7 @@ function addResult(r) {
     for (var i = 0; i < state.results.length; i++) {
         if (String(state.results[i].msgPath).toLowerCase() === key) {
             // Update: behalte existing _excelRow falls vorhanden
-            if (state.results[i]._excelRow &amp;&amp; !r._excelRow) r._excelRow = state.results[i]._excelRow;
+            if (state.results[i]._excelRow && !r._excelRow) r._excelRow = state.results[i]._excelRow;
             state.results[i] = r;
             state.pendingMap[key] = true;
             // Excel-Live-Write (Update vorhandener Zeile)
@@ -2812,7 +2677,7 @@ function buildUploadVbs() {
     v.push("    esc = Replace(esc, vbCr, \"\\n\")");
     v.push("    esc = Replace(esc, vbLf, \"\\n\")");
     v.push("    esc = Replace(esc, vbTab, \" \")");
-    v.push("    json = \"{\"\"status\"\":\" &amp; status &amp; \",\"\"body\"\":\"\"\" &amp; esc &amp; \"\"\"}\"");
+    v.push("    json = \"{\"\"status\"\":\" & status & \",\"\"body\"\":\"\"\" & esc & \"\"\"}\"");
     v.push("    Set fso = CreateObject(\"Scripting.FileSystemObject\")");
     v.push("    Set f = fso.CreateTextFile(resultPath, True, False)");
     v.push("    f.Write json");
@@ -2848,26 +2713,26 @@ function buildUploadVbs() {
     v.push("fileBytes = stmFile.Read");
     v.push("stmFile.Close");
     v.push("If Err.Number <> 0 Then");
-    v.push("    WriteResult 0, \"PDF read error: \" &amp; Err.Description");
+    v.push("    WriteResult 0, \"PDF read error: \" & Err.Description");
     v.push("    WScript.Quit 0");
     v.push("End If");
     v.push("");
     v.push("Dim guid, boundary");
     v.push("guid = CreateObject(\"Scriptlet.TypeLib\").Guid");
     v.push("guid = Replace(Replace(Replace(guid, \"{\", \"\"), \"}\", \"\"), \"-\", \"\")");
-    v.push("boundary = \"----WebKitFormBoundary\" &amp; Left(guid, 16)");
+    v.push("boundary = \"----WebKitFormBoundary\" & Left(guid, 16)");
     v.push("");
     v.push("Dim pre, post");
-    v.push("pre = \"--\" &amp; boundary &amp; vbCrLf");
-    v.push("pre = pre &amp; \"Content-Disposition: form-data; name=\"\"file_content\"\"; filename=\"\"\" &amp; fileName &amp; \"\"\"\" &amp; vbCrLf");
-    v.push("pre = pre &amp; \"Content-Type: application/pdf\" &amp; vbCrLf &amp; vbCrLf");
-    v.push("post = vbCrLf &amp; \"--\" &amp; boundary &amp; vbCrLf");
-    v.push("post = post &amp; \"Content-Disposition: form-data; name=\"\"filename\"\"\" &amp; vbCrLf &amp; vbCrLf");
-    v.push("post = post &amp; fileName &amp; vbCrLf");
-    v.push("post = post &amp; \"--\" &amp; boundary &amp; vbCrLf");
-    v.push("post = post &amp; \"Content-Disposition: form-data; name=\"\"conversation_id\"\"\" &amp; vbCrLf &amp; vbCrLf");
-    v.push("post = post &amp; convId &amp; vbCrLf");
-    v.push("post = post &amp; \"--\" &amp; boundary &amp; \"--\" &amp; vbCrLf");
+    v.push("pre = \"--\" & boundary & vbCrLf");
+    v.push("pre = pre & \"Content-Disposition: form-data; name=\"\"file_content\"\"; filename=\"\"\" & fileName & \"\"\"\" & vbCrLf");
+    v.push("pre = pre & \"Content-Type: application/pdf\" & vbCrLf & vbCrLf");
+    v.push("post = vbCrLf & \"--\" & boundary & vbCrLf");
+    v.push("post = post & \"Content-Disposition: form-data; name=\"\"filename\"\"\" & vbCrLf & vbCrLf");
+    v.push("post = post & fileName & vbCrLf");
+    v.push("post = post & \"--\" & boundary & vbCrLf");
+    v.push("post = post & \"Content-Disposition: form-data; name=\"\"conversation_id\"\"\" & vbCrLf & vbCrLf");
+    v.push("post = post & convId & vbCrLf");
+    v.push("post = post & \"--\" & boundary & \"--\" & vbCrLf");
     v.push("");
     v.push("Function Utf8Bytes(s)");
     v.push("    Dim st");
@@ -2907,14 +2772,14 @@ function buildUploadVbs() {
     v.push("http.SetRequestHeader \"Origin\", \"https://gpt.ergo.com\"");
     v.push("http.SetRequestHeader \"Referer\", \"https://gpt.ergo.com/\"");
     v.push("http.SetRequestHeader \"X-Requested-With\", \"XMLHttpRequest\"");
-    v.push("http.SetRequestHeader \"Content-Type\", \"multipart/form-data; boundary=\" &amp; boundary");
+    v.push("http.SetRequestHeader \"Content-Type\", \"multipart/form-data; boundary=\" & boundary");
     v.push("http.Send body");
     v.push("");
     v.push("Dim status, respBody");
     v.push("status = http.Status");
     v.push("respBody = http.ResponseText");
     v.push("If Err.Number <> 0 Then");
-    v.push("    WriteResult 0, \"HTTP error: \" &amp; Err.Description");
+    v.push("    WriteResult 0, \"HTTP error: \" & Err.Description");
     v.push("    WScript.Quit 0");
     v.push("End If");
     v.push("");
@@ -3059,7 +2924,7 @@ function extractAssistantFromNdjson(raw) {
         var ln = trim(lines[i]);
         if (!ln) continue;
         if (ln.toLowerCase().substr(0, 5) === "data:") ln = trim(ln.substr(5));
-        if (ln.charAt(0) === "{" &amp;&amp; ln.charAt(ln.length - 1) === "}") {
+        if (ln.charAt(0) === "{" && ln.charAt(ln.length - 1) === "}") {
             var t = extractAssistantFromChunk(ln);
             if (t) last = t;
         }
@@ -3083,7 +2948,7 @@ function extractServerHint(raw) {
     for (var i = 0; i < keys.length; i++) {
         var re = new RegExp('"' + keys[i] + '"\\s*:\\s*"((?:\\\\.|[^"]){0,500})"', "i");
         var m = raw.match(re);
-        if (m &amp;&amp; m[1]) return "Server: " + m[1].substr(0, 240);
+        if (m && m[1]) return "Server: " + m[1].substr(0, 240);
     }
     var lc = raw.toLowerCase();
     if (lc.indexOf("nicht mehr unterst") >= 0 || lc.indexOf("not supported") >= 0 ||
@@ -3108,7 +2973,7 @@ function parseGptJson(answer) {
     t = t.substr(s, e - s + 1);
     try {
         // IE11 has JSON.parse but be defensive
-        if (typeof JSON !== "undefined" &amp;&amp; JSON.parse) return JSON.parse(t);
+        if (typeof JSON !== "undefined" && JSON.parse) return JSON.parse(t);
         return eval("(" + t + ")");
     } catch(ex) {
         // Try line by line key extraction as fallback
@@ -3144,16 +3009,16 @@ function parseJsonStr(json, key) {
 function isAuthError(desc) {
     if (!desc) return false;
     var s = desc.toLowerCase();
-    return (s.indexOf("403") >= 0 &amp;&amp; (s.indexOf("forbidden") >= 0 || s.indexOf("create failed") >= 0)) ||
+    return (s.indexOf("403") >= 0 && (s.indexOf("forbidden") >= 0 || s.indexOf("create failed") >= 0)) ||
            s.indexOf("azure-application-gateway") >= 0 ||
-           (s.indexOf("401") >= 0 &amp;&amp; s.indexOf("unauthor") >= 0);
+           (s.indexOf("401") >= 0 && s.indexOf("unauthor") >= 0);
 }
 
 function isModelError(desc) {
     if (!desc) return false;
     var s = desc.toLowerCase();
     return s.indexOf("nicht mehr unterst") >= 0 ||
-           (s.indexOf("modell") >= 0 &amp;&amp; s.indexOf("unterstuetzt") >= 0) ||
+           (s.indexOf("modell") >= 0 && s.indexOf("unterstuetzt") >= 0) ||
            s.indexOf("unknown model") >= 0 ||
            s.indexOf("not supported") >= 0;
 }
@@ -3191,7 +3056,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
 
     p += "1) maklerpool - extrahiert UND konsolidiert. Verwende die EINHEITLICHEN Schreibweisen aus der folgenden Liste, NICHT die Roh-Variante aus der Mail:\n";
     p += "    KONSOLIDIERUNGS-MAP (linke Seite: gefundene Variante -> rechts: einheitlicher Name)\n";
-    p += "    - 'Jung, DMS', 'Jung DMS', 'JDC', 'Jung,DMS &amp; Cie. Pool GmbH', 'jungdms', 'jdcgroup' -> 'JDC / Jung, DMS &amp; Cie.'\n";
+    p += "    - 'Jung, DMS', 'Jung DMS', 'JDC', 'Jung,DMS & Cie. Pool GmbH', 'jungdms', 'jdcgroup' -> 'JDC / Jung, DMS & Cie.'\n";
     p += "    - 'Fonds Finanz', 'fondsfinanz', 'ff-makler', 'Fonds-Finanz' -> 'Fonds Finanz Maklerservice GmbH'\n";
     p += "    - 'blau direkt', 'blau-direkt', 'blaudirekt' -> 'blau direkt GmbH'\n";
     p += "    - 'DEMA', 'DEMMAK', 'Deutsche Versicherungsmakler' -> 'DEMA Deutsche Versicherungsmakler AG'\n";
@@ -3221,7 +3086,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "    - 'Invers' -> 'Invers GmbH'\n";
     p += "    - 'BEST GRUPPE', 'BESTGRUPPE' -> 'BEST GRUPPE'\n";
     p += "    - 'LEIMEISTER' -> 'LEIMEISTER Versicherungsmakler GmbH'\n";
-    p += "    - 'INCON' -> 'INCON GmbH &amp; Co. Assekuranz KG'\n";
+    p += "    - 'INCON' -> 'INCON GmbH & Co. Assekuranz KG'\n";
     p += "    - 'DEUTUNA' -> 'DEUTUNA Finanzplanung GmbH'\n";
     p += "    - 'DASG' -> 'DASG Deutsche Assekuranzservice GmbH'\n";
     p += "    - 'vfm Service' -> 'vfm Service GmbH'\n";
@@ -3233,7 +3098,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "   Wenn KEINE Einzelperson, sondern eine Makler-FIRMA handelt, gehoert der Firmenname in makler_nachname.\n";
     p += "   WICHTIG Pool vs. zugrundeliegender Makler: Wenn der Maklervertrag / die Maklervollmacht auf eine\n";
     p += "   Makler-Firma laeuft, die nur ueber einen Pool abwickelt (z.B. Finanzguru, abgewickelt ueber Jung DMS),\n";
-    p += "   dann bleibt maklerpool = 'JDC / Jung, DMS &amp; Cie.' ABER makler_nachname = der eigentliche Makler\n";
+    p += "   dann bleibt maklerpool = 'JDC / Jung, DMS & Cie.' ABER makler_nachname = der eigentliche Makler\n";
     p += "   (also z.B. 'Finanzguru'). Pool und tatsaechlicher Makler sind getrennt zu fuehren.\n\n";
     p += "3a) makler_nummer - Identifikator BEIM VERSICHERER. STRENGE Priorisierung:\n";
     p += "    1. 'Agentur-Nr.' / 'Vermittler-Nr.' im Briefkopf-Block (das ist die Wunsch-Nummer).\n";
@@ -3502,7 +3367,7 @@ function exportToExcel() {
             var s1 = String(sheet.Cells(2, 2).Value || "");
             var sM = String(sheet.Cells(midRow, 2).Value || "");
             var s2 = String(sheet.Cells(state.results.length + 1, 2).Value || "");
-            if (s1.length > 0 &amp;&amp; sM.length > 0 &amp;&amp; s2.length > 0) {
+            if (s1.length > 0 && sM.length > 0 && s2.length > 0) {
                 bulkOk = true;
             } else {
                 throw new Error("FillRangeFromTsv: Stichproben leer (anfang='" + s1.substr(0,30) +
@@ -3610,7 +3475,7 @@ function exportToExcel() {
                             sheet.Cells(row, COL_FEHLER).Interior.Color = H_ROT;
                         }
                         var vt = sg(dd, "vorgangstyp");
-                        if (vt &amp;&amp; vt !== "Makler-Vorgang" &amp;&amp; vt !== "") {
+                        if (vt && vt !== "Makler-Vorgang" && vt !== "") {
                             sheet.Range(sheet.Cells(row, COL_MAKLERPOOL), sheet.Cells(row, COL_HINWEIS)).Interior.Color = H_GRAU;
                             sheet.Cells(row, COL_VORGANGSTYP).Interior.Color = H_ORANGE;
                         }
@@ -3691,7 +3556,7 @@ function exportToExcel() {
                 if (auswErr) okMsg += " <strong>Auswertung-Sheet fehlgeschlagen:</strong> " + auswErr;
                 okMsg += " Bitte manuell speichern.";
                 if (statusEl) statusEl.innerText = "";
-                if (pgEl &amp;&amp; !state.running) pgEl.style.display = "none";
+                if (pgEl && !state.running) pgEl.style.display = "none";
                 showSuccess(okMsg);
             } catch(eF) {
                 failExport("Finalize-Fehler: " + eF.message);
@@ -3708,7 +3573,7 @@ function exportToExcel() {
                 excel.Visible = true;
             }} catch(eR) {}
             if (statusEl) statusEl.innerText = "";
-            if (pgEl &amp;&amp; !state.running) pgEl.style.display = "none";
+            if (pgEl && !state.running) pgEl.style.display = "none";
             showError("Excel-Export fehlgeschlagen: " + msg);
         }
 
@@ -3962,7 +3827,7 @@ function buildAuswertungSheet(wb, excel) {
                 if (!st.mvStatusBue.hasOwnProperty(emk)) continue;
                 var inOrder = false;
                 for (var oi = 0; oi < mvOrder.length; oi++) if (mvOrder[oi] === emk) { inOrder = true; break; }
-                if (!inOrder &amp;&amp; st.mvStatusBue[emk] > 0) dataRow(emk, st.mvStatusBue[emk], pct(st.mvStatusBue[emk], st.bueResults.length), true);
+                if (!inOrder && st.mvStatusBue[emk] > 0) dataRow(emk, st.mvStatusBue[emk], pct(st.mvStatusBue[emk], st.bueResults.length), true);
             }
             row++;
 
@@ -4120,7 +3985,7 @@ function renderTable() {
         var sCls = "s-ok";
         var sTxt = "OK";
         if (!r.ok) {
-            if (r.errMsg &amp;&amp; r.errMsg.indexOf("ABGEBROCHEN") >= 0) { sCls = "s-cancel"; sTxt = "Abbruch"; }
+            if (r.errMsg && r.errMsg.indexOf("ABGEBROCHEN") >= 0) { sCls = "s-cancel"; sTxt = "Abbruch"; }
             else { sCls = "s-err"; sTxt = "Fehler"; }
         }
 
@@ -4168,7 +4033,7 @@ function showDetail(idx) {
     var kv = "";
     kv += '<div class="k">Datei</div><div class="v">' + esc(r.msgPath) + '</div>';
     kv += '<div class="k">Datum</div><div class="v">' + esc(r.datum) + '</div>';
-    kv += '<div class="k">Absender</div><div class="v">' + esc(r.absName) + " &amp;lt;" + esc(r.absMail) + "&amp;gt;</div>";
+    kv += '<div class="k">Absender</div><div class="v">' + esc(r.absName) + " &lt;" + esc(r.absMail) + "&gt;</div>";
     kv += '<div class="k">Anhaenge</div><div class="v">' + esc(r.anhangAlle || "(keine)") + '</div>';
     kv += '<div class="k">PDFs hochgeladen</div><div class="v">' + esc(r.pdfListe || "(keine)") + '</div>';
     kv += '<div class="k">Status</div><div class="v">' + (r.ok ? '<span style="color:#10b981">OK</span>' : '<span style="color:#ef4444">' + esc(r.errMsg) + '</span>') + '</div>';
@@ -4185,7 +4050,7 @@ function showDetail(idx) {
 }
 
 function closeDetail(ev) {
-    if (ev &amp;&amp; ev.target &amp;&amp; String(ev.target.className).indexOf("modal-backdrop") === -1) return;
+    if (ev && ev.target && String(ev.target.className).indexOf("modal-backdrop") === -1) return;
     document.getElementById("detailModal").className = "modal-backdrop";
 }
 
@@ -4212,7 +4077,7 @@ function getSenderEmail(mailItem) {
                 var s = mailItem.Sender;
                 if (s) {
                     var eu = s.GetExchangeUser();
-                    if (eu &amp;&amp; eu.PrimarySmtpAddress) return eu.PrimarySmtpAddress;
+                    if (eu && eu.PrimarySmtpAddress) return eu.PrimarySmtpAddress;
                 }
             } catch(e) {}
         }
@@ -4238,7 +4103,7 @@ function getRecipientsTo(mailItem) {
                     var ae = rcp.AddressEntry;
                     if (ae) {
                         var eu = ae.GetExchangeUser();
-                        if (eu &amp;&amp; eu.PrimarySmtpAddress) smtp = eu.PrimarySmtpAddress;
+                        if (eu && eu.PrimarySmtpAddress) smtp = eu.PrimarySmtpAddress;
                     }
                 } catch(e) {}
                 if (!smtp) {
@@ -4247,7 +4112,7 @@ function getRecipientsTo(mailItem) {
                     if (smtp.charAt(0) === "/") smtp = "";
                 }
                 var entry = name;
-                if (smtp &amp;&amp; smtp !== name &amp;&amp; smtp.indexOf("@") > 0) {
+                if (smtp && smtp !== name && smtp.indexOf("@") > 0) {
                     entry = name ? (name + " <" + smtp + ">") : smtp;
                 }
                 if (entry) out.push(entry);
@@ -4287,7 +4152,7 @@ function getHtaFileName() {
 // IE klassifiziert das als Internet-Zone -> ADODB.Stream wird gesperrt.
 function isRunningFromUnc() {
     var dir = getHtaDir();
-    return dir &amp;&amp; dir.substr(0, 2) === "\\\\";
+    return dir && dir.substr(0, 2) === "\\\\";
 }
 
 // Kopiert HTA + Cookie.txt nach %LOCALAPPDATA%\ergo-vorgang-analyse\,
@@ -4384,7 +4249,7 @@ function getHtaDir() {
         }
         // Anzahl fuehrender Slashes zaehlen
         var leadSlashes = 0;
-        while (leadSlashes < href.length &amp;&amp; href.charAt(leadSlashes) === "/") {
+        while (leadSlashes < href.length && href.charAt(leadSlashes) === "/") {
             leadSlashes++;
         }
         href = href.substr(leadSlashes);
@@ -4421,7 +4286,7 @@ function getFileName(path) {
 // Liest Datum aus Dateinamen-Praefix (Muster YYYY-MM-DD oder YYYY-MM-DD_HHMM).
 // Wenn kein Datum im Namen erkennbar: Mail wird eingeschlossen (Default-Strict).
 function isInDateRange(filePath) {
-    if (!state.dateFrom &amp;&amp; !state.dateTo) return true;
+    if (!state.dateFrom && !state.dateTo) return true;
     var fname = getFileName(filePath);
     var m = fname.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (!m) return true; // kein Datum im Namen -> default einschliessen
@@ -4430,7 +4295,7 @@ function isInDateRange(filePath) {
     var d = parseInt(m[3], 10);
     if (isNaN(y) || isNaN(mo) || isNaN(d)) return true;
     var fileDate = new Date(y, mo, d);
-    if (state.dateFrom &amp;&amp; fileDate < state.dateFrom) return false;
+    if (state.dateFrom && fileDate < state.dateFrom) return false;
     if (state.dateTo) {
         // dateTo gilt als end-of-day
         var endOfDay = new Date(state.dateTo.getFullYear(), state.dateTo.getMonth(), state.dateTo.getDate(), 23, 59, 59);
@@ -4442,7 +4307,7 @@ function isInDateRange(filePath) {
 // Liefert die durch Datum gefilterten msgFiles. Default: state.msgFiles
 // (unfiltriert), wenn beide Datum-Felder leer.
 function getFilteredMsgFiles() {
-    if (!state.dateFrom &amp;&amp; !state.dateTo) return state.msgFiles;
+    if (!state.dateFrom && !state.dateTo) return state.msgFiles;
     var out = [];
     for (var i = 0; i < state.msgFiles.length; i++) {
         if (isInDateRange(state.msgFiles[i])) out.push(state.msgFiles[i]);
@@ -4524,7 +4389,7 @@ function onDateChange() {
 function refreshDateRangeStatus() {
     var el = document.getElementById("dateRangeStatus");
     if (!el) return;
-    if (!state.dateFrom &amp;&amp; !state.dateTo) {
+    if (!state.dateFrom && !state.dateTo) {
         el.innerText = "Filtert nach Datum im Dateinamen (Muster YYYY-MM-DD_HHMM_...). Aktuell: kein Filter aktiv - alle Mails werden analysiert.";
         return;
     }
@@ -4571,7 +4436,7 @@ function pad(n) { return n < 10 ? "0" + n : "" + n; }
 function trim(s) { return s == null ? "" : String(s).replace(/^\s+|\s+$/g, ""); }
 function esc(s) {
     if (s == null) return "";
-    return String(s).replace(/&amp;/g, "&amp;amp;").replace(/</g, "&amp;lt;").replace(/>/g, "&amp;gt;").replace(/"/g, "&amp;quot;");
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function jsonEscape(s) {
@@ -4600,7 +4465,7 @@ function jsonUnescape(s) {
 }
 
 function jsonStringify(obj) {
-    if (typeof JSON !== "undefined" &amp;&amp; JSON.stringify) {
+    if (typeof JSON !== "undefined" && JSON.stringify) {
         try { return JSON.stringify(obj, null, 2); } catch(e) {}
     }
     return jsonStringifyFallback(obj);
@@ -4787,7 +4652,7 @@ var POOL_RULES = [
     {
         name: "JDC Group AG / Jung DMS",
         domains: ["jdc.de", "jungdms.de", "jung-dms.de", "jdcgroup.de"],
-        sigPatterns: [/JDC[\s-]*Group/i, /Jung[\s-]*DMS/i, /Jung,\s*DMS\s*&amp;\s*Cie/i],
+        sigPatterns: [/JDC[\s-]*Group/i, /Jung[\s-]*DMS/i, /Jung,\s*DMS\s*&\s*Cie/i],
         subjectPatterns: []
     },
     {
@@ -4797,7 +4662,7 @@ var POOL_RULES = [
         subjectPatterns: []
     },
     {
-        name: "blau direkt GmbH &amp; Co. KG",
+        name: "blau direkt GmbH & Co. KG",
         domains: ["blau-direkt.de", "blaudirekt.de"],
         sigPatterns: [/blau[\s-]*direkt/i],
         subjectPatterns: []
@@ -4876,7 +4741,7 @@ function extractSignature(body) {
     if (!body) return "";
     var lines = String(body).split(/\r?\n/);
     // Entferne leere Zeilen am Anfang/Ende
-    while (lines.length > 0 &amp;&amp; trim(lines[lines.length-1]) === "") lines.pop();
+    while (lines.length > 0 && trim(lines[lines.length-1]) === "") lines.pop();
     // Nimm letzte 20 Zeilen (signatur + footer)
     var sig = lines.slice(Math.max(0, lines.length - 20)).join("\n");
     return sig;
@@ -4894,7 +4759,7 @@ function detectPool(senderEmail, senderName, subject, body) {
         var rule = POOL_RULES[i];
         for (var d = 0; d < rule.domains.length; d++) {
             var dom = rule.domains[d];
-            if (emailDomain === dom || emailDomain.length > dom.length + 1 &amp;&amp;
+            if (emailDomain === dom || emailDomain.length > dom.length + 1 &&
                 emailDomain.substr(emailDomain.length - dom.length - 1) === "." + dom) {
                 return { name: rule.name, source: "Domain", detail: emailDomain };
             }
@@ -5158,7 +5023,7 @@ function exportPoolOverviewToExcel(rows, poolCounts, sourceCounts) {
             try { sheet2.Range(sheet2.Cells(row2,1), sheet2.Cells(row2, headers2.length)).Interior.Color = rgb(254, 240, 138); } catch(e) {}
         } else if (pp.name === "(Fehler)") {
             try { sheet2.Range(sheet2.Cells(row2,1), sheet2.Cells(row2, headers2.length)).Interior.Color = rgb(252, 165, 165); } catch(e) {}
-        } else if (pi === 0 &amp;&amp; pp.count >= 2) {
+        } else if (pi === 0 && pp.count >= 2) {
             try { sheet2.Cells(row2, 2).Interior.Color = rgb(187, 247, 208); } catch(e) {}
         }
     }
@@ -5359,15 +5224,15 @@ function processNextXxlChunk() {
             readDiag.contentLength = content.length;
             readDiag.contentPreview = content.substr(0, 200);
 
-            if (content &amp;&amp; content.length > 2) {
+            if (content && content.length > 2) {
                 try {
                     var parsed;
-                    if (typeof JSON !== "undefined" &amp;&amp; JSON.parse) {
+                    if (typeof JSON !== "undefined" && JSON.parse) {
                         parsed = JSON.parse(content);
                     } else {
                         parsed = eval("(" + content + ")");
                     }
-                    if (parsed &amp;&amp; parsed.length) {
+                    if (parsed && parsed.length) {
                         for (var k = 0; k < parsed.length; k++) xs.results.push(parsed[k]);
                         readDiag.parseOk = true;
                         readDiag.parsedCount = parsed.length;
@@ -5393,7 +5258,7 @@ function processNextXxlChunk() {
     var chunkProducedResults = xs.results.length > resultsBeforeChunk;
 
     // Wenn erster Chunk nichts liefert: Canary lesen, Diagnose merken, abbrechen
-    if (!chunkProducedResults &amp;&amp; !xs.firstFailureDiag) {
+    if (!chunkProducedResults && !xs.firstFailureDiag) {
         var canaryContent = "(Canary-Log konnte nicht gelesen werden)";
         try {
             if (fso.FileExists(canaryPath)) {
@@ -5440,7 +5305,7 @@ function finishXxl() {
     refreshStartButton();
 
     // 0-Result-Diagnose-Pfad
-    if (xs.results.length === 0 &amp;&amp; xs.firstFailureDiag) {
+    if (xs.results.length === 0 && xs.firstFailureDiag) {
         var d = xs.firstFailureDiag;
         var readDiag = xs._lastReadDiag || {};
         var attemptsHtml = "";
@@ -5476,7 +5341,7 @@ function finishXxl() {
                   "<div style=\"font-size:11px;background:#0f172a;padding:6px;border-radius:4px;\">" + attemptsHtml + "</div>" +
 
                   "<br><strong>Best variant:</strong> " + esc(readDiag.bestVariant || "(keine)") +
-                  " &amp;mdash; Content-Length nach BOM-Strip: " + (readDiag.contentLength || 0) + "<br>" +
+                  " &mdash; Content-Length nach BOM-Strip: " + (readDiag.contentLength || 0) + "<br>" +
                   "<strong>Content Preview:</strong><br>" +
                   "<pre style=\"background:#0f172a;padding:6px;border-radius:4px;font-size:11px;max-height:120px;overflow:auto;white-space:pre-wrap;\">" +
                   esc(readDiag.contentPreview || "(leer)") + "</pre>" +
@@ -5488,7 +5353,7 @@ function finishXxl() {
 
                   "<strong>Debug-Dateien (NICHT geloescht):</strong><br>" +
                   "<code style=\"font-size:10px;\">" +
-                  "Output:&amp;nbsp;" + esc(d.outPath) + "</code>";
+                  "Output:&nbsp;" + esc(d.outPath) + "</code>";
         showError(msg);
         return;
     }
@@ -5518,7 +5383,7 @@ function finishXxl() {
         };
         var atPos = row.absMail.indexOf("@");
         if (atPos >= 0) row.absDomain = row.absMail.substr(atPos + 1).toLowerCase();
-        if (row.attNames &amp;&amp; row.attNames.length > 0) {
+        if (row.attNames && row.attNames.length > 0) {
             row.attCount = row.attNames.split(";").length;
         }
 
@@ -5593,14 +5458,14 @@ function buildParseMsgVbs() {
     v.push("    On Error GoTo 0");
     v.push("End Sub");
     v.push("");
-    v.push("Log \"VBS started at \" &amp; Now");
-    v.push("Log \"Args: input=\" &amp; inputPath &amp; \" output=\" &amp; outputPath");
+    v.push("Log \"VBS started at \" & Now");
+    v.push("Log \"Args: input=\" & inputPath & \" output=\" & outputPath");
     v.push("");
     v.push("On Error Resume Next");
     v.push("Dim tsIn");
     v.push("Set tsIn = fso.OpenTextFile(inputPath, 1, False, -1)");
     v.push("If Err.Number <> 0 Then");
-    v.push("    Log \"FATAL OpenTextFile(input) Error: \" &amp; Err.Description");
+    v.push("    Log \"FATAL OpenTextFile(input) Error: \" & Err.Description");
     v.push("    Err.Clear");
     v.push("    On Error GoTo 0");
     v.push("    If Not canaryStm Is Nothing Then canaryStm.Close");
@@ -5611,7 +5476,7 @@ function buildParseMsgVbs() {
     v.push("raw = tsIn.ReadAll");
     v.push("tsIn.Close");
     v.push("paths = Split(raw, vbCrLf)");
-    v.push("Log \"Path list loaded, \" &amp; (UBound(paths) + 1) &amp; \" entries\"");
+    v.push("Log \"Path list loaded, \" & (UBound(paths) + 1) & \" entries\"");
     v.push("");
     // Output via FSO Unicode (UTF-16 LE + BOM) - das kann FSO auf JS-Seite
     // sauber wieder lesen. ADODB.Stream-UTF-8 hingegen kann FSO nicht parsen.
@@ -5619,7 +5484,7 @@ function buildParseMsgVbs() {
     v.push("On Error Resume Next");
     v.push("Set outFile = fso.CreateTextFile(outputPath, True, True)");
     v.push("If Err.Number <> 0 Then");
-    v.push("    Log \"FATAL CreateTextFile Error: \" &amp; Err.Description");
+    v.push("    Log \"FATAL CreateTextFile Error: \" & Err.Description");
     v.push("    Err.Clear");
     v.push("    On Error GoTo 0");
     v.push("    If Not canaryStm Is Nothing Then canaryStm.Close");
@@ -5639,8 +5504,8 @@ function buildParseMsgVbs() {
     v.push("            On Error Resume Next");
     v.push("            j = ParseMsg(path)");
     v.push("            If Err.Number <> 0 Then");
-    v.push("                Log \"ParseMsg error for \" &amp; path &amp; \": \" &amp; Err.Description");
-    v.push("                j = \"{\"\"file\"\":\"\"\" &amp; JsonEsc(fso.GetFileName(path)) &amp; \"\"\",\"\"err\"\":\"\"\" &amp; JsonEsc(Err.Description) &amp; \"\"\"}\"");
+    v.push("                Log \"ParseMsg error for \" & path & \": \" & Err.Description");
+    v.push("                j = \"{\"\"file\"\":\"\"\" & JsonEsc(fso.GetFileName(path)) & \"\"\",\"\"err\"\":\"\"\" & JsonEsc(Err.Description) & \"\"\"}\"");
     v.push("                Err.Clear");
     v.push("                errored = errored + 1");
     v.push("            End If");
@@ -5649,19 +5514,19 @@ function buildParseMsgVbs() {
     v.push("            outFile.Write j");
     v.push("            isFirst = False");
     v.push("            processed = processed + 1");
-    v.push("            If processed Mod 50 = 0 Then Log \"Progress: \" &amp; processed &amp; \"/\" &amp; (UBound(paths)+1)");
+    v.push("            If processed Mod 50 = 0 Then Log \"Progress: \" & processed & \"/\" & (UBound(paths)+1)");
     v.push("        Else");
-    v.push("            Log \"File not found (skipped): \" &amp; path");
+    v.push("            Log \"File not found (skipped): \" & path");
     v.push("        End If");
     v.push("    End If");
     v.push("Next");
     v.push("");
     v.push("outFile.Write \"]\"");
     v.push("outFile.Close");
-    v.push("Log \"Loop done. processed=\" &amp; processed &amp; \" errored=\" &amp; errored");
-    v.push("Log \"Output saved to \" &amp; outputPath");
+    v.push("Log \"Loop done. processed=\" & processed & \" errored=\" & errored");
+    v.push("Log \"Output saved to \" & outputPath");
     v.push("");
-    v.push("Log \"VBS finished at \" &amp; Now");
+    v.push("Log \"VBS finished at \" & Now");
     v.push("If Not canaryStm Is Nothing Then canaryStm.Close");
     v.push("WScript.Quit 0");
     v.push("");
@@ -5675,7 +5540,7 @@ function buildParseMsgVbs() {
     v.push("    On Error Resume Next");
     v.push("    raw16 = ReadAsUtf16(path)");
     v.push("    If Err.Number <> 0 Then");
-    v.push("        errMsg = \"read-error: \" &amp; Err.Description");
+    v.push("        errMsg = \"read-error: \" & Err.Description");
     v.push("        Err.Clear");
     v.push("    End If");
     v.push("    On Error GoTo 0");
@@ -5686,7 +5551,7 @@ function buildParseMsgVbs() {
     v.push("            Dim hEnd, hdrs, blank");
     v.push("            hEnd = hStart + 16000");
     v.push("            If hEnd > Len(raw16) Then hEnd = Len(raw16)");
-    v.push("            blank = InStr(hStart, raw16, vbCrLf &amp; vbCrLf)");
+    v.push("            blank = InStr(hStart, raw16, vbCrLf & vbCrLf)");
     v.push("            If blank > 0 And blank < hEnd Then hEnd = blank");
     v.push("            hdrs = Mid(raw16, hStart, hEnd - hStart)");
     v.push("            subject = ExtractMimeField(hdrs, \"Subject\")");
@@ -5705,16 +5570,16 @@ function buildParseMsgVbs() {
 
     // MakeJson
     v.push("Function MakeJson(fname, path, datum, fromName, fromEmail, toAll, subject, body, attNames, errMsg)");
-    v.push("    MakeJson = \"{\"\"file\"\":\"\"\" &amp; JsonEsc(fname) &amp; _");
-    v.push("               \"\"\",\"\"path\"\":\"\"\" &amp; JsonEsc(path) &amp; _");
-    v.push("               \"\"\",\"\"datum\"\":\"\"\" &amp; JsonEsc(datum) &amp; _");
-    v.push("               \"\"\",\"\"fromName\"\":\"\"\" &amp; JsonEsc(fromName) &amp; _");
-    v.push("               \"\"\",\"\"fromEmail\"\":\"\"\" &amp; JsonEsc(fromEmail) &amp; _");
-    v.push("               \"\"\",\"\"to\"\":\"\"\" &amp; JsonEsc(Left(toAll, 500)) &amp; _");
-    v.push("               \"\"\",\"\"subject\"\":\"\"\" &amp; JsonEsc(Left(subject, 500)) &amp; _");
-    v.push("               \"\"\",\"\"body\"\":\"\"\" &amp; JsonEsc(Left(body, 1500)) &amp; _");
-    v.push("               \"\"\",\"\"attNames\"\":\"\"\" &amp; JsonEsc(attNames) &amp; _");
-    v.push("               \"\"\",\"\"err\"\":\"\"\" &amp; JsonEsc(errMsg) &amp; \"\"\"}\"");
+    v.push("    MakeJson = \"{\"\"file\"\":\"\"\" & JsonEsc(fname) & _");
+    v.push("               \"\"\",\"\"path\"\":\"\"\" & JsonEsc(path) & _");
+    v.push("               \"\"\",\"\"datum\"\":\"\"\" & JsonEsc(datum) & _");
+    v.push("               \"\"\",\"\"fromName\"\":\"\"\" & JsonEsc(fromName) & _");
+    v.push("               \"\"\",\"\"fromEmail\"\":\"\"\" & JsonEsc(fromEmail) & _");
+    v.push("               \"\"\",\"\"to\"\":\"\"\" & JsonEsc(Left(toAll, 500)) & _");
+    v.push("               \"\"\",\"\"subject\"\":\"\"\" & JsonEsc(Left(subject, 500)) & _");
+    v.push("               \"\"\",\"\"body\"\":\"\"\" & JsonEsc(Left(body, 1500)) & _");
+    v.push("               \"\"\",\"\"attNames\"\":\"\"\" & JsonEsc(attNames) & _");
+    v.push("               \"\"\",\"\"err\"\":\"\"\" & JsonEsc(errMsg) & \"\"\"}\"");
     v.push("End Function");
     v.push("");
 
@@ -5736,7 +5601,7 @@ function buildParseMsgVbs() {
     // FindHeaderStart
     v.push("Function FindHeaderStart(r)");
     v.push("    Dim a, anchors, p, best");
-    v.push("    anchors = Array(\"Received: \", vbLf &amp; \"From: \", vbCrLf &amp; \"From: \", \"Return-Path: \", \"Authentication-Results: \", \"Delivered-To: \")");
+    v.push("    anchors = Array(\"Received: \", vbLf & \"From: \", vbCrLf & \"From: \", \"Return-Path: \", \"Authentication-Results: \", \"Delivered-To: \")");
     v.push("    best = -1");
     v.push("    For Each a In anchors");
     v.push("        p = InStr(r, a)");
@@ -5753,7 +5618,7 @@ function buildParseMsgVbs() {
     v.push("Function ExtractField(hdrs, fieldName)");
     v.push("    Dim re, m");
     v.push("    Set re = CreateObject(\"VBScript.RegExp\")");
-    v.push("    re.Pattern = \"(^|[\\r\\n])\" &amp; fieldName &amp; \":\\s*((?:[^\\r\\n]|[\\r\\n]+[ \\t])+)\"");
+    v.push("    re.Pattern = \"(^|[\\r\\n])\" & fieldName & \":\\s*((?:[^\\r\\n]|[\\r\\n]+[ \\t])+)\"");
     v.push("    re.IgnoreCase = True");
     v.push("    re.Multiline = True");
     v.push("    If re.Test(hdrs) Then");
@@ -5804,18 +5669,18 @@ function buildParseMsgVbs() {
     v.push("        ch = Mid(s, i, 1)");
     v.push("        If ch = \"=\" And i + 2 <= Len(s) Then");
     v.push("            On Error Resume Next");
-    v.push("            h = CInt(\"&amp;H\" &amp; Mid(s, i + 1, 2))");
+    v.push("            h = CInt(\"&H\" & Mid(s, i + 1, 2))");
     v.push("            If Err.Number = 0 Then");
-    v.push("                out = out &amp; Chr(h)");
+    v.push("                out = out & Chr(h)");
     v.push("                i = i + 3");
     v.push("            Else");
-    v.push("                out = out &amp; ch");
+    v.push("                out = out & ch");
     v.push("                i = i + 1");
     v.push("                Err.Clear");
     v.push("            End If");
     v.push("            On Error GoTo 0");
     v.push("        Else");
-    v.push("            out = out &amp; ch");
+    v.push("            out = out & ch");
     v.push("            i = i + 1");
     v.push("        End If");
     v.push("    Loop");
@@ -5849,7 +5714,7 @@ function buildParseMsgVbs() {
     v.push("Function ExtractAttachmentNames(raw)");
     v.push("    Dim re, m, seen, names, fn, k");
     v.push("    Set re = CreateObject(\"VBScript.RegExp\")");
-    v.push("    re.Pattern = \"([A-Za-z0-9_\\-\\(\\)\\.\\,\\s\\[\\]" + "\\xC4\\xD6\\xDC\\xDF\\xE4\\xF6\\xFC" + "&amp;!]{3,150}\\.(pdf|docx|doc|xlsx|xls|jpg|jpeg|png|msg|eml|zip|rtf|txt|csv|tif|tiff|gif|bmp))\"");
+    v.push("    re.Pattern = \"([A-Za-z0-9_\\-\\(\\)\\.\\,\\s\\[\\]" + "\\xC4\\xD6\\xDC\\xDF\\xE4\\xF6\\xFC" + "&!]{3,150}\\.(pdf|docx|doc|xlsx|xls|jpg|jpeg|png|msg|eml|zip|rtf|txt|csv|tif|tiff|gif|bmp))\"");
     v.push("    re.IgnoreCase = True");
     v.push("    re.Global = True");
     v.push("    Set seen = CreateObject(\"Scripting.Dictionary\")");
@@ -5859,8 +5724,8 @@ function buildParseMsgVbs() {
     v.push("        k = LCase(fn)");
     v.push("        If Not seen.Exists(k) And Len(fn) >= 4 Then");
     v.push("            seen.Add k, 1");
-    v.push("            If names <> \"\" Then names = names &amp; \"; \"");
-    v.push("            names = names &amp; fn");
+    v.push("            If names <> \"\" Then names = names & \"; \"");
+    v.push("            names = names & fn");
     v.push("            If Len(names) > 800 Then Exit For");
     v.push("        End If");
     v.push("    Next");
@@ -6030,7 +5895,7 @@ function bulkTriageTick() {
     var bs = state.bulkState;
 
     // A) freie Slots fuellen
-    while (Object.keysCount(bs.slots) < bs.parallelN &amp;&amp; bs.nextBatchIdx < bs.batches.length &amp;&amp; !state.cancelled) {
+    while (Object.keysCount(bs.slots) < bs.parallelN && bs.nextBatchIdx < bs.batches.length && !state.cancelled) {
         var bIdx = bs.nextBatchIdx;
         var batch = bs.batches[bIdx];
         bs.slotCounter++;
@@ -6095,8 +5960,8 @@ function bulkTriageTick() {
     renderSlotStatus();
 
     // Done?
-    if (state.cancelled || (bs.nextBatchIdx >= bs.batches.length &amp;&amp; Object.keysCount(bs.slots) === 0)) {
-        if (state.cancelled &amp;&amp; Object.keysCount(bs.slots) > 0) {
+    if (state.cancelled || (bs.nextBatchIdx >= bs.batches.length && Object.keysCount(bs.slots) === 0)) {
+        if (state.cancelled && Object.keysCount(bs.slots) > 0) {
             // wait for inflight to abort
             for (var ck in bs.slots) {
                 if (!bs.slots.hasOwnProperty(ck)) continue;
@@ -6140,13 +6005,13 @@ function processBulkTriageResponse(slot) {
             var ki = null;
             // Try by nr
             for (var ai = 0; ai < arr.length; ai++) {
-                if (arr[ai] &amp;&amp; (parseInt(arr[ai].nr) === (m + 1) || arr[ai].nr === String(m + 1))) {
+                if (arr[ai] && (parseInt(arr[ai].nr) === (m + 1) || arr[ai].nr === String(m + 1))) {
                     ki = arr[ai];
                     break;
                 }
             }
             // Fallback: positional
-            if (!ki &amp;&amp; arr[m]) ki = arr[m];
+            if (!ki && arr[m]) ki = arr[m];
 
             if (ki) {
                 mail.triage = ki;
@@ -6176,7 +6041,7 @@ function parseGptJsonArray(text) {
     if (s < 0 || e <= s) return null;
     t = t.substr(s, e - s + 1);
     try {
-        if (typeof JSON !== "undefined" &amp;&amp; JSON.parse) return JSON.parse(t);
+        if (typeof JSON !== "undefined" && JSON.parse) return JSON.parse(t);
         return eval("(" + t + ")");
     } catch(ex) {
         // Letzter Versuch: einzelne Objects parsen
@@ -6187,7 +6052,7 @@ function parseGptJsonArray(text) {
             if (c === "{") { if (depth === 0) start = i; depth++; }
             else if (c === "}") {
                 depth--;
-                if (depth === 0 &amp;&amp; start >= 0) {
+                if (depth === 0 && start >= 0) {
                     try {
                         out.push(JSON.parse(t.substr(start, i - start + 1)));
                     } catch(eO) {}
@@ -6352,7 +6217,7 @@ function exportBulkTriageToExcel(rows, elapsedSec) {
             else if (t.konfidenz === "hoch") sheet.Cells(row, 24).Interior.Color = H_GRUEN;
             if (t.mv_pruefung_noetig === "ja") sheet.Cells(row, 23).Interior.Color = H_GELB;
             if (t.klassifikation === "Nicht-Standard") sheet.Cells(row, 11).Interior.Color = rgb(253, 230, 138);
-            if (t.vorgangstyp &amp;&amp; t.vorgangstyp !== "Makler-Vorgang" &amp;&amp; t.vorgangstyp !== "") {
+            if (t.vorgangstyp && t.vorgangstyp !== "Makler-Vorgang" && t.vorgangstyp !== "") {
                 sheet.Range(sheet.Cells(row, 10), sheet.Cells(row, 27)).Interior.Color = H_GRAU;
             }
         } catch(e) {}
@@ -6488,7 +6353,7 @@ function buildBulkTriageStats(wb, rows, elapsedSec) {
     for (var nk in notMaklerByType) {
         var inList = false;
         for (var nj = 0; nj < notMaklerOrder.length; nj++) if (notMaklerOrder[nj] === nk) { inList = true; break; }
-        if (!inList &amp;&amp; notMaklerByType.hasOwnProperty(nk)) {
+        if (!inList && notMaklerByType.hasOwnProperty(nk)) {
             r(nk, notMaklerByType[nk], pct(notMaklerByType[nk], bucketNotMakler), true);
         }
     }
@@ -6506,7 +6371,7 @@ function buildBulkTriageStats(wb, rows, elapsedSec) {
     for (var mk in maklerNotBueByClass) {
         var inListB = false;
         for (var mj = 0; mj < clOrderNotBue.length; mj++) if (clOrderNotBue[mj] === mk) { inListB = true; break; }
-        if (!inListB &amp;&amp; maklerNotBueByClass.hasOwnProperty(mk)) {
+        if (!inListB && maklerNotBueByClass.hasOwnProperty(mk)) {
             r(mk, maklerNotBueByClass[mk], pct(maklerNotBueByClass[mk], maklerNotBue), true);
         }
     }
@@ -6548,7 +6413,7 @@ function buildBulkTriageStats(wb, rows, elapsedSec) {
         for (var gk in gtCounts) {
             var inListG = false;
             for (var gj = 0; gj < gtOrder.length; gj++) if (gtOrder[gj] === gk) { inListG = true; break; }
-            if (!inListG &amp;&amp; gtCounts.hasOwnProperty(gk)) {
+            if (!inListG && gtCounts.hasOwnProperty(gk)) {
                 r(gk, gtCounts[gk], pct(gtCounts[gk], echteBue.length), true);
             }
         }
@@ -6859,7 +6724,7 @@ function renameMsgFilesWithDate() {
 function copyZeitraumToNewFolder() {
     if (state.running) return;
     if (!state.folderPath) { showError("Erst Ordner waehlen."); return; }
-    if (!state.dateFrom &amp;&amp; !state.dateTo) {
+    if (!state.dateFrom && !state.dateTo) {
         showError("Bitte zuerst Zeitraum setzen (mind. Von oder Bis).");
         return;
     }
@@ -6879,7 +6744,7 @@ function copyZeitraumToNewFolder() {
     );
     if (limitStr === null) return; // Cancel
     var limit = parseInt(limitStr) || filtered.length;
-    if (limit > 0 &amp;&amp; limit < filtered.length) {
+    if (limit > 0 && limit < filtered.length) {
         filtered = filtered.slice(0, limit);
     }
 
@@ -7070,7 +6935,7 @@ function ensureFolderPath(fso, path) {
     if (!path) return;
     if (fso.FolderExists(path)) return;
     var parent = path.substr(0, path.lastIndexOf("\\"));
-    if (parent &amp;&amp; !fso.FolderExists(parent)) ensureFolderPath(fso, parent);
+    if (parent && !fso.FolderExists(parent)) ensureFolderPath(fso, parent);
     if (!fso.FolderExists(path)) fso.CreateFolder(path);
 }
 
@@ -7321,7 +7186,7 @@ function wsPickFolder() {
     try {
         var shell = new ActiveXObject("Shell.Application");
         var f = shell.BrowseForFolder(0, "Ordner mit Demo-Mails", 0);
-        if (f &amp;&amp; f.Self &amp;&amp; f.Self.Path) wsUseFolder(f.Self.Path);
+        if (f && f.Self && f.Self.Path) wsUseFolder(f.Self.Path);
     } catch(e) {
         var p = prompt("Ordner-Pfad:", state._wsFolder || "C:\\");
         if (p) wsUseFolder(p);
@@ -7378,8 +7243,8 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
     p += '  "ist_reminder":"ja|nein",\n';
     p += '  "reminder_quelle":"leer wenn nein, sonst komma-getrennt aus: Anhang-PDF-Inhalt, Anhang-Dateiname, Mail-Betreff, Mail-Body",\n';
     p += '  "nicht_neuer_vorgang_grund":"leer wenn Erstvorgang, sonst warum kein neuer (Reminder/WV/Nachreichung)",\n';
-    p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS &amp; Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.)",\n';
-    p += '  "makler_nachname":"handelnde Person ODER Makler-Firma beim Makler (NICHT Kunde). Wenn Maklervertrag auf eine Firma laeuft die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS): makler_nachname = eigentlicher Makler (Finanzguru), maklerpool bleibt JDC / Jung, DMS &amp; Cie. Sonst leer",\n';
+    p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS & Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.)",\n';
+    p += '  "makler_nachname":"handelnde Person ODER Makler-Firma beim Makler (NICHT Kunde). Wenn Maklervertrag auf eine Firma laeuft die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS): makler_nachname = eigentlicher Makler (Finanzguru), maklerpool bleibt JDC / Jung, DMS & Cie. Sonst leer",\n';
     p += '  "makler_vorname":"oder leer",\n';
     p += '  "makler_nummer":"Agentur-Nr / Vermittler-Nr / BD-Nr (Prioritaet siehe oben), oder leer",\n';
     p += '  "auftrag_datum":"Datum aus Maklerauftrag/Pool-Anschreiben (NICHT Mail-Eingang), oder leer",\n';
@@ -7421,7 +7286,7 @@ function wsParseJson(txt) {
 function wsBuildNotizHtml(data, lfdNr) {
     var d = data || {};
     var lfd = (lfdNr == null ? "" : String(lfdNr));
-    function esc(s) { return String(s == null ? "" : s).replace(/&amp;/g, "&amp;amp;").replace(/</g, "&amp;lt;").replace(/>/g, "&amp;gt;").replace(/"/g, "&amp;quot;"); }
+    function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
     function clean(v) {
         var s = String(v == null ? "" : v).replace(/^\s+|\s+$/g, "");
         if (/^(leer|-|k\.?\s?a\.?|n\/a|na|none|null|undefined|nicht[ _]pruefbar|keine?)$/i.test(s)) return "";
@@ -7459,8 +7324,8 @@ function wsBuildNotizHtml(data, lfdNr) {
 '.next strong{display:block;font-size:11px;color:#3b82f6;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;}' +
 '.footer{margin-top:32px;color:#9ca3af;font-size:11px;text-align:center;}</style></head><body>' +
 '<h1>KI-Vorgangs-Analyse' + (lfd ? ' <span style="float:right;font-size:15px;background:#c8102e;color:#fff;padding:4px 12px;border-radius:6px;">Lfd-Nr ' + esc(lfd) + '</span>' : '') + '</h1>' +
-(lfd ? '<div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Vorgangs-Nr. <strong>' + esc(lfd) + '</strong> &amp;mdash; identisch zur Spalte <strong>Lfd_Nr</strong> in der Excel-Auswertung (Mapping Excel &amp;harr; Vorgang).</div>' : '') +
-'<div class="sub">' + klassBadge + remBadge + ' &amp;nbsp;Maklervollmacht: ' + mvBadge + '</div>' +
+(lfd ? '<div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Vorgangs-Nr. <strong>' + esc(lfd) + '</strong> &mdash; identisch zur Spalte <strong>Lfd_Nr</strong> in der Excel-Auswertung (Mapping Excel &harr; Vorgang).</div>' : '') +
+'<div class="sub">' + klassBadge + remBadge + ' &nbsp;Maklervollmacht: ' + mvBadge + '</div>' +
 '<h2>Zusammenfassung</h2>' +
 '<p style="font-size:14px;line-height:1.5;color:#1f2937;">' + esc(d.zusammenfassung || "-") + '</p>' +
 '<div class="next"><strong style="display:block;font-size:11px;color:#3b82f6;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Naechster Schritt</strong><span>' + esc(clean(d.naechster_schritt) || "-") + '</span></div>' +
@@ -7471,7 +7336,7 @@ rowHi("Makler-Nummer (Agentur/Vermittler)", d.makler_nummer) +
 rowFn("Auftrag-Datum", d.auftrag_datum) +
 rowFn("Makler namentlich genannt", d.makler_namentlich_genannt) +
 '</table>' +
-'<h2>Kunde &amp;amp; Vertrag</h2><table>' +
+'<h2>Kunde &amp; Vertrag</h2><table>' +
 rowFn("Kunde (Name)", kundeName) +
 rowFn("Kunden-/Partnernummer", d.kunde_nummer) +
 rowFn("Versicherungsnummer", d.versicherungsnummer) +
@@ -7487,7 +7352,7 @@ rowFn("Reminder/Wiedervorlage", isRem ? "ja" : "nein") +
 (isRem ? rowFn("Reminder-Quelle", d.reminder_quelle) : "") +
 (d.nicht_neuer_vorgang_grund ? rowFn("Kein neuer Vorgang weil", d.nicht_neuer_vorgang_grund) : "") +
 '</table>' +
-'<h2>Anhaenge &amp;amp; Maklervollmacht</h2><table>' +
+'<h2>Anhaenge &amp; Maklervollmacht</h2><table>' +
 rowFn("Anhang-Typen", d.anhang_typen) +
 rowFn("PDF-Qualitaet", d.pdf_qualitaet) +
 rowFn("Maklervollmacht enthalten", d.enthaelt_maklervollmacht) +
@@ -7501,11 +7366,11 @@ rowFn("Unterlagen angefragt", d.unterlagen_angefragt) +
 (d.unterlagen_liste ? rowFn("Fehlende Unterlagen", d.unterlagen_liste) : "") +
 '</table>' +
 (clean(d.hinweis) ? '<div class="next" style="background:#fffbeb;border-color:#fde68a;color:#92400e;"><strong style="display:block;font-size:11px;color:#d97706;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Hinweis</strong><span>' + esc(clean(d.hinweis)) + '</span></div>' : "") +
-'<div class="footer">Erstellt durch ERGO Vorgang-Analyse Workshop-Demo &amp;middot; ' + new Date().toLocaleString() + '</div>' +
+'<div class="footer">Erstellt durch ERGO Vorgang-Analyse Workshop-Demo &middot; ' + new Date().toLocaleString() + '</div>' +
 '</body></html>';
     // Alle Nicht-ASCII-Zeichen (Umlaute ae oe ue ss etc.) als numerische HTML-Entities -
     // dann ist die Darstellung in Outlook unabhaengig von der Charset-Interpretation korrekt.
-    return _h.replace(new RegExp('[\\u0080-\\uFFFF]','g'), function(ch){ return '&amp;#' + ch.charCodeAt(0) + ';'; });
+    return _h.replace(new RegExp('[\\u0080-\\uFFFF]','g'), function(ch){ return '&#' + ch.charCodeAt(0) + ';'; });
 }
 
 function wsWriteNotizFile(html, basename) {
@@ -7581,7 +7446,7 @@ function wsPrepareSlot(msgPath) {
                 var fn = String(att.FileName || "");
                 if (fn.length === 0) continue;
                 slot.anhangAlle += (slot.anhangAlle ? "; " : "") + fn;
-                if (fn.toLowerCase().substr(-4) === ".pdf" &amp;&amp; slot.pdfPaths.length < 20) {
+                if (fn.toLowerCase().substr(-4) === ".pdf" && slot.pdfPaths.length < 20) {
                     var safe = sanitizeFilename(fn);
                     var outPath = tempDir + "\\" + safe;
                     att.SaveAsFile(outPath);
@@ -7689,7 +7554,7 @@ function wsTick() {
                     if (!fso.FileExists(s.uploadHandles[ui].resultPath)) { allUp = false; break; }
                 }
                 var elapsed = new Date().getTime() - (s.uploadStart || 0);
-                if (!allUp &amp;&amp; elapsed < 90000) continue;   // weiter warten (max 90s)
+                if (!allUp && elapsed < 90000) continue;   // weiter warten (max 90s)
                 // Result-Files lesen
                 for (var ri = 0; ri < s.uploadHandles.length; ri++) {
                     try {
@@ -7742,7 +7607,7 @@ function wsTick() {
                     for (var ci = 0; ci < s.pdfPaths.length; ci++) {
                         try { fso.DeleteFile(s.pdfPaths[ci].path, true); } catch(e) {}
                     }
-                    if (s.tempDir &amp;&amp; fso.FolderExists(s.tempDir)) fso.DeleteFolder(s.tempDir, true);
+                    if (s.tempDir && fso.FolderExists(s.tempDir)) fso.DeleteFolder(s.tempDir, true);
                 } catch(e) {}
                 try { fireDelete(s.convId); } catch(e) {}
                 s.stage = "DONE";
@@ -7917,7 +7782,7 @@ function wsFinishDemo(processed) {
         // Zielordner: Unterordner des Workshop-Ordners, sonst %TEMP%
         var outDir = "";
         try {
-            if (fsoS &amp;&amp; state._wsFolder) {
+            if (fsoS && state._wsFolder) {
                 outDir = state._wsFolder.replace(/\\+$/, "") + "\\_KI-Vorgaenge";
                 if (!fsoS.FolderExists(outDir)) fsoS.CreateFolder(outDir);
             }
@@ -7950,8 +7815,8 @@ function wsFinishDemo(processed) {
                             "Vorgang: " + (p.betreff || p.fileName);
                 m.HTMLBody = wsBuildNotizHtml(p.data, lfd) +
                     "<hr><p style='font-family:Segoe UI;font-size:12px;color:#6b7280;'>" +
-                    "Lfd-Nr " + lfd + " &amp;middot; Original-Mail: " + cellSafe(p.fileName) +
-                    " (als .msg angehaengt) &amp;middot; KI-Notiz ebenfalls als HTML angehaengt.</p>";
+                    "Lfd-Nr " + lfd + " &middot; Original-Mail: " + cellSafe(p.fileName) +
+                    " (als .msg angehaengt) &middot; KI-Notiz ebenfalls als HTML angehaengt.</p>";
 
                 // 2c) KI-Notiz + Original-.msg als ANHAENGE
                 try { m.Attachments.Add(notePath, 1, 1, "KI-Notiz_" + lfd + ".html"); }
@@ -7981,11 +7846,11 @@ function wsFinishDemo(processed) {
               (failed ? ", " + failed + " fehlgeschlagen" : "") + ".");
         wsShowSuccess("Fertig! <strong>" + saved + "</strong> Vorgaenge als .msg gespeichert" +
                       (failed ? " (" + failed + " Fehler)" : "") +
-                      ". Excel mit Spalte <strong>Lfd_Nr</strong> erstellt &amp;mdash; gleiche Nummer " +
-                      "steht in jeder KI-Notiz (Mapping Excel &amp;harr; Vorgang).");
+                      ". Excel mit Spalte <strong>Lfd_Nr</strong> erstellt &mdash; gleiche Nummer " +
+                      "steht in jeder KI-Notiz (Mapping Excel &harr; Vorgang).");
 
         // Zielordner im Explorer zeigen
-        try { if (saved > 0 &amp;&amp; outDir) shellS.Run('explorer.exe "' + outDir + '"', 1, false); } catch(eExp) {}
+        try { if (saved > 0 && outDir) shellS.Run('explorer.exe "' + outDir + '"', 1, false); } catch(eExp) {}
 
         wsLog("Ablage: " + outDir);
         wsLog("Original .msg-Dateien im Quellordner bleiben unveraendert.");
@@ -8029,7 +7894,7 @@ function caLog(msg, reset) {
     if (reset) { el.innerHTML = ""; el.style.display = "none"; return; }
     el.style.display = "block";
     el.innerHTML += (el.innerHTML ? "\n" : "") +
-        String(msg).replace(/&amp;/g, "&amp;amp;").replace(/</g, "&amp;lt;");
+        String(msg).replace(/&/g, "&amp;").replace(/</g, "&lt;");
     el.scrollTop = el.scrollHeight;
 }
 
@@ -8119,21 +7984,21 @@ function caBuildGrabPs1() {
     cs.push("    int c=ls.IndexOf(':',p); int q1=ls.IndexOf('\"',c+1); int q2=ls.IndexOf('\"',q1+1);");
     cs.push("    if(q1<0||q2<0) return null; string b64=ls.Substring(q1+1,q2-q1-1);");
     cs.push("    byte[] kb=Convert.FromBase64String(b64);");
-    cs.push("    if(kb.Length>5 &amp;&amp; kb[0]==68&amp;&amp;kb[1]==80&amp;&amp;kb[2]==65&amp;&amp;kb[3]==80&amp;&amp;kb[4]==73){ byte[] t=new byte[kb.Length-5]; Array.Copy(kb,5,t,0,t.Length); kb=t; }");
+    cs.push("    if(kb.Length>5 && kb[0]==68&&kb[1]==80&&kb[2]==65&&kb[3]==80&&kb[4]==73){ byte[] t=new byte[kb.Length-5]; Array.Copy(kb,5,t,0,t.Length); kb=t; }");
     cs.push("    return Dpapi(kb); }");
     cs.push("  static string DecVal(byte[] v,byte[] mk,ref bool appbound){");
     cs.push("    if(v==null||v.Length==0) return \"\";");
-    cs.push("    if(v.Length>3 &amp;&amp; v[0]==118 &amp;&amp; v[1]==49 &amp;&amp; (v[2]==48||v[2]==49)){");
+    cs.push("    if(v.Length>3 && v[0]==118 && v[1]==49 && (v[2]==48||v[2]==49)){");
     cs.push("      if(mk==null) return null;");
     cs.push("      byte[] no=new byte[12]; Array.Copy(v,3,no,0,12);");
     cs.push("      byte[] ct=new byte[v.Length-3-12-16]; Array.Copy(v,15,ct,0,ct.Length);");
     cs.push("      byte[] tg=new byte[16]; Array.Copy(v,v.Length-16,tg,0,16);");
     cs.push("      byte[] pt=AesGcm(mk,no,ct,tg); return pt==null?null:Encoding.UTF8.GetString(pt); }");
-    cs.push("    if(v.Length>3 &amp;&amp; v[0]==118 &amp;&amp; v[1]==50 &amp;&amp; v[2]==48){ appbound=true; return null; }");
+    cs.push("    if(v.Length>3 && v[0]==118 && v[1]==50 && v[2]==48){ appbound=true; return null; }");
     cs.push("    byte[] d=Dpapi(v); return d==null?null:Encoding.UTF8.GetString(d); }");
     // ---- minimaler SQLite-Leser (Tabelle 'cookies') ----
     cs.push("  static byte[] F; static int PS; static int US;");
-    cs.push("  static long Varint(int off,out int len){ long r=0; int i=0; for(;i<9;i++){ byte b=F[off+i]; if(i==8){ r=(r<<8)|b; } else { r=(r<<7)|(byte)(b&amp;0x7f); if((b&amp;0x80)==0){ i++; break; } } } len=i; return r; }");
+    cs.push("  static long Varint(int off,out int len){ long r=0; int i=0; for(;i<9;i++){ byte b=F[off+i]; if(i==8){ r=(r<<8)|b; } else { r=(r<<7)|(byte)(b&0x7f); if((b&0x80)==0){ i++; break; } } } len=i; return r; }");
     cs.push("  static byte[] Payload(int cellOff,bool tableLeaf){");
     cs.push("    int o=cellOff; int l; long plen=Varint(o,out l); o+=l;");
     cs.push("    if(tableLeaf){ long rid=Varint(o,out l); o+=l; }");
@@ -8142,7 +8007,7 @@ function caBuildGrabPs1() {
     cs.push("    int M=((US-12)*32)/255-23; int K=M+(int)((plen-M)%(US-4)); int local=(K<=X)?K:M;");
     cs.push("    byte[] buf=new byte[plen]; Array.Copy(F,o,buf,0,local); int bp=local;");
     cs.push("    int ovf=(int)(((uint)F[o+local]<<24)|((uint)F[o+local+1]<<16)|((uint)F[o+local+2]<<8)|F[o+local+3]);");
-    cs.push("    while(ovf!=0 &amp;&amp; bp<plen){ int po=(ovf-1)*PS; int nxt=(int)(((uint)F[po]<<24)|((uint)F[po+1]<<16)|((uint)F[po+2]<<8)|F[po+3]);");
+    cs.push("    while(ovf!=0 && bp<plen){ int po=(ovf-1)*PS; int nxt=(int)(((uint)F[po]<<24)|((uint)F[po+1]<<16)|((uint)F[po+2]<<8)|F[po+3]);");
     cs.push("      int take=Math.Min(US-4,(int)plen-bp); Array.Copy(F,po+4,buf,bp,take); bp+=take; ovf=nxt; } return buf; }");
     cs.push("  static List<byte[][]> Rows(int page,List<byte[][]> acc){");
     cs.push("    int baseo=(page-1)*PS; int hdr=(page==1)?100:0; int po=baseo+hdr;");
@@ -8158,7 +8023,7 @@ function caBuildGrabPs1() {
     cs.push("      for(int c=0;c<stypes.Count;c++){ long st=stypes[c]; int sz=SerLen(st);");
     cs.push("        byte[] cv=new byte[sz]; if(sz>0) Array.Copy(rec,dp,cv,0,sz); cols[c]=cv; dp+=sz; }");
     cs.push("      acc.Add(cols); } return acc; }");
-    cs.push("  static long Varint2(byte[] a,int off,out int len){ long r=0; int i=0; for(;i<9;i++){ byte b=a[off+i]; if(i==8){ r=(r<<8)|b; } else { r=(r<<7)|(byte)(b&amp;0x7f); if((b&amp;0x80)==0){ i++; break; } } } len=i; return r; }");
+    cs.push("  static long Varint2(byte[] a,int off,out int len){ long r=0; int i=0; for(;i<9;i++){ byte b=a[off+i]; if(i==8){ r=(r<<8)|b; } else { r=(r<<7)|(byte)(b&0x7f); if((b&0x80)==0){ i++; break; } } } len=i; return r; }");
     cs.push("  static int SerLen(long st){ if(st==0||st==8||st==9) return 0; if(st==1)return 1; if(st==2)return 2; if(st==3)return 3; if(st==4)return 4; if(st==5)return 6; if(st==6||st==7)return 8; if(st>=12) return (int)((st-(st%2==0?12:13))/2); return 0; }");
     cs.push("  static string Txt(byte[] b){ return b==null?\"\":Encoding.UTF8.GetString(b); }");
     cs.push("  static long I(byte[] b){ long r=0; for(int i=0;i<b.Length;i++) r=(r<<8)|b[i]; return r; }");
@@ -8177,7 +8042,7 @@ function caBuildGrabPs1() {
     cs.push("        try{ F=File.ReadAllBytes(tmp); }catch{ continue; }");
     cs.push("        PS=(F[16]<<8)|F[17]; if(PS==1) PS=65536; US=PS-F[20];");
     cs.push("        List<byte[][]> master=Rows(1,new List<byte[][]>()); int root=-1; int ihost=1,iname=2,ienc=12,ipath=4;");
-    cs.push("        foreach(byte[][] r in master){ if(r.Length>=5 &amp;&amp; Txt(r[1])==\"cookies\"){ root=(int)I(r[3]); string sql=Txt(r[4]).ToLower();");
+    cs.push("        foreach(byte[][] r in master){ if(r.Length>=5 && Txt(r[1])==\"cookies\"){ root=(int)I(r[3]); string sql=Txt(r[4]).ToLower();");
     cs.push("          ihost=ColIdx(sql,\"host_key\"); iname=ColIdx(sql,\"name\"); ienc=ColIdx(sql,\"encrypted_value\"); ipath=ColIdx(sql,\"path\"); } }");
     cs.push("        if(root<0) continue;");
     cs.push("        List<byte[][]> rows=Rows(root,new List<byte[][]>());");
@@ -8189,7 +8054,7 @@ function caBuildGrabPs1() {
     cs.push("        if(parts.Count>0){ File.Delete(tmp); return \"COOKIE:\"+string.Join(\"; \",parts.ToArray()); }");
     cs.push("        try{ File.Delete(tmp); }catch{} } }");
     cs.push("    if(!sawDb) return \"STATUS:NOBROWSER\";");
-    cs.push("    if(appbound &amp;&amp; !sawErgo) return \"STATUS:APPBOUND\";");
+    cs.push("    if(appbound && !sawErgo) return \"STATUS:APPBOUND\";");
     cs.push("    if(appbound) return \"STATUS:APPBOUND\";");
     cs.push("    if(!sawErgo) return \"STATUS:NOERGO\";");
     cs.push("    return \"STATUS:NOVALUE\"; }");
@@ -8281,7 +8146,7 @@ function caFetchCookie() {
     var nl = raw.indexOf("\n");
     if (nl < 0) nl = raw.indexOf("\r");
     var diag = "", payload = raw;
-    if (raw.substring(0, 5) === "DIAG:" &amp;&amp; nl > 0) {
+    if (raw.substring(0, 5) === "DIAG:" && nl > 0) {
         diag = trim(raw.substring(5, nl));
         payload = trim(raw.substring(nl + 1));
     } else if (raw.substring(0, 5) === "DIAG:") {
@@ -8301,7 +8166,7 @@ function caFetchCookie() {
     if (payload === "STATUS:CLM" || rc === 7) {
         caStatus("error",
             "<strong>PowerShell laeuft im ConstrainedLanguage-Modus</strong> (Konzern-GPO/AppLocker).<br>" +
-            "Damit sind <code>Add-Type</code> und .NET-Aufrufe gesperrt &amp;mdash; weder WinINET noch das " +
+            "Damit sind <code>Add-Type</code> und .NET-Aufrufe gesperrt &mdash; weder WinINET noch das " +
             "Entschluesseln der Edge-/Chrome-Cookie-DB ist hier moeglich.<br>" +
             "Bitte den <strong>manuellen Weg</strong> nutzen (Cookie im Hauptfenster einfuegen) bzw. mit " +
             "der IT-Sicherheit klaeren.");
@@ -8309,7 +8174,7 @@ function caFetchCookie() {
     }
     if (payload === "STATUS:APPBOUND") {
         caStatus("error",
-            "<strong>App-Bound Encryption (v20)</strong> aktiv &amp;mdash; aktuelles Edge/Chrome bindet den " +
+            "<strong>App-Bound Encryption (v20)</strong> aktiv &mdash; aktuelles Edge/Chrome bindet den " +
             "Cookie-Schluessel an den Browser-Prozess. Von aussen (auch mit DPAPI) nicht entschluesselbar.<br>" +
             "Hier bleibt nur der manuelle Weg oder ein Login im IE/Edge-IE-Modus (WinINET).");
         return;
@@ -8341,7 +8206,7 @@ function caFetchCookie() {
         caStatus("error", "Cookie gelesen, aber Speichern fehlgeschlagen: " + e.message);
         return;
     }
-    if (state.cookie &amp;&amp; state.cookie.length >= 50) {
+    if (state.cookie && state.cookie.length >= 50) {
         var hasSess = /ai_session|XSRF-TOKEN/i.test(state.cookie);
         caStatus("success",
             "<strong>Cookie uebernommen</strong> (" + state.cookie.length + " Zeichen" +
@@ -8373,7 +8238,7 @@ Function ReadFileFullUtf16LE(path)
     byteCount = stm.Size
     If byteCount <> fileSize Then
         stm.Close
-        Err.Raise vbObjectError + 1, "ReadFileFullUtf16LE", "Stream.Size " &amp; byteCount &amp; " <> fileSize " &amp; fileSize
+        Err.Raise vbObjectError + 1, "ReadFileFullUtf16LE", "Stream.Size " & byteCount & " <> fileSize " & fileSize
     End If
     stm.Position = 0
     Dim byteArr
@@ -8398,7 +8263,7 @@ Function ReadFileFullUtf16LE(path)
     For i = startIdx + 1 To byteCount - 1 Step 2
         b1 = AscB(MidB(byteArr, i, 1))
         b2 = AscB(MidB(byteArr, i + 1, 1))
-        cur = cur &amp; ChrW(b1 + b2 * 256)
+        cur = cur & ChrW(b1 + b2 * 256)
         If Len(cur) >= 32768 Then
             chunks(chunkCount) = cur
             chunkCount = chunkCount + 1
@@ -8547,19 +8412,19 @@ End Function
 </style>
 
 <div id="workshopOverlay">
-    <button id="wsClose" class="ws-close" onclick="closeWorkshopMode()">&amp;larr; zurueck</button>
+    <button id="wsClose" class="ws-close" onclick="closeWorkshopMode()">&larr; zurueck</button>
     <div class="ws-wrap">
         <div class="ws-header">
             <div class="ws-logo">KI</div>
             <h1>ERGO Vorgang-Analyse</h1>
-            <div class="ws-sub">Workshop-Demo &amp;middot; Mails im Ordner analysieren und beschriften</div>
+            <div class="ws-sub">Workshop-Demo &middot; Mails im Ordner analysieren und beschriften</div>
         </div>
 
         <div class="ws-card">
-            <div class="ws-step-label"><span class="ws-step-num">1</span>Bei ErgoGPT anmelden &amp;amp; Cookie holen</div>
+            <div class="ws-step-label"><span class="ws-step-num">1</span>Bei ErgoGPT anmelden &amp; Cookie holen</div>
             <div style="font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.55;">
                 ErgoGPT im <strong>Standard-Browser</strong> oeffnen und normal anmelden (SSO laeuft
-                i.&amp;nbsp;d.&amp;nbsp;R. automatisch). Danach "Cookie uebernehmen": liest zuerst WinINET,
+                i.&nbsp;d.&nbsp;R. automatisch). Danach "Cookie uebernehmen": liest zuerst WinINET,
                 dann die <strong>Edge-/Chrome-Cookie-DB</strong> (DPAPI-Key + AES-GCM fuer v10/v11).
                 <em>Prototyp: aktuelles Edge/Chrome mit App-Bound Encryption (v20) ist von aussen nicht
                 entschluesselbar; je nach Konzern-GPO ist PowerShell im ConstrainedLanguage-Modus
@@ -8576,7 +8441,7 @@ End Function
         <div class="ws-card">
             <div class="ws-step-label"><span class="ws-step-num">2</span>Ordner mit Demo-Mails waehlen</div>
             <div class="ws-folder-display">
-                <span class="ws-icon">&amp;#128193;</span>
+                <span class="ws-icon">&#128193;</span>
                 <span class="ws-folder-path ws-empty" id="wsFolderPath">Noch kein Ordner gewaehlt</span>
             </div>
             <button class="ws-btn-folder" id="wsPick" onclick="wsPickFolder()">Ordner waehlen...</button>
@@ -8598,102 +8463,21 @@ End Function
                 <div class="ws-progress-text" id="wsProgressText">0 von 0</div>
             </div>
             <button class="ws-btn-play" id="wsPlay" onclick="wsRunDemo()" disabled>
-                <span class="ws-play-icon">&amp;#9654;</span><span>Analyse starten</span>
+                <span class="ws-play-icon">&#9654;</span><span>Analyse starten</span>
             </button>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
                 Alle Mails werden <strong>parallel</strong> via ErgoGPT analysiert (Inhalt + Anhaenge).<br>
                 Ergebnis: <strong>Excel-Tabelle</strong> mit Spalte <strong>Lfd_Nr</strong> und je Vorgang<br>
                 eine <strong>.msg-Datei</strong> (KI-Notiz + Original als Anhang). Die Lfd-Nr steht auch<br>
-                in der KI-Notiz &amp;mdash; so mappt man Excel-Zeile &amp;harr; Vorgang.<br>
+                in der KI-Notiz &mdash; so mappt man Excel-Zeile &harr; Vorgang.<br>
                 <strong>Original .msg-Dateien im Quellordner bleiben unveraendert.</strong>
             </div>
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v1.66</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.66</div>
     </div>
 </div>
 
-</body>
-</html>
-</textarea>
-
-</div>
-</div>
-
-<script>
-function copyCode() {
-    var ta = document.getElementById('code');
-    var btn = document.getElementById('btnCopy');
-    var status = document.getElementById('status');
-    try {
-        ta.focus();
-        ta.select();
-        ta.setSelectionRange(0, ta.value.length);
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(ta.value).then(function() {
-                showCopied();
-            }).catch(function() {
-                var ok = document.execCommand('copy');
-                if (ok) showCopied();
-                else status.innerText = 'Kopieren fehlgeschlagen - bitte manuell markieren + Strg+C';
-            });
-        } else {
-            var ok = document.execCommand('copy');
-            if (ok) showCopied();
-            else status.innerText = 'Kopieren fehlgeschlagen - bitte manuell markieren + Strg+C';
-        }
-    } catch(e) {
-        status.innerText = 'Kopieren fehlgeschlagen: ' + e.message;
-    }
-}
-
-function showCopied() {
-    var btn = document.getElementById('btnCopy');
-    var status = document.getElementById('status');
-    btn.classList.add('copied');
-    btn.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Kopiert!';
-    status.innerText = String(document.getElementById('code').value.length) + ' Zeichen in Zwischenablage.';
-    setTimeout(function() {
-        btn.classList.remove('copied');
-        btn.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Code kopieren';
-        status.innerText = '';
-    }, 3000);
-}
-
-function downloadCode() {
-    var content = document.getElementById('code').value;
-    var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'ergo-vorgang-analyse.hta';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
-    document.getElementById('status').innerText = 'Download gestartet.';
-    setTimeout(function() { document.getElementById('status').innerText = ''; }, 3000);
-}
-
-function selectAll() {
-    var ta = document.getElementById('code');
-    ta.focus();
-    ta.select();
-    ta.setSelectionRange(0, ta.value.length);
-    document.getElementById('status').innerText = 'Markiert - jetzt Strg+C druecken.';
-    setTimeout(function() { document.getElementById('status').innerText = ''; }, 3000);
-}
-
-(function() {
-    var ta = document.getElementById('code');
-    var v = ta.value;
-    document.getElementById('meta-size').innerText = Math.round(v.length / 1024) + ' KB';
-    var lines = v.split('\n').length;
-    document.getElementById('meta-lines').innerText = lines;
-})();
-</script>
 </body>
 </html>

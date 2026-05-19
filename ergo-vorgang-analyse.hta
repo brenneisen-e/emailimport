@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.77"
+        VERSION="1.78"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.77 - Cookie-Helfer erweitert: Edge-/Chrome-Cookie-DB entschluesseln (Local State DPAPI-Key + AES-GCM fuer v10/v11), App-Bound v20 erkannt, ConstrainedLanguage-Diagnose. Erste Ausgabezeile DIAG (PS-Version|Sprachmodus|Quelle). v1.76 - Login im echten Standard-Browser</div>
+            <div class="ver">v1.78 - Workshop speichert jetzt JEDEN Vorgang als .msg (neues ungespeichertes MailItem + SaveAs umgeht Outlook-Guard; KI-Notiz als ASCII-HTML via FSO + Original als Anhang). Excel-Spalte Lfd_Nr, gleiche Nr in der KI-Notiz (Mapping Excel<->Vorgang). Eigenstaendiges Workshop-HTA + Copy-Paste-Seite. v1.77 - Cookie-Helfer Edge/Chrome-DB</div>
         </div>
 
         <!-- Cookie -->
@@ -7282,8 +7282,9 @@ function wsParseJson(txt) {
     return null;
 }
 
-function wsBuildNotizHtml(data) {
+function wsBuildNotizHtml(data, lfdNr) {
     var d = data || {};
+    var lfd = (lfdNr == null ? "" : String(lfdNr));
     function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
     function clean(v) {
         var s = String(v == null ? "" : v).replace(/^\s+|\s+$/g, "");
@@ -7321,7 +7322,8 @@ function wsBuildNotizHtml(data) {
 '.next{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-top:20px;font-size:13px;color:#1e3a8a;}' +
 '.next strong{display:block;font-size:11px;color:#3b82f6;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;}' +
 '.footer{margin-top:32px;color:#9ca3af;font-size:11px;text-align:center;}</style></head><body>' +
-'<h1>KI-Vorgangs-Analyse</h1>' +
+'<h1>KI-Vorgangs-Analyse' + (lfd ? ' <span style="float:right;font-size:15px;background:#c8102e;color:#fff;padding:4px 12px;border-radius:6px;">Lfd-Nr ' + esc(lfd) + '</span>' : '') + '</h1>' +
+(lfd ? '<div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Vorgangs-Nr. <strong>' + esc(lfd) + '</strong> &mdash; identisch zur Spalte <strong>Lfd_Nr</strong> in der Excel-Auswertung (Mapping Excel &harr; Vorgang).</div>' : '') +
 '<div class="sub">' + klassBadge + remBadge + ' &nbsp;Maklervollmacht: ' + mvBadge + '</div>' +
 '<h2>Zusammenfassung</h2>' +
 '<p style="font-size:14px;line-height:1.5;color:#1f2937;">' + esc(d.zusammenfassung || "-") + '</p>' +
@@ -7658,8 +7660,8 @@ function wsFinishDemo(processed) {
         return;
     }
 
-    wsShowSuccess("Fertig! <strong>" + processed.length + " von " + state._wsMsgFiles.length +
-                  "</strong> Mails analysiert. Excel wird erstellt + Demo-Mail im Entwurf geoeffnet...");
+    wsShowInfo("<strong>" + processed.length + " von " + state._wsMsgFiles.length +
+               "</strong> Mails analysiert. Excel wird erstellt und jeder Vorgang als .msg gespeichert...");
     wsLog("");
 
     setTimeout(function() {
@@ -7676,7 +7678,7 @@ function wsFinishDemo(processed) {
             // Spalten-Definition: gleiche Felder wie das grosse Tool.
             // w = Spaltenbreite, wrap = Zeilenumbruch fuer lange Freitexte.
             var colDefs = [
-                { h:"#",                   w:4,  wrap:false, v:function(r,d,i){ return i+1; } },
+                { h:"Lfd_Nr",              w:8,  wrap:false, v:function(r,d,i){ return wsLfdNr(i); } },
                 { h:"Datei",               w:34, wrap:false, v:function(r,d){ return cellSafe(r.fileName); } },
                 { h:"Datum",               w:16, wrap:false, v:function(r,d){ return cellSafe(r.datum); } },
                 { h:"Absender",            w:28, wrap:false, v:function(r,d){ return cellSafe(r.absName + " <" + r.absMail + ">"); } },
@@ -7762,36 +7764,103 @@ function wsFinishDemo(processed) {
             wsLog("   Excel-Fehler: " + eX.message);
         }
 
-        // ---- 2. DRAFT-MAIL-TEST: Eine Demo-Mail im Entwurfsmodus mit Anhang ----
+        // ---- 2. JEDE Mail als .msg-Vorgang speichern (KI-Notiz + Original als Anhang) ----
+        // Warum das geht (frueher scheiterte es): Wir AENDERN NICHT die empfangene
+        // Original-Mail (das blockt der Outlook-Object-Model-Guard). Stattdessen:
+        //   - NEUES, ungespeichertes MailItem via CreateItem(0)  -> Guard-"clean"
+        //   - Attachments.Add(Dateipfad) + SaveAs laufen IM Outlook-Prozess
+        //     -> umgeht die HTA-Internet-Zonen-Sperre (wie Excel.Application)
+        //   - Notiz-Datei via FSO.CreateTextFile (erlaubt; Notiz ist reines ASCII,
+        //     Umlaute sind numerische HTML-Entities) statt ADODB.Stream (das war
+        //     der frühere Fehler).
         wsLog("");
-        wsLog("Test: erste Mail als Entwurf in Outlook mit Anhang...");
+        wsLog("Speichere " + processed.length + " Vorgaenge als .msg (KI-Notiz + Original als Anhang)...");
+        var fsoS = null, shellS = null;
+        try { fsoS = new ActiveXObject("Scripting.FileSystemObject"); shellS = new ActiveXObject("WScript.Shell"); } catch(eF) {}
+
+        // Zielordner: Unterordner des Workshop-Ordners, sonst %TEMP%
+        var outDir = "";
         try {
-            var first = processed[0];
-            var draft = outlookApp.CreateItem(0);   // 0 = olMailItem (NEU, ungespeichert)
-            draft.Subject = (first.isReminder ? "Reminder " : "") + "DEMO-Vorgang: " + first.betreff;
-            draft.HTMLBody = wsBuildNotizHtml(first.data) +
-                "<hr><p style='font-family:Segoe UI;font-size:12px;color:#6b7280;'>" +
-                "Original-Mail: " + first.fileName + " &middot; angehaengt als .msg</p>";
-            // Original-.msg als Anhang an den NEUEN Entwurf - bei neuem unsaved Item
-            // greift der Outlook-Guard meist nicht (normale Compose-Aktion).
-            try {
-                draft.Attachments.Add(first.msgPath);
-                wsLog("   Original-.msg als Anhang hinzugefuegt.");
-            } catch(eAtt) {
-                wsLog("   Anhang-Add blockiert (" + eAtt.message + ") - Entwurf ohne Anhang.");
+            if (fsoS && state._wsFolder) {
+                outDir = state._wsFolder.replace(/\\+$/, "") + "\\_KI-Vorgaenge";
+                if (!fsoS.FolderExists(outDir)) fsoS.CreateFolder(outDir);
             }
-            draft.Display();   // im Entwurfs-/Compose-Fenster oeffnen (kein Save)
-            wsLog("   Demo-Entwurf geoeffnet: " + first.fileName);
-        } catch(eD) {
-            wsLog("   Draft-Mail-Fehler: " + eD.message);
+        } catch(eDir) { outDir = ""; }
+        if (!outDir) {
+            try {
+                outDir = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\ERGO-KI-Vorgaenge";
+                if (!fsoS.FolderExists(outDir)) fsoS.CreateFolder(outDir);
+            } catch(eDir2) { outDir = shellS.ExpandEnvironmentStrings("%TEMP%"); }
+        }
+        wsLog("   Zielordner: " + outDir);
+
+        var saved = 0, failed = 0;
+        for (var pi = 0; pi < processed.length; pi++) {
+            var p = processed[pi];
+            var lfd = wsLfdNr(pi);
+            var notePath = "";
+            try {
+                // 2a) KI-Notiz als ASCII-HTML in TEMP schreiben (FSO erlaubt)
+                var noteHtml = wsBuildNotizHtml(p.data, lfd);
+                notePath = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\KI-Notiz_" + lfd + "_" +
+                           new Date().getTime() + ".html";
+                var nf = fsoS.CreateTextFile(notePath, true, false); // ASCII
+                nf.Write(noteHtml);
+                nf.Close();
+
+                // 2b) NEUES MailItem (ungespeichert -> Guard greift nicht)
+                var m = outlookApp.CreateItem(0);
+                m.Subject = "[" + lfd + "] " + (p.isReminder ? "Reminder " : "") +
+                            "Vorgang: " + (p.betreff || p.fileName);
+                m.HTMLBody = wsBuildNotizHtml(p.data, lfd) +
+                    "<hr><p style='font-family:Segoe UI;font-size:12px;color:#6b7280;'>" +
+                    "Lfd-Nr " + lfd + " &middot; Original-Mail: " + cellSafe(p.fileName) +
+                    " (als .msg angehaengt) &middot; KI-Notiz ebenfalls als HTML angehaengt.</p>";
+
+                // 2c) KI-Notiz + Original-.msg als ANHAENGE
+                try { m.Attachments.Add(notePath, 1, 1, "KI-Notiz_" + lfd + ".html"); }
+                catch(eN) { wsLog("   [" + lfd + "] Notiz-Anhang fehlgeschlagen: " + eN.message); }
+                try { m.Attachments.Add(p.msgPath, 1, 2, "Original_" + cellSafe(p.fileName)); }
+                catch(eO) { wsLog("   [" + lfd + "] Original-Anhang fehlgeschlagen: " + eO.message); }
+
+                // 2d) Als .msg speichern (Outlook-Prozess -> keine Zonensperre)
+                var safeBetreff = String(p.betreff || p.fileName || "Vorgang")
+                                    .replace(/[\\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").substring(0, 60);
+                var target = outDir.replace(/\\+$/, "") + "\\Vorgang_" + lfd + "_" + safeBetreff + ".msg";
+                m.SaveAs(target, 9);   // 9 = olMSGUnicode
+                saved++;
+                wsLog("   [" + lfd + "] gespeichert: " + target);
+
+                try { fsoS.DeleteFile(notePath, true); } catch(eDel) {}
+            } catch(eSave) {
+                failed++;
+                wsLog("   [" + lfd + "] FEHLER: " + (eSave.message || eSave) +
+                      " (evtl. Outlook-Sicherheitsabfrage 'Zugriff zulassen' bestaetigen)");
+                try { if (notePath) fsoS.DeleteFile(notePath, true); } catch(eDel2) {}
+            }
         }
 
         wsLog("");
-        wsLog("Demo abgeschlossen.");
-        wsLog("  - Excel-Tabelle mit allen " + processed.length + " analysierten Mails");
-        wsLog("  - Erste Mail als Outlook-Entwurf mit KI-Notiz im Body + Original als Anhang");
-        wsLog("Original .msg-Dateien bleiben unveraendert.");
+        wsLog("Fertig: " + saved + " Vorgaenge als .msg gespeichert" +
+              (failed ? ", " + failed + " fehlgeschlagen" : "") + ".");
+        wsShowSuccess("Fertig! <strong>" + saved + "</strong> Vorgaenge als .msg gespeichert" +
+                      (failed ? " (" + failed + " Fehler)" : "") +
+                      ". Excel mit Spalte <strong>Lfd_Nr</strong> erstellt &mdash; gleiche Nummer " +
+                      "steht in jeder KI-Notiz (Mapping Excel &harr; Vorgang).");
+
+        // Zielordner im Explorer zeigen
+        try { if (saved > 0 && outDir) shellS.Run('explorer.exe "' + outDir + '"', 1, false); } catch(eExp) {}
+
+        wsLog("Ablage: " + outDir);
+        wsLog("Original .msg-Dateien im Quellordner bleiben unveraendert.");
     }, 300);
+}
+
+// Laufende Nummer / Vorgangs-ID, 3-stellig genullt (Mapping Excel <-> Notiz <-> .msg)
+function wsLfdNr(i) {
+    var n = String(i + 1);
+    while (n.length < 3) n = "0" + n;
+    return n;
 }
 
 // ============================================================================
@@ -8397,9 +8466,10 @@ End Function
             </button>
             <div style="font-size: 11px; color: #9ca3af; text-align: center;">
                 Alle Mails werden <strong>parallel</strong> via ErgoGPT analysiert (Inhalt + Anhaenge).<br>
-                Ergebnis kommt in eine <strong>Excel-Tabelle</strong>. Zusaetzlich wird die erste Mail als<br>
-                <strong>Outlook-Entwurf</strong> mit KI-Notiz im Body + Original als Anhang geoeffnet.<br>
-                <strong>Original .msg-Dateien bleiben unveraendert.</strong>
+                Ergebnis: <strong>Excel-Tabelle</strong> mit Spalte <strong>Lfd_Nr</strong> und je Vorgang<br>
+                eine <strong>.msg-Datei</strong> (KI-Notiz + Original als Anhang). Die Lfd-Nr steht auch<br>
+                in der KI-Notiz &mdash; so mappt man Excel-Zeile &harr; Vorgang.<br>
+                <strong>Original .msg-Dateien im Quellordner bleiben unveraendert.</strong>
             </div>
             <div class="ws-log" id="wsLog"></div>
         </div>
