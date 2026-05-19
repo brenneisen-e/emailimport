@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.08"
+        VERSION="2.09"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -9281,7 +9281,15 @@ function wsKombiReduce() {
     var bs = {
         stage: "CREATING_CONV", mails: kb.mails,
         allPdfs: [{ path: kb.combinedPdf, name: "Sammeldokument.pdf" }],
-        combinedPdf: kb.combinedPdf, prompt: prompt, stream: true,
+        // stream:false - Kombi laeuft wieder ueber den schnellen In-HTA-Async-
+        // Pfad (startAnswerAsync) wie vor v2.04. Der Subprozess-Stream startet
+        // pro Lauf einen kalten wscript+WinHttp-Prozess: im ERGO-Netz erneute
+        // Proxy-Aufloesung/-Authentifizierung => deutlich langsamer als die
+        // warme, schon authentifizierte In-HTA-Verbindung. Der v2.04-Crash
+        // (staendiges Neu-Parsen der wachsenden .part-Datei) existiert hier
+        // nicht: die Antwort wird EINMAL gelesen (In-Memory, kein Datei-/
+        // Domaenen-Block) und EINMAL geparst.
+        combinedPdf: kb.combinedPdf, prompt: prompt, stream: false,
         convHttp: createConversationAsyncFire(prompt), convId: null,
         uploadHandles: [], docIds: [], docIdsJson: "[]",
         answerHttp: null, startedAt: new Date().getTime(), onDone: kb.onDone
