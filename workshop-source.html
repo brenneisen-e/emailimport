@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v1.85 - HTA Quellcode</title>
+<title>ERGO Workshop v1.86 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v1.85</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v1.86</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.85"
+        VERSION="1.86"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.85 - Workshop-Frontend: echte Umlaute statt ae/oe/ue (waehlen->w&amp;auml;hlen, zurueck->zur&amp;uuml;ck, gewaehlt, unveraendert, angehaengt, pruefen) als HTML-Entities. v1.84 - agentur_nummer/vermittler_nummer getrennt, Datum TT.MM.JJJJ, Excel Header-Farblogik + Spalten</div>
+            <div class="ver">v1.86 - Batch-Fix: Receive-Timeout fuer Batch-Antwort 180s->15min (laengerer v1.83-Prompt sprengte 180s), Lebenszeichen alle 15s im Log, HTTP-Status-Check, harte Notbremse nach 18min - kein "haengt bei 2/7" mehr. v1.85 - Workshop-Frontend echte Umlaute</div>
         </div>
 
         <!-- Cookie -->
@@ -2553,10 +2553,12 @@ function createConversationAsyncFire(prompt) {
     return http;
 }
 
-function startAnswerAsync(convId, prompt, docIdsJson) {
+function startAnswerAsync(convId, prompt, docIdsJson, recvMs) {
     var http = new ActiveXObject("WinHttp.WinHttpRequest.5.1");
     var payload = buildPayload(cleanForJson(prompt), docIdsJson);
-    try { http.SetTimeouts(30000, 30000, 60000, 180000); } catch(e) {}
+    // recvMs: Receive-Timeout. Batch (5 Mails in 1 Prompt) braucht deutlich
+    // laenger als ein Einzel-Call -> Default 180s, Batch uebergibt mehr.
+    try { http.SetTimeouts(30000, 30000, 60000, recvMs || 180000); } catch(e) {}
     http.Open("PUT", ERGO_BASE + "/conversation/" + convId, true);
     try { http.SetProxy(0); } catch(e) {}
     setWinHttpHeaders(http);
@@ -8226,19 +8228,36 @@ function wsBatchTick() {
         }
 
         if (bs.stage === "READY") {
-            bs.answerHttp = startAnswerAsync(bs.convId, bs.prompt, bs.docIdsJson);
+            // Batch-Antwort (5 Mails in 1 Prompt) dauert deutlich laenger als
+            // ein Einzel-Call -> 15 min Receive-Timeout statt 180s.
+            bs.answerHttp = startAnswerAsync(bs.convId, bs.prompt, bs.docIdsJson, 900000);
             bs.answerStart = new Date().getTime();
+            bs._hbAt = 0;
             bs.stage = "RUNNING";
             wsProgress(2, state._wsMsgFiles.length + 2);
+            wsLog("   Batch-Prompt gesendet - warte auf ErgoGPT (kann bei 5 Mails einige Minuten dauern)...");
         }
 
         if (bs.stage === "RUNNING") {
+            var elAns = new Date().getTime() - (bs.answerStart || 0);
+            // Lebenszeichen alle ~15s, damit es nicht "eingefroren" aussieht
+            if (elAns - (bs._hbAt || 0) >= 15000) {
+                bs._hbAt = elAns;
+                wsLog("   ... warte auf Batch-Antwort (" + Math.round(elAns/1000) + "s)");
+            }
+            // Harte Notbremse nach 18 min
+            if (elAns > 1080000) return wsBatchFail(bs,
+                "Antwort-Timeout (>18 min). ErgoGPT hat den Batch nicht beantwortet - " +
+                "bitte Parallel-Modus nutzen oder weniger Mails pro Batch.");
             var ad = false;
             try { ad = bs.answerHttp.WaitForResponse(0); } catch(eA) {
                 bs._ar = (bs._ar||0)+1; if (bs._ar > 12) return wsBatchFail(bs, "Answer-Wait: " + eA.message);
-                return setTimeout(wsBatchTick, 500);
+                return setTimeout(wsBatchTick, 800);
             }
-            if (!ad) return setTimeout(wsBatchTick, 500);
+            if (!ad) return setTimeout(wsBatchTick, 800);
+            var astatus = 0;
+            try { astatus = bs.answerHttp.Status; } catch(eS) {}
+            if (astatus &amp;&amp; astatus !== 200) return wsBatchFail(bs, "ErgoGPT HTTP " + astatus + " (Batch-Antwort)");
             var aresp = "";
             try {
                 var rb = bs.answerHttp.ResponseBody;
