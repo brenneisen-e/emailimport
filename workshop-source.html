@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v1.96 - HTA Quellcode</title>
+<title>ERGO Workshop v1.97 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v1.96</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v1.97</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.96"
+        VERSION="1.97"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.96 - Kombi-Worker-Bremse behoben: kein Clipboard mehr (Content.Copy/Paste -> Selection.InsertFile), parallele Word-Prozesse kollidierten auf der globalen Zwischenablage (ein Worker dadurch um Vielfaches langsamer). Beschreibungstext linksbuendig + Hinweis auf parallele Worker. v1.95 - KI-Notiz farbige Bereichs-Header wie Excel-Gruppen</div>
+            <div class="ver">v1.97 - Kombi: Antwort-Read in Subprozess ausgelagert (MSXML-Stream in waschsende .part-Datei) - HTA blockiert NICHT mehr; fertige Vorgaenge werden EINZELN sofort verwertet (Brace-Matching auf dem Teil-Stream), Abschluss sobald alle Objekte da sind ODER Stream endet (kein Warten auf Socket/Timeout). v1.96 - Kombi-Worker-Clipboard-Fix</div>
         </div>
 
         <!-- Cookie -->
@@ -8348,14 +8348,28 @@ function wsBatchTick() {
         }
 
         if (bs.stage === "READY") {
-            // Batch-Antwort (5 Mails in 1 Prompt) dauert deutlich laenger als
-            // ein Einzel-Call -> 15 min Receive-Timeout statt 180s.
-            bs.answerHttp = startAnswerAsync(bs.convId, bs.prompt, bs.docIdsJson, 900000);
-            bs.answerStart = new Date().getTime();
-            bs._hbAt = 0;
-            bs.stage = "RUNNING";
-            wsProgress(2, state._wsMsgFiles.length + 2);
-            wsLog("   Batch-Prompt gesendet - warte auf ErgoGPT (kann bei 5 Mails einige Minuten dauern)...");
+            if (bs.stream) {
+                // STREAMING: Antwort-Read in Subprozess auslagern; fertige
+                // Objekte werden SOFORT verwertet (nicht auf alles warten).
+                var nm = 0;
+                for (var nmI = 0; nmI < bs.mails.length; nmI++) if (!bs.mails[nmI].error) nm++;
+                bs._nMails = nm;
+                bs._seen = {}; bs._used = []; bs.streamProcessed = [];
+                bs.streamHandle = wsStreamAnswerStart(ERGO_BASE + "/conversation/" + bs.convId, bs.prompt, bs.docIdsJson);
+                bs.answerStart = new Date().getTime();
+                bs._hbAt = 0; bs._lastPartLen = 0;
+                bs.stage = "STREAMING";
+                wsProgress(0, bs._nMails);
+                wsLog("Prompt gesendet (Subprozess-Stream) - Vorgaenge werden einzeln verwertet, sobald sie fertig sind...", "head");
+            } else {
+                // Batch-Antwort dauert laenger -> 15 min Receive-Timeout statt 180s.
+                bs.answerHttp = startAnswerAsync(bs.convId, bs.prompt, bs.docIdsJson, 900000);
+                bs.answerStart = new Date().getTime();
+                bs._hbAt = 0;
+                bs.stage = "RUNNING";
+                wsProgress(2, state._wsMsgFiles.length + 2);
+                wsLog("   Batch-Prompt gesendet - warte auf ErgoGPT (kann bei 5 Mails einige Minuten dauern)...");
+            }
         }
 
         if (bs.stage === "RUNNING") {
@@ -8410,27 +8424,204 @@ function wsBatchTick() {
                     summary: (d.zusammenfassung || "").substr(0, 200)
                 });
             }
-            // Cleanup TEMP-PDFs + Conversation
-            for (var ci = 0; ci < bs.mails.length; ci++) {
-                try {
-                    var mm = bs.mails[ci];
-                    for (var cp = 0; cp < mm.pdfPaths.length; cp++) { try { fso.DeleteFile(mm.pdfPaths[cp].path, true); } catch(e) {} }
-                    if (mm.tempDir &amp;&amp; fso.FolderExists(mm.tempDir)) fso.DeleteFolder(mm.tempDir, true);
-                } catch(e) {}
+            return wsBatchFinish(bs, fso, processed);
+        }
+
+        if (bs.stage === "STREAMING") {
+            var sh2 = bs.streamHandle;
+            var elS = new Date().getTime() - (bs.answerStart || 0);
+            // 20-min Notbremse
+            if (elS > 1200000) return wsBatchFail(bs, "Stream-Timeout (>20 min).");
+            // Fehler-/Status-Datei?
+            if (fso.FileExists(sh2.errFile)) {
+                var em = "";
+                try { var ef = fso.OpenTextFile(sh2.errFile, 1, false, 0); em = ef.AtEndOfStream ? "" : ef.ReadAll(); ef.Close(); } catch(e) {}
+                return wsBatchFail(bs, "Stream-Fehler: " + (em || "unbekannt"));
             }
-            // Sammel-PDF NICHT loeschen - liegt absichtlich im Ergebnis-Ordner.
-            if (bs.combinedPdf) wsLog("Sammel-PDF bleibt im Ordner: " + bs.combinedPdf, "ok");
-            try { fireDelete(bs.convId); } catch(e) {}
-            wsProgress(state._wsMsgFiles.length + 2, state._wsMsgFiles.length + 2);
-            wsLog((bs.combinedPdf ? "KOMBI-PDF" : "BATCH") + " fertig: " + processed.length + " Vorgaenge erkannt.");
-            var cb = bs.onDone; state._wsBatch = null;
-            if (cb) cb(processed); else wsFinishDemo(processed);
-            return;
+            var doneNow = fso.FileExists(sh2.doneFile);
+            // Partielle Antwort lesen (UTF-8) - nicht blockierend, Datei waechst
+            var part = "";
+            try {
+                if (fso.FileExists(sh2.partFile)) {
+                    var pstm = new ActiveXObject("ADODB.Stream");
+                    pstm.Type = 2; pstm.Charset = "utf-8"; pstm.Open();
+                    pstm.LoadFromFile(sh2.partFile);
+                    part = String(pstm.ReadText()); pstm.Close();
+                }
+            } catch(ePr) { part = ""; }
+
+            if (part.length > (bs._lastPartLen || 0)) {
+                bs._lastPartLen = part.length;
+                // Aus dem bisher gestreamten NDJSON die schon KOMPLETTEN Objekte ziehen
+                var assembled = "";
+                try { assembled = jsonUnescape(extractAssistantFromNdjson(part)).replace(/\\n/g, "\n"); }
+                catch(eAa) { assembled = part; }
+                var objs = wsExtractObjects(assembled);
+                for (var oi = 0; oi < objs.length; oi++) {
+                    var od = null;
+                    try { var ev = eval("(" + objs[oi] + ")"); if (ev &amp;&amp; ev.datei != null) od = ev; } catch(eEv) {}
+                    if (!od) continue;
+                    var key = String(od.datei).toLowerCase();
+                    if (bs._seen[key]) continue;
+                    // Auf eine Mail mappen (per datei, sonst naechste freie)
+                    var mm2 = null, kl;
+                    for (var mj = 0; mj < bs.mails.length; mj++) {
+                        if (bs._used[mj] || bs.mails[mj].error) continue;
+                        var fnL = String(bs.mails[mj].fileName).toLowerCase();
+                        if (key === fnL || key.indexOf(fnL) >= 0 || fnL.indexOf(key) >= 0) { mm2 = bs.mails[mj]; bs._used[mj] = true; break; }
+                    }
+                    if (!mm2) { for (var mk = 0; mk < bs.mails.length; mk++) { if (!bs._used[mk] &amp;&amp; !bs.mails[mk].error) { mm2 = bs.mails[mk]; bs._used[mk] = true; break; } } }
+                    if (!mm2) continue;
+                    bs._seen[key] = true;
+                    bs.streamProcessed.push({
+                        msgPath: mm2.msgPath, fileName: mm2.fileName, datum: mm2.datum,
+                        absName: mm2.absName, absMail: mm2.absMail, betreff: mm2.betreff,
+                        anhangAlle: mm2.anhangAlle, data: od,
+                        isReminder: od.ist_reminder === "ja",
+                        klassifikation: od.klassifikation || "",
+                        summary: (od.zusammenfassung || "").substr(0, 200)
+                    });
+                    wsLog("Vorgang " + bs.streamProcessed.length + "/" + bs._nMails + " fertig: " +
+                          (mm2.fileName.length > 42 ? mm2.fileName.substr(0,42)+"..." : mm2.fileName) +
+                          " -> " + (od.klassifikation || "?"), "ok");
+                    wsProgress(bs.streamProcessed.length, bs._nMails);
+                }
+            }
+
+            // Fertig, sobald ALLE Objekte da sind ODER der Stream zu ist
+            // -> NICHT auf Socket-Schliessung / Timeout warten.
+            if (bs.streamProcessed.length >= bs._nMails || doneNow) {
+                try { fso.DeleteFile(sh2.partFile, true); } catch(e) {}
+                try { fso.DeleteFile(sh2.doneFile, true); } catch(e) {}
+                try { fso.DeleteFile(sh2.cookieFile, true); } catch(e) {}
+                try { fso.DeleteFile(sh2.payloadFile, true); } catch(e) {}
+                try { fso.DeleteFile(sh2.vbsPath, true); } catch(e) {}
+                if (bs.streamProcessed.length === 0) return wsBatchFail(bs, "Stream beendet, aber kein gueltiges Objekt erkannt.");
+                wsLog("Stream verarbeitet: " + bs.streamProcessed.length + "/" + bs._nMails +
+                      " Vorgaenge" + (doneNow &amp;&amp; bs.streamProcessed.length < bs._nMails ? " (Stream endete vorzeitig)" : ""), "head");
+                return wsBatchFinish(bs, fso, bs.streamProcessed);
+            }
+            if (elS - (bs._hbAt || 0) >= 12000) {
+                bs._hbAt = elS;
+                wsLog("... Stream laeuft (" + bs.streamProcessed.length + "/" + bs._nMails +
+                      " fertig, " + Math.round(elS/1000) + "s)", "muted");
+            }
+            return setTimeout(wsBatchTick, 1000);
         }
     } catch(eT) {
         return wsBatchFail(bs, "Tick: " + (eT.message || "?"));
     }
     setTimeout(wsBatchTick, 400);
+}
+
+// Gemeinsamer Abschluss: TEMP-Cleanup + Conversation loeschen + Ergebnis weiter
+function wsBatchFinish(bs, fso, processed) {
+    for (var ci = 0; ci < bs.mails.length; ci++) {
+        try {
+            var mm = bs.mails[ci];
+            for (var cp = 0; cp < mm.pdfPaths.length; cp++) { try { fso.DeleteFile(mm.pdfPaths[cp].path, true); } catch(e) {} }
+            if (mm.tempDir &amp;&amp; fso.FolderExists(mm.tempDir)) fso.DeleteFolder(mm.tempDir, true);
+        } catch(e) {}
+    }
+    if (bs.combinedPdf) wsLog("Sammel-PDF bleibt im Ordner: " + bs.combinedPdf, "ok");
+    try { fireDelete(bs.convId); } catch(e) {}
+    wsProgress(state._wsMsgFiles.length + 2, state._wsMsgFiles.length + 2);
+    wsLog((bs.combinedPdf ? "KOMBI-PDF" : "BATCH") + " fertig: " + processed.length + " Vorgaenge erkannt.");
+    var cb = bs.onDone; state._wsBatch = null;
+    if (cb) cb(processed); else wsFinishDemo(processed);
+}
+
+// ---- Streaming-Antwort als Subprozess (MSXML async) -> waechst eine .part-
+// Datei; die HTA pollt nicht-blockierend und verwertet fertige Objekte sofort.
+function wsBuildStreamVbs() {
+    var v = [];
+    v.push("Option Explicit");
+    v.push("Dim a, fso, ts, cookie, url, payloadFile, partFile, doneFile, errFile");
+    v.push("Set a = WScript.Arguments");
+    v.push("Dim cookieFile : cookieFile = a(0) : url = a(1) : payloadFile = a(2)");
+    v.push("partFile = a(3) : doneFile = a(4) : errFile = a(5)");
+    v.push("On Error Resume Next");
+    v.push("Set fso = CreateObject(\"Scripting.FileSystemObject\")");
+    v.push("Set ts = fso.OpenTextFile(cookieFile, 1, False, 0) : cookie = Trim(ts.ReadAll) : ts.Close");
+    v.push("Dim re, xsrf : xsrf = \"\"");
+    v.push("Set re = CreateObject(\"VBScript.RegExp\")");
+    v.push("re.Pattern = \"(?:XSRF-TOKEN|CSRF-TOKEN|csrfToken|_csrf)=([^;]+)\" : re.IgnoreCase = True");
+    v.push("If re.Test(cookie) Then xsrf = re.Execute(cookie)(0).SubMatches(0)");
+    v.push("Dim bs2 : Set bs2 = CreateObject(\"ADODB.Stream\")");
+    v.push("bs2.Type = 1 : bs2.Open : bs2.LoadFromFile payloadFile");
+    v.push("Dim body : body = bs2.Read : bs2.Close");
+    v.push("Dim x : Set x = CreateObject(\"MSXML2.XMLHTTP.6.0\")");
+    v.push("x.open \"PUT\", url, True");
+    v.push("x.setRequestHeader \"Content-Type\", \"application/json;charset=UTF-8\"");
+    v.push("x.setRequestHeader \"Accept\", \"*/*\"");
+    v.push("x.setRequestHeader \"Cookie\", cookie");
+    v.push("If xsrf <> \"\" Then");
+    v.push("    x.setRequestHeader \"X-XSRF-TOKEN\", xsrf");
+    v.push("    x.setRequestHeader \"X-CSRF-TOKEN\", xsrf");
+    v.push("End If");
+    v.push("x.setRequestHeader \"Origin\", \"https://gpt.ergo.com\"");
+    v.push("x.setRequestHeader \"Referer\", \"https://gpt.ergo.com/\"");
+    v.push("x.setRequestHeader \"X-Requested-With\", \"XMLHttpRequest\"");
+    v.push("x.send body");
+    v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"send: \" &amp; Err.Description : WScript.Quit");
+    v.push("Dim lastLen : lastLen = 0");
+    v.push("Do");
+    v.push("    Dim rs : rs = -1");
+    v.push("    rs = x.readyState");
+    v.push("    If rs >= 3 Then");
+    v.push("        Dim t : t = \"\"");
+    v.push("        Err.Clear : t = x.responseText");
+    v.push("        If Err.Number = 0 And Len(t) > lastLen Then");
+    v.push("            Dim w : Set w = CreateObject(\"ADODB.Stream\")");
+    v.push("            w.Type = 2 : w.Charset = \"utf-8\" : w.Open : w.WriteText t");
+    v.push("            w.SaveToFile partFile, 2 : w.Close");
+    v.push("            lastLen = Len(t)");
+    v.push("        End If");
+    v.push("        Err.Clear");
+    v.push("    End If");
+    v.push("    If rs = 4 Then Exit Do");
+    v.push("    WScript.Sleep 350");
+    v.push("Loop");
+    v.push("Dim st : st = 0");
+    v.push("Err.Clear : st = x.status");
+    v.push("If st <> 200 And st <> 0 Then WriteErr fso, errFile, \"HTTP \" &amp; st : WScript.Quit");
+    v.push("Dim df : Set df = fso.CreateTextFile(doneFile, True, False) : df.Write \"OK \" &amp; st : df.Close");
+    v.push("");
+    v.push("Sub WriteErr(f, p, m)");
+    v.push("    Dim o : Set o = f.CreateTextFile(p, True, False) : o.Write m : o.Close");
+    v.push("End Sub");
+    return v.join("\r\n");
+}
+
+function wsStreamAnswerStart(answerUrl, prompt, docIdsJson) {
+    var shell = new ActiveXObject("WScript.Shell");
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var tmp = shell.ExpandEnvironmentStrings("%TEMP%");
+    var st = String(new Date().getTime()) + "_" + Math.floor(Math.random()*1000000);
+    var h = {
+        cookieFile:  tmp + "\\ergo_str_" + st + "_c.txt",
+        payloadFile: tmp + "\\ergo_str_" + st + "_p.bin",
+        partFile:    tmp + "\\ergo_str_" + st + "_part.txt",
+        doneFile:    tmp + "\\ergo_str_" + st + "_done.txt",
+        errFile:     tmp + "\\ergo_str_" + st + "_err.txt",
+        vbsPath:     tmp + "\\ergo_str_" + st + ".vbs"
+    };
+    try { var cf = fso.CreateTextFile(h.cookieFile, true, false); cf.Write(state.cookie); cf.Close(); } catch(e) {}
+    // Payload als UTF-8-Bytes in Datei
+    var payload = buildPayload(cleanForJson(prompt), docIdsJson || "[]");
+    try {
+        var pstm = new ActiveXObject("ADODB.Stream");
+        pstm.Type = 2; pstm.Charset = "utf-8"; pstm.Open(); pstm.WriteText(payload);
+        pstm.Position = 0; pstm.Type = 1; if (pstm.Size >= 3) pstm.Read(3); // BOM weg
+        var pb = pstm.Read(); pstm.Close();
+        var ws = new ActiveXObject("ADODB.Stream");
+        ws.Type = 1; ws.Open(); ws.Write(pb); ws.SaveToFile(h.payloadFile, 2); ws.Close();
+    } catch(eP) {}
+    try { var vf = fso.CreateTextFile(h.vbsPath, true, false); vf.Write(wsBuildStreamVbs()); vf.Close(); } catch(e) {}
+    var cmd = 'wscript.exe //NoLogo //B "' + h.vbsPath + '" "' + h.cookieFile + '" "' +
+              answerUrl + '" "' + h.payloadFile + '" "' + h.partFile + '" "' + h.doneFile + '" "' + h.errFile + '"';
+    shell.Run(cmd, 0, false);
+    return h;
 }
 
 function wsBatchFail(bs, msg) {
@@ -8950,7 +9141,7 @@ function wsKombiReduce() {
     var bs = {
         stage: "CREATING_CONV", mails: kb.mails,
         allPdfs: [{ path: kb.combinedPdf, name: "Sammeldokument.pdf" }],
-        combinedPdf: kb.combinedPdf, prompt: prompt,
+        combinedPdf: kb.combinedPdf, prompt: prompt, stream: true,
         convHttp: createConversationAsyncFire(prompt), convId: null,
         uploadHandles: [], docIds: [], docIdsJson: "[]",
         answerHttp: null, startedAt: new Date().getTime(), onDone: kb.onDone
@@ -9403,7 +9594,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v1.96</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v1.97</div>
     </div>
 </div>
 
