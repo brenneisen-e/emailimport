@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.07"
+        VERSION="2.08"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -7838,7 +7838,7 @@ function wsFinishDemo(processed) {
                 if (!fsoS.FolderExists(outDir)) fsoS.CreateFolder(outDir);
             } catch(eDir2) { outDir = shellS.ExpandEnvironmentStrings("%TEMP%"); }
         }
-        wsLog("Zielordner (Excel + Vorgaenge): " + outDir);
+        wsLog("Zielordner (Excel + Vorgänge): " + outDir);
 
         // ---- 1. EXCEL erzeugen (laeuft im Excel-Prozess, keine HTA-Zonen-Sperre) ----
         wsLog("Erstelle Excel mit " + processed.length + " Zeilen...");
@@ -7980,7 +7980,7 @@ function wsFinishDemo(processed) {
         //   - PDF an die Original-Mail anhaengen, dann SaveAs als neue .msg
         //   - Fallback ohne Word: KI-Notiz als HTML anhaengen
         wsLog("");
-        wsLog("Speichere " + processed.length + " Vorgaenge: Original-Mail fuehrend, KI-Notiz als PDF angehaengt...");
+        wsLog("Speichere " + processed.length + " Vorgänge: Original-Mail führend, KI-Notiz als PDF angehängt...");
 
         // Word einmalig fuer HTML->PDF (im eigenen Prozess, keine Zonensperre)
         var word = null;
@@ -7989,10 +7989,10 @@ function wsFinishDemo(processed) {
             word.Visible = false;
             try { word.DisplayAlerts = 0; } catch(eW1) {}
             try { word.AutomationSecurity = 3; } catch(eW2) {}
-            wsLog("   Word fuer PDF-Erzeugung bereit.");
+            wsLog("   Word für PDF-Erzeugung bereit.");
         } catch(eW) {
             word = null;
-            wsLog("   Word nicht verfuegbar - KI-Notiz wird ersatzweise als HTML angehaengt.");
+            wsLog("   Word nicht verfügbar - KI-Notiz wird ersatzweise als HTML angehängt.");
         }
 
         var saved = 0, failed = 0;
@@ -8065,7 +8065,7 @@ function wsFinishDemo(processed) {
         try { if (word) word.Quit(0); } catch(eWq) {}
 
         wsLog("");
-        wsLog("Fertig: " + saved + " Vorgaenge gespeichert" +
+        wsLog("Fertig: " + saved + " Vorgänge gespeichert" +
               (failed ? ", " + failed + " fehlgeschlagen" : "") + ".");
         wsShowSuccess("Fertig! <strong>" + saved + "</strong> Original-Mails als .msg gespeichert" +
                       (failed ? " (" + failed + " Fehler)" : "") +
@@ -8077,7 +8077,7 @@ function wsFinishDemo(processed) {
         try { if (saved > 0 && outDir) shellS.Run('explorer.exe "' + outDir + '"', 1, false); } catch(eExp) {}
 
         wsLog("Ablage: " + outDir);
-        wsLog("Original .msg-Dateien im Quellordner bleiben unveraendert.");
+        wsLog("Original .msg-Dateien im Quellordner bleiben unverändert.");
     }, 300);
 }
 
@@ -8199,7 +8199,7 @@ function wsExtractMail(msgPath) {
                     if (skipScans && _aSz > 2500000) {
                         info.skippedScans.push(fn);
                         info.anhangAlle += (info.anhangAlle ? "; " : "") + fn + " [Scan - NICHT analysiert]";
-                        try { wsLog("Scan/Foto-PDF uebersprungen (Anhang " + (Math.round(_aSz/104857.6)/10) +
+                        try { wsLog("Scan/Foto-PDF übersprungen (Anhang " + (Math.round(_aSz/104857.6)/10) +
                               " MB): " + fn + " - " + info.fileName.substr(0, 40), "muted"); } catch(eL0) {}
                         continue;
                     }
@@ -8213,7 +8213,7 @@ function wsExtractMail(msgPath) {
                             info.skippedScans.push(fn);
                             info.anhangAlle += (info.anhangAlle ? "; " : "") + fn + " [Scan - NICHT analysiert]";
                             try { fso.DeleteFile(outPath, true); } catch(eD) {}
-                            try { wsLog("Scan/Foto-PDF uebersprungen: " + fn + " (" + _mb + " MB) - " +
+                            try { wsLog("Scan/Foto-PDF übersprungen: " + fn + " (" + _mb + " MB) - " +
                                   info.fileName.substr(0, 40), "muted"); } catch(eL) {}
                         } else {
                             info.pdfPaths.push({ path: outPath, name: fn });
@@ -8243,7 +8243,7 @@ function wsExtractMail(msgPath) {
             info.skipMailScan = true;
             info.pdfPaths = [];
             info.pdfListe = "";
-            try { wsLog("Mail komplett uebersprungen (enthaelt Foto-/Scan-PDF): " +
+            try { wsLog("Mail komplett übersprungen (enthält Foto-/Scan-PDF): " +
                   String(info.fileName).substr(0, 50), "muted"); } catch(eSpL) {}
         } else if (skipScans && info.skippedScans && info.skippedScans.length > 0) {
             info.skipMailScan = true;
@@ -8531,7 +8531,7 @@ function wsBatchTick() {
             if (!fso.FileExists(sh2.doneFile)) {
                 if (elS - (bs._hbAt || 0) >= 10000) {
                     bs._hbAt = elS;
-                    wsLog("... Antwort wird empfangen, Subprozess laeuft (" +
+                    wsLog("... Antwort wird empfangen, Subprozess läuft (" +
                           Math.round(elS/1000) + "s) - HTA bleibt ansprechbar", "muted");
                 }
                 return setTimeout(wsBatchTick, 1500);
@@ -8588,7 +8588,7 @@ function wsBatchTick() {
                       " Z. Anfang: " + String(_asm2 || part).substr(0,300).replace(/\s+/g," "), "err");
                 return wsBatchFail(bs, "Antwort erhalten, aber kein gueltiges Objekt erkannt - siehe DIAG/Log-Datei.");
             }
-            wsLog("Antwort verarbeitet: " + bs.streamProcessed.length + "/" + bs._nMails + " Vorgaenge", "head");
+            wsLog("Antwort verarbeitet: " + bs.streamProcessed.length + "/" + bs._nMails + " Vorgänge", "head");
             return wsBatchFinish(bs, fso, bs.streamProcessed);
         }
     } catch(eT) {
@@ -8609,7 +8609,7 @@ function wsBatchFinish(bs, fso, processed) {
     if (bs.combinedPdf) wsLog("Sammel-PDF bleibt im Ordner: " + bs.combinedPdf, "ok");
     try { fireDelete(bs.convId); } catch(e) {}
     wsProgress(state._wsMsgFiles.length + 2, state._wsMsgFiles.length + 2);
-    wsLog((bs.combinedPdf ? "KOMBI-PDF" : "BATCH") + " fertig: " + processed.length + " Vorgaenge erkannt.");
+    wsLog((bs.combinedPdf ? "KOMBI-PDF" : "BATCH") + " fertig: " + processed.length + " Vorgänge erkannt.");
     var cb = bs.onDone; state._wsBatch = null;
     if (cb) cb(processed); else wsFinishDemo(processed);
 }
@@ -8725,7 +8725,7 @@ function wsStreamAnswerStart(answerUrl, prompt, docIdsJson) {
               answerUrl + '" "' + h.payloadFile + '" "' + h.partFile + '" "' + h.doneFile + '" "' + h.errFile + '"';
     wsLog("Stream-Start: starte Subprozess...", "muted");
     shell.Run(cmd, 0, false);
-    wsLog("Stream-Start: Subprozess laeuft.", "muted");
+    wsLog("Stream-Start: Subprozess läuft.", "muted");
     return h;
 }
 
@@ -8907,7 +8907,7 @@ function wsChunkTick() {
                 }
                 try { fireDelete(s.convId); } catch(e) {}
                 s.stage = "DONE";
-                wsLog("Chunk " + s.cidx + " fertig: " + s.processed.length + " Vorgaenge.", "ok");
+                wsLog("Chunk " + s.cidx + " fertig: " + s.processed.length + " Vorgänge.", "ok");
             }
         } catch(eT) {
             s.stage = "ERROR"; s.error = "Tick: " + (eT.message || "?");
@@ -8924,7 +8924,7 @@ function wsChunkTick() {
         }
         var cb = state._wsChunkOnDone;
         state._wsChunkSlots = null; state._wsChunkOnDone = null;
-        wsLog("CHUNKED-BATCH fertig: " + processed.length + " Vorgaenge gesamt.", "ok");
+        wsLog("CHUNKED-BATCH fertig: " + processed.length + " Vorgänge gesamt.", "ok");
         if (cb) cb(processed); else wsFinishDemo(processed);
         return;
     }
@@ -9199,7 +9199,7 @@ function wsStartCombined(onDone) {
         vbsPath: vbsPath, startAt: new Date().getTime(), _hbAt: 0
     };
     wsLog("");
-    wsLog(parts.length + " Word-Worker (Last nach PDF-Groesse verteilt) - HTA bleibt ansprechbar...", "head");
+    wsLog(parts.length + " Word-Worker (Last nach PDF-Größe verteilt) - HTA bleibt ansprechbar...", "head");
     setTimeout(wsKombiPoll, 600);
 }
 
@@ -9241,7 +9241,7 @@ function wsKombiReduce() {
     var kb = state._wsKombi;
     if (!kb) return;
     var fso = new ActiveXObject("Scripting.FileSystemObject");
-    wsLog("Fuege Teil-Dokumente zu EINER PDF zusammen (verlustfrei, kein Reflow)...", "head");
+    wsLog("Füge Teil-Dokumente zu EINER PDF zusammen (verlustfrei, kein Reflow)...", "head");
     var rw = null;
     try {
         rw = new ActiveXObject("Word.Application");
@@ -9643,6 +9643,9 @@ End Function
 #workshopOverlay .ws-ll .ws-llt {
     color: #64748b; font-family: 'Consolas','Courier New',monospace;
     font-size: 11px; flex: 0 0 auto; padding-top: 1px;
+    /* margin-right statt flex-gap: MSHTA/Trident kennt flexbox 'gap' nicht,
+       sonst klebt die Uhrzeit am Log-Text (21:04:03Lade...). */
+    margin-right: 12px;
 }
 #workshopOverlay .ws-ll .ws-llm {
     font-family: 'Segoe UI', Tahoma, sans-serif; white-space: pre-wrap;
