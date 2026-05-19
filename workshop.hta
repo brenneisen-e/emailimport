@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.01"
+        VERSION="2.02"
         WINDOWSTATE="normal"
     />
     <style>
@@ -200,7 +200,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.01 - Scan-Erkennung verschaerft: Dateien > 2,5 MB gelten immer als Foto-/Scan-PDF (z.B. 5,8 MB) und werden uebersprungen, auch wenn ein Deckblatt eine Schrift einbettet; uebersprungene Scans erscheinen jetzt im Log inkl. MB-Groesse. v2.00 - Option "Scan-/Foto-PDFs ueberspringen"</div>
+            <div class="ver">v2.02 - FIX Scan-Skip griff nicht: Groessenpruefung lief erst NACH dem fragilen Byte-Read (warf bei 5,8 MB -> Catch "behalten"). Jetzt Groesse ZUERST + Skip schon VOR dem Speichern anhand Outlook-Anhangsgroesse (grosse Foto-PDF wird gar nicht erst auf Platte geschrieben). v2.01 - Scan-Erkennung verschaerft</div>
         </div>
 
         <!-- Cookie -->
@@ -8089,26 +8089,29 @@ function wsSkipScansOn() {
 // Font-Marker UND (Bild-Filter ODER auffaellig gross). Fehlklassifikation
 // = kein Datenverlust (wird als "manuell pruefen" markiert).
 function wsIsLikelyScanPdf(path, fso) {
+    // 1) GROESSE ZUERST - billig + zuverlaessig, unabhaengig vom Byte-Read.
+    var size = 0;
+    try { size = fso.GetFile(path).Size; } catch(eS) { size = 0; }
+    if (size > 2500000) return true;               // > 2,5 MB = Foto/Scan -> skip
+    // 2) Mittelgrosse Dateien: Byte-Heuristik (Font-Marker vs. Bild-Codec).
+    //    Schlaegt das Lesen fehl -> NUR groessenbasiert entscheiden (NICHT
+    //    pauschal "behalten", sonst rutschen Scans durch).
     try {
-        var size = 0;
-        try { size = fso.GetFile(path).Size; } catch(eS) { size = 0; }
         var stm = new ActiveXObject("ADODB.Stream");
         stm.Type = 2; stm.Charset = "iso-8859-1"; stm.Open();
         stm.LoadFromFile(path);
-        var sample = String(stm.ReadText(600000));   // erste ~600 KB reichen
+        var sample = String(stm.ReadText(600000));
         stm.Close();
-        var hasFont  = /\/(BaseFont|FontFile2?|FontFile3|Type0|TrueType)\b/.test(sample) ||
-                       /\/Font\s*[<\/\[]/.test(sample);
-        var hasImg   = /\/(DCTDecode|CCITTFaxDecode|JPXDecode|JBIG2Decode)\b/.test(sample) ||
-                       /\/Subtype\s*\/Image\b/.test(sample);
-        // Sehr grosse Datei = quasi sicher Foto-/Scan-PDF (z.B. 5.8 MB) ->
-        // ueberspringen, selbst wenn ein Deckblatt eine Schrift einbettet.
-        if (size > 2500000) return true;
+        var hasFont = /\/(BaseFont|FontFile2?|FontFile3|Type0|TrueType)\b/.test(sample) ||
+                      /\/Font\s*[<\/\[]/.test(sample);
+        var hasImg  = /\/(DCTDecode|CCITTFaxDecode|JPXDecode|JBIG2Decode)\b/.test(sample) ||
+                      /\/Subtype\s*\/Image\b/.test(sample);
         if (hasFont) return false;                 // echte Textebene -> behalten
         if (hasImg) return true;                   // Bild-Codec, kein Font -> Scan
-        if (size > 350000) return true;            // gross + kein Font -> Scan
-        return false;
-    } catch(e) { return false; }                   // im Zweifel NICHT ueberspringen
+        return size > 350000;                      // gross + kein Font -> Scan
+    } catch(e) {
+        return size > 350000;                      // Read fehlgeschlagen -> Groesse
+    }
 }
 
 function wsExtractMail(msgPath) {
@@ -8140,6 +8143,16 @@ function wsExtractMail(msgPath) {
                 var fn = String(att.FileName || "");
                 if (fn.length === 0) continue;
                 if (fn.toLowerCase().substr(-4) === ".pdf" && info.pdfPaths.length < 20) {
+                    // Schon VOR dem Speichern anhand der Outlook-Anhangsgroesse
+                    // abbrechen (grosse Foto-PDF gar nicht erst auf Platte schreiben).
+                    var _aSz = 0; try { _aSz = att.Size; } catch(eAs) { _aSz = 0; }
+                    if (skipScans && _aSz > 2500000) {
+                        info.skippedScans.push(fn);
+                        info.anhangAlle += (info.anhangAlle ? "; " : "") + fn + " [Scan - NICHT analysiert]";
+                        try { wsLog("Scan/Foto-PDF uebersprungen (Anhang " + (Math.round(_aSz/104857.6)/10) +
+                              " MB): " + fn + " - " + info.fileName.substr(0, 40), "muted"); } catch(eL0) {}
+                        continue;
+                    }
                     var outPath = tempDir + "\\" + sanitizeFilename(fn);
                     att.SaveAsFile(outPath);
                     if (fso.FileExists(outPath)) {
@@ -9629,7 +9642,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v2.01</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v2.02</div>
     </div>
 </div>
 
