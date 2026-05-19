@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.97"
+        VERSION="1.98"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.97 - Kombi: Antwort-Read in Subprozess ausgelagert (MSXML-Stream in waschsende .part-Datei) - HTA blockiert NICHT mehr; fertige Vorgaenge werden EINZELN sofort verwertet (Brace-Matching auf dem Teil-Stream), Abschluss sobald alle Objekte da sind ODER Stream endet (kein Warten auf Socket/Timeout). v1.96 - Kombi-Worker-Clipboard-Fix</div>
+            <div class="ver">v1.98 - Kombi-Worker-Last nach PDF-BYTES verteilt (LPT statt Mail-Anzahl -> kein Worker mehr deutlich langsamer) + gestaffelter Start (1.5s, kein Normal.dotm-Ansturm). Streaming-Schleife abgehaertet (nur neue Objekte parsen, lokales try/catch, 1.5s-Takt) gegen mshta-Absturz. v1.97 - Kombi-Antwort als Streaming-Subprozess</div>
         </div>
 
         <!-- Cookie -->
@@ -8284,7 +8284,7 @@ function wsBatchTick() {
                 var nm = 0;
                 for (var nmI = 0; nmI < bs.mails.length; nmI++) if (!bs.mails[nmI].error) nm++;
                 bs._nMails = nm;
-                bs._seen = {}; bs._used = []; bs.streamProcessed = [];
+                bs._seen = {}; bs._used = []; bs.streamProcessed = []; bs._objCount = 0;
                 bs.streamHandle = wsStreamAnswerStart(ERGO_BASE + "/conversation/" + bs.convId, bs.prompt, bs.docIdsJson);
                 bs.answerStart = new Date().getTime();
                 bs._hbAt = 0; bs._lastPartLen = 0;
@@ -8380,14 +8380,19 @@ function wsBatchTick() {
                 }
             } catch(ePr) { part = ""; }
 
+            // Nur arbeiten, wenn die Datei seit dem letzten Tick GEWACHSEN ist,
+            // und das schwere Parsen lokal kapseln (ein Fehler darf den Lauf
+            // NICHT abbrechen/abstuerzen lassen - einfach naechster Tick).
             if (part.length > (bs._lastPartLen || 0)) {
                 bs._lastPartLen = part.length;
-                // Aus dem bisher gestreamten NDJSON die schon KOMPLETTEN Objekte ziehen
-                var assembled = "";
-                try { assembled = jsonUnescape(extractAssistantFromNdjson(part)).replace(/\\n/g, "\n"); }
-                catch(eAa) { assembled = part; }
-                var objs = wsExtractObjects(assembled);
-                for (var oi = 0; oi < objs.length; oi++) {
+                var objs = null;
+                try {
+                    var assembled = jsonUnescape(extractAssistantFromNdjson(part)).replace(/\\n/g, "\n");
+                    objs = wsExtractObjects(assembled);
+                } catch(eAa) { objs = null; }
+                // Nur die NEUEN, noch nicht verarbeiteten Objekte ansehen
+                // (Indizes <= bs._objCount sind bereits fertig + stabil).
+                for (var oi = (bs._objCount || 0); objs && oi < objs.length; oi++) {
                     var od = null;
                     try { var ev = eval("(" + objs[oi] + ")"); if (ev && ev.datei != null) od = ev; } catch(eEv) {}
                     if (!od) continue;
@@ -8416,6 +8421,7 @@ function wsBatchTick() {
                           " -> " + (od.klassifikation || "?"), "ok");
                     wsProgress(bs.streamProcessed.length, bs._nMails);
                 }
+                if (objs) bs._objCount = objs.length;
             }
 
             // Fertig, sobald ALLE Objekte da sind ODER der Stream zu ist
@@ -8436,7 +8442,7 @@ function wsBatchTick() {
                 wsLog("... Stream laeuft (" + bs.streamProcessed.length + "/" + bs._nMails +
                       " fertig, " + Math.round(elS/1000) + "s)", "muted");
             }
-            return setTimeout(wsBatchTick, 1000);
+            return setTimeout(wsBatchTick, 1500);
         }
     } catch(eT) {
         return wsBatchFail(bs, "Tick: " + (eT.message || "?"));
@@ -8951,20 +8957,43 @@ function wsStartCombined(onDone) {
     var nMails = mails.length;
     var nWorkers = Math.min(WS_KOMBI_WORKERS, nMails);
     if (nWorkers < 1) nWorkers = 1;
-    var per = Math.ceil(nMails / nWorkers);
+
+    // Last NICHT nach Mail-Anzahl, sondern nach PDF-BYTES verteilen: ein dicker
+    // (Scan-)Vertrag dominiert die Word-Reflow-Zeit. LPT-Scheduling: groesste
+    // Vorgaenge zuerst, jeweils dem aktuell leichtesten Worker zuweisen.
+    var items = [];
+    for (var mi0 = 0; mi0 < nMails; mi0++) {
+        var m0 = mails[mi0];
+        if (m0.error) continue;
+        var sz = 200;
+        for (var ps = 0; ps < m0.pdfPaths.length; ps++) {
+            try { sz += fso.GetFile(m0.pdfPaths[ps].path).Size; } catch(eSz) { sz += 50000; }
+        }
+        items.push({ mi: mi0, m: m0, sz: sz });
+    }
+    items.sort(function(a, b) { return b.sz - a.sz; });
+    var buckets = [], loads = [];
+    for (var bi = 0; bi < nWorkers; bi++) { buckets.push([]); loads.push(0); }
+    for (var it = 0; it < items.length; it++) {
+        var lw = 0;
+        for (var lj = 1; lj < nWorkers; lj++) if (loads[lj] < loads[lw]) lw = lj;
+        buckets[lw].push(items[it]);
+        loads[lw] += items[it].sz;
+    }
+
     var parts = [];
+    var spawnList = [];
     for (var w = 0; w < nWorkers; w++) {
-        var from = w * per, to = Math.min(from + per, nMails);
-        if (from >= to) break;
+        var bk = buckets[w];
+        if (!bk.length) continue;
         var jobPath = tmp + "\\ergo_kombi_" + stamp + "_job" + w + ".txt";
         var docxPath = tmp + "\\ergo_kombi_" + stamp + "_part" + w + ".docx";
         var okPath = tmp + "\\ergo_kombi_" + stamp + "_part" + w + ".ok";
         try { fso.DeleteFile(okPath, true); } catch(e) {}
         var bodyFiles = [];
         var jobLines = [];
-        for (var mi = from; mi < to; mi++) {
-            var m = mails[mi];
-            if (m.error) continue;
+        for (var bj = 0; bj < bk.length; bj++) {
+            var m = bk[bj].m, mi = bk[bj].mi;
             var bodyPath = tmp + "\\ergo_kombi_" + stamp + "_b" + mi + ".txt";
             try { var bf = fso.CreateTextFile(bodyPath, true, true); bf.Write(String(m.body || "(kein Text)")); bf.Close(); }
             catch(eB) { bodyPath = ""; }
@@ -8979,10 +9008,20 @@ function wsStartCombined(onDone) {
         try { var jf = fso.CreateTextFile(jobPath, true, true); jf.Write(jobLines.join("\r\n")); jf.Close(); }
         catch(eJ) { continue; }
         var cmd = 'wscript.exe //NoLogo //B "' + vbsPath + '" "' + jobPath + '" "' + docxPath + '" "' + okPath + '"';
-        shell.Run(cmd, 0, false);   // fire-and-forget, eigener Word-Prozess
         parts.push({ w: w, jobPath: jobPath, docxPath: docxPath, okPath: okPath,
-                     bodyFiles: bodyFiles, from: from, to: to, status: null });
+                     bodyFiles: bodyFiles, count: bk.length,
+                     mb: Math.round(loads[w]/104857.6)/10, status: null });
+        spawnList.push({ cmd: cmd, w: w, count: bk.length, mb: Math.round(loads[w]/104857.6)/10 });
     }
+
+    // Gestaffelter Start (~1.5s) -> kein gleichzeitiger Word/Normal.dotm-Ansturm
+    (function spawnNext(k) {
+        if (k >= spawnList.length) return;
+        var s = spawnList[k];
+        try { shell.Run(s.cmd, 0, false); } catch(eRun) {}
+        wsLog("Worker " + (s.w+1) + " gestartet (" + s.count + " Mails, ~" + s.mb + " MB PDF)", "muted");
+        setTimeout(function() { spawnNext(k+1); }, 1500);
+    })(0);
 
     state._wsKombi = {
         mails: mails, parts: parts, combinedPdf: combinedPdf, onDone: onDone || null,
@@ -9006,7 +9045,7 @@ function wsKombiPoll() {
             try { var ts = fso.OpenTextFile(p.okPath, 1, false, 0); txt = ts.AtEndOfStream ? "OK" : ts.ReadAll(); ts.Close(); } catch(e) {}
             p.status = (String(txt).substr(0,3) === "ERR") ? "err" : "ok";
             if (p.status === "err") wsLog("Worker " + (p.w+1) + " Fehler: " + txt, "err");
-            else wsLog("Worker " + (p.w+1) + " fertig (" + (p.to - p.from) + " Mails -> Teil-Docx).", "ok");
+            else wsLog("Worker " + (p.w+1) + " fertig (" + p.count + " Mails -> Teil-Docx).", "ok");
             done++;
         }
     }
@@ -9524,7 +9563,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.97</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.98</div>
     </div>
 </div>
 
