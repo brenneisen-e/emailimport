@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.74"
+        VERSION="1.75"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.74 - PROTOTYP "Cookie automatisch holen": ErgoGPT-Login im WinINET-Fenster (weisses ERGO-Design), danach Cookie inkl. HttpOnly via PowerShell + InternetGetCookieEx auslesen und als Cookie.txt uebernehmen. v1.73 - Entwurfs-Mail Label-Abstand, leere Felder gefiltert, Umlaute fix</div>
+            <div class="ver">v1.75 - "Cookie automatisch holen" jetzt als Schritt 1 IM Workshop-Frontend (weisses ERGO-Design) statt separatem Fenster: anmelden + Cookie inkl. HttpOnly via InternetGetCookieEx uebernehmen, dann Ordner + Analyse. v1.73 - Entwurfs-Mail Label-Abstand, leere Felder gefiltert, Umlaute fix</div>
         </div>
 
         <!-- Cookie -->
@@ -211,7 +211,6 @@
                     <button class="btn btn-secondary" onclick="toggleCookieVis()" title="Sichtbarkeit umschalten">&#128065;</button>
                     <button class="btn btn-success" onclick="saveCookie()">Speichern</button>
                     <button class="btn btn-secondary" onclick="loadCookieFromFile()" title="Cookie.txt erneut von der Platte laden">&#128260; Neu laden</button>
-                    <button class="btn btn-secondary" onclick="openCookieAutoMode()" title="Prototyp: bei ErgoGPT anmelden und den Cookie automatisch aus dem WinINET-Speicher uebernehmen">&#128273; Cookie automatisch holen</button>
                     <span id="cookieStatus" class="cookie-status missing">Cookie fehlt</span>
                 </div>
                 <div class="info-box" style="margin-top: 0.4rem;">
@@ -7148,11 +7147,18 @@ function openWorkshopMode() {
     document.getElementById("wsLog").style.display = "none";
     document.getElementById("wsLog").innerText = "";
     wsHideStatus();
+    caResetCard();
     if (!outlookApp) wsShowError("Outlook ist nicht verbunden - bitte erst in Hauptmodus die Verbindung pruefen.");
-    if (state.cookie.length < 50) wsShowError("Cookie fehlt - bitte erst im Hauptmodus eintragen.");
+    if (state.cookie.length < 50) {
+        caStatus("info", "Noch kein Cookie. Schritt 1: anmelden und Cookie automatisch uebernehmen.");
+    } else {
+        caStatus("success", "Cookie bereits vorhanden (" + state.cookie.length + " Zeichen). Schritt 1 nur noetig, wenn er abgelaufen ist.");
+    }
 }
 
 function closeWorkshopMode() {
+    var fr = document.getElementById("caFrame");
+    if (fr) fr.src = "about:blank";
     var ov = document.getElementById("workshopOverlay");
     if (ov) ov.style.display = "none";
 }
@@ -7794,19 +7800,14 @@ function wsFinishDemo(processed) {
 // COOKIE AUTOMATISCH HOLEN (Prototyp) - SSO-Login im WinINET-Zone-Browser,
 // danach Cookie inkl. HttpOnly via PowerShell + InternetGetCookieEx auslesen.
 // ============================================================================
-function openCookieAutoMode() {
-    document.getElementById("cookieAutoOverlay").style.display = "block";
+// Cookie-Karte im Workshop-Overlay zuruecksetzen (von openWorkshopMode genutzt).
+function caResetCard() {
     caResetStatus();
     caLog("", true);
-    document.getElementById("caStep2Btn").disabled = true;
+    var b = document.getElementById("caStep2Btn");
+    if (b) b.disabled = true;
     var fr = document.getElementById("caFrame");
-    if (fr) fr.src = "about:blank";
-}
-
-function closeCookieAutoMode() {
-    var fr = document.getElementById("caFrame");
-    if (fr) fr.src = "about:blank";
-    document.getElementById("cookieAutoOverlay").style.display = "none";
+    if (fr) { fr.style.display = "none"; fr.src = "about:blank"; }
 }
 
 function caResetStatus() {
@@ -8178,6 +8179,10 @@ End Function
     font-size: 12px; color: #4b5563; max-height: 200px; overflow-y: auto;
     display: none; white-space: pre-wrap; margin-top: 16px;
 }
+#workshopOverlay .ws-ca-frame {
+    width: 100%; height: 420px; border: 1px solid #e5e7eb; border-radius: 10px;
+    margin-top: 16px; display: none; background: #fafafa;
+}
 #workshopOverlay .ws-footer { text-align: center; color: #9ca3af; font-size: 11px; margin-top: 40px; }
 </style>
 
@@ -8191,7 +8196,25 @@ End Function
         </div>
 
         <div class="ws-card">
-            <div class="ws-step-label"><span class="ws-step-num">1</span>Ordner mit Demo-Mails waehlen</div>
+            <div class="ws-step-label"><span class="ws-step-num">1</span>Bei ErgoGPT anmelden &amp; Cookie holen</div>
+            <div style="font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.55;">
+                ErgoGPT oeffnen und normal anmelden (SSO laeuft i.&nbsp;d.&nbsp;R. automatisch mit der
+                Windows-Anmeldung). Danach wird der Cookie automatisch uebernommen &mdash; kein manuelles
+                Kopieren mehr noetig. <em>Prototyp: funktioniert nur, wenn die Anmeldung in diesem Fenster
+                laeuft (nicht separat in Chrome/Edge); je nach GPO kann PowerShell gesperrt sein.</em>
+            </div>
+            <div id="caStatusInfo" class="ws-status ws-info"></div>
+            <div id="caStatusSuccess" class="ws-status ws-success"></div>
+            <div id="caStatusError" class="ws-status ws-error"></div>
+            <button class="ws-btn-folder" style="margin-right:8px;margin-bottom:8px;" onclick="caOpenLogin()">1. ErgoGPT-Login oeffnen</button>
+            <button class="ws-btn-folder" style="margin-right:8px;margin-bottom:8px;" onclick="caOpenLoginWindow()">in eigenem Fenster</button>
+            <button class="ws-btn-folder" id="caStep2Btn" onclick="caFetchCookie()" disabled style="margin-bottom:8px;border-color:#c8102e;color:#c8102e;font-weight:600;">2. Cookie uebernehmen</button>
+            <iframe id="caFrame" class="ws-ca-frame" src="about:blank"></iframe>
+            <div class="ws-log" id="caLog"></div>
+        </div>
+
+        <div class="ws-card">
+            <div class="ws-step-label"><span class="ws-step-num">2</span>Ordner mit Demo-Mails waehlen</div>
             <div class="ws-folder-display">
                 <span class="ws-icon">&#128193;</span>
                 <span class="ws-folder-path ws-empty" id="wsFolderPath">Noch kein Ordner gewaehlt</span>
@@ -8206,7 +8229,7 @@ End Function
         </div>
 
         <div class="ws-card">
-            <div class="ws-step-label"><span class="ws-step-num">2</span>Analyse starten</div>
+            <div class="ws-step-label"><span class="ws-step-num">3</span>Analyse starten</div>
             <div id="wsStatusInfo" class="ws-status ws-info"></div>
             <div id="wsStatusSuccess" class="ws-status ws-success"></div>
             <div id="wsStatusError" class="ws-status ws-error"></div>
@@ -8227,127 +8250,6 @@ End Function
         </div>
 
         <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.66</div>
-    </div>
-</div>
-
-<!-- ==================== COOKIE-AUTO-OVERLAY (Prototyp) ==================== -->
-<style>
-#cookieAutoOverlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: #ffffff; z-index: 10000; overflow-y: auto;
-    display: none; font-family: 'Segoe UI', Tahoma, sans-serif;
-}
-#cookieAutoOverlay .ca-wrap { max-width: 760px; margin: 0 auto; padding: 56px 40px; }
-#cookieAutoOverlay .ca-close {
-    position: absolute; top: 20px; right: 24px;
-    background: #ffffff; border: 1px solid #e5e7eb; color: #6b7280;
-    padding: 8px 16px; border-radius: 8px; cursor: pointer;
-    font-size: 13px; font-weight: 500; font-family: inherit;
-}
-#cookieAutoOverlay .ca-close:hover { background: #f3f4f6; color: #1f2937; }
-#cookieAutoOverlay .ca-header { text-align: center; margin-bottom: 40px; }
-#cookieAutoOverlay .ca-logo {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 64px; height: 64px; background: #c8102e; border-radius: 16px;
-    margin-bottom: 20px; color: #fff; font-size: 28px;
-}
-#cookieAutoOverlay .ca-header h1 { font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 8px; }
-#cookieAutoOverlay .ca-sub { font-size: 14px; color: #6b7280; }
-#cookieAutoOverlay .ca-card {
-    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px;
-    padding: 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-}
-#cookieAutoOverlay .ca-step-label {
-    font-size: 14px; font-weight: 600; color: #1f2937;
-    display: flex; align-items: center; margin-bottom: 16px;
-}
-#cookieAutoOverlay .ca-step-num {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px; background: #c8102e; color: #fff;
-    border-radius: 50%; font-weight: 600; font-size: 13px; margin-right: 12px;
-}
-#cookieAutoOverlay .ca-desc { font-size: 13px; color: #6b7280; margin-bottom: 16px; line-height: 1.55; }
-#cookieAutoOverlay button.ca-btn {
-    background: #c8102e; color: #fff; border: none; border-radius: 10px;
-    padding: 14px 24px; font-size: 15px; font-weight: 600; cursor: pointer;
-    font-family: inherit; margin-right: 10px;
-}
-#cookieAutoOverlay button.ca-btn:hover { background: #a30d24; }
-#cookieAutoOverlay button.ca-btn:disabled { background: #d1d5db; cursor: not-allowed; }
-#cookieAutoOverlay button.ca-btn-2 {
-    background: #ffffff; color: #1f2937; border: 1.5px solid #d1d5db;
-    border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 500;
-    cursor: pointer; font-family: inherit;
-}
-#cookieAutoOverlay button.ca-btn-2:hover { background: #f3f4f6; border-color: #9ca3af; }
-#cookieAutoOverlay .ca-frame {
-    width: 100%; height: 460px; border: 1px solid #e5e7eb; border-radius: 10px;
-    margin-top: 16px; display: none; background: #fafafa;
-}
-#cookieAutoOverlay .ca-status {
-    padding: 14px 18px; border-radius: 10px; font-size: 13.5px;
-    margin-bottom: 16px; display: none; line-height: 1.55;
-}
-#cookieAutoOverlay .ca-status.ca-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
-#cookieAutoOverlay .ca-status.ca-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
-#cookieAutoOverlay .ca-status.ca-error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
-#cookieAutoOverlay .ca-log {
-    background: #fafafa; border: 1px solid #e5e7eb; border-radius: 10px;
-    padding: 14px; font-family: 'Consolas','Courier New', monospace;
-    font-size: 12px; color: #4b5563; max-height: 170px; overflow-y: auto;
-    display: none; white-space: pre-wrap; margin-top: 16px;
-}
-#cookieAutoOverlay .ca-hint {
-    background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
-    border-radius: 10px; padding: 14px 18px; font-size: 12.5px;
-    line-height: 1.55; margin-bottom: 22px;
-}
-#cookieAutoOverlay .ca-footer { text-align: center; color: #9ca3af; font-size: 11px; margin-top: 32px; }
-</style>
-
-<div id="cookieAutoOverlay">
-    <button class="ca-close" onclick="closeCookieAutoMode()">&larr; zurueck</button>
-    <div class="ca-wrap">
-        <div class="ca-header">
-            <div class="ca-logo">&#128273;</div>
-            <h1>Cookie automatisch holen</h1>
-            <div class="ca-sub">Prototyp &middot; ErgoGPT-Anmeldung + Cookie aus dem Windows-Speicher uebernehmen</div>
-        </div>
-
-        <div class="ca-hint">
-            <strong>Prototyp / Hinweis:</strong> Es wird der ErgoGPT-Login im Windows-Browser-Speicher
-            (WinINET) geoeffnet; danach liest ein PowerShell-Helfer den Sitzungs-Cookie inkl. HttpOnly
-            aus. Funktioniert nur, wenn die Anmeldung in <em>diesem</em> Fenster laeuft (nicht separat in
-            Chrome/Edge). Je nach GPO/AppLocker kann PowerShell gesperrt sein &mdash; dann bitte den
-            manuellen Weg nutzen.
-        </div>
-
-        <div class="ca-card">
-            <div class="ca-step-label"><span class="ca-step-num">1</span>Bei ErgoGPT anmelden</div>
-            <div class="ca-desc">
-                ErgoGPT oeffnen und ganz normal anmelden (SSO laeuft i.&nbsp;d.&nbsp;R. automatisch mit
-                der Windows-Anmeldung). Login bleibt im selben Cookie-Speicher, den Schritt&nbsp;2 ausliest.
-            </div>
-            <button class="ca-btn" onclick="caOpenLogin()">ErgoGPT-Login oeffnen</button>
-            <button class="ca-btn-2" onclick="caOpenLoginWindow()">In eigenem Fenster oeffnen</button>
-            <iframe id="caFrame" class="ca-frame" src="about:blank"></iframe>
-        </div>
-
-        <div class="ca-card">
-            <div class="ca-step-label"><span class="ca-step-num">2</span>Cookie uebernehmen</div>
-            <div class="ca-desc">
-                Liest den Cookie (inkl. HttpOnly-Session) per <code>InternetGetCookieEx</code> aus und
-                speichert ihn als <code>Cookie.txt</code> neben der HTA &mdash; danach ist die KI-Analyse
-                sofort einsatzbereit.
-            </div>
-            <div id="caStatusInfo" class="ca-status ca-info"></div>
-            <div id="caStatusSuccess" class="ca-status ca-success"></div>
-            <div id="caStatusError" class="ca-status ca-error"></div>
-            <button class="ca-btn" id="caStep2Btn" onclick="caFetchCookie()" disabled>Cookie jetzt auslesen &amp; uebernehmen</button>
-            <div class="ca-log" id="caLog"></div>
-        </div>
-
-        <div class="ca-footer">Prototyp &middot; WinINET / InternetGetCookieEx &middot; ERGO Vorgang-Analyse</div>
     </div>
 </div>
 
