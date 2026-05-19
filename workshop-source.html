@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v2.03 - HTA Quellcode</title>
+<title>ERGO Workshop v2.04 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v2.03</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v2.04</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.03"
+        VERSION="2.04"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.03 - Batch-Abbruch "JSON-Array nicht parsebar": jetzt DIAG-Ausgabe im Log (HTTP-Status, Antwortlaenge, erste 300 Zeichen) -> Ursache (leere/HTML-/Fehlerantwort) wird sichtbar. v2.02 - Scan-Skip-Fix (Groesse zuerst + Pre-Save-Skip)</div>
+            <div class="ver">v2.04 - CRASH-FIX Kombi-Streaming: (1) Log wird sofort in Workshop-Log_*.txt geschrieben (uebersteht HTA-Absturz, danach oeffenbar); (2) Stream-Subprozess nutzt WinHttp statt MSXML (Cookie/Origin-Header erlaubt) und schreibt die Antwort EINMAL; (3) HTA parst NICHT mehr die wachsende Datei jede Sekunde (das war der mshta-Crash) - liest+parst genau einmal wenn fertig. v2.03 - DIAG bei Parse-Fehler</div>
         </div>
 
         <!-- Cookie -->
@@ -7276,6 +7276,37 @@ function wsLog(msg, kind) {
         (isBlank ? '' : '<span class="ws-llt">' + ts + '</span>') +
         '<span class="ws-llm">' + (isBlank ? '&amp;nbsp;' : wsEsc(s)) + '</span></div>';
     el.scrollTop = el.scrollHeight;
+    // Zusaetzlich SOFORT in eine .txt schreiben - bleibt erhalten, falls die
+    // HTA hart abstuerzt/schliesst. Datei: <Ordner>\_KI-Vorgaenge bzw. %TEMP%.
+    try {
+        if (!state._wsLogFile) {
+            var lf = new ActiveXObject("Scripting.FileSystemObject");
+            var lsh = new ActiveXObject("WScript.Shell");
+            var dir = "";
+            try {
+                if (state._wsFolder) {
+                    dir = state._wsFolder.replace(/\\+$/, "") + "\\_KI-Vorgaenge";
+                    if (!lf.FolderExists(dir)) lf.CreateFolder(dir);
+                }
+            } catch(eLd) { dir = ""; }
+            if (!dir) { try { dir = lsh.ExpandEnvironmentStrings("%TEMP%"); } catch(e) {} }
+            var dt2 = new Date();
+            var stmp = String(dt2.getFullYear()) + p2(dt2.getMonth()+1) + p2(dt2.getDate()) + "_" +
+                       p2(dt2.getHours()) + p2(dt2.getMinutes()) + p2(dt2.getSeconds());
+            state._wsLogFile = dir.replace(/\\+$/, "") + "\\Workshop-Log_" + stmp + ".txt";
+            var hf = lf.CreateTextFile(state._wsLogFile, true, true); // Unicode (Umlaute)
+            hf.WriteLine("ERGO Workshop Log - " + dt2.toLocaleString());
+            hf.WriteLine("==================================================");
+            hf.Close();
+            var first = el.getElementsByClassName ? null : null;
+            // Pfad einmalig sichtbar machen
+            el.innerHTML += '<div class="ws-ll ws-ll-muted"><span class="ws-llt">' + ts +
+                '</span><span class="ws-llm">Log-Datei: ' + wsEsc(state._wsLogFile) + '</span></div>';
+        }
+        var af = new ActiveXObject("Scripting.FileSystemObject").OpenTextFile(state._wsLogFile, 8, true, -1);
+        af.WriteLine(ts + "  [" + kind + "]  " + s);
+        af.Close();
+    } catch(eLog) {}
 }
 function wsProgress(done, total) {
     var pct = total > 0 ? Math.round(done * 100 / total) : 0;
@@ -8517,8 +8548,22 @@ function wsBatchTick() {
                 try { var ef = fso.OpenTextFile(sh2.errFile, 1, false, 0); em = ef.AtEndOfStream ? "" : ef.ReadAll(); ef.Close(); } catch(e) {}
                 return wsBatchFail(bs, "Stream-Fehler: " + (em || "unbekannt"));
             }
-            var doneNow = fso.FileExists(sh2.doneFile);
-            // Partielle Antwort lesen (UTF-8) - nicht blockierend, Datei waechst
+            // WICHTIG (Crash-Fix): die wachsende .part-Datei wird NICHT mehr
+            // jede Sekunde gelesen/geparst (das war der mshta-Crash-Vektor:
+            // schweres Regex/eval ueber einen riesigen, ggf. garbled Buffer
+            // bei gleichzeitigem Schreiben durch den Subprozess). Der
+            // Subprozess (WinHttp) wartet die ganze Antwort ab und schreibt
+            // EINMAL doneFile. Wir lesen + parsen GENAU EINMAL - wenn fertig.
+            if (!fso.FileExists(sh2.doneFile)) {
+                if (elS - (bs._hbAt || 0) >= 10000) {
+                    bs._hbAt = elS;
+                    wsLog("... Antwort wird empfangen, Subprozess laeuft (" +
+                          Math.round(elS/1000) + "s) - HTA bleibt ansprechbar", "muted");
+                }
+                return setTimeout(wsBatchTick, 1500);
+            }
+
+            // Fertig -> Antwort EINMAL lesen (UTF-8) und parsen
             var part = "";
             try {
                 if (fso.FileExists(sh2.partFile)) {
@@ -8528,70 +8573,51 @@ function wsBatchTick() {
                     part = String(pstm.ReadText()); pstm.Close();
                 }
             } catch(ePr) { part = ""; }
-
-            // Nur arbeiten, wenn die Datei seit dem letzten Tick GEWACHSEN ist,
-            // und das schwere Parsen lokal kapseln (ein Fehler darf den Lauf
-            // NICHT abbrechen/abstuerzen lassen - einfach naechster Tick).
-            if (part.length > (bs._lastPartLen || 0)) {
-                bs._lastPartLen = part.length;
-                var objs = null;
-                try {
-                    var assembled = jsonUnescape(extractAssistantFromNdjson(part)).replace(/\\n/g, "\n");
-                    objs = wsExtractObjects(assembled);
-                } catch(eAa) { objs = null; }
-                // Nur die NEUEN, noch nicht verarbeiteten Objekte ansehen
-                // (Indizes <= bs._objCount sind bereits fertig + stabil).
-                for (var oi = (bs._objCount || 0); objs &amp;&amp; oi < objs.length; oi++) {
-                    var od = null;
-                    try { var ev = eval("(" + objs[oi] + ")"); if (ev &amp;&amp; ev.datei != null) od = ev; } catch(eEv) {}
-                    if (!od) continue;
-                    var key = String(od.datei).toLowerCase();
-                    if (bs._seen[key]) continue;
-                    // Auf eine Mail mappen (per datei, sonst naechste freie)
-                    var mm2 = null, kl;
-                    for (var mj = 0; mj < bs.mails.length; mj++) {
-                        if (bs._used[mj] || bs.mails[mj].error) continue;
-                        var fnL = String(bs.mails[mj].fileName).toLowerCase();
-                        if (key === fnL || key.indexOf(fnL) >= 0 || fnL.indexOf(key) >= 0) { mm2 = bs.mails[mj]; bs._used[mj] = true; break; }
-                    }
-                    if (!mm2) { for (var mk = 0; mk < bs.mails.length; mk++) { if (!bs._used[mk] &amp;&amp; !bs.mails[mk].error) { mm2 = bs.mails[mk]; bs._used[mk] = true; break; } } }
-                    if (!mm2) continue;
-                    bs._seen[key] = true;
-                    bs.streamProcessed.push({
-                        msgPath: mm2.msgPath, fileName: mm2.fileName, datum: mm2.datum,
-                        absName: mm2.absName, absMail: mm2.absMail, betreff: mm2.betreff,
-                        anhangAlle: mm2.anhangAlle, data: od,
-                        isReminder: od.ist_reminder === "ja",
-                        klassifikation: od.klassifikation || "",
-                        summary: (od.zusammenfassung || "").substr(0, 200)
-                    });
-                    wsLog("Vorgang " + bs.streamProcessed.length + "/" + bs._nMails + " fertig: " +
-                          (mm2.fileName.length > 42 ? mm2.fileName.substr(0,42)+"..." : mm2.fileName) +
-                          " -> " + (od.klassifikation || "?"), "ok");
-                    wsProgress(bs.streamProcessed.length, bs._nMails);
+            var objs = null, _asm2 = "";
+            try {
+                _asm2 = jsonUnescape(extractAssistantFromNdjson(part)).replace(/\\n/g, "\n");
+                objs = wsExtractObjects(_asm2);
+            } catch(eAa) { objs = null; }
+            for (var oi = 0; objs &amp;&amp; oi < objs.length; oi++) {
+                var od = null;
+                try { var ev = eval("(" + objs[oi] + ")"); if (ev &amp;&amp; ev.datei != null) od = ev; } catch(eEv) {}
+                if (!od) continue;
+                var key = String(od.datei).toLowerCase();
+                if (bs._seen[key]) continue;
+                var mm2 = null;
+                for (var mj = 0; mj < bs.mails.length; mj++) {
+                    if (bs._used[mj] || bs.mails[mj].error) continue;
+                    var fnL = String(bs.mails[mj].fileName).toLowerCase();
+                    if (key === fnL || key.indexOf(fnL) >= 0 || fnL.indexOf(key) >= 0) { mm2 = bs.mails[mj]; bs._used[mj] = true; break; }
                 }
-                if (objs) bs._objCount = objs.length;
+                if (!mm2) { for (var mk = 0; mk < bs.mails.length; mk++) { if (!bs._used[mk] &amp;&amp; !bs.mails[mk].error) { mm2 = bs.mails[mk]; bs._used[mk] = true; break; } } }
+                if (!mm2) continue;
+                bs._seen[key] = true;
+                bs.streamProcessed.push({
+                    msgPath: mm2.msgPath, fileName: mm2.fileName, datum: mm2.datum,
+                    absName: mm2.absName, absMail: mm2.absMail, betreff: mm2.betreff,
+                    anhangAlle: mm2.anhangAlle, data: od,
+                    isReminder: od.ist_reminder === "ja",
+                    klassifikation: od.klassifikation || "",
+                    summary: (od.zusammenfassung || "").substr(0, 200)
+                });
+                wsLog("Vorgang " + bs.streamProcessed.length + "/" + bs._nMails + ": " +
+                      (mm2.fileName.length > 42 ? mm2.fileName.substr(0,42)+"..." : mm2.fileName) +
+                      " -> " + (od.klassifikation || "?"), "ok");
+                wsProgress(bs.streamProcessed.length, bs._nMails);
             }
-
-            // Fertig, sobald ALLE Objekte da sind ODER der Stream zu ist
-            // -> NICHT auf Socket-Schliessung / Timeout warten.
-            if (bs.streamProcessed.length >= bs._nMails || doneNow) {
-                try { fso.DeleteFile(sh2.partFile, true); } catch(e) {}
-                try { fso.DeleteFile(sh2.doneFile, true); } catch(e) {}
-                try { fso.DeleteFile(sh2.cookieFile, true); } catch(e) {}
-                try { fso.DeleteFile(sh2.payloadFile, true); } catch(e) {}
-                try { fso.DeleteFile(sh2.vbsPath, true); } catch(e) {}
-                if (bs.streamProcessed.length === 0) return wsBatchFail(bs, "Stream beendet, aber kein gueltiges Objekt erkannt.");
-                wsLog("Stream verarbeitet: " + bs.streamProcessed.length + "/" + bs._nMails +
-                      " Vorgaenge" + (doneNow &amp;&amp; bs.streamProcessed.length < bs._nMails ? " (Stream endete vorzeitig)" : ""), "head");
-                return wsBatchFinish(bs, fso, bs.streamProcessed);
+            try { fso.DeleteFile(sh2.partFile, true); } catch(e) {}
+            try { fso.DeleteFile(sh2.doneFile, true); } catch(e) {}
+            try { fso.DeleteFile(sh2.cookieFile, true); } catch(e) {}
+            try { fso.DeleteFile(sh2.payloadFile, true); } catch(e) {}
+            try { fso.DeleteFile(sh2.vbsPath, true); } catch(e) {}
+            if (bs.streamProcessed.length === 0) {
+                wsLog("DIAG: Antwort " + part.length + " Z., assembled " + _asm2.length +
+                      " Z. Anfang: " + String(_asm2 || part).substr(0,300).replace(/\s+/g," "), "err");
+                return wsBatchFail(bs, "Antwort erhalten, aber kein gueltiges Objekt erkannt - siehe DIAG/Log-Datei.");
             }
-            if (elS - (bs._hbAt || 0) >= 12000) {
-                bs._hbAt = elS;
-                wsLog("... Stream laeuft (" + bs.streamProcessed.length + "/" + bs._nMails +
-                      " fertig, " + Math.round(elS/1000) + "s)", "muted");
-            }
-            return setTimeout(wsBatchTick, 1500);
+            wsLog("Antwort verarbeitet: " + bs.streamProcessed.length + "/" + bs._nMails + " Vorgaenge", "head");
+            return wsBatchFinish(bs, fso, bs.streamProcessed);
         }
     } catch(eT) {
         return wsBatchFail(bs, "Tick: " + (eT.message || "?"));
@@ -8635,41 +8661,37 @@ function wsBuildStreamVbs() {
     v.push("Dim bs2 : Set bs2 = CreateObject(\"ADODB.Stream\")");
     v.push("bs2.Type = 1 : bs2.Open : bs2.LoadFromFile payloadFile");
     v.push("Dim body : body = bs2.Read : bs2.Close");
-    v.push("Dim x : Set x = CreateObject(\"MSXML2.XMLHTTP.6.0\")");
-    v.push("x.open \"PUT\", url, True");
-    v.push("x.setRequestHeader \"Content-Type\", \"application/json;charset=UTF-8\"");
-    v.push("x.setRequestHeader \"Accept\", \"*/*\"");
-    v.push("x.setRequestHeader \"Cookie\", cookie");
+    // WinHttp (NICHT MSXML.XMLHTTP): erlaubt Cookie/Origin/Referer-Header
+    // (XMLHTTP blockt diese als 'restricted' -> Worker scheiterte). Synchron,
+    // EINMAL die volle Antwort schreiben - kein 350ms-Overwrite-Loop, der
+    // gleichzeitig von der HTA gelesen wurde (Crash-Vektor entfernt).
+    v.push("Dim x : Set x = CreateObject(\"WinHttp.WinHttpRequest.5.1\")");
+    v.push("x.SetTimeouts 30000, 30000, 60000, 1200000");
+    v.push("x.Open \"PUT\", url, False");
+    v.push("On Error Resume Next : x.SetProxy 0 : On Error Resume Next");
+    v.push("x.SetRequestHeader \"Content-Type\", \"application/json;charset=UTF-8\"");
+    v.push("x.SetRequestHeader \"Accept\", \"*/*\"");
+    v.push("x.SetRequestHeader \"Cookie\", cookie");
     v.push("If xsrf <> \"\" Then");
-    v.push("    x.setRequestHeader \"X-XSRF-TOKEN\", xsrf");
-    v.push("    x.setRequestHeader \"X-CSRF-TOKEN\", xsrf");
+    v.push("    x.SetRequestHeader \"X-XSRF-TOKEN\", xsrf");
+    v.push("    x.SetRequestHeader \"X-CSRF-TOKEN\", xsrf");
     v.push("End If");
-    v.push("x.setRequestHeader \"Origin\", \"https://gpt.ergo.com\"");
-    v.push("x.setRequestHeader \"Referer\", \"https://gpt.ergo.com/\"");
-    v.push("x.setRequestHeader \"X-Requested-With\", \"XMLHttpRequest\"");
-    v.push("x.send body");
+    v.push("x.SetRequestHeader \"Origin\", \"https://gpt.ergo.com\"");
+    v.push("x.SetRequestHeader \"Referer\", \"https://gpt.ergo.com/\"");
+    v.push("x.SetRequestHeader \"X-Requested-With\", \"XMLHttpRequest\"");
+    v.push("Err.Clear");
+    v.push("x.Send body");
     v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"send: \" &amp; Err.Description : WScript.Quit");
-    v.push("Dim lastLen : lastLen = 0");
-    v.push("Do");
-    v.push("    Dim rs : rs = -1");
-    v.push("    rs = x.readyState");
-    v.push("    If rs >= 3 Then");
-    v.push("        Dim t : t = \"\"");
-    v.push("        Err.Clear : t = x.responseText");
-    v.push("        If Err.Number = 0 And Len(t) > lastLen Then");
-    v.push("            Dim w : Set w = CreateObject(\"ADODB.Stream\")");
-    v.push("            w.Type = 2 : w.Charset = \"utf-8\" : w.Open : w.WriteText t");
-    v.push("            w.SaveToFile partFile, 2 : w.Close");
-    v.push("            lastLen = Len(t)");
-    v.push("        End If");
-    v.push("        Err.Clear");
-    v.push("    End If");
-    v.push("    If rs = 4 Then Exit Do");
-    v.push("    WScript.Sleep 350");
-    v.push("Loop");
     v.push("Dim st : st = 0");
-    v.push("Err.Clear : st = x.status");
-    v.push("If st <> 200 And st <> 0 Then WriteErr fso, errFile, \"HTTP \" &amp; st : WScript.Quit");
+    v.push("Err.Clear : st = x.Status");
+    v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"status: \" &amp; Err.Description : WScript.Quit");
+    v.push("If st <> 200 Then WriteErr fso, errFile, \"HTTP \" &amp; st : WScript.Quit");
+    // Antwort als UTF-8 schreiben (Bytes -> Datei), dann done-Marker
+    v.push("Dim rb : rb = x.ResponseBody");
+    v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"body: \" &amp; Err.Description : WScript.Quit");
+    v.push("Dim w : Set w = CreateObject(\"ADODB.Stream\")");
+    v.push("w.Type = 1 : w.Open : w.Write rb : w.SaveToFile partFile, 2 : w.Close");
+    v.push("If Err.Number <> 0 Then WriteErr fso, errFile, \"write: \" &amp; Err.Description : WScript.Quit");
     v.push("Dim df : Set df = fso.CreateTextFile(doneFile, True, False) : df.Write \"OK \" &amp; st : df.Close");
     v.push("");
     v.push("Sub WriteErr(f, p, m)");
@@ -9720,7 +9742,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.03</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.04</div>
     </div>
 </div>
 
