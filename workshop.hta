@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.81"
+        VERSION="1.82"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.81 - Workshop: neuer BATCH-Modus (alle Mails + PDFs in EINER Conversation/EINEM Prompt, JSON-Array, Mapping per Dateiname) per Knopf, sowie TESTMODUS (erst Parallel, dann Batch, schreibt Vergleichsdatei Parallel-vs-Batch je Feld zum Hochladen bei einer KI). v1.80 - Cookie nur aus Cookie.txt, PDF-Notiz-Fix, Excel in Vorgangs-Ordner</div>
+            <div class="ver">v1.82 - Fix: Testmodus-Vergleichsdatei wird jetzt als Unicode geschrieben (echte Umlaute aus KI-Daten -> ASCII warf "Ungueltiger Prozeduraufruf"). v1.81 - Workshop BATCH-Modus + TESTMODUS (Parallel vs. Batch Vergleichsdatei)</div>
         </div>
 
         <!-- Cookie -->
@@ -8286,7 +8286,9 @@ function wsWriteComparison(par, bat) {
                 p2(dt.getHours()) + p2(dt.getMinutes()) + p2(dt.getSeconds());
     var path = outDir.replace(/\\+$/, "") + "\\KI-Vergleich_Parallel-vs-Batch_" + stamp + ".txt";
     try {
-        var f = fso.CreateTextFile(path, true, false); // ASCII (Umlaute bleiben lesbar genug)
+        // Unicode (UTF-16) - der Text enthaelt echte Umlaute aus den KI-Daten;
+        // ASCII-CreateTextFile wuerde bei Nicht-ASCII "Ungueltiger Prozeduraufruf" werfen.
+        var f = fso.CreateTextFile(path, true, true);
         f.Write(t);
         f.Close();
         wsLog("Vergleichsdatei: " + path + " (" + totalDiff + " abweichende Felder gesamt)");
