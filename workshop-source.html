@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v1.98 - HTA Quellcode</title>
+<title>ERGO Workshop v1.99 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v1.98</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v1.99</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.98"
+        VERSION="1.99"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.98 - Kombi-Worker-Last nach PDF-BYTES verteilt (LPT statt Mail-Anzahl -> kein Worker mehr deutlich langsamer) + gestaffelter Start (1.5s, kein Normal.dotm-Ansturm). Streaming-Schleife abgehaertet (nur neue Objekte parsen, lokales try/catch, 1.5s-Takt) gegen mshta-Absturz. v1.97 - Kombi-Antwort als Streaming-Subprozess</div>
+            <div class="ver">v1.99 - FIX Skriptfehler "'per' ist undefiniert" (verwaiste Variable aus dem v1.98-LPT-Umbau brach den Kombi-Start ab). v1.98 - Kombi-Worker-Last nach PDF-Bytes (LPT) + gestaffelter Start + Streaming-Schleife abgehaertet</div>
         </div>
 
         <!-- Cookie -->
@@ -9098,7 +9098,7 @@ function wsStartCombined(onDone) {
         vbsPath: vbsPath, startAt: new Date().getTime(), _hbAt: 0
     };
     wsLog("");
-    wsLog(parts.length + " Word-Worker parallel gestartet (je ~" + per + " Mails) - HTA bleibt ansprechbar...", "head");
+    wsLog(parts.length + " Word-Worker (Last nach PDF-Groesse verteilt) - HTA bleibt ansprechbar...", "head");
     setTimeout(wsKombiPoll, 600);
 }
 
@@ -9633,7 +9633,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v1.98</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v1.99</div>
     </div>
 </div>
 

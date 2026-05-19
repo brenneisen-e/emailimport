@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.98"
+        VERSION="1.99"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.98 - Kombi-Worker-Last nach PDF-BYTES verteilt (LPT statt Mail-Anzahl -> kein Worker mehr deutlich langsamer) + gestaffelter Start (1.5s, kein Normal.dotm-Ansturm). Streaming-Schleife abgehaertet (nur neue Objekte parsen, lokales try/catch, 1.5s-Takt) gegen mshta-Absturz. v1.97 - Kombi-Antwort als Streaming-Subprozess</div>
+            <div class="ver">v1.99 - FIX Skriptfehler "'per' ist undefiniert" (verwaiste Variable aus dem v1.98-LPT-Umbau brach den Kombi-Start ab). v1.98 - Kombi-Worker-Last nach PDF-Bytes (LPT) + gestaffelter Start + Streaming-Schleife abgehaertet</div>
         </div>
 
         <!-- Cookie -->
@@ -9028,7 +9028,7 @@ function wsStartCombined(onDone) {
         vbsPath: vbsPath, startAt: new Date().getTime(), _hbAt: 0
     };
     wsLog("");
-    wsLog(parts.length + " Word-Worker parallel gestartet (je ~" + per + " Mails) - HTA bleibt ansprechbar...", "head");
+    wsLog(parts.length + " Word-Worker (Last nach PDF-Groesse verteilt) - HTA bleibt ansprechbar...", "head");
     setTimeout(wsKombiPoll, 600);
 }
 
@@ -9563,7 +9563,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.98</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.99</div>
     </div>
 </div>
 
