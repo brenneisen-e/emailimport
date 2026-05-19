@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.92 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.93 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.92</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.93</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.92"
+        VERSION="1.93"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.92 - Neuer Modus "Chunked-Batch" (4er-Chunks, alle Chunks parallel - 2026-Best-Practice gegen Lost-in-the-Middle, empfohlen fuer viele Mails) + robuste JSON-Repair-Schicht (Codefences/Kommentare/Trailing-Kommas/Smart-Quotes/Steuerzeichen, notfalls Objekte einzeln per Brace-Matching - rettet auch abgeschnittene Antworten). v1.91 - Testmodus-Text + Umlaut-Fix</div>
+            <div class="ver">v1.93 - Prompt-Schaerfung aus P/B/K-Vergleich (alle Modi): sonderfall nur bei AUSDRUECKLICHER Nennung - Sonderkonditions-Vorbehalt ist KEIN Sondertarif (behebt Kombi-PDF-Fehler); maklerpool LEER wenn nicht aus Mail/PDF/Signatur belegt - nicht aus Absender-Domain raten (behebt Parallel-Halluzination). v1.92 - Chunked-Batch + JSON-Repair</div>
         </div>
 
         <!-- Cookie -->
@@ -7421,7 +7421,7 @@ function wsFieldLines() {
     p += '  "ist_reminder":"ja|nein",\n';
     p += '  "reminder_quelle":"leer wenn nein, sonst komma-getrennt aus: Anhang-PDF-Inhalt, Anhang-Dateiname, Mail-Betreff, Mail-Body",\n';
     p += '  "nicht_neuer_vorgang_grund":"leer wenn Erstvorgang, sonst warum kein neuer (Reminder/WV/Nachreichung)",\n';
-    p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS &amp; Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.)",\n';
+    p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS &amp; Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.). NUR wenn der Pool eindeutig aus Mail-Text/PDF/Signatur hervorgeht. NICHT aus der Absender-Domain oder dem Makler-Namen erraten. Sonst LEER",\n';
     p += '  "makler_nachname":"handelnde Person ODER Makler-Firma beim Makler (NICHT Kunde). Wenn Maklervertrag auf eine Firma laeuft die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS): makler_nachname = eigentlicher Makler (Finanzguru), maklerpool bleibt JDC / Jung, DMS &amp; Cie. Sonst leer",\n';
     p += '  "makler_vorname":"oder leer",\n';
     p += '  "agentur_nummer":"NUR der reine Agentur-Nummern-Wert OHNE das Wort Agentur (z.B. 8903235); leer wenn keine",\n';
@@ -7435,7 +7435,7 @@ function wsFieldLines() {
     p += '  "geschaefts_typ":"BUe einfacher Vertrag|BUe Kundenverbindung|Keine BUe",\n';
     p += '  "unterlagen_angefragt":"ja|nein",\n';
     p += '  "unterlagen_liste":"kommagetrennt fehlende Unterlagen, oder leer",\n';
-    p += '  "sonderfall":"Flottengeschaeft|Sondertarif|Kein Sonderfall",\n';
+    p += '  "sonderfall":"Flottengeschaeft|Sondertarif|Kein Sonderfall. NUR Flottengeschaeft/Sondertarif wenn AUSDRUECKLICH im Vertrag/Anschreiben so benannt. Ein Sonderkonditions-Vorbehalt (\'nicht uebertragen falls Sonderkonditionen verloren gehen\') ist KEIN Sondertarif -> dann Kein Sonderfall. Im Zweifel Kein Sonderfall",\n';
     p += '  "anhang_typen":"kommagetrennt: Maklervollmacht,Police,Antrag,Schadenmeldung,Beitragsrechnung,Anschreiben,Kuendigung,Datenblatt,Sonstiges",\n';
     p += '  "pdf_qualitaet":"Text-PDF|Scan|Mixed|Keine_PDFs|nicht_pruefbar",\n';
     p += '  "enthaelt_maklervollmacht":"ja|nein",\n';
@@ -7487,7 +7487,10 @@ function wsBuildBatchPrompt(mails) {
     p += "CHECK24 ueber Fonds Finanz -> maklerpool='Fonds Finanz Maklerservice GmbH', makler_nachname='CHECK24' ";
     p += "(NUR wenn der Pool auch wirklich aus Mail/PDF hervorgeht, sonst maklerpool leer).\n";
     p += "6. geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n";
-    p += "7. Firmenkunde: kunde_vorname bleibt leer (NICHT 'Firma'), Firmenname in kunde_nachname.\n\n";
+    p += "7. Firmenkunde: kunde_vorname bleibt leer (NICHT 'Firma'), Firmenname in kunde_nachname.\n";
+    p += "8. sonderfall: NUR Flottengeschaeft/Sondertarif wenn AUSDRUECKLICH so benannt. Ein ";
+    p += "Sonderkonditions-Vorbehalt ist KEIN Sondertarif -> Kein Sonderfall. Vorbehalt gehoert in mv_einschraenkungen.\n";
+    p += "9. maklerpool LEER, wenn nicht eindeutig aus Mail/PDF/Signatur belegt - NICHT aus Absender-Domain raten.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown, keine ";
     p += "Erklaerung), GENAU " + mails.length + " Objekte, in derselben Reihenfolge wie die Mails.\n";
     p += "Jedes Objekt hat ZUSAETZLICH als erstes Feld \"datei\" mit dem EXAKTEN Dateinamen.\n";
@@ -8717,7 +8720,10 @@ function wsBuildCombinedPrompt(mails) {
     p += "maklerpool='JDC / Jung, DMS &amp; Cie.', makler_nachname='Finanzguru'; CHECK24 ueber ";
     p += "Fonds Finanz analog; Pool nur wenn wirklich belegt, sonst leer).\n";
     p += "6. geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n";
-    p += "7. Firmenkunde: kunde_vorname leer (nicht 'Firma').\n\n";
+    p += "7. Firmenkunde: kunde_vorname leer (nicht 'Firma').\n";
+    p += "8. sonderfall: NUR Flottengeschaeft/Sondertarif wenn AUSDRUECKLICH so benannt. Ein ";
+    p += "Sonderkonditions-Vorbehalt ist KEIN Sondertarif -> Kein Sonderfall (Vorbehalt -> mv_einschraenkungen).\n";
+    p += "9. maklerpool LEER, wenn nicht eindeutig aus Mail/PDF/Signatur belegt - NICHT aus Absender-Domain raten.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown), GENAU ";
     p += mails.length + " Objekte. Echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß):\n";
     p += "[\n  {\n";
