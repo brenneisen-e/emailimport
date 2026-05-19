@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v1.82 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v1.83 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v1.82</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v1.83</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.82"
+        VERSION="1.83"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.82 - Fix: Testmodus-Vergleichsdatei wird jetzt als Unicode geschrieben (echte Umlaute aus KI-Daten -> ASCII warf "Ungueltiger Prozeduraufruf"). v1.81 - Workshop BATCH-Modus + TESTMODUS (Parallel vs. Batch Vergleichsdatei)</div>
+            <div class="ver">v1.83 - Batch-Prompt verschaerft (nur Batch, Parallel unveraendert): Reminder bleibt 'BUe-Vorgang' (nicht 'Anfrage-Ruecksprache'), makler_nummer-Format 'Agentur X / Vermittler Y', auftrag_datum TT.MM.JJJJ, Pool vs. eigentlicher Makler (Finanzguru/JDC, CHECK24/Fonds Finanz), Firmenkunde kunde_vorname leer. v1.82 - Vergleichsdatei als Unicode</div>
         </div>
 
         <!-- Cookie -->
@@ -7446,9 +7446,23 @@ function wsBuildBatchPrompt(mails) {
         p += "Body:\n<<<\n" + m.body + "\n>>>\n";
     }
     p += "\n========== ENDE ==========\n\n";
-    p += "WICHTIG zu makler_nummer - STRENGE Priorisierung: 1. Agentur-/Vermittler-Nr. ";
-    p += "im Briefkopf  2. BD-/Bestandsnummer/Beraterzeichen  3. NUR Fallback Pool-IDs.\n";
-    p += "geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n\n";
+    p += "REGELN (strikt einhalten, sonst Mappingfehler):\n";
+    p += "1. Reihenfolge &amp; Mapping: Genau " + mails.length + " Objekte in der Reihenfolge der Mails, ";
+    p += "Feld \"datei\" = EXAKTER Dateiname. PDFs der Mail zuordnen, deren Dateiname/Inhalt passt. Vorgaenge NICHT vermischen.\n";
+    p += "2. klassifikation bei Reminder/Erinnerung/Mahnung: NICHT 'Anfrage-Ruecksprache' - ";
+    p += "klassifiziere nach dem ZUGRUNDE LIEGENDEN Vorgang (Bestandsuebertragung -> 'BUe-Vorgang') ";
+    p += "und setze ist_reminder='ja'. Eine Erinnerung an eine BUe ist weiterhin ein 'BUe-Vorgang'.\n";
+    p += "3. makler_nummer - STRENGE Prioritaet (1. Agentur-/Vermittler-Nr. im Briefkopf, ";
+    p += "2. BD-/Bestandsnummer/Beraterzeichen, 3. nur Fallback Pool-IDs). Format EXAKT ";
+    p += "'Agentur <nr> / Vermittler <nr>' (Agentur zuerst, mit ' / ' getrennt); fehlt eine, nur die vorhandene.\n";
+    p += "4. auftrag_datum IMMER im Format TT.MM.JJJJ (z.B. 06.04.2026), niemals ISO/JJJJ-MM-TT.\n";
+    p += "5. maklerpool vs. eigentlicher Makler trennen: laeuft der Maklervertrag auf eine Firma, ";
+    p += "die nur ueber einen Pool abwickelt, ist maklerpool der Pool und makler_nachname die Firma. ";
+    p += "Beispiele: Finanzguru ueber Jung DMS -> maklerpool='JDC / Jung, DMS &amp; Cie.', makler_nachname='Finanzguru'. ";
+    p += "CHECK24 ueber Fonds Finanz -> maklerpool='Fonds Finanz Maklerservice GmbH', makler_nachname='CHECK24' ";
+    p += "(NUR wenn der Pool auch wirklich aus Mail/PDF hervorgeht, sonst maklerpool leer).\n";
+    p += "6. geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n";
+    p += "7. Firmenkunde: kunde_vorname bleibt leer (NICHT 'Firma'), Firmenname in kunde_nachname.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown, keine ";
     p += "Erklaerung), GENAU " + mails.length + " Objekte, in derselben Reihenfolge wie die Mails.\n";
     p += "Jedes Objekt hat ZUSAETZLICH als erstes Feld \"datei\" mit dem EXAKTEN Dateinamen.\n";
