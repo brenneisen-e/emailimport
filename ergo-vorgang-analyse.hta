@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.73"
+        VERSION="1.74"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.73 - Entwurfs-Mail: "Naechster Schritt"/"Hinweis"-Label jetzt mit Abstand zum Text (Outlook-feste Inline-Styles). Leere Felder ("leer"/"-" etc.) werden gefiltert -> kein "leer Finanzguru" mehr. Umlaute ae oe ue ss als numerische HTML-Entities -> korrekt in Outlook unabhaengig vom Charset. v1.72 - Pool vs. eigentlicher Makler getrennt (Finanzguru via Jung DMS)</div>
+            <div class="ver">v1.74 - PROTOTYP "Cookie automatisch holen": ErgoGPT-Login im WinINET-Fenster (weisses ERGO-Design), danach Cookie inkl. HttpOnly via PowerShell + InternetGetCookieEx auslesen und als Cookie.txt uebernehmen. v1.73 - Entwurfs-Mail Label-Abstand, leere Felder gefiltert, Umlaute fix</div>
         </div>
 
         <!-- Cookie -->
@@ -211,6 +211,7 @@
                     <button class="btn btn-secondary" onclick="toggleCookieVis()" title="Sichtbarkeit umschalten">&#128065;</button>
                     <button class="btn btn-success" onclick="saveCookie()">Speichern</button>
                     <button class="btn btn-secondary" onclick="loadCookieFromFile()" title="Cookie.txt erneut von der Platte laden">&#128260; Neu laden</button>
+                    <button class="btn btn-secondary" onclick="openCookieAutoMode()" title="Prototyp: bei ErgoGPT anmelden und den Cookie automatisch aus dem WinINET-Speicher uebernehmen">&#128273; Cookie automatisch holen</button>
                     <span id="cookieStatus" class="cookie-status missing">Cookie fehlt</span>
                 </div>
                 <div class="info-box" style="margin-top: 0.4rem;">
@@ -431,6 +432,7 @@ var outlookApp = null;
 var outlookNS = null;
 var COOKIE_PATH = "";  // computed at startup -> Cookie.txt next to this HTA
 var ERGO_BASE = "https://gpt.ergo.com/api";
+var ERGO_SITE = "https://gpt.ergo.com";  // Cookie-Domain / SSO-Login-Einstieg
 // Limits absichtlich SEHR hoch - die KI soll die volle Mail + alle Anhaenge sehen.
 // MAX_PDFS war frueher 3 (Token-Sparen bei 5000er-Laeufen). Bei kleineren
 // Stichproben gibt es keinen Grund Anhaenge zu droppen.
@@ -7787,6 +7789,204 @@ function wsFinishDemo(processed) {
         wsLog("Original .msg-Dateien bleiben unveraendert.");
     }, 300);
 }
+
+// ============================================================================
+// COOKIE AUTOMATISCH HOLEN (Prototyp) - SSO-Login im WinINET-Zone-Browser,
+// danach Cookie inkl. HttpOnly via PowerShell + InternetGetCookieEx auslesen.
+// ============================================================================
+function openCookieAutoMode() {
+    document.getElementById("cookieAutoOverlay").style.display = "block";
+    caResetStatus();
+    caLog("", true);
+    document.getElementById("caStep2Btn").disabled = true;
+    var fr = document.getElementById("caFrame");
+    if (fr) fr.src = "about:blank";
+}
+
+function closeCookieAutoMode() {
+    var fr = document.getElementById("caFrame");
+    if (fr) fr.src = "about:blank";
+    document.getElementById("cookieAutoOverlay").style.display = "none";
+}
+
+function caResetStatus() {
+    var ids = ["caStatusInfo", "caStatusSuccess", "caStatusError"];
+    for (var i = 0; i < ids.length; i++) {
+        var e = document.getElementById(ids[i]);
+        e.style.display = "none"; e.innerHTML = "";
+    }
+}
+function caStatus(kind, html) {
+    caResetStatus();
+    var map = { info: "caStatusInfo", success: "caStatusSuccess", error: "caStatusError" };
+    var e = document.getElementById(map[kind] || "caStatusInfo");
+    e.innerHTML = html; e.style.display = "block";
+}
+function caLog(msg, reset) {
+    var el = document.getElementById("caLog");
+    if (reset) { el.innerHTML = ""; el.style.display = "none"; return; }
+    el.style.display = "block";
+    el.innerHTML += (el.innerHTML ? "\n" : "") +
+        String(msg).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    el.scrollTop = el.scrollHeight;
+}
+
+// Schritt 1: ErgoGPT-Login im eingebetteten Frame oeffnen (laeuft in der
+// WinINET-Zone, die InternetGetCookieEx spaeter ausliest). Falls die Seite
+// X-Frame-Options setzt, gibt es den Fallback "in eigenem Fenster".
+function caOpenLogin() {
+    caStatus("info", "ErgoGPT wird geoeffnet. Bitte ganz normal anmelden (SSO laeuft automatisch). " +
+                     "Wenn die Seite geladen / du angemeldet bist, auf <strong>Schritt 2</strong> klicken.");
+    caLog("", true);
+    caLog("Schritt 1: oeffne " + ERGO_SITE + " ...");
+    try {
+        var fr = document.getElementById("caFrame");
+        fr.style.display = "block";
+        fr.src = ERGO_SITE + "/";
+        caLog("Login-Frame geladen. Falls leer/blockiert -> Button 'In eigenem Fenster oeffnen'.");
+    } catch (e) {
+        caLog("Frame-Fehler: " + e.message);
+    }
+    document.getElementById("caStep2Btn").disabled = false;
+}
+
+function caOpenLoginWindow() {
+    try {
+        window.open(ERGO_SITE + "/", "_blank", "width=1100,height=820,scrollbars=yes,resizable=yes");
+        caLog("ErgoGPT in eigenem Fenster geoeffnet (gleicher WinINET-Cookie-Speicher).");
+        document.getElementById("caStep2Btn").disabled = false;
+    } catch (e) {
+        caLog("window.open-Fehler: " + e.message);
+    }
+}
+
+// Schritt 2: PowerShell-Helfer schreiben + ausfuehren. Liest den Cookie
+// (inkl. HttpOnly) via wininet!InternetGetCookieEx aus dem WinINET-Speicher.
+function caBuildGrabPs1() {
+    var ps = [];
+    ps.push("param([string]$Url, [string]$OutFile)");
+    ps.push("$ErrorActionPreference = 'Stop'");
+    ps.push("try {");
+    ps.push("  $sig = @'");
+    ps.push("using System;");
+    ps.push("using System.Text;");
+    ps.push("using System.Runtime.InteropServices;");
+    ps.push("public class WinInetCookieReader {");
+    ps.push("  [DllImport(\"wininet.dll\", CharSet=CharSet.Auto, SetLastError=true)]");
+    ps.push("  public static extern bool InternetGetCookieEx(string url, string name, System.Text.StringBuilder data, ref int size, int flags, IntPtr reserved);");
+    ps.push("}");
+    ps.push("'@");
+    ps.push("  Add-Type -TypeDefinition $sig");
+    ps.push("  $HTTPONLY = 0x00002000");
+    ps.push("  $size = 0");
+    ps.push("  [void][WinInetCookieReader]::InternetGetCookieEx($Url, $null, $null, [ref]$size, $HTTPONLY, [IntPtr]::Zero)");
+    ps.push("  if ($size -le 0) { [System.IO.File]::WriteAllText($OutFile, '', [System.Text.Encoding]::ASCII); exit 2 }");
+    ps.push("  $sb = New-Object System.Text.StringBuilder ($size)");
+    ps.push("  $ok = [WinInetCookieReader]::InternetGetCookieEx($Url, $null, $sb, [ref]$size, $HTTPONLY, [IntPtr]::Zero)");
+    ps.push("  if (-not $ok) { exit 3 }");
+    ps.push("  [System.IO.File]::WriteAllText($OutFile, $sb.ToString(), [System.Text.Encoding]::ASCII)");
+    ps.push("  exit 0");
+    ps.push("} catch {");
+    ps.push("  try { [System.IO.File]::WriteAllText($OutFile, 'ERR:' + $_.Exception.Message, [System.Text.Encoding]::ASCII) } catch {}");
+    ps.push("  exit 9");
+    ps.push("}");
+    return ps.join("\r\n");
+}
+
+function caFetchCookie() {
+    caStatus("info", "Lese Cookie aus dem WinINET-Speicher (PowerShell + InternetGetCookieEx) ...");
+    var shell, fso;
+    try {
+        shell = new ActiveXObject("WScript.Shell");
+        fso = new ActiveXObject("Scripting.FileSystemObject");
+    } catch (e) {
+        caStatus("error", "WScript.Shell/FSO nicht verfuegbar: " + e.message);
+        return;
+    }
+    var tempDir = shell.ExpandEnvironmentStrings("%TEMP%");
+    var stamp = String(new Date().getTime()) + "_" + Math.floor(Math.random() * 1000000);
+    var ps1Path = tempDir + "\\ergo_cookiegrab_" + stamp + ".ps1";
+    var outPath = tempDir + "\\ergo_cookiegrab_" + stamp + ".txt";
+
+    try {
+        var f = fso.CreateTextFile(ps1Path, true, false);
+        f.Write(caBuildGrabPs1());
+        f.Close();
+    } catch (e) {
+        caStatus("error", "PowerShell-Skript konnte nicht geschrieben werden: " + e.message);
+        return;
+    }
+
+    var cmd = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ' +
+              '"' + ps1Path + '" "' + ERGO_SITE + '" "' + outPath + '"';
+    caLog("Schritt 2: starte PowerShell-Helfer ...");
+    var rc = -1;
+    try {
+        rc = shell.Run(cmd, 0, true);   // versteckt, blockierend
+    } catch (e) {
+        caStatus("error", "PowerShell ließ sich nicht starten (evtl. per GPO/AppLocker gesperrt): " + e.message);
+        try { fso.DeleteFile(ps1Path, true); } catch (e2) {}
+        return;
+    }
+    caLog("PowerShell beendet, ExitCode " + rc + ".");
+
+    var raw = "";
+    try {
+        if (fso.FileExists(outPath)) {
+            var ts = fso.OpenTextFile(outPath, 1, false, 0); // ASCII
+            raw = ts.AtEndOfStream ? "" : ts.ReadAll();
+            ts.Close();
+        }
+    } catch (e) {
+        caLog("Ausgabedatei nicht lesbar: " + e.message);
+    }
+    try { fso.DeleteFile(ps1Path, true); } catch (e) {}
+    try { fso.DeleteFile(outPath, true); } catch (e) {}
+
+    raw = trim(raw);
+
+    if (raw.substring(0, 4) === "ERR:") {
+        caStatus("error", "Fehler im PowerShell-Helfer: " + raw.substring(4));
+        return;
+    }
+    if (rc === 2 || raw.length === 0) {
+        caStatus("error",
+            "<strong>Kein Cookie im WinINET-Speicher gefunden.</strong><br>" +
+            "Wahrscheinlichste Ursachen:<br>" +
+            "&bull; Login lief in Chrome/Edge (eigener Cookie-Speicher) statt im hier geoeffneten Fenster<br>" +
+            "&bull; SSO/Anmeldung noch nicht abgeschlossen<br>" +
+            "Bitte Schritt 1 ueber den Button hier oeffnen, vollstaendig anmelden, dann Schritt 2 erneut.");
+        return;
+    }
+    if (rc !== 0) {
+        caStatus("error", "InternetGetCookieEx meldete einen Fehler (ExitCode " + rc + ").");
+        return;
+    }
+    if (raw.indexOf("=") < 0 || raw.length < 30) {
+        caStatus("error", "Antwort sieht nicht wie ein Cookie aus (" + raw.length + " Zeichen).");
+        return;
+    }
+
+    // Cookie uebernehmen: in Input + saveCookie() (validiert, schreibt Cookie.txt
+    // neben die HTA, setzt state.cookie, aktualisiert den Status oben).
+    try {
+        document.getElementById("cookieInput").value = raw;
+        saveCookie();
+    } catch (e) {
+        caStatus("error", "Cookie gelesen, aber Speichern fehlgeschlagen: " + e.message);
+        return;
+    }
+    if (state.cookie && state.cookie.length >= 50) {
+        var hasSess = /ai_session|XSRF-TOKEN/i.test(state.cookie);
+        caStatus("success",
+            "<strong>Cookie uebernommen</strong> (" + state.cookie.length + " Zeichen" +
+            (hasSess ? ", inkl. Session/XSRF" : "") + ").<br>" +
+            "Gespeichert als Cookie.txt neben der HTA. Du kannst dieses Fenster schliessen.");
+        caLog("OK - Cookie uebernommen und gespeichert.");
+    } else {
+        caStatus("error", "Cookie zu kurz / ungueltig - bitte erneut anmelden und Schritt 2 wiederholen.");
+    }
+}
 </script>
 
 <script language="VBScript">
@@ -8027,6 +8227,127 @@ End Function
         </div>
 
         <div class="ws-footer">Datenfluss bleibt lokal &middot; ErgoGPT-Backend &middot; Vorgang-Analyse v1.66</div>
+    </div>
+</div>
+
+<!-- ==================== COOKIE-AUTO-OVERLAY (Prototyp) ==================== -->
+<style>
+#cookieAutoOverlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #ffffff; z-index: 10000; overflow-y: auto;
+    display: none; font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+#cookieAutoOverlay .ca-wrap { max-width: 760px; margin: 0 auto; padding: 56px 40px; }
+#cookieAutoOverlay .ca-close {
+    position: absolute; top: 20px; right: 24px;
+    background: #ffffff; border: 1px solid #e5e7eb; color: #6b7280;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 500; font-family: inherit;
+}
+#cookieAutoOverlay .ca-close:hover { background: #f3f4f6; color: #1f2937; }
+#cookieAutoOverlay .ca-header { text-align: center; margin-bottom: 40px; }
+#cookieAutoOverlay .ca-logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 64px; height: 64px; background: #c8102e; border-radius: 16px;
+    margin-bottom: 20px; color: #fff; font-size: 28px;
+}
+#cookieAutoOverlay .ca-header h1 { font-size: 26px; font-weight: 700; color: #111827; margin-bottom: 8px; }
+#cookieAutoOverlay .ca-sub { font-size: 14px; color: #6b7280; }
+#cookieAutoOverlay .ca-card {
+    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px;
+    padding: 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+#cookieAutoOverlay .ca-step-label {
+    font-size: 14px; font-weight: 600; color: #1f2937;
+    display: flex; align-items: center; margin-bottom: 16px;
+}
+#cookieAutoOverlay .ca-step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; background: #c8102e; color: #fff;
+    border-radius: 50%; font-weight: 600; font-size: 13px; margin-right: 12px;
+}
+#cookieAutoOverlay .ca-desc { font-size: 13px; color: #6b7280; margin-bottom: 16px; line-height: 1.55; }
+#cookieAutoOverlay button.ca-btn {
+    background: #c8102e; color: #fff; border: none; border-radius: 10px;
+    padding: 14px 24px; font-size: 15px; font-weight: 600; cursor: pointer;
+    font-family: inherit; margin-right: 10px;
+}
+#cookieAutoOverlay button.ca-btn:hover { background: #a30d24; }
+#cookieAutoOverlay button.ca-btn:disabled { background: #d1d5db; cursor: not-allowed; }
+#cookieAutoOverlay button.ca-btn-2 {
+    background: #ffffff; color: #1f2937; border: 1.5px solid #d1d5db;
+    border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+}
+#cookieAutoOverlay button.ca-btn-2:hover { background: #f3f4f6; border-color: #9ca3af; }
+#cookieAutoOverlay .ca-frame {
+    width: 100%; height: 460px; border: 1px solid #e5e7eb; border-radius: 10px;
+    margin-top: 16px; display: none; background: #fafafa;
+}
+#cookieAutoOverlay .ca-status {
+    padding: 14px 18px; border-radius: 10px; font-size: 13.5px;
+    margin-bottom: 16px; display: none; line-height: 1.55;
+}
+#cookieAutoOverlay .ca-status.ca-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+#cookieAutoOverlay .ca-status.ca-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+#cookieAutoOverlay .ca-status.ca-error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+#cookieAutoOverlay .ca-log {
+    background: #fafafa; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 14px; font-family: 'Consolas','Courier New', monospace;
+    font-size: 12px; color: #4b5563; max-height: 170px; overflow-y: auto;
+    display: none; white-space: pre-wrap; margin-top: 16px;
+}
+#cookieAutoOverlay .ca-hint {
+    background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+    border-radius: 10px; padding: 14px 18px; font-size: 12.5px;
+    line-height: 1.55; margin-bottom: 22px;
+}
+#cookieAutoOverlay .ca-footer { text-align: center; color: #9ca3af; font-size: 11px; margin-top: 32px; }
+</style>
+
+<div id="cookieAutoOverlay">
+    <button class="ca-close" onclick="closeCookieAutoMode()">&larr; zurueck</button>
+    <div class="ca-wrap">
+        <div class="ca-header">
+            <div class="ca-logo">&#128273;</div>
+            <h1>Cookie automatisch holen</h1>
+            <div class="ca-sub">Prototyp &middot; ErgoGPT-Anmeldung + Cookie aus dem Windows-Speicher uebernehmen</div>
+        </div>
+
+        <div class="ca-hint">
+            <strong>Prototyp / Hinweis:</strong> Es wird der ErgoGPT-Login im Windows-Browser-Speicher
+            (WinINET) geoeffnet; danach liest ein PowerShell-Helfer den Sitzungs-Cookie inkl. HttpOnly
+            aus. Funktioniert nur, wenn die Anmeldung in <em>diesem</em> Fenster laeuft (nicht separat in
+            Chrome/Edge). Je nach GPO/AppLocker kann PowerShell gesperrt sein &mdash; dann bitte den
+            manuellen Weg nutzen.
+        </div>
+
+        <div class="ca-card">
+            <div class="ca-step-label"><span class="ca-step-num">1</span>Bei ErgoGPT anmelden</div>
+            <div class="ca-desc">
+                ErgoGPT oeffnen und ganz normal anmelden (SSO laeuft i.&nbsp;d.&nbsp;R. automatisch mit
+                der Windows-Anmeldung). Login bleibt im selben Cookie-Speicher, den Schritt&nbsp;2 ausliest.
+            </div>
+            <button class="ca-btn" onclick="caOpenLogin()">ErgoGPT-Login oeffnen</button>
+            <button class="ca-btn-2" onclick="caOpenLoginWindow()">In eigenem Fenster oeffnen</button>
+            <iframe id="caFrame" class="ca-frame" src="about:blank"></iframe>
+        </div>
+
+        <div class="ca-card">
+            <div class="ca-step-label"><span class="ca-step-num">2</span>Cookie uebernehmen</div>
+            <div class="ca-desc">
+                Liest den Cookie (inkl. HttpOnly-Session) per <code>InternetGetCookieEx</code> aus und
+                speichert ihn als <code>Cookie.txt</code> neben der HTA &mdash; danach ist die KI-Analyse
+                sofort einsatzbereit.
+            </div>
+            <div id="caStatusInfo" class="ca-status ca-info"></div>
+            <div id="caStatusSuccess" class="ca-status ca-success"></div>
+            <div id="caStatusError" class="ca-status ca-error"></div>
+            <button class="ca-btn" id="caStep2Btn" onclick="caFetchCookie()" disabled>Cookie jetzt auslesen &amp; uebernehmen</button>
+            <div class="ca-log" id="caLog"></div>
+        </div>
+
+        <div class="ca-footer">Prototyp &middot; WinINET / InternetGetCookieEx &middot; ERGO Vorgang-Analyse</div>
     </div>
 </div>
 
