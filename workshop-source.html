@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v1.88 - HTA Quellcode</title>
+<title>ERGO Workshop v1.90 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v1.88</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v1.90</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.88"
+        VERSION="1.90"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v1.88 - Kombi-PDF-Bau in Kleinst-Schritten (1 Kopf/1 PDF/1 Endmarke pro Tick) -> UI haengt nicht mehr, Progress+Log laufen sichtbar mit. Workshop-Log jetzt als schoenes HTML-Log (farbcodierte Zeilen + Zeitstempel) statt Klartext. Echte Umlaute (gebündelt, Anhänge, läuft, eingefügt). v1.87 - Experiment Kombi-PDF-Knopf</div>
+            <div class="ver">v1.90 - Makler_Nummer entfernt (nur Agentur/Vermittler getrennt). Excel: Header ohne "_" + einzeilig (Spalte breit genug), alle Zellen links+oben, Datenzeilen Umlauf (kein Ueberlauf). KI-Notiz-PDF + Sammel-PDF im Ergebnis-Ordner (nicht TEMP) und bleiben liegen. Testmodus faehrt jetzt ALLE 3 Modi (Parallel/Batch/Kombi-PDF) und schreibt EINE P-B-K-Vergleichsdatei. v1.88 - Kombi-PDF Kleinst-Schritte, HTML-Log</div>
         </div>
 
         <!-- Cookie -->
@@ -7331,11 +7331,11 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
     p += "Anhaenge: " + (anhangAlle || "(keine)") + "\n";
     p += "Anhaenge als PDFs hochgeladen: " + (pdfsHochgeladen || "(keine)") + "\n";
     p += "Body:\n<<<\n" + body + "\n>>>\n===== ENDE =====\n\n";
-    p += "WICHTIG zu makler_nummer - STRENGE Priorisierung:\n";
+    p += "WICHTIG zu agentur_nummer / vermittler_nummer - jeweils NUR der reine\n";
+    p += "Nummern-Wert OHNE Wort-Label, NICHT kombiniert. Quellen-Priorisierung:\n";
     p += "  1. 'Agentur-Nr.' / 'Vermittler-Nr.' im Briefkopf-Block (Wunsch-Nummer)\n";
     p += "  2. 'BD-Nummer' / 'Bestandsnummer' / 'Beraterzeichen'\n";
-    p += "  3. NUR Fallback: Pool-IDs ('MAKID','DEMMAK','BCA-ID' - pool-intern, NICHT beim Versicherer)\n";
-    p += "Gib wenn moeglich beides an, Format z.B. 'Agentur 8903235 / Vermittler 811774'.\n\n";
+    p += "  3. NUR Fallback: Pool-IDs ('MAKID','DEMMAK','BCA-ID' - pool-intern, NICHT beim Versicherer)\n\n";
     p += "geschaefts_typ STRENG: 'BUe einfacher Vertrag' nur bei GENAU EINER Vertragsnummer.\n";
     p += "'BUe Kundenverbindung' wenn mehrere Vertragsnummern ODER 'alle Vertraege'/'gesamte Kundenverbindung'.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-Objekt (kein Markdown, keine Erklaerung).\n";
@@ -7358,7 +7358,6 @@ function wsFieldLines() {
     p += '  "makler_vorname":"oder leer",\n';
     p += '  "agentur_nummer":"NUR der reine Agentur-Nummern-Wert OHNE das Wort Agentur (z.B. 8903235); leer wenn keine",\n';
     p += '  "vermittler_nummer":"NUR der reine Vermittler-/BD-Nummern-Wert OHNE das Wort Vermittler (z.B. 811774 oder 898-0003); leer wenn keine",\n';
-    p += '  "makler_nummer":"Kombi-Anzeige aus den beiden Nummern, EXAKT Format \\"Agentur <nr> / Vermittler <nr>\\" (Agentur zuerst); fehlt eine, nur die vorhandene; sonst leer",\n';
     p += '  "auftrag_datum":"Datum aus Maklerauftrag/Pool-Anschreiben (NICHT Mail-Eingang). IMMER Format TT.MM.JJJJ (z.B. 06.04.2026), niemals ISO/JJJJ-MM-TT; leer wenn keins",\n';
     p += '  "kunde_nachname":"VN / Vollmachtgeber, oder leer",\n';
     p += '  "kunde_vorname":"oder leer",\n';
@@ -7410,9 +7409,9 @@ function wsBuildBatchPrompt(mails) {
     p += "2. klassifikation bei Reminder/Erinnerung/Mahnung: NICHT 'Anfrage-Ruecksprache' - ";
     p += "klassifiziere nach dem ZUGRUNDE LIEGENDEN Vorgang (Bestandsuebertragung -> 'BUe-Vorgang') ";
     p += "und setze ist_reminder='ja'. Eine Erinnerung an eine BUe ist weiterhin ein 'BUe-Vorgang'.\n";
-    p += "3. makler_nummer - STRENGE Prioritaet (1. Agentur-/Vermittler-Nr. im Briefkopf, ";
-    p += "2. BD-/Bestandsnummer/Beraterzeichen, 3. nur Fallback Pool-IDs). Format EXAKT ";
-    p += "'Agentur <nr> / Vermittler <nr>' (Agentur zuerst, mit ' / ' getrennt); fehlt eine, nur die vorhandene.\n";
+    p += "3. agentur_nummer / vermittler_nummer - jeweils NUR der reine Nummern-Wert ";
+    p += "OHNE Wort-Label, NICHT kombiniert. Prioritaet: 1. Agentur-/Vermittler-Nr. im ";
+    p += "Briefkopf, 2. BD-/Bestandsnummer/Beraterzeichen, 3. nur Fallback Pool-IDs.\n";
     p += "4. auftrag_datum IMMER im Format TT.MM.JJJJ (z.B. 06.04.2026), niemals ISO/JJJJ-MM-TT.\n";
     p += "5. maklerpool vs. eigentlicher Makler trennen: laeuft der Maklervertrag auf eine Firma, ";
     p += "die nur ueber einen Pool abwickelt, ist maklerpool der Pool und makler_nachname die Firma. ";
@@ -7492,7 +7491,6 @@ rowFn("Maklerpool", d.maklerpool) +
 rowFn("Makler (Name)", maklerName) +
 rowHi("Agentur-Nummer", d.agentur_nummer) +
 rowHi("Vermittler-Nummer", d.vermittler_nummer) +
-rowFn("Makler-Nummer (kombiniert)", d.makler_nummer) +
 rowFn("Auftrag-Datum", d.auftrag_datum) +
 rowFn("Makler namentlich genannt", d.makler_namentlich_genannt) +
 '</table>' +
@@ -7888,7 +7886,6 @@ function wsFinishDemo(processed) {
                 { h:"Makler_Vorname",      g:"makler",w:16, wrap:false, v:function(r,d){ return cellSafe(d.makler_vorname); } },
                 { h:"Agentur_Nummer",      g:"makler",w:14, wrap:false, v:function(r,d){ return cellSafe(d.agentur_nummer); } },
                 { h:"Vermittler_Nummer",   g:"makler",w:14, wrap:false, v:function(r,d){ return cellSafe(d.vermittler_nummer); } },
-                { h:"Makler_Nummer",       g:"makler",w:24, wrap:false, v:function(r,d){ return cellSafe(d.makler_nummer); } },
                 { h:"Auftrag_Datum",       g:"makler",w:14, wrap:false, v:function(r,d){ return cellSafe(d.auftrag_datum); } },
                 { h:"Makler_Namentlich",   g:"makler",w:13, wrap:false, v:function(r,d){ return cellSafe(d.makler_namentlich_genannt); } },
                 { h:"Kunde_Nachname",      g:"kunde", w:18, wrap:false, v:function(r,d){ return cellSafe(d.kunde_nachname); } },
@@ -7923,16 +7920,19 @@ function wsFinishDemo(processed) {
                 erg:    rgb(21,128,61)    // Gruen
             };
             var nCols = colDefs.length;
-            for (var c = 0; c < nCols; c++) sh.Cells(1, c+1).Value = colDefs[c].h;
+            // Header OHNE Unterstrich anzeigen (z.B. "Lfd Nr", "Makler Nachname")
+            var heads = [];
+            for (var c = 0; c < nCols; c++) {
+                heads[c] = String(colDefs[c].h).replace(/_/g, " ");
+                sh.Cells(1, c+1).Value = heads[c];
+            }
             try {
                 var hr = sh.Range(sh.Cells(1,1), sh.Cells(1, nCols));
                 hr.Font.Bold = true;
                 hr.Font.Color = rgb(255,255,255);
-                hr.HorizontalAlignment = -4108;
-                hr.VerticalAlignment = -4108;
-                hr.WrapText = true;
-                sh.Rows(1).RowHeight = 34;
-                // Pro Spalte die Gruppenfarbe in den Header
+                hr.HorizontalAlignment = -4131; // xlLeft
+                hr.VerticalAlignment = -4160;   // xlTop
+                hr.WrapText = false;            // Header IMMER einzeilig
                 for (var hc = 0; hc < nCols; hc++) {
                     try { sh.Cells(1, hc+1).Interior.Color = grpColor[colDefs[hc].g] || rgb(55,65,81); } catch(eHc) {}
                 }
@@ -7944,22 +7944,27 @@ function wsFinishDemo(processed) {
                 for (var c = 0; c < nCols; c++) {
                     try { sh.Cells(row, c+1).Value = colDefs[c].v(r, d, i); } catch(eCell) {}
                 }
-                // Reminder-Zeile orange faerben
                 if (d.ist_reminder === "ja") {
                     try { sh.Range(sh.Cells(row,1), sh.Cells(row, nCols)).Interior.Color = rgb(254,215,170); } catch(e) {}
                 }
             }
             try {
+                // Spaltenbreite: mind. so breit, dass die Ueberschrift in EINER
+                // Zeile passt (Header-Laenge + Puffer), sonst Vorgabebreite.
                 for (var c = 0; c < nCols; c++) {
-                    var col = sh.Columns(c+1);
-                    col.ColumnWidth = colDefs[c].w;
-                    if (colDefs[c].wrap) {
-                        col.WrapText = true;
-                        col.VerticalAlignment = -4160; // xlTop
-                    }
+                    var wNeed = heads[c].length + 3;
+                    sh.Columns(c+1).ColumnWidth = (colDefs[c].w > wNeed ? colDefs[c].w : wNeed);
+                }
+                // Datenzeilen: Umlauf + links/oben (kein Ueberlauf). Header bleibt einzeilig.
+                if (processed.length > 0) {
+                    var dataRng = sh.Range(sh.Cells(2,1), sh.Cells(processed.length+1, nCols));
+                    dataRng.WrapText = true;
+                    dataRng.VerticalAlignment = -4160;   // xlTop
+                    dataRng.HorizontalAlignment = -4131; // xlLeft
                 }
                 sh.Range(sh.Cells(1,1), sh.Cells(processed.length+1, nCols)).AutoFilter();
-                try { sh.Rows("2:" + (processed.length + 1)).AutoFit(); } catch(eAf) {}
+                try { sh.Rows(1).AutoFit(); } catch(eAh) {}
+                if (processed.length > 0) { try { sh.Rows("2:" + (processed.length + 1)).AutoFit(); } catch(eAf) {} }
                 try {
                     excel.ActiveWindow.SplitColumn = 0;
                     excel.ActiveWindow.SplitRow = 1;
@@ -8008,58 +8013,66 @@ function wsFinishDemo(processed) {
         for (var pi = 0; pi < processed.length; pi++) {
             var p = processed[pi];
             var lfd = wsLfdNr(pi);
-            var notePath = "", pdfPath = "", item = null;
+            var tmpHtml = "", keepPath = "", item = null;
             try {
-                // 2a) KI-Notiz als ASCII-HTML in TEMP (FSO erlaubt; Umlaute = Entities)
+                // 2a) KI-Notiz als ASCII-HTML in TEMP (nur Zwischenschritt fuer Word)
                 var noteHtml = wsBuildNotizHtml(p.data, lfd);
                 var stampN = lfd + "_" + new Date().getTime() + "_" + Math.floor(Math.random()*100000);
-                notePath = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\KI-Notiz_" + stampN + ".html";
-                var nf = fsoS.CreateTextFile(notePath, true, false); // ASCII
+                tmpHtml = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\KI-Notiz_" + stampN + ".html";
+                var nf = fsoS.CreateTextFile(tmpHtml, true, false); // ASCII
                 nf.Write(noteHtml);
                 nf.Close();
 
-                // 2b) HTML -> PDF via Word
+                // 2b) HTML -> PDF via Word, ABLAGE IM SELBEN ORDNER wie Excel/.msg
+                //     (nicht TEMP). PDF bleibt als Datei im Ordner liegen.
+                var pdfPath = outDir.replace(/\\+$/, "") + "\\KI-Notiz_" + lfd + ".pdf";
                 if (word) {
                     try {
-                        pdfPath = shellS.ExpandEnvironmentStrings("%TEMP%") + "\\KI-Notiz_" + stampN + ".pdf";
-                        var doc = word.Documents.Open(notePath, false, true); // ConfirmConversions=false, ReadOnly=true
+                        try { if (fsoS.FileExists(pdfPath)) fsoS.DeleteFile(pdfPath, true); } catch(ePre) {}
+                        var doc = word.Documents.Open(tmpHtml, false, true); // ConfirmConversions=false, ReadOnly=true
                         doc.SaveAs2(pdfPath, 17);   // 17 = wdFormatPDF
                         doc.Close(0);               // 0 = wdDoNotSaveChanges
                     } catch(ePdf) {
                         pdfPath = "";
-                        wsLog("   [" + lfd + "] PDF-Erzeugung fehlgeschlagen (" + ePdf.message + ") - HTML-Fallback.");
+                        wsLog("   [" + lfd + "] PDF-Erzeugung fehlgeschlagen (" + ePdf.message + ") - HTML-Fallback.", "err");
                     }
                 }
 
-                // 2c) ORIGINAL-Mail oeffnen (fuehrend) und Notiz als Anhang ergaenzen
-                item = outlookApp.Session.OpenSharedItem(p.msgPath);
+                // 2c) Falls kein PDF: KI-Notiz als HTML in den Ordner (nicht TEMP)
                 if (pdfPath &amp;&amp; fsoS.FileExists(pdfPath)) {
-                    item.Attachments.Add(pdfPath, 1, 1, "KI-Notiz_" + lfd + ".pdf");
+                    keepPath = pdfPath;
                 } else {
-                    item.Attachments.Add(notePath, 1, 1, "KI-Notiz_" + lfd + ".html");
+                    keepPath = outDir.replace(/\\+$/, "") + "\\KI-Notiz_" + lfd + ".html";
+                    try { if (fsoS.FileExists(keepPath)) fsoS.DeleteFile(keepPath, true); } catch(e) {}
+                    var hf = fsoS.CreateTextFile(keepPath, true, false);
+                    hf.Write(noteHtml);
+                    hf.Close();
                 }
 
-                // 2d) Als neue .msg speichern (Outlook-Prozess -> keine Zonensperre).
-                //     Original-Subject bleibt unveraendert (Mail bleibt fuehrend).
+                // 2d) ORIGINAL-Mail oeffnen (fuehrend), Notiz-Datei als Anhang
+                item = outlookApp.Session.OpenSharedItem(p.msgPath);
+                item.Attachments.Add(keepPath, 1, 1,
+                    "KI-Notiz_" + lfd + (keepPath.substr(-4).toLowerCase() === ".pdf" ? ".pdf" : ".html"));
+
+                // 2e) Als neue .msg speichern (Outlook-Prozess -> keine Zonensperre).
                 var safeBetreff = String(p.betreff || p.fileName || "Vorgang")
                                     .replace(/[\\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").substring(0, 60);
                 var target = outDir.replace(/\\+$/, "") + "\\Vorgang_" + lfd + "_" + safeBetreff + ".msg";
                 item.SaveAs(target, 9);   // 9 = olMSGUnicode
-                try { item.Close(1); } catch(eC) {}   // 1 = olDiscard (Original nicht zurueckschreiben)
+                try { item.Close(1); } catch(eC) {}   // 1 = olDiscard
                 item = null;
                 saved++;
                 wsLog("   [" + lfd + "] gespeichert: " + target +
-                      (pdfPath ? " (Notiz als PDF)" : " (Notiz als HTML)"));
+                      (keepPath.substr(-4).toLowerCase() === ".pdf" ? " (Notiz als PDF im Ordner)" : " (Notiz als HTML im Ordner)"));
 
-                try { fsoS.DeleteFile(notePath, true); } catch(eDel) {}
-                try { if (pdfPath) fsoS.DeleteFile(pdfPath, true); } catch(eDel3) {}
+                // Nur den TEMP-Zwischenschritt loeschen - die Notiz im Ordner BLEIBT
+                try { fsoS.DeleteFile(tmpHtml, true); } catch(eDel) {}
             } catch(eSave) {
                 failed++;
                 wsLog("   [" + lfd + "] FEHLER: " + (eSave.message || eSave) +
-                      " (evtl. Outlook-Sicherheitsabfrage 'Zugriff zulassen' bestaetigen)");
+                      " (evtl. Outlook-Sicherheitsabfrage 'Zugriff zulassen' bestaetigen)", "err");
                 try { if (item) item.Close(1); } catch(eC2) {}
-                try { if (notePath) fsoS.DeleteFile(notePath, true); } catch(eDel2) {}
-                try { if (pdfPath) fsoS.DeleteFile(pdfPath, true); } catch(eDel4) {}
+                try { if (tmpHtml) fsoS.DeleteFile(tmpHtml, true); } catch(eDel2) {}
             }
         }
 
@@ -8082,11 +8095,11 @@ function wsFinishDemo(processed) {
     }, 300);
 }
 
-// Laufende Nummer / Vorgangs-ID, 3-stellig genullt (Mapping Excel <-> Notiz <-> .msg)
+// Laufende Nummer / Vorgangs-ID: "BÜ-KI-001" (Mapping Excel <-> Notiz <-> .msg)
 function wsLfdNr(i) {
     var n = String(i + 1);
     while (n.length < 3) n = "0" + n;
-    return n;
+    return "BÜ-KI-" + n;
 }
 
 // ============================================================================
@@ -8319,7 +8332,8 @@ function wsBatchTick() {
                     if (mm.tempDir &amp;&amp; fso.FolderExists(mm.tempDir)) fso.DeleteFolder(mm.tempDir, true);
                 } catch(e) {}
             }
-            try { if (bs.combinedPdf &amp;&amp; fso.FileExists(bs.combinedPdf)) fso.DeleteFile(bs.combinedPdf, true); } catch(e) {}
+            // Sammel-PDF NICHT loeschen - liegt absichtlich im Ergebnis-Ordner.
+            if (bs.combinedPdf) wsLog("Sammel-PDF bleibt im Ordner: " + bs.combinedPdf, "ok");
             try { fireDelete(bs.convId); } catch(e) {}
             wsProgress(state._wsMsgFiles.length + 2, state._wsMsgFiles.length + 2);
             wsLog((bs.combinedPdf ? "KOMBI-PDF" : "BATCH") + " fertig: " + processed.length + " Vorgaenge erkannt.");
@@ -8335,13 +8349,8 @@ function wsBatchTick() {
 
 function wsBatchFail(bs, msg) {
     state._wsBatch = null;
-    try {
-        if (bs &amp;&amp; bs.combinedPdf) {
-            var fsoF = new ActiveXObject("Scripting.FileSystemObject");
-            if (fsoF.FileExists(bs.combinedPdf)) fsoF.DeleteFile(bs.combinedPdf, true);
-        }
-    } catch(e) {}
-    wsLog("BATCH-FEHLER: " + msg);
+    // Sammel-PDF bleibt liegen (im Ergebnis-Ordner) - auch bei Fehler.
+    wsLog("BATCH-FEHLER: " + msg, "err");
     if (bs &amp;&amp; bs.onDone) { bs.onDone([]); return; }
     wsShowError("Batch-Analyse fehlgeschlagen: " + msg);
     wsRestoreUi();
@@ -8376,7 +8385,7 @@ function wsBuildCombinedPrompt(mails) {
     p += "1. Genau " + mails.length + " Objekte, Reihenfolge wie oben, Feld \"datei\" = EXAKTER Dateiname.\n";
     p += "2. Reminder/Erinnerung/Mahnung: NICHT 'Anfrage-Ruecksprache' - nach zugrunde ";
     p += "liegendem Vorgang klassifizieren (Bestandsuebertragung -> 'BUe-Vorgang'), ist_reminder='ja'.\n";
-    p += "3. makler_nummer Format EXAKT 'Agentur <nr> / Vermittler <nr>' (Agentur zuerst).\n";
+    p += "3. agentur_nummer / vermittler_nummer jeweils NUR reiner Nummern-Wert ohne Wort-Label, NICHT kombiniert.\n";
     p += "4. auftrag_datum IMMER TT.MM.JJJJ (nie ISO).\n";
     p += "5. maklerpool vs. eigentlicher Makler trennen (Finanzguru ueber Jung DMS -> ";
     p += "maklerpool='JDC / Jung, DMS &amp; Cie.', makler_nachname='Finanzguru'; CHECK24 ueber ";
@@ -8420,8 +8429,23 @@ function wsStartCombined(onDone) {
     }
 
     var shell = new ActiveXObject("WScript.Shell");
+    var fsoC = new ActiveXObject("Scripting.FileSystemObject");
     var stamp = String(new Date().getTime());
-    var combinedPdf = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ergo_sammeldok_" + stamp + ".pdf";
+    // Sammel-PDF im SELBEN Ordner wie Excel/.msg ablegen (nicht TEMP), bleibt liegen
+    var cOut = "";
+    try {
+        if (state._wsFolder) {
+            cOut = state._wsFolder.replace(/\\+$/, "") + "\\_KI-Vorgaenge";
+            if (!fsoC.FolderExists(cOut)) fsoC.CreateFolder(cOut);
+        }
+    } catch(eCo) { cOut = ""; }
+    if (!cOut) {
+        try {
+            cOut = shell.ExpandEnvironmentStrings("%TEMP%") + "\\ERGO-KI-Vorgaenge";
+            if (!fsoC.FolderExists(cOut)) fsoC.CreateFolder(cOut);
+        } catch(eCo2) { cOut = shell.ExpandEnvironmentStrings("%TEMP%"); }
+    }
+    var combinedPdf = cOut.replace(/\\+$/, "") + "\\Sammeldokument_" + stamp + ".pdf";
 
     var word = null, doc = null;
     try {
@@ -8560,22 +8584,28 @@ function wsRunTest() {
     if (state.cookie.length < 50) return wsShowError("Cookie fehlt");
     if (!outlookApp) return wsShowError("Outlook nicht verbunden");
     document.getElementById("wsLog").innerText = "";
-    wsLog("=== TESTMODUS: 1/2 PARALLEL ===");
+    wsLog("=== TESTMODUS 1/3: PARALLEL ===", "head");
     wsStartParallel(function(par) {
         wsLog("");
-        wsLog("=== TESTMODUS: 2/2 BATCH ===");
-        state._wsRunning = false;   // Guard fuer den naechsten Lauf freigeben
+        wsLog("=== TESTMODUS 2/3: BATCH (1 Prompt) ===", "head");
+        state._wsRunning = false;
         wsStartBatch(function(bat) {
             wsLog("");
-            wsLog("Schreibe Vergleichsdatei...");
-            wsWriteComparison(par, bat);
-            wsRestoreUi();
+            wsLog("=== TESTMODUS 3/3: KOMBI-PDF ===", "head");
+            state._wsRunning = false;
+            wsStartCombined(function(comb) {
+                wsLog("");
+                wsLog("Schreibe Vergleichsdatei (alle 3 Modi)...", "head");
+                wsWriteComparison(par, bat, comb);
+                wsRestoreUi();
+            });
         });
     });
 }
 
-// Vergleichsdatei (parallel vs. batch) - zum Hochladen bei einer KI
-function wsWriteComparison(par, bat) {
+// Vergleichsdatei: PARALLEL (P) vs. BATCH (B) vs. KOMBI-PDF (K), je Feld -
+// zum Hochladen bei einer KI.
+function wsWriteComparison(par, bat, comb) {
     var fso = new ActiveXObject("Scripting.FileSystemObject");
     var shell = new ActiveXObject("WScript.Shell");
     var outDir = "";
@@ -8587,69 +8617,77 @@ function wsWriteComparison(par, bat) {
     } catch(e) { outDir = ""; }
     if (!outDir) { try { outDir = shell.ExpandEnvironmentStrings("%TEMP%"); } catch(e) {} }
 
-    function idx(arr) { var o = {}; for (var i=0;i<arr.length;i++) o[String(arr[i].fileName).toLowerCase()] = arr[i]; return o; }
-    var pIdx = idx(par || []), bIdx = idx(bat || []);
-    var files = {}, k;
-    for (k in pIdx) if (pIdx.hasOwnProperty(k)) files[k] = true;
-    for (k in bIdx) if (bIdx.hasOwnProperty(k)) files[k] = true;
-    var fields = ["vorgangstyp","klassifikation","klassifikation_grund","ist_reminder","reminder_quelle",
-        "nicht_neuer_vorgang_grund","maklerpool","makler_nachname","makler_vorname","makler_nummer",
-        "auftrag_datum","kunde_nachname","kunde_vorname","kunde_nummer","versicherungsnummer","sparte",
-        "geschaefts_typ","unterlagen_angefragt","unterlagen_liste","sonderfall","anhang_typen",
-        "pdf_qualitaet","enthaelt_maklervollmacht","mv_vollumfaenglich","mv_einschraenkungen","mv_status",
-        "unterschrift_kunde","unterschrift_makler","auf_vn_ausgestellt","makler_namentlich_genannt",
-        "zusammenfassung","naechster_schritt","hinweis"];
+    function idx(arr) { var o = {}; for (var i=0;i<(arr||[]).length;i++) o[String(arr[i].fileName).toLowerCase()] = arr[i]; return o; }
+    var pIdx = idx(par), bIdx = idx(bat), kIdx = idx(comb);
+    var files = {}, k, src = [pIdx, bIdx, kIdx];
+    for (var si = 0; si < src.length; si++) for (k in src[si]) if (src[si].hasOwnProperty(k)) files[k] = true;
 
-    var t = "ERGO Vorgang-Analyse - VERGLEICH PARALLEL vs. BATCH\r\n";
+    var fields = ["vorgangstyp","klassifikation","klassifikation_grund","ist_reminder","reminder_quelle",
+        "nicht_neuer_vorgang_grund","maklerpool","makler_nachname","makler_vorname","agentur_nummer",
+        "vermittler_nummer","auftrag_datum","kunde_nachname","kunde_vorname","kunde_nummer",
+        "versicherungsnummer","sparte","geschaefts_typ","unterlagen_angefragt","unterlagen_liste",
+        "sonderfall","anhang_typen","pdf_qualitaet","enthaelt_maklervollmacht","mv_vollumfaenglich",
+        "mv_einschraenkungen","mv_status","unterschrift_kunde","unterschrift_makler","auf_vn_ausgestellt",
+        "makler_namentlich_genannt","zusammenfassung","naechster_schritt","hinweis"];
+
+    function norm(v){ return (v==null?"":String(v)).replace(/\s+/g," ").replace(/^\s+|\s+$/g,""); }
+
+    var t = "ERGO Vorgang-Analyse - VERGLEICH: PARALLEL (P) vs. BATCH (B) vs. KOMBI-PDF (K)\r\n";
     t += "Erstellt: " + new Date().toLocaleString() + "\r\n";
     t += "Mails: " + (function(){var c=0,x;for(x in files)if(files.hasOwnProperty(x))c++;return c;})() +
-         " | Parallel-Treffer: " + (par?par.length:0) + " | Batch-Treffer: " + (bat?bat.length:0) + "\r\n";
-    t += "Frage an die pruefende KI: Wo unterscheiden sich PARALLEL und BATCH inhaltlich? " +
-         "Welche Variante ist je Feld plausibler und warum? Gibt es Vermischungen (falsche Mail-Zuordnung im Batch)?\r\n";
+         " | P-Treffer: " + (par?par.length:0) +
+         " | B-Treffer: " + (bat?bat.length:0) +
+         " | K-Treffer: " + (comb?comb.length:0) + "\r\n";
+    t += "Frage an die pruefende KI: Wo unterscheiden sich die 3 Modi (P/B/K) inhaltlich je Feld? " +
+         "Welcher Modus ist je Feld am plausibelsten und warum? Gibt es Vermischungen (falsche Mail-Zuordnung) " +
+         "in B oder K? Welcher Modus ist insgesamt am verlaesslichsten?\r\n";
     t += "============================================================\r\n\r\n";
 
     var totalDiff = 0;
     for (k in files) {
         if (!files.hasOwnProperty(k)) continue;
-        var pr = pIdx[k], br = bIdx[k];
-        var name = (pr &amp;&amp; pr.fileName) || (br &amp;&amp; br.fileName) || k;
+        var pr = pIdx[k], br = bIdx[k], kr = kIdx[k];
+        var name = (pr&amp;&amp;pr.fileName) || (br&amp;&amp;br.fileName) || (kr&amp;&amp;kr.fileName) || k;
         t += "##### DATEI: " + name + " #####\r\n";
         if (!pr) t += "  (in PARALLEL nicht vorhanden)\r\n";
         if (!br) t += "  (in BATCH nicht vorhanden)\r\n";
-        var pd = (pr &amp;&amp; pr.data) || {}, bd = (br &amp;&amp; br.data) || {};
+        if (!kr) t += "  (in KOMBI-PDF nicht vorhanden)\r\n";
+        var pd = (pr&amp;&amp;pr.data)||{}, bd = (br&amp;&amp;br.data)||{}, kd = (kr&amp;&amp;kr.data)||{};
         for (var fi = 0; fi < fields.length; fi++) {
             var f = fields[fi];
-            var pv = pd[f] == null ? "" : String(pd[f]);
-            var bv = bd[f] == null ? "" : String(bd[f]);
-            var diff = (pv.replace(/\s+/g," ").replace(/^\s+|\s+$/g,"") !==
-                        bv.replace(/\s+/g," ").replace(/^\s+|\s+$/g,""));
+            var pv = pd[f]==null?"":String(pd[f]);
+            var bv = bd[f]==null?"":String(bd[f]);
+            var kv = kd[f]==null?"":String(kd[f]);
+            var diff = !(norm(pv)===norm(bv) &amp;&amp; norm(bv)===norm(kv));
             if (diff) totalDiff++;
             t += (diff ? " * " : "   ") + f + "\r\n";
             t += "      P: " + pv + "\r\n";
             t += "      B: " + bv + "\r\n";
+            t += "      K: " + kv + "\r\n";
         }
         t += "\r\n";
     }
     t += "============================================================\r\n";
-    t += "ROH-JSON PARALLEL:\r\n";
-    for (var a1 = 0; a1 < (par||[]).length; a1++) t += par[a1].fileName + ": " + jsonStringifySafe(par[a1].data) + "\r\n";
-    t += "\r\nROH-JSON BATCH:\r\n";
-    for (var a2 = 0; a2 < (bat||[]).length; a2++) t += bat[a2].fileName + ": " + jsonStringifySafe(bat[a2].data) + "\r\n";
+    function dump(label, arr) {
+        var s = "ROH-JSON " + label + ":\r\n";
+        for (var a=0;a<(arr||[]).length;a++) s += arr[a].fileName + ": " + jsonStringifySafe(arr[a].data) + "\r\n";
+        return s + "\r\n";
+    }
+    t += dump("PARALLEL", par) + dump("BATCH", bat) + dump("KOMBI-PDF", comb);
 
     var dt = new Date();
     function p2(n){ n=String(n); return n.length<2?"0"+n:n; }
     var stamp = String(dt.getFullYear()) + p2(dt.getMonth()+1) + p2(dt.getDate()) + "_" +
                 p2(dt.getHours()) + p2(dt.getMinutes()) + p2(dt.getSeconds());
-    var path = outDir.replace(/\\+$/, "") + "\\KI-Vergleich_Parallel-vs-Batch_" + stamp + ".txt";
+    var path = outDir.replace(/\\+$/, "") + "\\KI-Vergleich_P-B-K_" + stamp + ".txt";
     try {
-        // Unicode (UTF-16) - der Text enthaelt echte Umlaute aus den KI-Daten;
-        // ASCII-CreateTextFile wuerde bei Nicht-ASCII "Ungueltiger Prozeduraufruf" werfen.
-        var f = fso.CreateTextFile(path, true, true);
+        var f = fso.CreateTextFile(path, true, true); // Unicode (UTF-16) wegen Umlauten
         f.Write(t);
         f.Close();
-        wsLog("Vergleichsdatei: " + path + " (" + totalDiff + " abweichende Felder gesamt)");
-        wsShowSuccess("Testmodus fertig. <strong>" + totalDiff + "</strong> abweichende Felder. " +
-            "Vergleichsdatei gespeichert &amp;mdash; bei einer KI hochladen, um Unterschiede pr&amp;uuml;fen zu lassen.");
+        wsLog("Vergleichsdatei: " + path + " (" + totalDiff + " abweichende Felder gesamt)", "ok");
+        wsShowSuccess("Testmodus fertig (Parallel + Batch + Kombi-PDF). <strong>" + totalDiff +
+            "</strong> abweichende Felder. Vergleichsdatei im Ergebnis-Ordner &amp;mdash; bei einer KI " +
+            "hochladen, um die 3 Modi pr&amp;uuml;fen zu lassen.");
         try { shell.Run('notepad.exe "' + path + '"', 1, false); } catch(eN) {}
     } catch(eW) {
         wsShowError("Vergleichsdatei konnte nicht geschrieben werden: " + (eW.message || eW));
@@ -8944,8 +8982,8 @@ End Function
                 <strong>Batch (1 kombinierte PDF):</strong> Word baut aus ALLEN Mails+PDFs <em>eine</em> PDF mit
                 klaren Dokument-Trennern (<code>##### DOKUMENT-START ##### datei: ...</code>) und l&amp;auml;dt nur
                 diese eine hoch &amp;mdash; skaliert auf viele Mails. <em>Experimentell</em>: bei Scan-PDFs verlustbehaftet.<br>
-                <strong>Testmodus:</strong> erst Parallel, dann Batch &amp;mdash; schreibt eine <strong>Vergleichsdatei</strong>
-                (Parallel vs. Batch je Feld) zum Hochladen bei einer KI; <em>kein</em> .msg/Excel-Export.<br>
+                <strong>Testmodus:</strong> Parallel + Batch + Kombi-PDF nacheinander &amp;mdash; schreibt EINE
+                <strong>Vergleichsdatei</strong> (P/B/K je Feld) in den Ergebnis-Ordner, oeffnet sie zum Pruefen.<br>
                 Parallel/Batch/Kombi: <strong>Excel</strong> (Spalte Lfd_Nr) + je Vorgang die <strong>Original-Mail als .msg</strong>
                 mit <strong>KI-Notiz als PDF</strong>. Original-Dateien im Quellordner bleiben unver&amp;auml;ndert.
             </div>
