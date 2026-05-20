@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.16"
+        VERSION="2.17"
         WINDOWSTATE="normal"
     />
     <style>
@@ -200,7 +200,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.16 - Zustellfehler-Meldungen (Unzustellbarkeitsberichte / NDR / Bounce-Mails) werden VOR dem LLM-Aufruf erkannt und lokal klassifiziert (Absender postmaster/mailer-daemon/ITERGO-Security, Betreff "Nachricht nicht zustellbar", .eml-Anhang + Body-Hinweise). Kein API-Call mehr -> spart Token UND vermeidet JSON-Parse-Fehler durch die eingebetteten MIME-Header der originalen Mail im .eml-Anhang. Begriff "Bounce-NDR" umbenannt in deutsches "Zustellfehler" in allen Prompts und Spalten. v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.17 - KI-Notiz-PDF wird nur noch im TEMP angelegt, in die .msg eingebettet und danach geloescht. Vorher lag pro Vorgang ein redundantes KI-Notiz_BÜ-KI-NNN.pdf neben der .msg - das war ueberfluessig, weil die Notiz in der .msg selbst steckt. v2.16 - Zustellfehler-Meldungen (Unzustellbarkeitsberichte / NDR / Bounce-Mails) werden VOR dem LLM-Aufruf erkannt und lokal klassifiziert (Absender postmaster/mailer-daemon/ITERGO-Security, Betreff "Nachricht nicht zustellbar", .eml-Anhang + Body-Hinweise). Kein API-Call mehr -> spart Token UND vermeidet JSON-Parse-Fehler durch die eingebetteten MIME-Header der originalen Mail im .eml-Anhang. Begriff "Bounce-NDR" umbenannt in deutsches "Zustellfehler" in allen Prompts und Spalten. v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -8282,15 +8282,17 @@ function wsFinishDemo(processed) {
             wsLog("   Excel-Fehler: " + eX.message);
         }
 
-        // ---- 2. ORIGINAL-Mail ist fuehrend, KI-Notiz wird als PDF angehaengt ----
+        // ---- 2. ORIGINAL-Mail ist fuehrend, KI-Notiz wird als PDF EINGEBETTET ----
         // Die gespeicherte .msg IST die Original-Mail (Betreff/Absender/Body/
-        // Original-Anhaenge bleiben). Vorgehen ohne Guard-Block:
+        // Original-Anhaenge bleiben). Vorgehen:
         //   - Original via Session.OpenSharedItem(.msg) oeffnen (losgeloeste
         //     Kopie aus der Datei, NICHT das Postfach-Item)
-        //   - KI-Notiz: ASCII-HTML (FSO) -> per Word.Application zu PDF
+        //   - KI-Notiz: ASCII-HTML in TEMP -> per Word.Application zu PDF in TEMP
         //     (Word laeuft im eigenen Prozess wie Excel -> keine Zonensperre)
         //   - PDF an die Original-Mail anhaengen, dann SaveAs als neue .msg
-        //   - Fallback ohne Word: KI-Notiz als HTML anhaengen
+        //     Die PDF steckt nach SaveAs in der .msg drin - die TEMP-Datei wird
+        //     anschliessend wieder geloescht (kein separates PDF im Ordner).
+        //   - Fallback ohne Word: KI-Notiz als HTML anhaengen (ebenfalls aus TEMP)
         wsLog("");
         wsLog("Speichere " + processed.length + " Vorgänge: Original-Mail führend, KI-Notiz als PDF angehängt...");
 
@@ -8347,7 +8349,11 @@ function wsSaveTick(ctx) {
         nf.Write(noteHtml);
         nf.Close();
 
-        var pdfPath = ctx.outDir.replace(/\\+$/, "") + "\\KI-Notiz_" + lfd + ".pdf";
+        // PDF/HTML-Notiz nur als TEMP-Datei - sie wird in die .msg eingebettet
+        // und ist danach in der .msg enthalten. Eine separate Kopie im Vorgangs-
+        // Ordner ist redundant; wird unten geloescht.
+        var tempBase = ctx.shellS.ExpandEnvironmentStrings("%TEMP%");
+        var pdfPath = tempBase + "\\KI-Notiz_" + stampN + ".pdf";
         if (ctx.word) {
             try {
                 try { if (ctx.fsoS.FileExists(pdfPath)) ctx.fsoS.DeleteFile(pdfPath, true); } catch(ePre) {}
@@ -8363,7 +8369,7 @@ function wsSaveTick(ctx) {
         if (pdfPath && ctx.fsoS.FileExists(pdfPath)) {
             keepPath = pdfPath;
         } else {
-            keepPath = ctx.outDir.replace(/\\+$/, "") + "\\KI-Notiz_" + lfd + ".html";
+            keepPath = tempBase + "\\KI-Notiz_" + stampN + ".html";
             try { if (ctx.fsoS.FileExists(keepPath)) ctx.fsoS.DeleteFile(keepPath, true); } catch(e) {}
             var hf = ctx.fsoS.CreateTextFile(keepPath, true, false);
             hf.Write(noteHtml);
@@ -8382,15 +8388,18 @@ function wsSaveTick(ctx) {
         item = null;
         ctx.saved++;
         wsLog("   [" + lfd + "] (" + (ctx.pi + 1) + "/" + ctx.total + ") gespeichert: " + target +
-              (keepPath.substr(-4).toLowerCase() === ".pdf" ? " (Notiz als PDF)" : " (Notiz als HTML)"), "ok");
+              (keepPath.substr(-4).toLowerCase() === ".pdf" ? " (Notiz als PDF eingebettet)" : " (Notiz als HTML eingebettet)"), "ok");
 
+        // TEMP-Dateien aufraeumen - die Notiz steckt jetzt in der .msg.
         try { ctx.fsoS.DeleteFile(tmpHtml, true); } catch(eDel) {}
+        try { if (keepPath && ctx.fsoS.FileExists(keepPath)) ctx.fsoS.DeleteFile(keepPath, true); } catch(eDelK) {}
     } catch(eSave) {
         ctx.failed++;
         wsLog("   [" + lfd + "] FEHLER: " + (eSave.message || eSave) +
               " (evtl. Outlook-Sicherheitsabfrage 'Zugriff zulassen' bestaetigen)", "err");
         try { if (item) item.Close(1); } catch(eC2) {}
         try { if (tmpHtml) ctx.fsoS.DeleteFile(tmpHtml, true); } catch(eDel2) {}
+        try { if (keepPath && ctx.fsoS.FileExists(keepPath)) ctx.fsoS.DeleteFile(keepPath, true); } catch(eDelKE) {}
     }
     ctx.pi++;
     wsProgress(ctx.pi, ctx.total);
