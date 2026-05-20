@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v2.11 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v2.12 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v2.11</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v2.12</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.11"
+        VERSION="2.12"
         WINDOWSTATE="normal"
     />
     <style>
@@ -335,7 +335,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&amp;gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&amp;gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -1221,6 +1221,14 @@ function writeExcelLiveHeaders(sheet) {
             sheet.Columns("B:B").ColumnWidth = 40;
             sheet.Columns("C:I").ColumnWidth = 16;
         } catch(eCw) {}
+        // Nummern-Spalten als TEXT formatieren - sonst macht Excel aus
+        // "96877374.7" -> 96877374,7 (Locale) und aus langen Nummern E+17.
+        // 13=Maklernummer, 16=Kundennummer, 17=Versicherungsnummer.
+        try {
+            sheet.Columns(13).NumberFormat = "@";
+            sheet.Columns(16).NumberFormat = "@";
+            sheet.Columns(17).NumberFormat = "@";
+        } catch(eNf) {}
     } catch(e) {}
 }
 
@@ -4088,6 +4096,11 @@ function cellSafe(v) {
     if (v == null) return "";
     var s = String(v);
     if (s.length === 0) return "";
+    // LLM-Platzhalter wie "leer", "k.A.", "-" als wirklich leer behandeln (nichts
+    // in die Zelle schreiben). "nicht_pruefbar" bleibt erhalten - das ist eine
+    // bedeutungsvolle Antwort auf Pruef-Felder (Unterschriften etc.).
+    var stripped = s.replace(/^\s+|\s+$/g, "");
+    if (/^(leer|-|k\.?\s?a\.?|n\/a|na|none|null|undefined|keine?)$/i.test(stripped)) return "";
     var c0 = s.charAt(0);
     if (c0 === "=" || c0 === "+" || c0 === "-" || c0 === "@") {
         return "'" + s;
@@ -7585,6 +7598,7 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
     p += "Anhaenge mit '[Scan - NICHT analysiert]' wurden bewusst nicht hochgeladen: pdf_qualitaet='Scan', ";
     p += "hinweis 'Scan-Anhang nicht analysiert - manuell pruefen', Felder die nur daraus kaemen leer/nicht_pruefbar.\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-Objekt (kein Markdown, keine Erklaerung).\n";
+    p += "LEERE Felder als LEERER STRING \"\" - NICHT \"leer\", \"k.A.\", \"-\", \"keine\" oder aehnliches.\n";
     p += "Verwende echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß) in Freitext-Feldern:\n";
     p += "{\n" + wsFieldLines() + "}\n";
     return p;
@@ -7608,7 +7622,7 @@ function wsFieldLines() {
     p += '  "kunde_nachname":"VN / Vollmachtgeber, oder leer",\n';
     p += '  "kunde_vorname":"oder leer",\n';
     p += '  "kunde_nummer":"Partner-/Personennummer (NICHT Vers- oder Maklernummer), oder leer",\n';
-    p += '  "versicherungsnummer":"VNR / Vertragsnummer (z.B. LF060237653), oder leer",\n';
+    p += '  "versicherungsnummer":"VNR(n) / Vertragsnummer(n) als TEXT (NICHT als Zahl interpretieren). Behalte EXAKT die Originalform inkl. Buchstaben-Praefix (SV/LF/HG/RS/GU/HA/...), fuehrende Nullen sowie Punkt/Komma/Strich-Suffixe (z.B. SV096877374.7, HA4712946-217). Bei MEHREREN explizit benannten Vertragsnummern (z.B. \'BUe Kundenverbindung\' mit Aufzaehlung im Anschreiben) ALLE kommagetrennt auffuehren (z.B. \'SV096877374.7, SV075359847.2, SV096877892\'). Sonst leer",\n';
     p += '  "sparte":"Komposit|Leben|KV|Mehrere|Unbekannt",\n';
     p += '  "geschaefts_typ":"BUe einfacher Vertrag|BUe Kundenverbindung|Keine BUe",\n';
     p += '  "unterlagen_angefragt":"ja|nein",\n';
@@ -7675,6 +7689,7 @@ function wsBuildBatchPrompt(mails) {
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown, keine ";
     p += "Erklaerung), GENAU " + mails.length + " Objekte, in derselben Reihenfolge wie die Mails.\n";
     p += "Jedes Objekt hat ZUSAETZLICH als erstes Feld \"datei\" mit dem EXAKTEN Dateinamen.\n";
+    p += "LEERE Felder als LEERER STRING \"\" - NICHT \"leer\", \"k.A.\", \"-\", \"keine\" oder aehnliches.\n";
     p += "Verwende echte deutsche Umlaute (ae->ä, oe->ö, ue->ü, ss->ß) in Freitext-Feldern:\n";
     p += "[\n  {\n";
     p += '  "datei":"exakter Dateiname der zugehoerigen Mail",\n';
@@ -8107,6 +8122,12 @@ function wsFinishDemo(processed) {
         return;
     }
 
+    // Vorgaenge zu Clustern gruppieren (gleicher Makler + Kunde -> Cluster mit
+    // ID 001a/001b/... + gemeinsamer Pastell-Farbe). Aendert die Reihenfolge in
+    // processed[] - dadurch landen Cluster-Mitglieder direkt untereinander im
+    // Excel UND in der .msg-Ausgabe.
+    processed = wsAssignClusters(processed);
+
     wsShowInfo("<strong>" + processed.length + " von " + state._wsMsgFiles.length +
                "</strong> Mails analysiert. Excel wird erstellt und jeder Vorgang als .msg gespeichert...");
     wsLog("");
@@ -8150,6 +8171,7 @@ function wsFinishDemo(processed) {
             // Makler / Kunde+Vertrag / Unterlagen+Anhang / Maklervollmacht / Ergebnis
             var colDefs = [
                 { h:"Lfd_Nr",              g:"meta",  w:8,  wrap:false, v:function(r,d,i){ return wsLfdNr(i); } },
+                { h:"Cluster_ID",          g:"meta",  w:9,  wrap:false, v:function(r,d){ return cellSafe(r._clusterId || ""); } },
                 { h:"Datei",               g:"meta",  w:34, wrap:false, v:function(r,d){ return cellSafe(r.fileName); } },
                 { h:"Datum",               g:"meta",  w:16, wrap:false, v:function(r,d){ return cellSafe(r.datum); } },
                 { h:"Absender",            g:"meta",  w:28, wrap:false, v:function(r,d){ return cellSafe(r.absName + " <" + r.absMail + ">"); } },
@@ -8217,12 +8239,32 @@ function wsFinishDemo(processed) {
                     try { sh.Cells(1, hc+1).Interior.Color = grpColor[colDefs[hc].g] || rgb(55,65,81); } catch(eHc) {}
                 }
             } catch(e) {}
+            // Nummern-Spalten als TEXT formatieren, BEVOR Werte geschrieben werden -
+            // sonst macht Excel aus "96877374.7" -> 96877374,7 (deutsche Locale)
+            // und aus langen Vertragsnummern E+17.
+            try {
+                var textCols = { "Agentur_Nummer":1, "Vermittler_Nummer":1, "Kunde_Nummer":1,
+                                 "Versicherungsnummer":1, "Maklernummer":1, "Cluster_ID":1, "Lfd_Nr":1 };
+                for (var tc = 0; tc < nCols; tc++) {
+                    if (textCols[colDefs[tc].h]) {
+                        try { sh.Columns(tc+1).NumberFormat = "@"; } catch(eTc) {}
+                    }
+                }
+            } catch(eTcAll) {}
             for (var i = 0; i < processed.length; i++) {
                 var r = processed[i];
                 var d = r.data || {};
                 var row = i + 2;
                 for (var c = 0; c < nCols; c++) {
                     try { sh.Cells(row, c+1).Value = colDefs[c].v(r, d, i); } catch(eCell) {}
+                }
+                // Cluster-Pastell (gleicher Makler+Kunde) zuerst, Reminder-Orange
+                // gewinnt darueber.
+                if (r._clusterColor) {
+                    try {
+                        sh.Range(sh.Cells(row,1), sh.Cells(row, nCols)).Interior.Color =
+                            rgb(r._clusterColor[0], r._clusterColor[1], r._clusterColor[2]);
+                    } catch(eCl) {}
                 }
                 if (d.ist_reminder === "ja") {
                     try { sh.Range(sh.Cells(row,1), sh.Cells(row, nCols)).Interior.Color = rgb(254,215,170); } catch(e) {}
@@ -8245,10 +8287,16 @@ function wsFinishDemo(processed) {
                 sh.Range(sh.Cells(1,1), sh.Cells(processed.length+1, nCols)).AutoFilter();
                 try { sh.Rows(1).AutoFit(); } catch(eAh) {}
                 if (processed.length > 0) { try { sh.Rows("2:" + (processed.length + 1)).AutoFit(); } catch(eAf) {} }
+                // Freeze auf B2: Zeile 1 (Header) + Spalte A (Lfd_Nr) bleiben immer
+                // sichtbar beim Scrollen. Robust per Activate + Select.
                 try {
-                    excel.ActiveWindow.SplitColumn = 0;
-                    excel.ActiveWindow.SplitRow = 1;
-                    excel.ActiveWindow.FreezePanes = true;
+                    try { wb.Activate(); } catch(eWa) {}
+                    try { sh.Activate(); } catch(eSa) {}
+                    try { excel.ActiveWindow.FreezePanes = false; } catch(eFr0) {}
+                    try { excel.ActiveWindow.SplitColumn = 0; } catch(eFr1) {}
+                    try { excel.ActiveWindow.SplitRow = 0; } catch(eFr2) {}
+                    try { sh.Range("B2").Select(); } catch(eSel) {}
+                    try { excel.ActiveWindow.FreezePanes = true; } catch(eFr3) {}
                 } catch(eFr) {}
             } catch(e) {}
             // Excel direkt in den Vorgangs-Ordner speichern (gleicher Ordner wie .msg)
@@ -8380,6 +8428,66 @@ function wsLfdNr(i) {
     var n = String(i + 1);
     while (n.length < 3) n = "0" + n;
     return "BÜ-KI-" + n;
+}
+
+// Gruppiert Vorgaenge zu Clustern: gleicher Makler + gleicher Kunde -> ein Cluster.
+// Cluster mit >= 2 Mitgliedern bekommen eine ID wie "001a", "001b", ... und eine
+// gemeinsame Pastell-Hintergrundfarbe. Reihenfolge: Cluster-Mitglieder werden im
+// Ergebnis-Array stabil hintereinander gruppiert (erstes Vorkommen entscheidet
+// ueber Cluster-Reihenfolge). Singletons behalten ihren Platz relativ zu anderen
+// Singletons, werden aber nach den Clustern einsortiert.
+function wsAssignClusters(processed) {
+    if (!processed || processed.length === 0) return processed;
+    var palette = [
+        [252,231,243], [219,234,254], [220,252,231], [254,243,199],
+        [233,213,255], [207,250,254], [255,228,230], [240,249,255]
+    ];
+    function norm(s) {
+        return String(s == null ? "" : s).toLowerCase()
+            .replace(/[\s ]+/g, " ").replace(/^\s+|\s+$/g, "");
+    }
+    function keyFor(r) {
+        var d = r.data || {};
+        var mk = norm(d.makler_nachname) + "|" + norm(d.makler_vorname) + "|" + norm(d.maklerpool);
+        var ku = norm(d.kunde_nachname) + "|" + norm(d.kunde_vorname) + "|" + norm(d.kunde_nummer);
+        if (mk === "||" || ku === "||") return null; // ohne Makler ODER ohne Kunde kein Cluster
+        return mk + "##" + ku;
+    }
+    var groupOrder = [];
+    var groups = {};
+    var loners = [];
+    for (var i = 0; i < processed.length; i++) {
+        var k = keyFor(processed[i]);
+        if (k === null) { loners.push(processed[i]); continue; }
+        if (!groups[k]) { groups[k] = []; groupOrder.push(k); }
+        groups[k].push(processed[i]);
+    }
+    var sorted = [];
+    var clusterCount = 0;
+    for (var gi = 0; gi < groupOrder.length; gi++) {
+        var members = groups[groupOrder[gi]];
+        if (members.length >= 2) {
+            clusterCount++;
+            var num = String(clusterCount);
+            while (num.length < 3) num = "0" + num;
+            var col = palette[(clusterCount - 1) % palette.length];
+            for (var mi = 0; mi < members.length; mi++) {
+                members[mi]._clusterId = num + String.fromCharCode(97 + mi);
+                members[mi]._clusterColor = col;
+                sorted.push(members[mi]);
+            }
+        } else {
+            members[0]._clusterId = "";
+            members[0]._clusterColor = null;
+            sorted.push(members[0]);
+        }
+    }
+    for (var li = 0; li < loners.length; li++) {
+        loners[li]._clusterId = "";
+        loners[li]._clusterColor = null;
+        sorted.push(loners[li]);
+    }
+    return sorted;
 }
 
 // ============================================================================
