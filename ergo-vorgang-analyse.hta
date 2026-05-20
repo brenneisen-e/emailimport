@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.15"
+        VERSION="2.16"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.16 - Zustellfehler-Meldungen (Unzustellbarkeitsberichte / NDR / Bounce-Mails) werden VOR dem LLM-Aufruf erkannt und lokal klassifiziert (Absender postmaster/mailer-daemon/ITERGO-Security, Betreff "Nachricht nicht zustellbar", .eml-Anhang + Body-Hinweise). Kein API-Call mehr -> spart Token UND vermeidet JSON-Parse-Fehler durch die eingebetteten MIME-Header der originalen Mail im .eml-Anhang. Begriff "Bounce-NDR" umbenannt in deutsches "Zustellfehler" in allen Prompts und Spalten. v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -3050,7 +3050,7 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
     p += "Body:\n<<<\n" + text + "\n>>>\n===== ENDE EMAIL =====\n\n";
 
     p += "AUFGABE: Klassifiziere die Mail strikt anhand der unten definierten Felder und Wertelisten.\n\n";
-    p += "WICHTIG - SCHRITT 0 (Triage): Pruefe ZUERST das Feld 'vorgangstyp'. Wenn die Mail KEIN echter eingehender Makler-Vorgang ist (Bounce-NDR, von ergo selbst rausgegangen, automatische System-Mail, Werbung), dann setze ALLE anderen Felder auf '' (leerer String) - nur 'vorgangstyp' und 'hinweis' werden befuellt. NICHT raten.\n\n";
+    p += "WICHTIG - SCHRITT 0 (Triage): Pruefe ZUERST das Feld 'vorgangstyp'. Wenn die Mail KEIN echter eingehender Makler-Vorgang ist (Zustellfehler, von ergo selbst rausgegangen, automatische System-Mail, Werbung), dann setze ALLE anderen Felder auf '' (leerer String) - nur 'vorgangstyp' und 'hinweis' werden befuellt. NICHT raten.\n\n";
     p += "Nur wenn vorgangstyp == 'Makler-Vorgang': die uebrigen Felder befuellen. Nutze die HOCHGELADENEN PDFs (falls vorhanden) als zusaetzliche Quelle - insbesondere fuer die Maklervollmacht-Pruefung.\n\n";
 
     p += "REGELN:\n";
@@ -3060,8 +3060,8 @@ function buildVorgangPrompt(datum, absName, absMail, betreff, text, anhangAlle, 
 
     p += "FELDER:\n\n";
     p += "0) vorgangstyp (TRIAGE - immer ausfuellen)\n";
-    p += "   'Makler-Vorgang' / 'Bounce-NDR' / 'Ergo-Outbound' / 'System-Mail' / 'Werbung-Spam' / 'Unklar'\n";
-    p += "   Bounce-Indizien: 'postmaster','mailer-daemon','noreply','Mail Delivery Failure','5.7.1','Relay access denied'.\n";
+    p += "   'Makler-Vorgang' / 'Zustellfehler' / 'Ergo-Outbound' / 'System-Mail' / 'Werbung-Spam' / 'Unklar'\n";
+    p += "   Zustellfehler-Indizien: Absender 'postmaster'/'mailer-daemon'/'noreply', Betreff 'Mail Delivery Failure'/'Nachricht nicht zustellbar', SMTP-Code '5.7.1'/'5.1.1', 'Relay access denied'.\n";
     p += "   Ergo-Outbound: Absender @ergo.de / @itergo.com / @ergo.com.\n\n";
 
     p += "1) maklerpool - extrahiert UND konsolidiert. Verwende die EINHEITLICHEN Schreibweisen aus der folgenden Liste, NICHT die Roh-Variante aus der Mail:\n";
@@ -3995,7 +3995,7 @@ function renderTable() {
         var vt = sg(d, "vorgangstyp");
         var vtCls = "col-vt-other";
         if (vt === "Makler-Vorgang") vtCls = "col-vt-makler";
-        else if (vt === "Bounce-NDR" || vt === "Ergo-Outbound" || vt === "System-Mail") vtCls = "col-vt-bounce";
+        else if (vt === "Zustellfehler" || vt === "Ergo-Outbound" || vt === "System-Mail") vtCls = "col-vt-bounce";
 
         var sCls = "s-ok";
         var sTxt = "OK";
@@ -6087,7 +6087,7 @@ function buildBulkTriagePrompt(batch) {
     p += "Antworte mit GENAU einem JSON-Array, das fuer JEDE Mail genau ein Objekt enthaelt - in gleicher Reihenfolge, mit 'nr' = Mail-Nummer.\n\n";
     p += "FELDER PRO MAIL-OBJEKT (alle als String):\n";
     p += "- nr (Mail-Nummer 1-" + batch.length + ")\n";
-    p += "- vorgangstyp: 'Makler-Vorgang' / 'Bounce-NDR' / 'Ergo-Outbound' / 'System-Mail' / 'Werbung-Spam' / 'Unklar'\n";
+    p += "- vorgangstyp: 'Makler-Vorgang' / 'Zustellfehler' / 'Ergo-Outbound' / 'System-Mail' / 'Werbung-Spam' / 'Unklar'\n";
     p += "- klassifikation: 'BUe-Vorgang' / 'Mahnung-Reminder' / 'Schadenmeldung' / 'Antrag-Aenderung' / 'Anfrage-Ruecksprache' / 'Nicht-Standard' / 'Kein-Makler-Vorgang'\n";
     p += "- klassifikation_grund: kurz, max 150 Zeichen, konkretes Indiz\n";
     p += "- geschaefts_typ: 'BUe einfacher Vertrag' / 'BUe Kundenverbindung' / 'Keine BUe'\n";
@@ -6358,7 +6358,7 @@ function buildBulkTriageStats(wb, rows, elapsedSec) {
 
     // 2a: Nicht-Makler-Vorgang (Bounces / System / Outbound / etc.)
     r("Nicht-Makler-Vorgang (raus)", bucketNotMakler, pct(bucketNotMakler, processedCount), false, true);
-    var notMaklerOrder = ["Bounce-NDR", "Ergo-Outbound", "System-Mail", "Werbung-Spam", "Unklar"];
+    var notMaklerOrder = ["Zustellfehler", "Ergo-Outbound", "System-Mail", "Werbung-Spam", "Unklar"];
     for (var ni = 0; ni < notMaklerOrder.length; ni++) {
         if (notMaklerByType[notMaklerOrder[ni]]) {
             r(notMaklerOrder[ni], notMaklerByType[notMaklerOrder[ni]],
@@ -7473,7 +7473,7 @@ function wsBuildPrompt(datum, absName, absMail, betreff, body, anhangAlle, pdfsH
 // Gemeinsames Feld-Schema (Einzel- und Batch-Prompt nutzen es identisch).
 function wsFieldLines() {
     var p = "";
-    p += '  "vorgangstyp":"Makler-Vorgang|Bounce-NDR|Ergo-Outbound|System-Mail|Werbung-Spam|Unklar",\n';
+    p += '  "vorgangstyp":"Makler-Vorgang|Zustellfehler|Ergo-Outbound|System-Mail|Werbung-Spam|Unklar",\n';
     p += '  "klassifikation":"BUe-Vorgang|Anfrage-Ruecksprache|Antrag-Aenderung|Schadenmeldung|Nicht-Standard|Kein-Makler-Vorgang",\n';
     p += '  "klassifikation_grund":"kurze Begruendung, konkrete Indizien (max 200 Z.)",\n';
     p += '  "ist_reminder":"ja|nein",\n';
@@ -7750,6 +7750,49 @@ function wsSendAnswerSync(convId, prompt, docIdsJson) {
 // Bereitet einen Slot vor: oeffnet Mail, liest Properties + extrahiert PDFs,
 // baut Prompt, feuert createConversationAsyncFire (ASYNC), schliesst Mail.
 // Returns slot-Objekt mit stage="CREATING_CONV".
+// Zustellfehler-Heuristik (NDR / Non-Delivery-Report): erkennt automatische
+// Unzustellbarkeits-Meldungen des Mailservers VOR dem LLM-Aufruf. Spart API-
+// Token UND verhindert JSON-Parse-Fehler durch eingebettete MIME-Header /
+// .eml-Bodies, die das Modell verwirren oder die Antwort am Token-Limit
+// abschneiden.
+function wsIsBounceMail(slot, body) {
+    var m = String(slot.absMail || "").toLowerCase();
+    var n = String(slot.absName || "").toLowerCase();
+    var b = String(slot.betreff || "").toLowerCase();
+    var bd = String(body || "").toLowerCase();
+    var anh = String(slot.anhangAlle || "").toLowerCase();
+    var senderRx = /(postmaster|mailer[-_]?daemon|noreply|noresponse|no[-_]reply|itergo[-_]?security)@/i;
+    if (senderRx.test(m) || senderRx.test(n)) return true;
+    var subjRx = /(nicht\s*zustellbar|unzustellbar|delivery\s*(failure|status\s*notification)|undelivered\s*mail|returned\s*mail|mail\s*delivery\s*system|failure\s*notice|message\s*could\s*not\s*be\s*delivered|nachricht\s*nicht\s*zugestellt)/i;
+    if (subjRx.test(b)) return true;
+    if (anh.indexOf(".eml") >= 0 && /(zustell|delivery|user\s*unknown|550\s*5\.|recipient\s*address\s*rejected|automatisch\s*generierte\s*nachricht|dies\s*ist\s*eine\s*automatisch)/i.test(bd)) return true;
+    return false;
+}
+
+function wsSyntheticBounceData(slot) {
+    return {
+        vorgangstyp: "Zustellfehler",
+        ist_reminder: "nein", reminder_quelle: "", nicht_neuer_vorgang_grund: "",
+        klassifikation: "Kein-Makler-Vorgang",
+        klassifikation_grund: "Zustellfehler/Unzustellbarkeitsbericht - automatisch erkannt anhand Absender/Betreff/Body, kein LLM-Aufruf",
+        maklerpool: "", makler_nachname: "", makler_vorname: "",
+        agentur_nummer: "", vermittler_nummer: "", auftrag_datum: "",
+        kunde_nachname: "", kunde_vorname: "", kunde_nummer: "",
+        versicherungsnummer: "", sparte: "",
+        geschaefts_typ: "Keine BUe",
+        unterlagen_angefragt: "nein", unterlagen_liste: "",
+        sonderfall: "Kein Sonderfall",
+        anhang_typen: "Sonstiges", pdf_qualitaet: "Keine_PDFs",
+        enthaelt_maklervollmacht: "nein", mv_vollumfaenglich: "nicht_pruefbar",
+        mv_einschraenkungen: "", mv_status: "kein Anhang",
+        unterschrift_kunde: "nicht_pruefbar", unterschrift_makler: "nicht_pruefbar",
+        auf_vn_ausgestellt: "nicht_pruefbar", makler_namentlich_genannt: "nein",
+        zusammenfassung: "Unzustellbarkeitsbericht (Mail nicht zugestellt): " + (slot.betreff || ""),
+        naechster_schritt: "Zustellfehler-Meldung - keine Aktion noetig.",
+        hinweis: "Automatisch als Zustellfehler erkannt, KEIN LLM-Aufruf (spart Token + vermeidet JSON-Parse-Fehler durch MIME-Header in .eml-Anhang)."
+    };
+}
+
 function wsPrepareSlot(msgPath) {
     var fileName = msgPath.substr(msgPath.lastIndexOf("\\") + 1);
     var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -7797,6 +7840,20 @@ function wsPrepareSlot(msgPath) {
         }
         try { mail.Close(1); } catch(e) {}
         mail = null;
+
+        // Vor LLM-Aufruf: ist das eine Zustellfehler-Meldung (Bounce/NDR)? Dann
+        // synthetisch klassifizieren und Conversation gar nicht erst aufmachen.
+        // Spart Token, vermeidet JSON-Parse-Fehler durch eingebettete .eml-MIME-
+        // Header, die das Modell verwirren oder die Antwort truncaten lassen.
+        if (wsIsBounceMail(slot, body)) {
+            slot.data = wsSyntheticBounceData(slot);
+            slot.isReminder = false;
+            slot.klassifikation = slot.data.klassifikation;
+            slot.summary = slot.data.zusammenfassung;
+            slot.stage = "DONE";
+            try { wsLog("   Zustellfehler erkannt - kein LLM-Aufruf: " + slot.fileName, "muted"); } catch(eLb) {}
+            return slot;
+        }
 
         slot.prompt = wsBuildPrompt(slot.datum, slot.absName, slot.absMail,
                                     slot.betreff, body, slot.anhangAlle, pdfListe);
