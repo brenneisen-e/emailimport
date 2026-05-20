@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v2.14 - HTA Quellcode</title>
+<title>ERGO Workshop v2.15 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v2.14</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v2.15</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.14"
+        VERSION="2.15"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&amp;gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&amp;gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -7636,11 +7636,43 @@ function wsBuildBatchPrompt(mails) {
 
 function wsParseJson(txt) {
     if (!txt) return null;
-    var s = String(txt).replace(/^\s+|\s+$/g, "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
-    try { return eval("(" + s + ")"); } catch(e) {}
+    var raw = String(txt);
+    // 1. Code-Fences strip + trim
+    var s = raw.replace(/^\s+|\s+$/g, "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+    // 2. Smart-Quotes / typografische Anfuehrungszeichen normalisieren (Word/PDF-Copy
+    //    spuckt manchmal U+201C/U+201D statt ASCII \"; Apostrophe U+2018/U+2019).
+    s = s.replace(/[“”„‟]/g, '"')
+         .replace(/[‘’‚‛′‵]/g, "'");
+    // 3. Direkt versuchen (eval ist tolerant ggue. single-quotes, etc.)
+    var candidates = [s];
+    // 4. Nur das aeusserste {...} extrahieren (greedy bis zur letzten })
     var m = s.match(/\{[\s\S]*\}/);
-    if (m) { try { return eval("(" + m[0] + ")"); } catch(e2) {} }
+    if (m) candidates.push(m[0]);
+    // 5. Trailing-Comma-Cleanup (haeufiger LLM-Fehler: {"a":1,})
+    if (m) candidates.push(m[0].replace(/,(\s*[}\]])/g, "$1"));
+    // 6. Truncation-Recovery: fehlt am Ende ein `}`? Schliessende Klammern auffuellen.
+    if (m) {
+        var open = (m[0].match(/\{/g) || []).length;
+        var close = (m[0].match(/\}/g) || []).length;
+        if (open > close) {
+            var fixed = m[0].replace(/,(\s*[}\]])/g, "$1");
+            for (var k = 0; k < (open - close); k++) fixed += "}";
+            candidates.push(fixed);
+        }
+    }
+    for (var i = 0; i < candidates.length; i++) {
+        try { return eval("(" + candidates[i] + ")"); } catch(e) {}
+    }
     return null;
+}
+
+// Logging-Helper: bei JSON-Parse-Fehlern den Roh-Text anzeigen damit man sieht
+// was der LLM ueberhaupt zurueckgegeben hat. Liefert die ersten 250 Zeichen,
+// Newlines durch Leerzeichen ersetzt, fuer eine Log-Zeile.
+function wsParseSnippet(txt) {
+    var s = String(txt || "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+    if (s.length > 250) s = s.substring(0, 250) + "...";
+    return s;
 }
 
 function wsBuildNotizHtml(data, lfdNr) {
@@ -7987,8 +8019,13 @@ function wsTick() {
                 } catch(eRb) {
                     try { aresp = s.answerHttp.ResponseText; } catch(e) {}
                 }
-                var data = wsParseJson(jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"));
-                if (!data) { s.stage = "ERROR"; s.error = "JSON nicht parsebar"; continue; }
+                var _rawAnswer = jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n");
+                var data = wsParseJson(_rawAnswer);
+                if (!data) {
+                    s.stage = "ERROR";
+                    s.error = "JSON nicht parsebar - LLM-Antwort: " + wsParseSnippet(_rawAnswer);
+                    continue;
+                }
                 s.data = data;
                 s.isReminder = data.ist_reminder === "ja";
                 s.klassifikation = data.klassifikation || "";
@@ -9337,8 +9374,13 @@ function wsChunkTick() {
                     rstm.Type = 1; rstm.Open(); rstm.Write(rb); rstm.Position = 0;
                     rstm.Type = 2; rstm.Charset = "utf-8"; aresp = String(rstm.ReadText()); rstm.Close();
                 } catch(eRb) { try { aresp = s.answerHttp.ResponseText; } catch(e) {} }
-                var arr = wsParseJsonArray(jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n"));
-                if (!arr) { s.stage = "ERROR"; s.error = "JSON-Array nicht parsebar"; continue; }
+                var _rawA = jsonUnescape(extractAssistantFromNdjson(aresp)).replace(/\\n/g, "\n");
+                var arr = wsParseJsonArray(_rawA);
+                if (!arr) {
+                    s.stage = "ERROR";
+                    s.error = "JSON-Array nicht parsebar - LLM-Antwort: " + wsParseSnippet(_rawA);
+                    continue;
+                }
                 for (var mi = 0; mi < s.mails.length; mi++) {
                     var m = s.mails[mi];
                     if (m.error) continue;
