@@ -1603,7 +1603,7 @@
                                     </a>
                                 </div>
                                 <div style="font-size: 11px; color: #fbbf24; margin-top: 6px;">Quellcode-Seite mit Copy-Button + Browser-Download (umgeht Proxy-Filter). Als <code>ergo-workshop.hta</code> in einen lokalen Ordner speichern (nicht direkt vom Netzlaufwerk starten).</div>
-                                <div class="tool-meta">workshop.hta (abgeleitet aus ergo-vorgang-analyse.hta v2.09) | <strong>v2.09:</strong> Kombi wieder schnell (warmer In-HTA-Pfad statt kaltem Subprozess). <strong>v2.08:</strong> Workshop-Log mit echten Umlauten + Leerzeichen Uhrzeit/Text. <strong>v2.07:</strong> FIX Stream HTTP 403 - Streaming-Subprozess sendet jetzt Browser-User-Agent (sonst blockt das ERGO-Gateway). <strong>v2.06:</strong> FIX Stream-Start-Fehler "Datenquelle in einer anderen Dom&auml;ne" - kein ADODB.Stream mehr im HTA-Prozess. | Voraussetzung: Outlook + ErgoGPT-Cookie aus Cookie.txt (neben der HTA). <strong>Nur das Workshop-Frontend</strong> - grosse Hauptmaske komplett ausgeblendet. Knoepfe Parallel / Batch (1 Prompt) / <strong>Chunked-Batch (4er, parallel - empfohlen)</strong> / Batch (1 kombinierte PDF) / Testmodus. Lfd-Nr B&Uuml;-KI-001; Original-Mail als .msg + KI-Notiz-PDF + Excel im selben Ergebnis-Ordner.</div>
+                                <div class="tool-meta">workshop.hta (abgeleitet aus ergo-vorgang-analyse.hta v2.10) | <strong>v2.10:</strong> Neuer Knopf <strong>&quot;Outlook-Ordner exportieren...&quot;</strong> - Outlook-Ordnerbaum-Picker (PickFolder), alle Mails darin werden als <code>.msg</code> nach <code>%USERPROFILE%\Downloads\Workshop-Export_&lt;Ordnername&gt;_&lt;Stempel&gt;</code> exportiert (Originalbetreff = Dateiname, Sanitize nur fuer Pfadzeichen, Dedup-Suffix) und direkt als Workshop-Input gesetzt. Anreicherte <code>Vorgang_*.msg</code> aus dem _KI-Vorgaenge-Ordner ziehst du am Ende per Drag-Drop zurueck in den gewuenschten Outlook-Ordner. <strong>v2.09:</strong> Kombi wieder schnell (warmer In-HTA-Pfad statt kaltem Subprozess). <strong>v2.08:</strong> Workshop-Log mit echten Umlauten + Leerzeichen Uhrzeit/Text. <strong>v2.07:</strong> FIX Stream HTTP 403 - Streaming-Subprozess sendet jetzt Browser-User-Agent (sonst blockt das ERGO-Gateway). <strong>v2.06:</strong> FIX Stream-Start-Fehler "Datenquelle in einer anderen Dom&auml;ne" - kein ADODB.Stream mehr im HTA-Prozess. | Voraussetzung: Outlook + ErgoGPT-Cookie aus Cookie.txt (neben der HTA). <strong>Nur das Workshop-Frontend</strong> - grosse Hauptmaske komplett ausgeblendet. Knoepfe Parallel / Batch (1 Prompt) / <strong>Chunked-Batch (4er, parallel - empfohlen)</strong> / Batch (1 kombinierte PDF) / Testmodus. Lfd-Nr B&Uuml;-KI-001; Original-Mail als .msg + KI-Notiz-PDF + Excel im selben Ergebnis-Ordner.</div>
                             </div>
                         </details>
 
@@ -1629,7 +1629,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 11.12
+                Version 11.13
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v2.09 - HTA Quellcode</title>
+<title>ERGO Workshop v2.10 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v2.09</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v2.10</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.09"
+        VERSION="2.10"
         WINDOWSTATE="normal"
     />
     <style>
@@ -7325,6 +7325,151 @@ function wsPickFolder() {
     }
 }
 
+// Outlook-Ordnerbaum-Picker (alle Postf&amp;auml;cher/Unterordner) + Export aller
+// Mails als .msg in einen lokalen Workshop-Eingangsordner. Originalbetreff
+// wird als Dateiname beibehalten (nur Pfadzeichen sanitized + Dedup-Suffix).
+// Anschliessend wird der Zielordner direkt als Workshop-Input gesetzt.
+function wsPickOutlookFolder() {
+    if (!outlookApp || !outlookNS) {
+        wsShowError("Outlook ist nicht verbunden &amp;mdash; bitte Outlook &amp;ouml;ffnen und HTA neu starten.");
+        return;
+    }
+    var olFolder = null;
+    try {
+        olFolder = outlookNS.PickFolder();
+    } catch (e) {
+        wsShowError("Outlook-Ordnerauswahl fehlgeschlagen: " + wsEsc(e.message || e));
+        return;
+    }
+    if (!olFolder) return; // abgebrochen
+
+    var itemCount = 0;
+    try { itemCount = olFolder.Items.Count; } catch(eC) { itemCount = 0; }
+    if (itemCount === 0) {
+        wsShowError("Outlook-Ordner <strong>" + wsEsc(olFolder.Name) + "</strong> enth&amp;auml;lt keine Eintr&amp;auml;ge.");
+        return;
+    }
+
+    // Zielordner aufbauen: %USERPROFILE%\Downloads\Workshop-Export_<OrdnerName>_<Stempel>
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var sh  = new ActiveXObject("WScript.Shell");
+    var shApp = new ActiveXObject("Shell.Application");
+    var downloads = "";
+    try { downloads = shApp.NameSpace("shell:Downloads").Self.Path; } catch(eDl) {}
+    if (!downloads) {
+        try { downloads = sh.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads"; } catch(eU) {}
+    }
+    if (!downloads) downloads = sh.ExpandEnvironmentStrings("%TEMP%");
+
+    function p2(n) { n = String(n); return n.length < 2 ? "0" + n : n; }
+    var d0 = new Date();
+    var stamp = String(d0.getFullYear()) + p2(d0.getMonth()+1) + p2(d0.getDate()) + "_" +
+                p2(d0.getHours()) + p2(d0.getMinutes()) + p2(d0.getSeconds());
+    function sanitizeName(s, maxLen) {
+        var x = String(s == null ? "" : s)
+                  .replace(/[\\\/:*?"<>|\r\n\t]/g, "_")
+                  .replace(/\s+/g, " ")
+                  .replace(/^[\s\.]+|[\s\.]+$/g, "");
+        if (!x) x = "ohne_Betreff";
+        if (maxLen &amp;&amp; x.length > maxLen) x = x.substring(0, maxLen);
+        return x;
+    }
+    var safeFolderName = sanitizeName(olFolder.Name, 40);
+    var targetDir = downloads.replace(/\\+$/, "") + "\\Workshop-Export_" + safeFolderName + "_" + stamp;
+    try {
+        if (!fso.FolderExists(targetDir)) fso.CreateFolder(targetDir);
+    } catch (eMk) {
+        wsShowError("Zielordner konnte nicht erstellt werden: " + wsEsc(targetDir) + " (" + wsEsc(eMk.message || eMk) + ")");
+        return;
+    }
+
+    // UI sperren + Log starten
+    document.getElementById("wsLog").style.display = "block";
+    document.getElementById("wsLog").innerHTML = "";
+    document.getElementById("wsProgressWrap").style.display = "block";
+    wsProgress(0, itemCount);
+    wsShowInfo("Exportiere <strong>" + itemCount + "</strong> Eintr&amp;auml;ge aus Outlook-Ordner <strong>" +
+               wsEsc(olFolder.Name) + "</strong> nach <code>" + wsEsc(targetDir) + "</code>...");
+    wsLog("===== Outlook-Export: " + olFolder.Name + " (" + itemCount + " Einträge) =====", "head");
+    wsLog("Zielordner: " + targetDir, "info");
+
+    var pickBtn = document.getElementById("wsPick");
+    var olPickBtn = document.getElementById("wsPickOutlook");
+    if (pickBtn) pickBtn.disabled = true;
+    if (olPickBtn) olPickBtn.disabled = true;
+
+    var saved = 0, failed = 0, skipped = 0;
+    var idx = 1;
+    var itemsCol = olFolder.Items;
+    var usedNames = {};   // fuer Dedup
+
+    function stepOne() {
+        if (idx > itemCount) {
+            if (pickBtn) pickBtn.disabled = false;
+            if (olPickBtn) olPickBtn.disabled = false;
+            wsLog("", "info");
+            wsLog("Fertig: " + saved + " als .msg gespeichert" +
+                  (skipped ? ", " + skipped + " uebersprungen (kein MailItem)" : "") +
+                  (failed ? ", " + failed + " fehlgeschlagen" : "") + ".", "ok");
+            if (saved > 0) {
+                wsShowSuccess("<strong>" + saved + "</strong> Mails als <code>.msg</code> exportiert" +
+                              (failed ? " (" + failed + " Fehler, siehe Log)" : "") +
+                              (skipped ? ", " + skipped + " Nicht-Mails uebersprungen" : "") +
+                              " &amp;mdash; Ordner wird jetzt als Workshop-Input gesetzt.");
+                try { sh.Run('explorer.exe "' + targetDir + '"', 1, false); } catch(eExp) {}
+                wsUseFolder(targetDir);
+            } else {
+                wsShowError("Keine Mail konnte exportiert werden &amp;mdash; siehe Log.");
+            }
+            return;
+        }
+
+        var item = null;
+        try {
+            item = itemsCol.Item(idx);
+            var cls = 0;
+            try { cls = item.Class; } catch(eCl) { cls = 0; }
+            // 43 = olMail. Andere Outlook-Item-Typen (Termine, Aufgaben, Kontakte) skippen
+            if (cls !== 43) {
+                skipped++;
+                wsLog("[" + idx + "/" + itemCount + "] uebersprungen (Outlook-Class " + cls + ", keine Mail)", "muted");
+            } else {
+                var subj = "";
+                try { subj = item.Subject; } catch(eS) { subj = ""; }
+                var baseName = sanitizeName(subj, 120);
+                var fname = baseName + ".msg";
+                var fkey = fname.toLowerCase();
+                if (usedNames[fkey] || fso.FileExists(targetDir + "\\" + fname)) {
+                    var n = 2;
+                    while (usedNames[(baseName + " (" + n + ").msg").toLowerCase()] ||
+                           fso.FileExists(targetDir + "\\" + baseName + " (" + n + ").msg")) {
+                        n++;
+                        if (n > 9999) break;
+                    }
+                    fname = baseName + " (" + n + ").msg";
+                    fkey = fname.toLowerCase();
+                }
+                usedNames[fkey] = true;
+                var target = targetDir + "\\" + fname;
+                item.SaveAs(target, 9); // 9 = olMSGUnicode
+                saved++;
+                wsLog("[" + idx + "/" + itemCount + "] " + fname, "ok");
+            }
+        } catch (eIt) {
+            failed++;
+            wsLog("[" + idx + "/" + itemCount + "] FEHLER: " + (eIt.message || eIt) +
+                  " (evtl. Outlook-Sicherheitsabfrage 'Zugriff zulassen' bestaetigen)", "err");
+        }
+        try { item = null; } catch(eN) {}
+
+        idx++;
+        wsProgress(idx - 1, itemCount);
+        setTimeout(stepOne, 5);
+    }
+
+    setTimeout(stepOne, 50);
+}
+
 function wsUseFolder(path) {
     state._wsFolder = path;
     state._wsMsgFiles = [];
@@ -7702,6 +7847,7 @@ function wsStartParallel(onDone) {
     state._wsOnDone = onDone || null;
     document.getElementById("wsPlay").disabled = true;
     document.getElementById("wsPick").disabled = true;
+    var _olBtn1 = document.getElementById("wsPickOutlook"); if (_olBtn1) _olBtn1.disabled = true;
     document.getElementById("wsClose").disabled = true;
     document.getElementById("wsProgressWrap").style.display = "block";
     if (!onDone) document.getElementById("wsLog").innerText = "";
@@ -7875,6 +8021,7 @@ function wsFinishDemo(processed) {
     state._wsRunning = false;
     document.getElementById("wsPlay").disabled = state._wsMsgFiles.length === 0;
     document.getElementById("wsPick").disabled = false;
+    var _olBtn2 = document.getElementById("wsPickOutlook"); if (_olBtn2) _olBtn2.disabled = false;
     document.getElementById("wsClose").disabled = false;
     wsProgress(state._wsMsgFiles.length, state._wsMsgFiles.length);
 
@@ -8171,6 +8318,7 @@ function wsRestoreUi() {
     if ((b = document.getElementById("wsChunked"))) b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsTest")))  b.disabled = state._wsMsgFiles.length === 0;
     if ((b = document.getElementById("wsPick")))  b.disabled = false;
+    if ((b = document.getElementById("wsPickOutlook"))) b.disabled = false;
     if ((b = document.getElementById("wsClose"))) b.disabled = false;
     wsProgress(state._wsMsgFiles.length, state._wsMsgFiles.length);
 }
@@ -8416,6 +8564,7 @@ function wsStartBatch(onDone) {
     if ((b = document.getElementById("wsBatch"))) b.disabled = true;
     if ((b = document.getElementById("wsTest")))  b.disabled = true;
     if ((b = document.getElementById("wsPick")))  b.disabled = true;
+    if ((b = document.getElementById("wsPickOutlook"))) b.disabled = true;
     if ((b = document.getElementById("wsClose"))) b.disabled = true;
     document.getElementById("wsProgressWrap").style.display = "block";
     if (!onDone) document.getElementById("wsLog").innerText = "";
@@ -8836,6 +8985,7 @@ function wsStartChunked(onDone) {
     if ((b = document.getElementById("wsChunked"))) b.disabled = true;
     if ((b = document.getElementById("wsTest")))     b.disabled = true;
     if ((b = document.getElementById("wsPick")))     b.disabled = true;
+    if ((b = document.getElementById("wsPickOutlook"))) b.disabled = true;
     if ((b = document.getElementById("wsClose")))    b.disabled = true;
     document.getElementById("wsProgressWrap").style.display = "block";
     if (!onDone) document.getElementById("wsLog").innerText = "";
@@ -9155,6 +9305,7 @@ function wsStartCombined(onDone) {
     if ((b = document.getElementById("wsChunked")))  b.disabled = true;
     if ((b = document.getElementById("wsTest")))     b.disabled = true;
     if ((b = document.getElementById("wsPick")))     b.disabled = true;
+    if ((b = document.getElementById("wsPickOutlook"))) b.disabled = true;
     if ((b = document.getElementById("wsClose")))    b.disabled = true;
     document.getElementById("wsProgressWrap").style.display = "block";
     if (!onDone) document.getElementById("wsLog").innerText = "";
@@ -9757,7 +9908,17 @@ End Function
                 <span class="ws-icon">&amp;#128193;</span>
                 <span class="ws-folder-path ws-empty" id="wsFolderPath">Noch kein Ordner gew&amp;auml;hlt</span>
             </div>
-            <button class="ws-btn-folder" id="wsPick" onclick="wsPickFolder()">Ordner w&amp;auml;hlen...</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="ws-btn-folder" id="wsPick" onclick="wsPickFolder()"
+                        title="Bereits gespeicherte .msg-Dateien aus einem Ordner einlesen">
+                    &amp;#128193; Ordner w&amp;auml;hlen...
+                </button>
+                <button class="ws-btn-folder" id="wsPickOutlook" onclick="wsPickOutlookFolder()"
+                        title="Outlook-Ordner im Postfach ausw&amp;auml;hlen - alle Mails darin werden als .msg in einen lokalen Ordner exportiert (Originalbetreff = Dateiname) und direkt als Workshop-Input verwendet."
+                        style="border-color:#0078d4;color:#0078d4;font-weight:600;">
+                    &amp;#128231; Outlook-Ordner exportieren...
+                </button>
+            </div>
             <div class="ws-info-grid" id="wsInfoGrid" style="display:none;">
                 <div class="ws-info-tile">
                     <span class="ws-num" id="wsNumMsgs">0</span>
@@ -9826,7 +9987,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.05</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.10</div>
     </div>
 </div>
 
