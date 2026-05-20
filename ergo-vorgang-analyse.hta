@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.12"
+        VERSION="2.13"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -7986,6 +7986,11 @@ function wsFinishDemo(processed) {
         return;
     }
 
+    // Angleicher: gleiche Maklerpool-/Maklerfirma-Schreibungen vereinheitlichen
+    // (z.B. "Finanzguru Versicherungsservice GmbH" -> "Finanzguru"), damit
+    // Cluster-Match nicht an Tippvarianten scheitert.
+    wsCanonicalizeNames(processed);
+
     // Vorgaenge zu Clustern gruppieren (gleicher Makler + Kunde -> Cluster mit
     // ID 001a/001b/... + gemeinsamer Pastell-Farbe). Aendert die Reihenfolge in
     // processed[] - dadurch landen Cluster-Mitglieder direkt untereinander im
@@ -8294,6 +8299,81 @@ function wsLfdNr(i) {
     return "BÜ-KI-" + n;
 }
 
+// Angleicher: gleicht unterschiedliche Schreibweisen DESSELBEN Maklerpools /
+// Maklers an, damit (a) Excel-Spalten konsistent aussehen und (b) Cluster den
+// Match nicht durch Tippvariation verlieren ("Finanzguru" vs "Finanzguru
+// Versicherungsservice GmbH"). Stem = erste signifikante Tokens nach Lowercase
+// + Punctuation-Strip + Drop von Rechtsform-Tokens (GmbH, AG, ...). Canonical
+// pro Stem = kuerzeste Variante (bei Gleichstand haeufigste).
+function wsCanonicalizeField(processed, fieldName) {
+    var counts = {};
+    for (var i = 0; i < processed.length; i++) {
+        var v = (processed[i].data || {})[fieldName];
+        if (v == null) continue;
+        var s = String(v).replace(/^\s+|\s+$/g, "");
+        if (!s) continue;
+        counts[s] = (counts[s] || 0) + 1;
+    }
+    var uniques = [];
+    for (var k in counts) if (counts.hasOwnProperty(k)) uniques.push(k);
+    if (uniques.length <= 1) return;
+
+    function stemOf(s) {
+        var t = String(s).toLowerCase().replace(/[.,;:&/\\()\[\]"'+]/g, " ").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+        var drop = { "gmbh":1, "ag":1, "kg":1, "co":1, "kgaa":1, "ohg":1, "ug":1, "mbh":1,
+                     "gbr":1, "ek":1, "ev":1,
+                     "service":1, "versicherungsservice":1, "maklerservice":1,
+                     "versicherungsmakler":1, "versicherung":1, "versicherungen":1,
+                     "makler":1, "die":1, "und":1, "the":1, "cie":1 };
+        var tokens = t.split(" ");
+        var keep = [];
+        for (var j = 0; j < tokens.length; j++) {
+            var tk = tokens[j];
+            if (!tk || drop[tk]) continue;
+            keep.push(tk);
+            if (keep.length >= 2) break;
+        }
+        return keep.join(" ");
+    }
+
+    var groups = {};
+    for (var u = 0; u < uniques.length; u++) {
+        var st = stemOf(uniques[u]);
+        if (!st) continue;
+        if (!groups[st]) groups[st] = [];
+        groups[st].push(uniques[u]);
+    }
+
+    var rewriteMap = {};
+    for (var gs in groups) {
+        if (!groups.hasOwnProperty(gs)) continue;
+        var variants = groups[gs];
+        if (variants.length < 2) continue;
+        // Sortiert: kuerzeste zuerst (cleaner Anzeigename), bei Gleichstand haeufigste
+        variants.sort(function(a, b) {
+            if (a.length !== b.length) return a.length - b.length;
+            return counts[b] - counts[a];
+        });
+        var canonical = variants[0];
+        for (var v = 1; v < variants.length; v++) rewriteMap[variants[v]] = canonical;
+    }
+
+    for (var i2 = 0; i2 < processed.length; i2++) {
+        var d2 = processed[i2].data;
+        if (!d2) continue;
+        var cur = d2[fieldName];
+        if (cur == null) continue;
+        var s2 = String(cur).replace(/^\s+|\s+$/g, "");
+        if (rewriteMap[s2]) d2[fieldName] = rewriteMap[s2];
+    }
+}
+
+function wsCanonicalizeNames(processed) {
+    if (!processed || processed.length === 0) return;
+    wsCanonicalizeField(processed, "maklerpool");
+    wsCanonicalizeField(processed, "makler_nachname");
+}
+
 // Gruppiert Vorgaenge zu Clustern: gleicher Makler + gleicher Kunde -> ein Cluster.
 // Cluster mit >= 2 Mitgliedern bekommen eine ID wie "001a", "001b", ... und eine
 // gemeinsame Pastell-Hintergrundfarbe. Reihenfolge: Cluster-Mitglieder werden im
@@ -8312,9 +8392,26 @@ function wsAssignClusters(processed) {
     }
     function keyFor(r) {
         var d = r.data || {};
-        var mk = norm(d.makler_nachname) + "|" + norm(d.makler_vorname) + "|" + norm(d.maklerpool);
-        var ku = norm(d.kunde_nachname) + "|" + norm(d.kunde_vorname) + "|" + norm(d.kunde_nummer);
-        if (mk === "||" || ku === "||") return null; // ohne Makler ODER ohne Kunde kein Cluster
+        // Makler-Identitaet: Agentur-/Vermittler-Nummer ist verlaesslicher als
+        // ein Name (auch wenn der Angleicher normalisiert, koennen Schreibungen
+        // weichen). Wenn vorhanden, danach matchen - sonst Name+Pool als Fallback.
+        var agt = norm(d.agentur_nummer), verm = norm(d.vermittler_nummer);
+        var mk;
+        if (agt || verm) {
+            mk = "ID:" + agt + "/" + verm;
+        } else {
+            mk = "N:" + norm(d.maklerpool) + "|" + norm(d.makler_nachname) + "|" + norm(d.makler_vorname);
+            if (mk === "N:||") return null;
+        }
+        // Kunde-Identitaet: Kundennummer wenn vorhanden, sonst Vor+Nachname.
+        var kn = norm(d.kunde_nummer);
+        var ku;
+        if (kn) {
+            ku = "K:" + kn;
+        } else {
+            ku = "N:" + norm(d.kunde_nachname) + "|" + norm(d.kunde_vorname);
+            if (ku === "N:|") return null;
+        }
         return mk + "##" + ku;
     }
     var groupOrder = [];
