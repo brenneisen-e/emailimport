@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.22"
+        VERSION="2.24"
         WINDOWSTATE="normal"
     />
     <style>
@@ -199,7 +199,7 @@
                     <div class="subtitle">.msg-Mails &rarr; ErgoGPT Klassifikation &rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.22 - Token-Caps wieder gelockert: harte Zeichengrenzen je Feld zurueck auf vorherige weiche Vorgaben ("1-2 Saetze" statt "max 140 Zeichen"). Globale "max ~1500 Tokens"-Anweisung raus. Begruendung: mit dem robusten Truncation-Recovery-Parser (v2.18) und dem entfernten naechster_schritt (v2.21) ist Puffer da; die harten Caps waren ueberkautelarisch und schraenkten die LLM-Antwort unnoetig ein. Die Anweisung "knapp + praezise, keine PDF-Zitate ins JSON" bleibt. v2.21 - Schema-Umbau: (a) neues Feld "mv_datum" = Datum der Maklervollmacht-Unterschrift durch den Kunden (TT.MM.JJJJ), abgegrenzt vom "auftrag_datum" (Datum des Pool-Anschreibens). Eigene Spalte "MV Datum" im Excel. (b) Spalte "Datum" umbenannt zu "Mail Datum" - klarer abgegrenzt von MV_Datum und Auftrag_Datum. (c) "naechster_schritt" komplett aus LLM-Schema entfernt (war nicht benoetigt, sparte Token). (d) "Zusammenfassung" wieder in der Excel-Spalte UND in der KI-Notiz-PDF. v2.20 - Workshop-Excel: Spalten "Zusammenfassung" und "Naechster_Schritt" entfernt (nicht benoetigt, machten die Tabelle nur breit). Die Felder bleiben im LLM-Schema und in der KI-Notiz-PDF erhalten. v2.19 - Token-Limit-Truncation an der Wurzel angepackt: alle Freitext-Felder im JSON-Schema haben jetzt explizite Zeichengrenzen (klassifikation_grund 140, zusammenfassung 140, naechster_schritt 100, hinweis 80, mv_einschraenkungen 120, unterlagen_liste 150). Plus globale Anweisung im Prompt: max ~1500 Tokens Gesamtantwort, keine PDF-Zitate ins JSON. Vorher schrieb das Modell teils 500+ Zeichen pro Begruendung und hat sich damit selbst ins Token-Limit gefahren. v2.18 - JSON-Parser kann jetzt auch HARTE Truncation (mitten im Key/Value am Token-Limit abgeschnitten) reparieren: scant rueckwaerts bis zur letzten kompletten Property, kappt dort sauber und schliesst die Klammern. Vorher war nur fehlende } am Ende reparierbar - wenn der LLM mitten in einem String aufhoerte, war die ganze Antwort verloren. Zusaetzliche Perf-Optimierung: wsLog nutzt jetzt createElement statt innerHTML += (war bei vielen Mails quadratisch langsam) und cached den FSO statt ihn pro Log-Zeile neu anzulegen. Cap auf letzte 1500 Log-Zeilen. Macht Parallel-Prep + Analyse deutlich fluessiger. v2.17 - KI-Notiz-PDF wird nur noch im TEMP angelegt, in die .msg eingebettet und danach geloescht. Vorher lag pro Vorgang ein redundantes KI-Notiz_BÜ-KI-NNN.pdf neben der .msg - das war ueberfluessig, weil die Notiz in der .msg selbst steckt. v2.16 - Zustellfehler-Meldungen (Unzustellbarkeitsberichte / NDR / Bounce-Mails) werden VOR dem LLM-Aufruf erkannt und lokal klassifiziert (Absender postmaster/mailer-daemon/ITERGO-Security, Betreff "Nachricht nicht zustellbar", .eml-Anhang + Body-Hinweise). Kein API-Call mehr -> spart Token UND vermeidet JSON-Parse-Fehler durch die eingebetteten MIME-Header der originalen Mail im .eml-Anhang. Begriff "Bounce-NDR" umbenannt in deutsches "Zustellfehler" in allen Prompts und Spalten. v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.24 - (a) Cluster-Key nutzt jetzt Union(Agentur,Vermittler) statt "Agentur/Vermittler" - wenn dieselbe Maklernummer einmal in Agentur und einmal in Vermittler steht (LLM-Klassifikations-Unschaerfe), entsteht jetzt derselbe Cluster-Schluessel. (b) Mails ohne KI-Notiz (Analyse-Fehler / Save-Fehler) werden als Original-.msg in Unterordner _Fehler_ohne_KI-Notiz kopiert - per Drag-Drop wieder in Outlook importierbar. (c) Word-Performance: ScreenUpdating, Pagination, Grammatik/Rechtschreib-Background-Checks und AutoFormat-Quotes abgeschaltet beim Word-Init - spart ~50-200ms pro PDF, sichtbar bei vielen Mails. v2.23 - FERTIG-Log-Zeile enthaelt jetzt den Fortschritt "FERTIG (X/Y)" statt nur "FERTIG", so dass auf einen Blick zu sehen ist, wie viele der Parallel-Mails schon durch sind. v2.22 - Token-Caps wieder gelockert: harte Zeichengrenzen je Feld zurueck auf vorherige weiche Vorgaben ("1-2 Saetze" statt "max 140 Zeichen"). Globale "max ~1500 Tokens"-Anweisung raus. Begruendung: mit dem robusten Truncation-Recovery-Parser (v2.18) und dem entfernten naechster_schritt (v2.21) ist Puffer da; die harten Caps waren ueberkautelarisch und schraenkten die LLM-Antwort unnoetig ein. Die Anweisung "knapp + praezise, keine PDF-Zitate ins JSON" bleibt. v2.21 - Schema-Umbau: (a) neues Feld "mv_datum" = Datum der Maklervollmacht-Unterschrift durch den Kunden (TT.MM.JJJJ), abgegrenzt vom "auftrag_datum" (Datum des Pool-Anschreibens). Eigene Spalte "MV Datum" im Excel. (b) Spalte "Datum" umbenannt zu "Mail Datum" - klarer abgegrenzt von MV_Datum und Auftrag_Datum. (c) "naechster_schritt" komplett aus LLM-Schema entfernt (war nicht benoetigt, sparte Token). (d) "Zusammenfassung" wieder in der Excel-Spalte UND in der KI-Notiz-PDF. v2.20 - Workshop-Excel: Spalten "Zusammenfassung" und "Naechster_Schritt" entfernt (nicht benoetigt, machten die Tabelle nur breit). Die Felder bleiben im LLM-Schema und in der KI-Notiz-PDF erhalten. v2.19 - Token-Limit-Truncation an der Wurzel angepackt: alle Freitext-Felder im JSON-Schema haben jetzt explizite Zeichengrenzen (klassifikation_grund 140, zusammenfassung 140, naechster_schritt 100, hinweis 80, mv_einschraenkungen 120, unterlagen_liste 150). Plus globale Anweisung im Prompt: max ~1500 Tokens Gesamtantwort, keine PDF-Zitate ins JSON. Vorher schrieb das Modell teils 500+ Zeichen pro Begruendung und hat sich damit selbst ins Token-Limit gefahren. v2.18 - JSON-Parser kann jetzt auch HARTE Truncation (mitten im Key/Value am Token-Limit abgeschnitten) reparieren: scant rueckwaerts bis zur letzten kompletten Property, kappt dort sauber und schliesst die Klammern. Vorher war nur fehlende } am Ende reparierbar - wenn der LLM mitten in einem String aufhoerte, war die ganze Antwort verloren. Zusaetzliche Perf-Optimierung: wsLog nutzt jetzt createElement statt innerHTML += (war bei vielen Mails quadratisch langsam) und cached den FSO statt ihn pro Log-Zeile neu anzulegen. Cap auf letzte 1500 Log-Zeilen. Macht Parallel-Prep + Analyse deutlich fluessiger. v2.17 - KI-Notiz-PDF wird nur noch im TEMP angelegt, in die .msg eingebettet und danach geloescht. Vorher lag pro Vorgang ein redundantes KI-Notiz_BÜ-KI-NNN.pdf neben der .msg - das war ueberfluessig, weil die Notiz in der .msg selbst steckt. v2.16 - Zustellfehler-Meldungen (Unzustellbarkeitsberichte / NDR / Bounce-Mails) werden VOR dem LLM-Aufruf erkannt und lokal klassifiziert (Absender postmaster/mailer-daemon/ITERGO-Security, Betreff "Nachricht nicht zustellbar", .eml-Anhang + Body-Hinweise). Kein API-Call mehr -> spart Token UND vermeidet JSON-Parse-Fehler durch die eingebetteten MIME-Header der originalen Mail im .eml-Anhang. Begriff "Bounce-NDR" umbenannt in deutsches "Zustellfehler" in allen Prompts und Spalten. v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -8092,8 +8092,13 @@ function wsTick() {
                 } catch(e) {}
                 try { fireDelete(s.convId); } catch(e) {}
                 s.stage = "DONE";
-                wsLog("   FERTIG: " + s.fileName + " -> " + (s.isReminder ? "[Reminder] " : "") +
-                      (s.klassifikation || "?"));
+                // Fortschritt: aktuell fertige (DONE+ERROR) / gesamt im Log mitloggen
+                var _wsTotal = slots.length, _wsDone = 0;
+                for (var _wj = 0; _wj < slots.length; _wj++) {
+                    if (slots[_wj].stage === "DONE" || slots[_wj].stage === "ERROR") _wsDone++;
+                }
+                wsLog("   FERTIG (" + _wsDone + "/" + _wsTotal + "): " + s.fileName + " -> " +
+                      (s.isReminder ? "[Reminder] " : "") + (s.klassifikation || "?"));
             }
         } catch(eTick) {
             s.stage = "ERROR";
@@ -8105,6 +8110,7 @@ function wsTick() {
 
     if (doneCount >= slots.length) {
         var processed = [];
+        var failed = [];
         for (var k = 0; k < slots.length; k++) {
             if (slots[k].stage === "DONE") {
                 processed.push({
@@ -8122,8 +8128,10 @@ function wsTick() {
                 });
             } else if (slots[k].stage === "ERROR") {
                 wsLog("   FEHLER " + slots[k].fileName + ": " + slots[k].error);
+                failed.push({ msgPath: slots[k].msgPath, fileName: slots[k].fileName, error: slots[k].error });
             }
         }
+        state._wsFailedSlots = failed;
         if (state._wsOnDone) {
             var cb = state._wsOnDone; state._wsOnDone = null;
             cb(processed);
@@ -8361,13 +8369,22 @@ function wsFinishDemo(processed) {
         wsLog("");
         wsLog("Speichere " + processed.length + " Vorgänge: Original-Mail führend, KI-Notiz als PDF angehängt...");
 
-        // Word einmalig fuer HTML->PDF (im eigenen Prozess, keine Zonensperre)
+        // Word einmalig fuer HTML->PDF (im eigenen Prozess, keine Zonensperre).
+        // Perf: ScreenUpdating, Rechtschreib/Grammatik-Background-Checks, AutoFormat
+        // und Pagination kosten je Doc ~50-200ms - aus weil wir nur SaveAs->PDF.
         var word = null;
         try {
             word = new ActiveXObject("Word.Application");
             word.Visible = false;
             try { word.DisplayAlerts = 0; } catch(eW1) {}
             try { word.AutomationSecurity = 3; } catch(eW2) {}
+            try { word.ScreenUpdating = false; } catch(eWsu) {}
+            try { word.Options.CheckGrammarAsYouType = false; } catch(eOg) {}
+            try { word.Options.CheckSpellingAsYouType = false; } catch(eOs) {}
+            try { word.Options.AutoFormatAsYouTypeReplaceQuotes = false; } catch(eAq) {}
+            try { word.Options.Pagination = false; } catch(eOp) {}
+            try { word.Options.SaveInterval = 0; } catch(eSi) {}
+            try { word.Options.AnimateScreenMovements = false; } catch(eAm) {}
             wsLog("   Word für PDF-Erzeugung bereit.");
         } catch(eW) {
             word = null;
@@ -8465,6 +8482,12 @@ function wsSaveTick(ctx) {
         try { if (item) item.Close(1); } catch(eC2) {}
         try { if (tmpHtml) ctx.fsoS.DeleteFile(tmpHtml, true); } catch(eDel2) {}
         try { if (keepPath && ctx.fsoS.FileExists(keepPath)) ctx.fsoS.DeleteFile(keepPath, true); } catch(eDelKE) {}
+        // Failed-Save: in _wsFailedSlots queuen, damit wsSaveFinish die Original-
+        // .msg in den Fehler-Ordner kopiert.
+        try {
+            if (!state._wsFailedSlots) state._wsFailedSlots = [];
+            state._wsFailedSlots.push({ msgPath: p.msgPath, fileName: p.fileName, error: String(eSave.message || eSave) });
+        } catch(ePush) {}
     }
     ctx.pi++;
     wsProgress(ctx.pi, ctx.total);
@@ -8473,14 +8496,54 @@ function wsSaveTick(ctx) {
 
 function wsSaveFinish(ctx) {
     try { if (ctx.word) ctx.word.Quit(0); } catch(eWq) {}
+
+    // Mails ohne KI-Notiz (LLM-Parse-Fehler / HTTP-Fehler / Save-Fehler) als
+    // Original-.msg-Kopie in einen Unterordner _Fehler_ohne_KI-Notiz legen,
+    // damit der Sachbearbeiter sie bei Bedarf wieder in Outlook importieren
+    // kann (drag-drop). _wsFailedSlots = analyse-fehler aus wsTick.
+    var errFolder = "";
+    try {
+        var errSlots = state._wsFailedSlots || [];
+        if (errSlots.length > 0 && ctx.outDir) {
+            errFolder = ctx.outDir.replace(/\\+$/, "") + "\\_Fehler_ohne_KI-Notiz";
+            if (!ctx.fsoS.FolderExists(errFolder)) ctx.fsoS.CreateFolder(errFolder);
+            var copied = 0;
+            for (var fi = 0; fi < errSlots.length; fi++) {
+                var es = errSlots[fi];
+                try {
+                    if (!ctx.fsoS.FileExists(es.msgPath)) continue;
+                    var safeFn = String(es.fileName || "vorgang.msg").replace(/[\\\/:*?"<>|]/g, "_");
+                    var dst = errFolder + "\\" + safeFn;
+                    // Falls Name kollidiert, Suffix anhaengen
+                    var coll = 1;
+                    while (ctx.fsoS.FileExists(dst)) {
+                        dst = errFolder + "\\" + safeFn.replace(/(\.msg)?$/i, "_" + coll + ".msg");
+                        coll++;
+                        if (coll > 99) break;
+                    }
+                    ctx.fsoS.CopyFile(es.msgPath, dst, true);
+                    copied++;
+                } catch(eCp) {
+                    wsLog("   Fehler-Kopie fehlgeschlagen fuer " + es.fileName + ": " + (eCp.message || eCp), "err");
+                }
+            }
+            if (copied > 0) {
+                wsLog(copied + " Mail(s) ohne KI-Notiz nach _Fehler_ohne_KI-Notiz kopiert (zum Reimport in Outlook).", "info");
+            }
+        }
+    } catch(eEf) {}
+    var totalFailed = (state._wsFailedSlots || []).length;
+    // Slot-Liste fuer naechsten Lauf zuruecksetzen
+    state._wsFailedSlots = [];
+
     wsLog("");
     wsLog("Fertig: " + ctx.saved + " Vorgänge gespeichert" +
-          (ctx.failed ? ", " + ctx.failed + " fehlgeschlagen" : "") + ".", "head");
+          (totalFailed ? ", " + totalFailed + " ohne KI-Notiz im Fehler-Ordner" : "") + ".", "head");
     wsShowSuccess("Fertig! <strong>" + ctx.saved + "</strong> Original-Mails als .msg gespeichert" +
-                  (ctx.failed ? " (" + ctx.failed + " Fehler)" : "") +
+                  (ctx.failed ? " (" + ctx.failed + " Save-Fehler)" : "") +
+                  (errFolder ? " &mdash; Mails ohne KI-Notiz im Unterordner <strong>_Fehler_ohne_KI-Notiz</strong>" : "") +
                   " &mdash; KI-Notiz je Mail als <strong>PDF</strong> angeh&auml;ngt. " +
-                  "<strong>Excel</strong> liegt im selben Ordner; Spalte <strong>Lfd_Nr</strong> = " +
-                  "Nummer in der KI-Notiz (Mapping Excel &harr; Vorgang).");
+                  "<strong>Excel</strong> liegt im selben Ordner.");
     try { if (ctx.saved > 0 && ctx.outDir) ctx.shellS.Run('explorer.exe "' + ctx.outDir + '"', 1, false); } catch(eExp) {}
     wsLog("Ablage: " + ctx.outDir);
     wsLog("Original .msg-Dateien im Quellordner bleiben unverändert.");
@@ -8586,13 +8649,19 @@ function wsAssignClusters(processed) {
     }
     function keyFor(r) {
         var d = r.data || {};
-        // Makler-Identitaet: Agentur-/Vermittler-Nummer ist verlaesslicher als
-        // ein Name (auch wenn der Angleicher normalisiert, koennen Schreibungen
-        // weichen). Wenn vorhanden, danach matchen - sonst Name+Pool als Fallback.
+        // Makler-Identitaet: Union aus Agentur- UND Vermittler-Nummer (sortiert,
+        // dedupliziert). Steht dieselbe Nummer einmal bei "Agentur" und einmal
+        // bei "Vermittler" (LLM-Klassifikations-Unschaerfe), ergibt sich derselbe
+        // Schluessel - sonst waere der Cluster falsch geteilt. Wenn keine Nummer
+        // da ist, Fallback auf Name+Pool.
         var agt = norm(d.agentur_nummer), verm = norm(d.vermittler_nummer);
+        var nums = [];
+        if (agt) nums.push(agt);
+        if (verm && verm !== agt) nums.push(verm);
+        nums.sort();
         var mk;
-        if (agt || verm) {
-            mk = "ID:" + agt + "/" + verm;
+        if (nums.length > 0) {
+            mk = "ID:" + nums.join("/");
         } else {
             mk = "N:" + norm(d.maklerpool) + "|" + norm(d.makler_nachname) + "|" + norm(d.makler_vorname);
             if (mk === "N:||") return null;
