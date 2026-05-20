@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v2.10 - HTA Quellcode</title>
+<title>ERGO Workshop v2.11 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v2.10</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v2.11</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.10"
+        VERSION="2.11"
         WINDOWSTATE="normal"
     />
     <style>
@@ -268,7 +268,7 @@ Alles markieren
                     <div class="subtitle">.msg-Mails &amp;rarr; ErgoGPT Klassifikation &amp;rarr; Excel-Export</div>
                 </div>
             </div>
-            <div class="ver">v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
+            <div class="ver">v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&amp;gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal</div>
         </div>
 
         <!-- Cookie -->
@@ -7854,20 +7854,31 @@ function wsStartParallel(onDone) {
     wsProgress(0, state._wsMsgFiles.length);
     wsShowInfo("Bereite " + state._wsMsgFiles.length + " Mails vor und analysiere ALLE parallel...");
 
-    // Phase 1: alle Slots vorbereiten (Outlook-Lesen ist sequenziell + schnell,
-    // Conversation-Create laeuft danach async fuer alle gleichzeitig)
+    // Phase 1 (v2.11): Prep-Loop in setTimeout-Ticks zerlegt - EINE Mail pro Tick.
+    // Vorher synchron in einer Schleife = HTA fror waehrend Outlook-OpenSharedItem +
+    // Anhang-SaveAsFile + Conv-Create-Fire fuer alle Mails am Stueck ein (bei 30
+    // Mails ~20-40 s ohne Log-Update). Jetzt: ein Slot pro Tick, dazwischen yieldet
+    // mshta -> Log/Progress/Buttons bleiben live, Fenster bleibt klickbar.
+    var total = state._wsMsgFiles.length;
     var slots = [];
-    for (var i = 0; i < state._wsMsgFiles.length; i++) {
-        var mp = state._wsMsgFiles[i];
-        wsLog("[" + (i+1) + "/" + state._wsMsgFiles.length + "] Vorbereiten: " + mp.substr(mp.lastIndexOf("\\")+1));
+    state._wsSlots = slots;
+    var idx = 0;
+    function wsPrepTick() {
+        if (idx >= total) {
+            wsLog("");
+            wsLog("Alle " + slots.length + " Conversations gestartet - analysiere parallel...");
+            setTimeout(wsTick, 200);
+            return;
+        }
+        var mp = state._wsMsgFiles[idx];
+        wsLog("[" + (idx+1) + "/" + total + "] Vorbereiten: " + mp.substr(mp.lastIndexOf("\\")+1));
         var s = wsPrepareSlot(mp);
         slots.push(s);
-        if (s.stage === "ERROR") wsLog("   PREP-FEHLER: " + s.error);
+        if (s.stage === "ERROR") wsLog("   PREP-FEHLER: " + s.error, "err");
+        idx++;
+        setTimeout(wsPrepTick, 5);
     }
-    state._wsSlots = slots;
-    wsLog("");
-    wsLog("Alle " + slots.length + " Conversations gestartet - analysiere parallel...");
-    setTimeout(wsTick, 200);
+    setTimeout(wsPrepTick, 50);
 }
 
 function wsTick() {
@@ -9987,7 +9998,7 @@ End Function
             <div class="ws-log" id="wsLog"></div>
         </div>
 
-        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.10</div>
+        <div class="ws-footer">Datenfluss bleibt lokal &amp;middot; ErgoGPT-Backend &amp;middot; Vorgang-Analyse v2.11</div>
     </div>
 </div>
 
