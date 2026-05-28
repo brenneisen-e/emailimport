@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Vorgang-Analyse v2.41 - HTA Quellcode</title>
+<title>ERGO Vorgang-Analyse v2.42 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -102,7 +102,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Vorgang-Analyse <strong>v2.41</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Vorgang-Analyse <strong>v2.42</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Standalone-Quellcode-Seite, falls Direkt-Download blockiert ist</p>
 
 <div class="info">
@@ -151,7 +151,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.41"
+        VERSION="2.42"
         WINDOWSTATE="normal"
     />
     <style>
@@ -460,13 +460,14 @@ Alles markieren
                 </div>
             </div>
             <!-- CHANGELOG (Historie, nicht im UI angezeigt):
+v2.42 - EXCEL-UMBAU + KONSISTENZ-FIXES (auf Basis Konsistenzanalyse analyse.xlsx): (1) Spaltenreihenfolge: die wichtigsten Such-Spalten stehen jetzt GANZ VORNE - Status, Versicherungsnummer, Kunde_Nachname/Vorname, Maklerpool, Maklernummer/Agentur_Nr/Vermittler_Nr (Vorgang sofort auffindbar, Cluster-Herkunft sichtbar). (2) NEUE Status-Ampel-Spalte: gruen='Neuer BÜ' (echter neuer BUe-Erstvorgang), gelb='BÜ-Reminder', rot='Kein BÜ' - LIVE im Excel waehrend der Analyse UND im Export gefaerbt. (3) Nummern-Verwechslung behoben: deriveMaklernummern() sortiert deterministisch nach ERGO-Regel (Nr. mit 6000/890 = Agentur_Nr, sonst Vermittler_Nr) + entfernt Dubletten (008923555==8923555). Behebt, dass dieselbe Nummer beim gleichen Makler mal in Agentur, mal in Vermittler stand. (4) Prompt geschaerft: 6000/890-Agenturregel, KDNR gehoert in kunde_nummer (nicht versicherungsnummer), Datumsfelder nur das Datum (kein Name/Ort), anhang_typen feste ASCII-Werte inkl. Bestandsuebertragungswunsch/Untervollmacht. (5) KI-Notiz (.msg) bekommt dasselbe BÜ-Ampel-Badge.
 v2.41 - KI-Notiz-Speicherphase zeigt jetzt Live-Fortschritt: Fortschrittsbalken + Zaehler (X/Y gespeichert) + Live-Log, damit man sieht wie viele Vorgaenge schon angereichert/gespeichert sind (Bildschirm aktualisiert pro Mail via updateProgress/forceRepaint). Die Analyse selbst lief bereits tick-basiert mit Live-Progress + externalisierten HTTP-Subprozessen.
 v2.40 - Workshop-Logiken in den Hauptmodus uebernommen: (1) Scan-/Foto-PDF-Skip mit Schalter (Default an) - Scans werden nicht hochgeladen, als "[Scan - NICHT analysiert]" markiert (Prompt-Hinweis ergaenzt). (2) Namens-Vereinheitlichung (wsCanonicalizeNames) fuer Maklerpool/Maklername vor Cluster + Anzeige. (3) Fehler-Ordner _Fehler_ohne_KI-Notiz im KI-Notiz-Modus (misslungene Speicherungen als Original-.msg-Kopie). Batch-Prompt (#4) + Outlook-Ordner-Quelle (#5) bewusst NICHT uebernommen.
 v2.39 - Modus-Umschalter im Hauptmodus: "Analysemodus" (volle Excel-Auswertung mit allen Sheets) oder "KI-Notiz-Modus" (nach der Analyse pro Mail eine 1-seitige KI-Notiz als PDF in die .msg einbetten + als Vorgang_Nr_Betreff.msg in einen waehlbaren Zielordner speichern; nur Vorgangstabelle, keine Analytics-Sheets). Tick-basiert (kein Freeze), nutzt wsBuildNotizHtml + Word-PDF + Outlook-Einbettung. Ein Tool statt zwei.
 v2.38 - UI stark verschlankt: Cookie-Sektion nur noch Status (kein Eingeben/Sehen/Speichern/Zuruecksetzen - kommt aus Cookie.txt); Datum-Praefix + Zeitraum-Filter + Sammeln + Stichprobe + Einstellungen + Advanced-Buttons (Pool-Uebersicht/XXL, Bulk-Triage, Reminder-Quellen, Externes Excel, JSON-Export) ausgeblendet; langer Versionstext aus dem Header entfernt (nur noch Versionsnummer).
 v2.37 - EIN-TOOL-KONSOLIDIERUNG (Workshop-Excel-Punkte ins Hauptsheet): (1) Cluster_ID-Spalte + Pastell-Zeilenfarbe - gleicher Makler (ueber EXTRAHIERTE Agentur-/Vermittlernummer, nicht Roh-String!) + gleicher Kunde bekommen gemeinsame ID (001a/001b...) und Farbe. (2) Makler_Key + Top-Makler-Aggregation nutzen jetzt die extrahierten Nummern -> dieselbe Agentur zersplittert nicht mehr in viele Namensvarianten (viel uebersichtlicher). (3) MV_Datum-Spalte ergaenzt (+ Feld im Haupt-Prompt, jetzt 42 JSON-Keys). (4) Datum konsistent auf TT.MM.JJJJ normalisiert (Auftrag_Datum, Kunde_Geburtsdatum, MV_Datum) - LLM-Varianten wie '2.4.26' werden vereinheitlicht. v2.36 - HAUPTSHEET UMSORTIERT + Single Source of Truth: Die analyse.xlsx-Spalten werden jetzt aus EINER Definition (EXCEL_COLS) generiert - Header, Beschreibungszeile, Indizes, Schreiben (live/bulk/export), Lesen (Readback) und Faerbung. Reihenfolge nach Wunsch: Kunde+Vertrag (Name/Geburtsdatum/Adresse/Versicherungsnummer/Sparte/Geschaeftstyp) ZUERST, dann Triage/Klassifikation, Zwischenbericht-Cluster, Makler, Unterlagen, MV+Unterschriften, Ergebnis - und die Mail-Benennung (Datei/Datum/Absender/Betreff/Anhaenge) ganz ans ENDE, als einklappbare Excel-Spaltengruppe (startet eingeklappt). Kopfzeilen-Zellen gruppenweise gefaerbt. Bestehende aeltere analyse.xlsx werden beim Laden automatisch erkannt (Header-basiert gelesen) und verlustfrei ins neue Layout umgebaut. Kein Index-Drift mehr moeglich. v2.35 - WORKSHOP-PARITAET: Der Workshop nutzt eigene Prompt-/Excel-Bausteine - diese jetzt nachgezogen. (1) wsFieldLines (Workshop-Schema) + wsBuildBatchPrompt um Quellentrennung (BUe-Wunsch vs Maklervollmacht getrennt auswerten) und die 8 neuen Felder erweitert: makler_adresse, kunde_geburtsdatum, kunde_adresse, untervollmacht_vorhanden, unterbevollmaechtigter, mv_makler_name, mv_kunde_name, unterschrift_fundort + Hinweise (Agenturnr 6000/890, Adressen ohne Komma). (2) Workshop-Excel: neue Spalten ergaenzt UND nach Wunsch umsortiert - Kunde+Vertrag ZUERST, Mail-Benennung (Datei/Absender/Betreff/Anhaenge) ans ENDE. v2.34 - (1) Kopfzeilen-Zellen wieder gruppenweise eingefaerbt (Live-Sheet war durchgehend blau) - gleiche Gruppenfarben wie Export. Export-Header: neue Spalten 39-56 bekommen jetzt auch Fuellfarbe (waren weisser Text auf weiss = unsichtbar). (2) Datei-Spalte (lange Mail-Dateinamen) ist jetzt einklappbar (Excel-Spaltengruppierung) und startet eingeklappt. (3) NEUE FUNKTION KWAD-Weiterleitung: Outlook-Quellordner waehlen, Empfaenger (default KWAD@ergo.de), optional Archiv-Ordner; alle Mails werden EINZELN mit einstellbarer Pause (default 2s) weitergeleitet und das Original danach ins Archiv verschoben. Tick-basiert (kein Freeze), EntryID-Snapshot (move-sicher), Live-Log. Prompt- + Excel-Verbesserungen gelten via Build automatisch auch fuer ERGO Workshop. v2.33 - Maklernummer sauber auf ZWEI Spalten getrennt: neue Spalten "Agentur_Nr" und "Vermittler_Nr" (nur Ziffern/Kennung, OHNE Label-Text wie "Vermittler"/"Agentur"). LLM gibt agentur_nummer + vermittler_nummer ab sofort getrennt aus (JSON-Schema 41 Keys); zusaetzlich Parser deriveMaklernummern(), der den kombinierten makler_nummer-String ("Vermittler 811774 Agentur 8903235") auftrennt - greift damit auch auf bereits analysierte Daten. Beide Spalten als TEXT formatiert. v2.32 - ANALYSE-LOGIK Kernfrage + MV-Reminder-Fix: (1) MV-Mangel ("MV fehlt"/"kein Anhang") wird bei REMINDERN nicht mehr als Mangel gewertet - computeMvStatus liefert dort "Reminder (MV n.e.)" (n.e.=nicht erwartet), da bei Wiedervorlagen kein Neueinreichen erfolgt. MV-Status wird zudem nur noch fuer BUe-Vorgaenge gezaehlt. (2) Neue KERNFRAGE-Sektion im KPI-Sheet: 3-Wege-Split (1=echte NEUE BUe-Erstvorgaenge, 2=Reminder/Wiedervorlage, 3=fachfremde Vorgaenge ohne BUe, 4=Nicht-Makler). (3) Einreichungs-Qualitaet NUR der neuen BUe-Erstvorgaenge: wie viele richtig/vollstaendig eingereicht (MV vorhanden+vollumfaenglich+VN-Unterschrift) vs unvollstaendig. (4) Fachfremde Vorgaenge nach Klassifikation aufgeschluesselt. MV-fehlt-Quote in Auffaelligkeiten jetzt ueber BUe-ERSTVORGAENGE (ohne Reminder). v2.31 - KI-Notiz passt jetzt auf EINE Seite: (1) CSS stark kompaktiert (kleinere Schriften/Paddings/Margins), (2) Sektion "Unterlagen &amp; Anhang" entfaellt - relevante Infos in Makler-/MV-Sektion gemerged, (3) lange Freitexte (Klassifikation-Grund, MV-Einschraenkungen, Unterschrift-Fundort, Hinweis, Zusammenfassung) werden fuer die Notiz gekappt, (4) Word-Konvertierung setzt A4 + schmale Raender (28/22/34/34 pt). BUGFIX nebenbei: Notiz referenzierte nicht existierende Felder (d.zusammenfassung statt mail_zusammenfassung, d.agentur_nummer/vermittler_nummer statt makler_nummer) - die zeigten immer "-". Jetzt korrekt + neue v2.30-Felder (Geburtsdatum, Adressen, Untervollmacht, MV-Abgleich) konditional eingebunden. v2.30 - PROMPT-UEBERARBEITUNG auf Basis der ERGO-Testreihe (87-89% Treffer): (1) QUELLENTRENNUNG als Kern-Arbeitsweise - BUe-Wunsch/Anschreiben und Maklervollmacht werden GETRENNT ausgewertet, Daten nicht mehr vermischt (Schritt 1 Dokumenten-Inventar, Schritt 2 nur Anschreiben, Schritt 3 nur MV, Schritt 4 uebergreifend Untervollmacht+Unterschriften). (2) Konkrete Extraktions-Hinweise: Agentur-/Vermittlernr beginnt oft mit 6000/890, Vertragsnr mit SV/LF/LV/KR/DA, Unterschriften handschriftlich/letzte Seite, Adressen OHNE Komma. (3) 8 neue Felder + Excel-Spalten: Makler_Adresse, Kunde_Geburtsdatum, Kunde_Adresse, Untervollmacht_Vorhanden, Unterbevollmaechtigter, MV_Makler_Name + MV_Kunde_Name (fuer Abgleich Anschreiben vs MV), Unterschrift_Fundort. JSON-Schema jetzt 39 Keys (war 31, alter "28"-Tippfehler behoben). Hinweis-Feld flaggt jetzt auch Makler/VN-Abweichungen zwischen Anschreiben und MV. v2.29 - Neues Sheet "Eingangskanal-Deepdive": gruppiert nach Empfaenger-Postfach (bestandsuebertragungen@ergo.de, maklerauftraege@ergo.de, ...). Pro Kanal: Segment-Eingang mit Quote, Quote "richtige Auftraege" vs. Fehlrouting (kanalspezifische Soll-Regel - Bestandsuebertragungen=BUe-Vorgang, Maklerauftraege=Makler-Vorgang ohne Schaden/Privat/Zustellfehler), Fehlrouting-Segmente (was faelschlich hier landet), Cluster-Verteilung, Top-Maklerpools. Oben eine Kanal-Vergleichstabelle (Volumen + Quote richtig/falsch je Kanal). v2.28 - Business-Case: zusaetzlich MAK-Aequivalente. Neue Annahme "Arbeitsstunden pro Vollzeit-MAK pro Jahr" (Default 1600). Drei neue Zeilen: (a) im IST-Block "entspricht Vollzeit-MAK heute gebundene Kapazitaet" (b) im Einsparungs-Block "SUMME Brutto-Einsparung in MAK-Aequivalenten" (c) im Netto-Block "Netto-Einsparung in Stunden/Jahr" + "Netto-Einsparung in MAK-Aequivalenten". Format "0,X MAK". v2.27 - ZWISCHENBERICHT-PAKET: (a) 5 neue Excel-Spalten am Ende: Segment / Auto_Cluster (vollautomatisierbar / teilautomatisierbar / manuell, regelbasiert aus Klassifikation + Reminder + MV-Status + PDF-Qualitaet) / Auto_Grund (Kurz-Begruendung) / Vorgang_Alter_Tage (Rueckstand) / Makler_Key (kanonischer Schluessel Pool|Name|#Nr). (b) Zweite Header-Zeile in der Excel mit Kurzbeschreibung je Spalte (was wird analysiert) - macht das Sheet selbsterklaerend. Bestehende xlsx-Caches werden bei Load automatisch migriert (Row 2 wird neu eingefuegt). (c) 4 neue Auto-Sheets werden am Ende des Batchlaufs gebaut: "KPI-Gesamtanalyse" (Datenstand, Cluster-Verteilung, Segment-Verteilung, Pool-Konzentration mit Top-6, Altersverteilung, qualitative Auffaelligkeiten), "Maklerpool-Konzentration" (kompakte Tabelle ALLER Pools mit Vorgaengen/Anteil/BU/Reminder/Auto-Quote/Top-Makler), je ein "Pool: <Name>"-Sub-Sheet fuer die Top-5 Maklerpools (Mini-KPI + Top-Makler im Pool + alle Vorgaenge dieses Pools), "Business-Case" (ROI-Rechnung mit editierbaren Annahme-Zellen: Mails/Woche, Token-Preis, Stundensatz, Zeitersparnis je Vorgangstyp; rechnet Brutto-Einsparung, Tool-Kosten, Netto-ROI und Payback per Excel-Formeln; Quoten kommen aus aktuellem Lauf). v2.26 - Neues Feld "Forward an Zielpostfach" im Workshop-UI. Wenn gesetzt, wird jede angereicherte Mail nach dem SaveAs zusaetzlich per Outlook-Forward+Send an diese Adresse geschickt. Hinweis: der Absender ist dann das eigene Postfach (kein echter Redirect ueber Outlook-OM moeglich); fuer Mensch-zu-Mensch-Workflows reicht das. v2.25 - Workshop-Frontend aufgeraeumt: Buttons Batch / Chunked-Batch / Kombi-PDF / Testmodus + die Erklaerungs-Box darunter ausgeblendet. Nur noch der grosse "Analyse starten"-Button sichtbar. Die Funktionen selbst bleiben im Code (per Hotkey o.ae. erreichbar), nur das UI ist auf den Default-Pfad reduziert. v2.24 - (a) Cluster-Key nutzt jetzt Union(Agentur,Vermittler) statt "Agentur/Vermittler" - wenn dieselbe Maklernummer einmal in Agentur und einmal in Vermittler steht (LLM-Klassifikations-Unschaerfe), entsteht jetzt derselbe Cluster-Schluessel. (b) Mails ohne KI-Notiz (Analyse-Fehler / Save-Fehler) werden als Original-.msg in Unterordner _Fehler_ohne_KI-Notiz kopiert - per Drag-Drop wieder in Outlook importierbar. (c) Word-Performance: ScreenUpdating, Pagination, Grammatik/Rechtschreib-Background-Checks und AutoFormat-Quotes abgeschaltet beim Word-Init - spart ~50-200ms pro PDF, sichtbar bei vielen Mails. v2.23 - FERTIG-Log-Zeile enthaelt jetzt den Fortschritt "FERTIG (X/Y)" statt nur "FERTIG", so dass auf einen Blick zu sehen ist, wie viele der Parallel-Mails schon durch sind. v2.22 - Token-Caps wieder gelockert: harte Zeichengrenzen je Feld zurueck auf vorherige weiche Vorgaben ("1-2 Saetze" statt "max 140 Zeichen"). Globale "max ~1500 Tokens"-Anweisung raus. Begruendung: mit dem robusten Truncation-Recovery-Parser (v2.18) und dem entfernten naechster_schritt (v2.21) ist Puffer da; die harten Caps waren ueberkautelarisch und schraenkten die LLM-Antwort unnoetig ein. Die Anweisung "knapp + praezise, keine PDF-Zitate ins JSON" bleibt. v2.21 - Schema-Umbau: (a) neues Feld "mv_datum" = Datum der Maklervollmacht-Unterschrift durch den Kunden (TT.MM.JJJJ), abgegrenzt vom "auftrag_datum" (Datum des Pool-Anschreibens). Eigene Spalte "MV Datum" im Excel. (b) Spalte "Datum" umbenannt zu "Mail Datum" - klarer abgegrenzt von MV_Datum und Auftrag_Datum. (c) "naechster_schritt" komplett aus LLM-Schema entfernt (war nicht benoetigt, sparte Token). (d) "Zusammenfassung" wieder in der Excel-Spalte UND in der KI-Notiz-PDF. v2.20 - Workshop-Excel: Spalten "Zusammenfassung" und "Naechster_Schritt" entfernt (nicht benoetigt, machten die Tabelle nur breit). Die Felder bleiben im LLM-Schema und in der KI-Notiz-PDF erhalten. v2.19 - Token-Limit-Truncation an der Wurzel angepackt: alle Freitext-Felder im JSON-Schema haben jetzt explizite Zeichengrenzen (klassifikation_grund 140, zusammenfassung 140, naechster_schritt 100, hinweis 80, mv_einschraenkungen 120, unterlagen_liste 150). Plus globale Anweisung im Prompt: max ~1500 Tokens Gesamtantwort, keine PDF-Zitate ins JSON. Vorher schrieb das Modell teils 500+ Zeichen pro Begruendung und hat sich damit selbst ins Token-Limit gefahren. v2.18 - JSON-Parser kann jetzt auch HARTE Truncation (mitten im Key/Value am Token-Limit abgeschnitten) reparieren: scant rueckwaerts bis zur letzten kompletten Property, kappt dort sauber und schliesst die Klammern. Vorher war nur fehlende } am Ende reparierbar - wenn der LLM mitten in einem String aufhoerte, war die ganze Antwort verloren. Zusaetzliche Perf-Optimierung: wsLog nutzt jetzt createElement statt innerHTML += (war bei vielen Mails quadratisch langsam) und cached den FSO statt ihn pro Log-Zeile neu anzulegen. Cap auf letzte 1500 Log-Zeilen. Macht Parallel-Prep + Analyse deutlich fluessiger. v2.17 - KI-Notiz-PDF wird nur noch im TEMP angelegt, in die .msg eingebettet und danach geloescht. Vorher lag pro Vorgang ein redundantes KI-Notiz_BÜ-KI-NNN.pdf neben der .msg - das war ueberfluessig, weil die Notiz in der .msg selbst steckt. v2.16 - Zustellfehler-Meldungen (Unzustellbarkeitsberichte / NDR / Bounce-Mails) werden VOR dem LLM-Aufruf erkannt und lokal klassifiziert (Absender postmaster/mailer-daemon/ITERGO-Security, Betreff "Nachricht nicht zustellbar", .eml-Anhang + Body-Hinweise). Kein API-Call mehr -> spart Token UND vermeidet JSON-Parse-Fehler durch die eingebetteten MIME-Header der originalen Mail im .eml-Anhang. Begriff "Bounce-NDR" umbenannt in deutsches "Zustellfehler" in allen Prompts und Spalten. v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&amp;gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal
 -->
-            <div class="ver" title="ERGO Vorgang-Analyse">v2.38</div>
+            <div class="ver" title="ERGO Vorgang-Analyse">v2.42</div>
         </div>
 
         <!-- Cookie - v2.38: nur Status. Cookie kommt automatisch aus Cookie.txt
@@ -1293,20 +1294,31 @@ var EXCEL_COLS = [
       get:function(r,d,ctx){ return ctx.lfd; } },
     { id:"cluster_id", h:"Cluster_ID", d:"v2.37: gleicher Makler + gleicher Kunde -> gemeinsame ID (001a/001b...) + Pastell-Farbe", g:"zb", w:11,
       get:function(r,d){ return r._clusterId || ""; } },
-    // ---- Kunde &amp; Vertrag ZUERST ----
-    { id:"kunde_nachname", h:"Kunde_Nachname", d:"Nachname des Endkunden (VN)", g:"kunde", w:18,
+    // ---- v2.42 AMPEL + wichtigste Such-Spalten ZUERST (Vorgang schnell finden) ----
+    { id:"status", h:"Status", d:"v2.42 Ampel: 'Neuer BUe' (gruen) = echter neuer BUe-Erstvorgang / 'BUe-Reminder' (gelb) / 'Kein BUe' (rot)", g:"zb", w:14,
+      get:function(r,d){ return deriveBuStatusLabel(r); } },
+    { id:"versicherungsnummer", h:"Versicherungsnummer", d:"Vertrags-/Versicherungsnummer (TEXT, kommagetrennt bei Kundenverbindung) - wichtigste Spalte zum Auffinden des Vorgangs", g:"kunde", w:20, fmt:"@",
+      get:function(r,d){ return sg(d,"versicherungsnummer"); }, set:function(r,d,v){ d.versicherungsnummer=v; } },
+    { id:"kunde_nachname", h:"Kunde_Nachname", d:"Nachname des Endkunden (VN) - zeigt, woraus der Cluster gebildet wurde", g:"kunde", w:18,
       get:function(r,d){ return sg(d,"kunde_nachname"); }, set:function(r,d,v){ d.kunde_nachname=v; } },
     { id:"kunde_vorname", h:"Kunde_Vorname", d:"Vorname des Endkunden", g:"kunde", w:16,
       get:function(r,d){ return sg(d,"kunde_vorname"); }, set:function(r,d,v){ d.kunde_vorname=v; } },
-    { id:"kunde_nummer", h:"Kundennummer", d:"Kunden-/Partner-Nummer in ERGO-Systemen", g:"kunde", w:16, fmt:"@",
+    { id:"maklerpool", h:"Maklerpool", d:"Erkannter Maklerpool (Jung DMS, Fonds Finanz, blau direkt, DEMA, ...)", g:"makler", w:28,
+      get:function(r,d){ return sg(d,"maklerpool"); }, set:function(r,d,v){ d.maklerpool=v; } },
+    { id:"makler_nummer", h:"Maklernummer", d:"Primaer-Maklernummer (kombiniert) - getrennt siehe Agentur_Nr/Vermittler_Nr", g:"makler", w:16, fmt:"@",
+      get:function(r,d){ return sg(d,"makler_nummer"); }, set:function(r,d,v){ d.makler_nummer=v; } },
+    { id:"agentur_nr", h:"Agentur_Nr", d:"v2.42: Agentur-Nr (6000.../890... = Agentur) als reine Ziffern/Kennung, deterministisch sortiert", g:"makler", w:14, fmt:"@",
+      get:function(r,d){ return deriveMaklernummern(r).agentur; }, set:function(r,d,v){ d.agentur_nummer=v; } },
+    { id:"vermittler_nr", h:"Vermittler_Nr", d:"v2.42: Vermittler-Nr (alles ohne 6000/890-Praefix) als reine Ziffern/Kennung, deterministisch sortiert", g:"makler", w:14, fmt:"@",
+      get:function(r,d){ return deriveMaklernummern(r).vermittler; }, set:function(r,d,v){ d.vermittler_nummer=v; } },
+    // ---- restlicher Kunde &amp; Vertrag ----
+    { id:"kunde_nummer", h:"Kundennummer", d:"Kunden-/Partner-Nummer in ERGO-Systemen (KDNR/Partnernr - NICHT die Versicherungsnummer)", g:"kunde", w:16, fmt:"@",
       get:function(r,d){ return sg(d,"kunde_nummer"); }, set:function(r,d,v){ d.kunde_nummer=v; } },
     { id:"kunde_geburtsdatum", h:"Kunde_Geburtsdatum", d:"Geburtsdatum des VN laut Anschreiben (TT.MM.JJJJ, vereinheitlicht)", g:"kunde", w:14, fmt:"@",
       get:function(r,d){ return normalizeGermanDate(sg(d,"kunde_geburtsdatum")); }, set:function(r,d,v){ d.kunde_geburtsdatum=v; } },
     { id:"kunde_adresse", h:"Kunde_Adresse", d:"Anschrift des VN laut Anschreiben (ohne Komma)", g:"kunde", w:32,
       get:function(r,d){ return sg(d,"kunde_adresse"); }, set:function(r,d,v){ d.kunde_adresse=v; } },
-    { id:"versicherungsnummer", h:"Versicherungsnummer", d:"Vertrags-/Versicherungsnummer (TEXT, kommagetrennt bei Kundenverbindung)", g:"kunde", w:18, fmt:"@",
-      get:function(r,d){ return sg(d,"versicherungsnummer"); }, set:function(r,d,v){ d.versicherungsnummer=v; } },
-    { id:"sparte", h:"Sparte", d:"KFZ / LV / KV / SHU / ...", g:"kunde", w:12,
+    { id:"sparte", h:"Sparte", d:"Komposit / Leben / KV / Mehrere / Unbekannt", g:"kunde", w:12,
       get:function(r,d){ return sg(d,"sparte"); }, set:function(r,d,v){ d.sparte=v; } },
     { id:"geschaefts_typ", h:"Geschaefts_Typ", d:"einfacher Vertrag vs. Kundenverbindung (ganzes Kundenportfolio)", g:"kunde", w:20,
       get:function(r,d){ return sg(d,"geschaefts_typ"); }, set:function(r,d,v){ d.geschaefts_typ=v; } },
@@ -1334,19 +1346,11 @@ var EXCEL_COLS = [
       get:function(r,d){ var a=deriveVorgangAlterDays(r); return (a===""?"":a); } },
     { id:"makler_key", h:"Makler_Key", d:"v2.27: Kanonischer Schluessel 'Pool | Nachname, Vorname | #Maklernummer'", g:"zb", w:42,
       get:function(r,d){ return deriveMaklerKey(r); } },
-    // ---- Makler ----
-    { id:"maklerpool", h:"Maklerpool", d:"Erkannter Maklerpool (Jung DMS, Fonds Finanz, blau direkt, DEMA, ...)", g:"makler", w:28,
-      get:function(r,d){ return sg(d,"maklerpool"); }, set:function(r,d,v){ d.maklerpool=v; } },
+    // ---- Makler (Pool + Nummern stehen jetzt vorne, hier nur Person/Adresse) ----
     { id:"makler_nachname", h:"Makler_Nachname", d:"Nachname/Firma des Maklers (LLM-extrahiert)", g:"makler", w:18,
       get:function(r,d){ return sg(d,"makler_nachname"); }, set:function(r,d,v){ d.makler_nachname=v; } },
     { id:"makler_vorname", h:"Makler_Vorname", d:"Vorname des Maklers", g:"makler", w:16,
       get:function(r,d){ return sg(d,"makler_vorname"); }, set:function(r,d,v){ d.makler_vorname=v; } },
-    { id:"makler_nummer", h:"Maklernummer", d:"Primaer-Maklernummer (kombiniert) - getrennt siehe Agentur_Nr/Vermittler_Nr", g:"makler", w:16, fmt:"@",
-      get:function(r,d){ return sg(d,"makler_nummer"); }, set:function(r,d,v){ d.makler_nummer=v; } },
-    { id:"agentur_nr", h:"Agentur_Nr", d:"v2.33: Agentur-Nr als reine Ziffern/Kennung (ohne Label-Text)", g:"makler", w:14, fmt:"@",
-      get:function(r,d){ return deriveMaklernummern(r).agentur; }, set:function(r,d,v){ d.agentur_nummer=v; } },
-    { id:"vermittler_nr", h:"Vermittler_Nr", d:"v2.33: Vermittler-Nr als reine Ziffern/Kennung (ohne Label-Text)", g:"makler", w:14, fmt:"@",
-      get:function(r,d){ return deriveMaklernummern(r).vermittler; }, set:function(r,d,v){ d.vermittler_nummer=v; } },
     { id:"makler_adresse", h:"Makler_Adresse", d:"v2.30: Anschrift des Maklers laut Anschreiben (ohne Komma)", g:"makler", w:32,
       get:function(r,d){ return sg(d,"makler_adresse"); }, set:function(r,d,v){ d.makler_adresse=v; } },
     { id:"auftrag_datum", h:"Auftrag_Datum", d:"Datum des Pool-/Makler-Anschreibens an den Kunden (TT.MM.JJJJ, vereinheitlicht)", g:"makler", w:14, fmt:"@",
@@ -1443,6 +1447,7 @@ var LIVE_COL_SONDERFALL = COLIX.sonderfall, LIVE_COL_PDF_QUAL = COLIX.pdf_qualit
 var LIVE_COL_VM_VOLLST = COLIX.mv_vollumfaenglich, LIVE_COL_MV_STATUS = COLIX.mv_status;
 var LIVE_COL_UNTERSCHR_K = COLIX.unterschrift_kunde, LIVE_COL_UNTERSCHR_M = COLIX.unterschrift_makler;
 var LIVE_COL_MAKLERPOOL = COLIX.maklerpool, LIVE_COL_HINWEIS = COLIX.hinweis, LIVE_COL_FEHLER = COLIX.fehler, LIVE_COL_REMINDER_QUELLE = COLIX.reminder_quelle;
+var LIVE_COL_STATUS = COLIX.status;
 
 // Zellwert fuer Live-Schreiben (cellSafe ausser bei num-Spalten).
 function colCellLive(col, r, d, ctx) {
@@ -1800,6 +1805,13 @@ function applyHighlightsToLiveRow(rowIdx, r) {
                 state.excelSheet.Range(state.excelSheet.Cells(rowIdx, 1), state.excelSheet.Cells(rowIdx, EXCEL_COLS.length)).Interior.Color =
                     rgb(r._clusterColor[0], r._clusterColor[1], r._clusterColor[2]);
             } catch(eClr) {}
+        }
+        // v2.42 - Ampel in der Status-Spalte (gruen/gelb/rot) ueber die Pastell-Basis.
+        if (LIVE_COL_STATUS) {
+            try {
+                var scLive = deriveBuStatusColor(r);
+                state.excelSheet.Cells(rowIdx, LIVE_COL_STATUS).Interior.Color = rgb(scLive[0], scLive[1], scLive[2]);
+            } catch(eSt) {}
         }
         if (!r.ok || r.errMsg) {
             state.excelSheet.Cells(rowIdx, LIVE_COL_FEHLER).Interior.Color = H_LIVE_ROT();
@@ -3904,6 +3916,7 @@ function exportToExcel() {
         var COL_KLASSIFIK = COLIX.klassifikation, COL_SONDERFALL = COLIX.sonderfall;
         var COL_PDF_QUAL = COLIX.pdf_qualitaet, COL_VM_VOLLST = COLIX.mv_vollumfaenglich;
         var COL_MV_STATUS = COLIX.mv_status, COL_UNTERSCHR_K = COLIX.unterschrift_kunde, COL_UNTERSCHR_M = COLIX.unterschrift_makler;
+        var COL_STATUS = COLIX.status;
 
         for (var c = 0; c < headers.length; c++) {
             sheet.Cells(1, c+1).Value = headers[c];
@@ -4032,6 +4045,10 @@ function exportToExcel() {
                         // v2.37 - Cluster-Pastell als Zeilen-Basisfarbe
                         if (rr._clusterColor) {
                             try { sheet.Range(sheet.Cells(row, 1), sheet.Cells(row, headers.length)).Interior.Color = rgb(rr._clusterColor[0], rr._clusterColor[1], rr._clusterColor[2]); } catch(eClC) {}
+                        }
+                        // v2.42 - Ampel in der Status-Spalte (gruen=neuer BUe / gelb=Reminder / rot=kein BUe)
+                        if (COL_STATUS) {
+                            try { var scExp = deriveBuStatusColor(rr); sheet.Cells(row, COL_STATUS).Interior.Color = rgb(scExp[0], scExp[1], scExp[2]); } catch(eStX) {}
                         }
                         if (!rr.ok || rr.errMsg) {
                             sheet.Cells(row, COL_FEHLER).Interior.Color = H_ROT;
@@ -4244,6 +4261,24 @@ function deriveGrundkategorie(r) {
     return "Fachfremd (kein BUe)";
 }
 
+// v2.42 - Ampel-Label fuer die Status-Spalte (gruen=echter neuer BUe-Erstvorgang,
+// gelb=BUe-Reminder/Wiedervorlage, rot=kein BUe / Nicht-Makler). Echte Umlaute,
+// da sichtbarer Zellwert.
+function deriveBuStatusLabel(r) {
+    var g = deriveGrundkategorie(r);
+    if (g === "BUe-Erstvorgang") return "Neuer BÜ";
+    if (g === "BUe-Reminder") return "BÜ-Reminder";
+    if (g === "Fachfremd (kein BUe)") return "Kein BÜ";
+    return "Nicht-Makler";
+}
+// v2.42 - Fuellfarbe (RGB-Array) zur Status-Ampel. Wird live + im Export genutzt.
+function deriveBuStatusColor(r) {
+    var g = deriveGrundkategorie(r);
+    if (g === "BUe-Erstvorgang") return [34, 197, 94];    // kraeftiges Gruen = echter neuer BUe
+    if (g === "BUe-Reminder") return [254, 240, 138];     // Gelb = Reminder/Wiedervorlage
+    return [248, 113, 113];                               // Rot = kein BUe / Nicht-Makler
+}
+
 // v2.32 - Ist ein BUe-ERSTVORGANG vollstaendig/richtig eingereicht?
 // Kriterien: MV vorhanden + vollumfaenglich (mv_status OK) UND VN hat unterschrieben.
 // (Makler-Unterschrift ist laut Fachvorgabe optional.) Liefert true/false.
@@ -4383,8 +4418,37 @@ function deriveMaklernummern(r) {
     // Aus kombiniertem String parsen, wo die LLM-Felder leer sind.
     if (!ag) { var ma = raw.match(/agentur[\s\-]*(?:nr\.?|nummer)?[\s:.\-]*([A-Za-z]?\d[\d\-\/]*)/i); if (ma) ag = ma[1]; }
     if (!vm) { var mv = raw.match(/vermittler[\s\-]*(?:nr\.?|nummer)?[\s:.\-]*([A-Za-z]?\d[\d\-\/]*)/i); if (mv) vm = mv[1]; }
-    out.agentur = ag;
-    out.vermittler = vm;
+    // Wenn beide Felder leer sind, aber eine nackte Nummer im kombinierten
+    // makler_nummer-String steht (ohne Label): diese als Kandidat aufnehmen.
+    var bare = "";
+    if (!ag &amp;&amp; !vm &amp;&amp; raw) { var mb = raw.match(/([A-Za-z]?\d[\d\-\/]{3,})/); if (mb) bare = mb[1]; }
+
+    // v2.42 - DETERMINISTISCHE ZUORDNUNG nach ERGO-Regel: eine Nummer, die (nach
+    // Entfernen von Nicht-Ziffern) mit 6000 oder 890 beginnt, IST eine
+    // Agenturnummer und gehoert in Agentur_Nr - egal in welchem LLM-Feld sie
+    // urspruenglich stand. Alles andere ist Vermittler-/BD-Nummer. Behebt die
+    // beobachtete Spalten-Verwechslung (dieselbe Nummer mal Agentur, mal
+    // Vermittler beim selben Makler). Cluster-Key nutzt Union(ag,vm) -> bleibt stabil.
+    function digitsOnly(s) { return String(s == null ? "" : s).replace(/[^0-9]/g, ""); }
+    function isAgenturNr(s) { var dd = digitsOnly(s); return dd.length >= 4 &amp;&amp; (dd.indexOf("6000") === 0 || dd.indexOf("890") === 0); }
+    var cand = [];
+    function pushCand(v) {
+        v = cl(v); if (!v) return;
+        var sig = digitsOnly(v); if (!sig) return;
+        for (var ci = 0; ci < cand.length; ci++) { if (digitsOnly(cand[ci]) === sig) return; } // Dublette (z.B. 008923555 == 8923555)
+        cand.push(v);
+    }
+    pushCand(ag); pushCand(vm); pushCand(bare);
+    var fAg = "", fVm = "";
+    for (var i = 0; i < cand.length; i++) {
+        if (isAgenturNr(cand[i])) { if (!fAg) fAg = cand[i]; }
+        else { if (!fVm) fVm = cand[i]; }
+    }
+    out.agentur = fAg;
+    out.vermittler = fVm;
+    // Sicherheitsnetz: keine Kandidaten klassifizierbar -> Originalwerte behalten,
+    // damit nichts verloren geht.
+    if (!out.agentur &amp;&amp; !out.vermittler) { out.agentur = ag; out.vermittler = vm; }
     return out;
 }
 
@@ -9664,22 +9728,22 @@ function wsFieldLines() {
     p += '  "maklerpool":"Pool-Name konsolidiert (JDC / Jung, DMS &amp; Cie.; Fonds Finanz Maklerservice GmbH; blau direkt GmbH; etc.). NUR wenn der Pool eindeutig aus Mail-Text/PDF/Signatur hervorgeht. NICHT aus der Absender-Domain oder dem Makler-Namen erraten. Sonst LEER",\n';
     p += '  "makler_nachname":"handelnde Person ODER Makler-Firma beim Makler (NICHT Kunde). Wenn Maklervertrag auf eine Firma laeuft die nur ueber einen Pool abwickelt (z.B. Finanzguru via Jung DMS): makler_nachname = eigentlicher Makler (Finanzguru), maklerpool bleibt JDC / Jung, DMS &amp; Cie. Sonst leer",\n';
     p += '  "makler_vorname":"oder leer",\n';
-    p += '  "agentur_nummer":"[QUELLE: BUe-Wunsch/Anschreiben] NUR der reine Agentur-Nummern-Wert OHNE das Wort Agentur (z.B. 8903235; beginnt oft mit 6000 oder 890); leer wenn keine",\n';
-    p += '  "vermittler_nummer":"[QUELLE: BUe-Wunsch/Anschreiben] NUR der reine Vermittler-/BD-Nummern-Wert OHNE das Wort Vermittler (z.B. 811774 oder 898-0003); leer wenn keine",\n';
+    p += '  "agentur_nummer":"[QUELLE: BUe-Wunsch/Anschreiben] NUR der reine Agentur-Nummern-Wert OHNE das Wort Agentur. WICHTIG: jede Nummer, die mit 6000 oder 890 beginnt, ist eine AGENTURNUMMER und gehoert IMMER hierher (NICHT nach vermittler_nummer), z.B. 8903235, 600042497; leer wenn keine",\n';
+    p += '  "vermittler_nummer":"[QUELLE: BUe-Wunsch/Anschreiben] NUR der reine Vermittler-/BD-Nummern-Wert OHNE das Wort Vermittler. NUR Nummern, die NICHT mit 6000/890 beginnen (z.B. 811774 oder 898-0003); eine 6000.../890...-Nummer NIEMALS hier ablegen; leer wenn keine",\n';
     p += '  "makler_adresse":"[QUELLE: BUe-Wunsch/Anschreiben] Anschrift des Maklers OHNE Komma (z.B. Musterstr 12 80331 Muenchen); leer wenn keine",\n';
     p += '  "auftrag_datum":"Datum aus Maklerauftrag/Pool-Anschreiben (NICHT Mail-Eingang). IMMER Format TT.MM.JJJJ (z.B. 06.04.2026), niemals ISO/JJJJ-MM-TT; leer wenn keins",\n';
     p += '  "kunde_nachname":"[QUELLE: BUe-Wunsch/Anschreiben] VN / Vollmachtgeber, oder leer",\n';
     p += '  "kunde_vorname":"oder leer",\n';
-    p += '  "kunde_nummer":"Partner-/Personennummer (NICHT Vers- oder Maklernummer), oder leer",\n';
+    p += '  "kunde_nummer":"Kunden-/Partner-/Personennummer (KDNR/PartnerNr). NICHT die Versicherungs-/Vertragsnummer und NICHT die Maklernummer. Eine mit KDNR/Kundennummer bezeichnete Nummer gehoert HIERHER, NICHT in versicherungsnummer. Oder leer",\n';
     p += '  "kunde_geburtsdatum":"[QUELLE: BUe-Wunsch/Anschreiben] Geburtsdatum des VN TT.MM.JJJJ; leer wenn nicht genannt",\n';
     p += '  "kunde_adresse":"[QUELLE: BUe-Wunsch/Anschreiben] Anschrift des VN OHNE Komma; leer wenn keine",\n';
-    p += '  "versicherungsnummer":"VNR(n) / Vertragsnummer(n) als TEXT (NICHT als Zahl interpretieren). Behalte EXAKT die Originalform inkl. Buchstaben-Praefix (SV/LF/HG/RS/GU/HA/...), fuehrende Nullen sowie Punkt/Komma/Strich-Suffixe (z.B. SV096877374.7, HA4712946-217). Bei MEHREREN explizit benannten Vertragsnummern (z.B. \'BUe Kundenverbindung\' mit Aufzaehlung im Anschreiben) ALLE kommagetrennt auffuehren (z.B. \'SV096877374.7, SV075359847.2, SV096877892\'). Sonst leer",\n';
+    p += '  "versicherungsnummer":"VNR(n) / Vertragsnummer(n) als TEXT (NICHT als Zahl interpretieren). Behalte EXAKT die Originalform inkl. Buchstaben-Praefix (SV/LF/LV/KR/DA/HG/RS/GU/HA/...), fuehrende Nullen sowie Punkt/Komma/Strich-Suffixe (z.B. SV096877374.7, HA4712946-217). Eine reine Kunden-/Partnernummer (KDNR) ist KEINE Versicherungsnummer und gehoert NICHT hierher (sondern in kunde_nummer). Pruefe auch den Betreff auf Vertragsnummern. Bei MEHREREN explizit benannten Vertragsnummern (z.B. \'BUe Kundenverbindung\' mit Aufzaehlung im Anschreiben) ALLE kommagetrennt auffuehren (z.B. \'SV096877374.7, SV075359847.2, SV096877892\'). Sonst leer",\n';
     p += '  "sparte":"Komposit|Leben|KV|Mehrere|Unbekannt",\n';
     p += '  "geschaefts_typ":"BUe einfacher Vertrag|BUe Kundenverbindung|Keine BUe",\n';
     p += '  "unterlagen_angefragt":"ja|nein",\n';
     p += '  "unterlagen_liste":"kommagetrennt fehlende Unterlagen, oder leer",\n';
     p += '  "sonderfall":"Flottengeschaeft|Sondertarif|Kein Sonderfall. NUR Flottengeschaeft/Sondertarif wenn AUSDRUECKLICH im Vertrag/Anschreiben so benannt. Ein Sonderkonditions-Vorbehalt (\'nicht uebertragen falls Sonderkonditionen verloren gehen\') ist KEIN Sondertarif -> dann Kein Sonderfall. Im Zweifel Kein Sonderfall",\n';
-    p += '  "anhang_typen":"kommagetrennt: Maklervollmacht,Police,Antrag,Schadenmeldung,Beitragsrechnung,Anschreiben,Kuendigung,Datenblatt,Sonstiges",\n';
+    p += '  "anhang_typen":"kommagetrennt, NUR exakt diese festen Werte in ASCII-Schreibweise (KEINE Umlaute, immer ue/ae/oe): Bestandsuebertragungswunsch,Maklervollmacht,Untervollmacht,Maklervertrag,Police,Antrag,Schadenmeldung,Beitragsrechnung,Anschreiben,Kuendigung,Datenblatt,Sonstiges. Den Bestandsuebertragungswunsch immer genau so (mit ue) schreiben, nie mit ue-Umlaut",\n';
     p += '  "pdf_qualitaet":"Text-PDF|Scan|Mixed|Keine_PDFs|nicht_pruefbar",\n';
     p += '  "enthaelt_maklervollmacht":"ja|nein",\n';
     p += '  "mv_datum":"Datum der Maklervollmacht-Unterschrift durch den KUNDEN (Vollmachtgeber). Format TT.MM.JJJJ. NICHT das Datum des Maklerauftrag-Anschreibens (das ist auftrag_datum). Leer wenn nicht ersichtlich",\n';
@@ -9733,8 +9797,10 @@ function wsBuildBatchPrompt(mails) {
     p += "klassifiziere nach dem ZUGRUNDE LIEGENDEN Vorgang (Bestandsuebertragung -> 'BUe-Vorgang') ";
     p += "und setze ist_reminder='ja'. Eine Erinnerung an eine BUe ist weiterhin ein 'BUe-Vorgang'.\n";
     p += "3. agentur_nummer / vermittler_nummer - jeweils NUR der reine Nummern-Wert ";
-    p += "OHNE Wort-Label, NICHT kombiniert. Prioritaet: 1. Agentur-/Vermittler-Nr. im ";
-    p += "Briefkopf, 2. BD-/Bestandsnummer/Beraterzeichen, 3. nur Fallback Pool-IDs.\n";
+    p += "OHNE Wort-Label, NICHT kombiniert. ZUORDNUNGSREGEL: jede Nummer, die mit 6000 ";
+    p += "oder 890 beginnt, ist eine AGENTURNUMMER (agentur_nummer) - niemals in ";
+    p += "vermittler_nummer ablegen. Nummern ohne 6000/890-Praefix sind Vermittler-/BD-Nr. ";
+    p += "Prioritaet: 1. Agentur-/Vermittler-Nr. im Briefkopf, 2. BD-/Bestandsnummer/Beraterzeichen, 3. nur Fallback Pool-IDs.\n";
     p += "4. auftrag_datum IMMER im Format TT.MM.JJJJ (z.B. 06.04.2026), niemals ISO/JJJJ-MM-TT.\n";
     p += "5. maklerpool vs. eigentlicher Makler trennen: laeuft der Maklervertrag auf eine Firma, ";
     p += "die nur ueber einen Pool abwickelt, ist maklerpool der Pool und makler_nachname die Firma. ";
@@ -9748,7 +9814,12 @@ function wsBuildBatchPrompt(mails) {
     p += "9. maklerpool LEER, wenn nicht eindeutig aus Mail/PDF/Signatur belegt - NICHT aus Absender-Domain raten.\n";
     p += "10. Anhaenge mit '[Scan - NICHT analysiert]' wurden bewusst NICHT hochgeladen: ";
     p += "pdf_qualitaet='Scan', hinweis enthaelt 'Scan-Anhang nicht analysiert - manuell pruefen', ";
-    p += "Felder die nur aus diesem Scan kaemen = leer/nicht_pruefbar (nicht raten).\n\n";
+    p += "Felder die nur aus diesem Scan kaemen = leer/nicht_pruefbar (nicht raten).\n";
+    p += "11. Datumsfelder (auftrag_datum, mv_datum, kunde_geburtsdatum) enthalten AUSSCHLIESSLICH ";
+    p += "das Datum TT.MM.JJJJ - KEIN Name, Ort oder Zusatztext davor/dahinter (z.B. 19.05.2026, NICHT 'Emmerich 19.05.2026').\n";
+    p += "12. Kunden-/Partnernummer (KDNR) gehoert in kunde_nummer, NICHT in versicherungsnummer. ";
+    p += "versicherungsnummer NUR echte Vertrags-/Versicherungsnummern (oft Praefix SV/LF/LV/KR/DA).\n";
+    p += "13. anhang_typen: feste ASCII-Werte (siehe Schema), den Bestandsuebertragungswunsch IMMER mit 'ue' schreiben (nie mit Umlaut).\n\n";
     p += "Antworte AUSSCHLIESSLICH mit EINEM gueltigen JSON-ARRAY (kein Markdown, keine ";
     p += "Erklaerung), GENAU " + mails.length + " Objekte, in derselben Reihenfolge wie die Mails.\n";
     p += "Jedes Objekt hat ZUSAETZLICH als erstes Feld \"datei\" mit dem EXAKTEN Dateinamen.\n";
@@ -9860,6 +9931,10 @@ function wsBuildNotizHtml(data, lfdNr) {
     var klassBadge = '<span class="badge badge-blue">' + esc(d.klassifikation || "(leer)") + '</span>';
     var remBadge = isRem ? ' <span class="badge badge-amber">Reminder</span>' : "";
     var mvBadge = '<span class="badge ' + (mvOk ? "badge-green" : "badge-red") + '">' + esc(d.mv_status || "-") + '</span>';
+    // v2.42 - BUe-Ampel-Badge (analog Status-Spalte der Excel)
+    var isBueNote = (d.klassifikation === "BUe-Vorgang");
+    var buBadge = '<span class="badge ' + (isBueNote ? (isRem ? "badge-amber" : "badge-green") : "badge-red") + '">' +
+                  (isBueNote ? (isRem ? "BÜ-Reminder" : "Neuer BÜ-Vorgang") : "Kein BÜ-Vorgang") + '</span>';
     function rowHi(label, value) {
         return '<tr><td class="lbl">' + esc(label) + '</td><td class="val" style="background:#fff7ed;color:#9a3412;font-weight:700;">' + esc(clean(value) || "-") + '</td></tr>';
     }
@@ -9887,7 +9962,7 @@ function wsBuildNotizHtml(data, lfdNr) {
   var html = '';
   html += '<h1>KI-Vorgangs-Analyse' + (lfd ? ' <span style="float:right;font-size:15px;background:#c8102e;color:#fff;padding:4px 12px;border-radius:6px;">Lfd-Nr ' + esc(lfd) + '</span>' : '') + '</h1>';
   html += (lfd ? '<div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Vorgangs-Nr. <strong>' + esc(lfd) + '</strong> &amp;mdash; identisch zur Spalte <strong>Lfd_Nr</strong> in der Excel-Auswertung (Mapping Excel &amp;harr; Vorgang). Farbgruppen wie in der Excel.</div>' : '');
-  html += '<div class="sub">' + klassBadge + remBadge + ' &amp;nbsp;Maklervollmacht: ' + mvBadge + '</div>';
+  html += '<div class="sub">' + buBadge + ' ' + klassBadge + remBadge + ' &amp;nbsp;Maklervollmacht: ' + mvBadge + '</div>';
 
   html += sec("Klassifikation &amp;amp; Vorgang", C.klass) + '<table>' +
     rowFn("Vorgangstyp", d.vorgangstyp) +
