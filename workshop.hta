@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.40"
+        VERSION="2.41"
         WINDOWSTATE="normal"
     />
     <style>
@@ -325,6 +325,7 @@
                 </div>
             </div>
             <!-- CHANGELOG (Historie, nicht im UI angezeigt):
+v2.41 - KI-Notiz-Speicherphase zeigt jetzt Live-Fortschritt: Fortschrittsbalken + Zaehler (X/Y gespeichert) + Live-Log, damit man sieht wie viele Vorgaenge schon angereichert/gespeichert sind (Bildschirm aktualisiert pro Mail via updateProgress/forceRepaint). Die Analyse selbst lief bereits tick-basiert mit Live-Progress + externalisierten HTTP-Subprozessen.
 v2.40 - Workshop-Logiken in den Hauptmodus uebernommen: (1) Scan-/Foto-PDF-Skip mit Schalter (Default an) - Scans werden nicht hochgeladen, als "[Scan - NICHT analysiert]" markiert (Prompt-Hinweis ergaenzt). (2) Namens-Vereinheitlichung (wsCanonicalizeNames) fuer Maklerpool/Maklername vor Cluster + Anzeige. (3) Fehler-Ordner _Fehler_ohne_KI-Notiz im KI-Notiz-Modus (misslungene Speicherungen als Original-.msg-Kopie). Batch-Prompt (#4) + Outlook-Ordner-Quelle (#5) bewusst NICHT uebernommen.
 v2.39 - Modus-Umschalter im Hauptmodus: "Analysemodus" (volle Excel-Auswertung mit allen Sheets) oder "KI-Notiz-Modus" (nach der Analyse pro Mail eine 1-seitige KI-Notiz als PDF in die .msg einbetten + als Vorgang_Nr_Betreff.msg in einen waehlbaren Zielordner speichern; nur Vorgangstabelle, keine Analytics-Sheets). Tick-basiert (kein Freeze), nutzt wsBuildNotizHtml + Word-PDF + Outlook-Einbettung. Ein Tool statt zwei.
 v2.38 - UI stark verschlankt: Cookie-Sektion nur noch Status (kein Eingeben/Sehen/Speichern/Zuruecksetzen - kommt aus Cookie.txt); Datum-Praefix + Zeitraum-Filter + Sammeln + Stichprobe + Einstellungen + Advanced-Buttons (Pool-Uebersicht/XXL, Bulk-Triage, Reminder-Quellen, Externes Excel, JSON-Export) ausgeblendet; langer Versionstext aus dem Header entfernt (nur noch Versionsnummer).
@@ -5838,6 +5839,11 @@ function runKiNotizSaveMain() {
     } catch(eW) { word = null; }
 
     appendAiLog("HEAD", "", "KI-Notiz-Modus: " + state.results.length + " Vorgaenge -> " + outDir + (word ? " (Notiz als PDF)" : " (Notiz als HTML - Word fehlt)"));
+    // v2.41 - Fortschrittsbalken fuer die Speicherphase einblenden
+    try {
+        document.getElementById("progressContainer").style.display = "block";
+        updateProgress(0, state.results.length, "KI-Notizen speichern...");
+    } catch(ePg) {}
     var ctx = {
         pi: 0, total: state.results.length, processed: state.results,
         fsoS: fsoS, shellS: shellS, word: word, outlookApp: outlookApp,
@@ -5900,11 +5906,14 @@ function kiNotizTick(ctx) {
         try { if (tmpHtml) ctx.fsoS.DeleteFile(tmpHtml, true); } catch(eD2) {}
     }
     ctx.pi++;
+    // v2.41 - Bildschirm live aktualisieren: Fortschrittsbalken + Zaehler
+    try { updateProgress(ctx.pi, ctx.total, "KI-Notizen gespeichert: " + ctx.saved + (ctx.failed ? " | Fehler: " + ctx.failed : "")); } catch(ePg) {}
     setTimeout(function() { kiNotizTick(ctx); }, 20);
 }
 
 function kiNotizFinishMain(ctx) {
     try { if (ctx.word) ctx.word.Quit(0); } catch(eWq) {}
+    try { document.getElementById("progressContainer").style.display = "none"; } catch(ePg) {}
     // v2.40 - misslungene Speicherungen als Original-.msg in _Fehler_ohne_KI-Notiz
     // kopieren (Reimport per Drag-Drop in Outlook moeglich).
     var errFolder = "";
