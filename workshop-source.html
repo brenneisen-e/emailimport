@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>ERGO Workshop v2.48 - HTA Quellcode</title>
+<title>ERGO Workshop v2.49 - HTA Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f1f5f9; min-height: 100vh; padding: 1.5rem; }
@@ -34,7 +34,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <body>
 <div class="container">
 <div class="card">
-<h1>ERGO Workshop <strong>v2.48</strong> &mdash; HTA Quellcode</h1>
+<h1>ERGO Workshop <strong>v2.49</strong> &mdash; HTA Quellcode</h1>
 <p class="subtitle">Eigenstaendiges Workshop-Tool (startet direkt im weissen Workshop-Frontend)</p>
 
 <div class="info">
@@ -83,7 +83,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="2.48"
+        VERSION="2.49"
         WINDOWSTATE="normal"
     />
     <style>
@@ -393,6 +393,7 @@ Alles markieren
                 </div>
             </div>
             <!-- CHANGELOG (Historie, nicht im UI angezeigt):
+v2.49 - NEU: Wort-/Token-Zaehler (ohne KI). Button 'Woerter/Token zaehlen' zaehlt fuer alle .msg im gewaehlten Ordner Mail-Betreff+Body + echten PDF-Textinhalt (via Word, ReadOnly) und schaetzt Tokens (~Zeichen/4 und ~Woerter x1,4). Tick-basiert (kein Freeze), Ergebnis als eigenes Excel-Workbook 'Token-Schaetzung' (Zusammenfassung + Tabelle je Vorgang). Tipp: vorher per Zufallsstichprobe z.B. 150 Vorgaenge in einen Ordner kopieren. Scans ohne Textebene zaehlen ~0.
 v2.48 - MAKLER-IDENTITAET VIERSTUFIG + Konsistenz: Block Maklerpool -> Untervermittler -> Kooperation (NEU) -> Makler_Nachname/Vorname (natuerliche Person) zusammen vorne. (1) Neue Spalte Kooperation = Firma aus 'handelnd in Kooperation mit der ...' (z.B. Reuther Consult), getrennt vom Untervermittler. (2) Handelnder Makler als Person (z.B. Frank Haase) landet in Nachname/Vorname statt verloren zu gehen. (3) Inkonsistenz behoben: ist Maklerpool leer, aber ein Kandidat ein bekannter Pool (POOL_RULES), wird er als Pool gesetzt. Prompt (Feld makler_kooperation + Regel 5 mit Vollmacht-Beispiel) und KI-Notiz angepasst.
 v2.47 - MEHRFACHAGENT (MFA) korrekt behandelt: (1) Neue Spalte "Typ" direkt hinter Status = 'Makler' oder 'MFA' (Mehrfachagent: Betreuungswechsel/Mandat z.B. Jung DMS Pro GmbH, VPV). Erkennung via LLM-Feld ist_mehrfachagent + Heuristik. (2) Bei MFA gibt es KEINE klassische Maklervollmacht - computeMvStatus wertet den unterschriebenen Betreuungswechsel: Kunde unterschrieben -> 'OK (MFA)' (gruen), sonst 'MFA - VN-Unterschrift fehlt' (gelb), NICHT mehr faelschlich 'MV fehlt'/'manuell'. (3) KI-Notiz zeigt MFA-Badge + MFA-MV-Status. Prompt um ist_mehrfachagent + Regel 14 erweitert.
 v2.46 - (1) Makler-Parteien deterministisch getrennt (deriveMaklerParteien): Pool (POOL_RULES) bleibt in Maklerpool, das angebundene Maklerunternehmen (z.B. Finanzguru - steht oft nur in mv_makler_name) wandert in Untervermittler, Makler_Nachname/Vorname nur noch echte natuerliche Personen. Wirkt auch auf alte/migrierte Daten (Getter-basiert). (2) Cluster_ID wird LIVE gesetzt (liveUpdateClusters nach jeder fertigen Mail, nur geaenderte Zeilen neu gefaerbt). (3) Sparte nach vorne (hinter Versicherungsnummer), Segment in den hinteren Zwischenbericht-Block.
@@ -406,7 +407,7 @@ v2.39 - Modus-Umschalter im Hauptmodus: "Analysemodus" (volle Excel-Auswertung m
 v2.38 - UI stark verschlankt: Cookie-Sektion nur noch Status (kein Eingeben/Sehen/Speichern/Zuruecksetzen - kommt aus Cookie.txt); Datum-Praefix + Zeitraum-Filter + Sammeln + Stichprobe + Einstellungen + Advanced-Buttons (Pool-Uebersicht/XXL, Bulk-Triage, Reminder-Quellen, Externes Excel, JSON-Export) ausgeblendet; langer Versionstext aus dem Header entfernt (nur noch Versionsnummer).
 v2.37 - EIN-TOOL-KONSOLIDIERUNG (Workshop-Excel-Punkte ins Hauptsheet): (1) Cluster_ID-Spalte + Pastell-Zeilenfarbe - gleicher Makler (ueber EXTRAHIERTE Agentur-/Vermittlernummer, nicht Roh-String!) + gleicher Kunde bekommen gemeinsame ID (001a/001b...) und Farbe. (2) Makler_Key + Top-Makler-Aggregation nutzen jetzt die extrahierten Nummern -> dieselbe Agentur zersplittert nicht mehr in viele Namensvarianten (viel uebersichtlicher). (3) MV_Datum-Spalte ergaenzt (+ Feld im Haupt-Prompt, jetzt 42 JSON-Keys). (4) Datum konsistent auf TT.MM.JJJJ normalisiert (Auftrag_Datum, Kunde_Geburtsdatum, MV_Datum) - LLM-Varianten wie '2.4.26' werden vereinheitlicht. v2.36 - HAUPTSHEET UMSORTIERT + Single Source of Truth: Die analyse.xlsx-Spalten werden jetzt aus EINER Definition (EXCEL_COLS) generiert - Header, Beschreibungszeile, Indizes, Schreiben (live/bulk/export), Lesen (Readback) und Faerbung. Reihenfolge nach Wunsch: Kunde+Vertrag (Name/Geburtsdatum/Adresse/Versicherungsnummer/Sparte/Geschaeftstyp) ZUERST, dann Triage/Klassifikation, Zwischenbericht-Cluster, Makler, Unterlagen, MV+Unterschriften, Ergebnis - und die Mail-Benennung (Datei/Datum/Absender/Betreff/Anhaenge) ganz ans ENDE, als einklappbare Excel-Spaltengruppe (startet eingeklappt). Kopfzeilen-Zellen gruppenweise gefaerbt. Bestehende aeltere analyse.xlsx werden beim Laden automatisch erkannt (Header-basiert gelesen) und verlustfrei ins neue Layout umgebaut. Kein Index-Drift mehr moeglich. v2.35 - WORKSHOP-PARITAET: Der Workshop nutzt eigene Prompt-/Excel-Bausteine - diese jetzt nachgezogen. (1) wsFieldLines (Workshop-Schema) + wsBuildBatchPrompt um Quellentrennung (BUe-Wunsch vs Maklervollmacht getrennt auswerten) und die 8 neuen Felder erweitert: makler_adresse, kunde_geburtsdatum, kunde_adresse, untervollmacht_vorhanden, unterbevollmaechtigter, mv_makler_name, mv_kunde_name, unterschrift_fundort + Hinweise (Agenturnr 6000/890, Adressen ohne Komma). (2) Workshop-Excel: neue Spalten ergaenzt UND nach Wunsch umsortiert - Kunde+Vertrag ZUERST, Mail-Benennung (Datei/Absender/Betreff/Anhaenge) ans ENDE. v2.34 - (1) Kopfzeilen-Zellen wieder gruppenweise eingefaerbt (Live-Sheet war durchgehend blau) - gleiche Gruppenfarben wie Export. Export-Header: neue Spalten 39-56 bekommen jetzt auch Fuellfarbe (waren weisser Text auf weiss = unsichtbar). (2) Datei-Spalte (lange Mail-Dateinamen) ist jetzt einklappbar (Excel-Spaltengruppierung) und startet eingeklappt. (3) NEUE FUNKTION KWAD-Weiterleitung: Outlook-Quellordner waehlen, Empfaenger (default KWAD@ergo.de), optional Archiv-Ordner; alle Mails werden EINZELN mit einstellbarer Pause (default 2s) weitergeleitet und das Original danach ins Archiv verschoben. Tick-basiert (kein Freeze), EntryID-Snapshot (move-sicher), Live-Log. Prompt- + Excel-Verbesserungen gelten via Build automatisch auch fuer ERGO Workshop. v2.33 - Maklernummer sauber auf ZWEI Spalten getrennt: neue Spalten "Agentur_Nr" und "Vermittler_Nr" (nur Ziffern/Kennung, OHNE Label-Text wie "Vermittler"/"Agentur"). LLM gibt agentur_nummer + vermittler_nummer ab sofort getrennt aus (JSON-Schema 41 Keys); zusaetzlich Parser deriveMaklernummern(), der den kombinierten makler_nummer-String ("Vermittler 811774 Agentur 8903235") auftrennt - greift damit auch auf bereits analysierte Daten. Beide Spalten als TEXT formatiert. v2.32 - ANALYSE-LOGIK Kernfrage + MV-Reminder-Fix: (1) MV-Mangel ("MV fehlt"/"kein Anhang") wird bei REMINDERN nicht mehr als Mangel gewertet - computeMvStatus liefert dort "Reminder (MV n.e.)" (n.e.=nicht erwartet), da bei Wiedervorlagen kein Neueinreichen erfolgt. MV-Status wird zudem nur noch fuer BUe-Vorgaenge gezaehlt. (2) Neue KERNFRAGE-Sektion im KPI-Sheet: 3-Wege-Split (1=echte NEUE BUe-Erstvorgaenge, 2=Reminder/Wiedervorlage, 3=fachfremde Vorgaenge ohne BUe, 4=Nicht-Makler). (3) Einreichungs-Qualitaet NUR der neuen BUe-Erstvorgaenge: wie viele richtig/vollstaendig eingereicht (MV vorhanden+vollumfaenglich+VN-Unterschrift) vs unvollstaendig. (4) Fachfremde Vorgaenge nach Klassifikation aufgeschluesselt. MV-fehlt-Quote in Auffaelligkeiten jetzt ueber BUe-ERSTVORGAENGE (ohne Reminder). v2.31 - KI-Notiz passt jetzt auf EINE Seite: (1) CSS stark kompaktiert (kleinere Schriften/Paddings/Margins), (2) Sektion "Unterlagen &amp; Anhang" entfaellt - relevante Infos in Makler-/MV-Sektion gemerged, (3) lange Freitexte (Klassifikation-Grund, MV-Einschraenkungen, Unterschrift-Fundort, Hinweis, Zusammenfassung) werden fuer die Notiz gekappt, (4) Word-Konvertierung setzt A4 + schmale Raender (28/22/34/34 pt). BUGFIX nebenbei: Notiz referenzierte nicht existierende Felder (d.zusammenfassung statt mail_zusammenfassung, d.agentur_nummer/vermittler_nummer statt makler_nummer) - die zeigten immer "-". Jetzt korrekt + neue v2.30-Felder (Geburtsdatum, Adressen, Untervollmacht, MV-Abgleich) konditional eingebunden. v2.30 - PROMPT-UEBERARBEITUNG auf Basis der ERGO-Testreihe (87-89% Treffer): (1) QUELLENTRENNUNG als Kern-Arbeitsweise - BUe-Wunsch/Anschreiben und Maklervollmacht werden GETRENNT ausgewertet, Daten nicht mehr vermischt (Schritt 1 Dokumenten-Inventar, Schritt 2 nur Anschreiben, Schritt 3 nur MV, Schritt 4 uebergreifend Untervollmacht+Unterschriften). (2) Konkrete Extraktions-Hinweise: Agentur-/Vermittlernr beginnt oft mit 6000/890, Vertragsnr mit SV/LF/LV/KR/DA, Unterschriften handschriftlich/letzte Seite, Adressen OHNE Komma. (3) 8 neue Felder + Excel-Spalten: Makler_Adresse, Kunde_Geburtsdatum, Kunde_Adresse, Untervollmacht_Vorhanden, Unterbevollmaechtigter, MV_Makler_Name + MV_Kunde_Name (fuer Abgleich Anschreiben vs MV), Unterschrift_Fundort. JSON-Schema jetzt 39 Keys (war 31, alter "28"-Tippfehler behoben). Hinweis-Feld flaggt jetzt auch Makler/VN-Abweichungen zwischen Anschreiben und MV. v2.29 - Neues Sheet "Eingangskanal-Deepdive": gruppiert nach Empfaenger-Postfach (bestandsuebertragungen@ergo.de, maklerauftraege@ergo.de, ...). Pro Kanal: Segment-Eingang mit Quote, Quote "richtige Auftraege" vs. Fehlrouting (kanalspezifische Soll-Regel - Bestandsuebertragungen=BUe-Vorgang, Maklerauftraege=Makler-Vorgang ohne Schaden/Privat/Zustellfehler), Fehlrouting-Segmente (was faelschlich hier landet), Cluster-Verteilung, Top-Maklerpools. Oben eine Kanal-Vergleichstabelle (Volumen + Quote richtig/falsch je Kanal). v2.28 - Business-Case: zusaetzlich MAK-Aequivalente. Neue Annahme "Arbeitsstunden pro Vollzeit-MAK pro Jahr" (Default 1600). Drei neue Zeilen: (a) im IST-Block "entspricht Vollzeit-MAK heute gebundene Kapazitaet" (b) im Einsparungs-Block "SUMME Brutto-Einsparung in MAK-Aequivalenten" (c) im Netto-Block "Netto-Einsparung in Stunden/Jahr" + "Netto-Einsparung in MAK-Aequivalenten". Format "0,X MAK". v2.27 - ZWISCHENBERICHT-PAKET: (a) 5 neue Excel-Spalten am Ende: Segment / Auto_Cluster (vollautomatisierbar / teilautomatisierbar / manuell, regelbasiert aus Klassifikation + Reminder + MV-Status + PDF-Qualitaet) / Auto_Grund (Kurz-Begruendung) / Vorgang_Alter_Tage (Rueckstand) / Makler_Key (kanonischer Schluessel Pool|Name|#Nr). (b) Zweite Header-Zeile in der Excel mit Kurzbeschreibung je Spalte (was wird analysiert) - macht das Sheet selbsterklaerend. Bestehende xlsx-Caches werden bei Load automatisch migriert (Row 2 wird neu eingefuegt). (c) 4 neue Auto-Sheets werden am Ende des Batchlaufs gebaut: "KPI-Gesamtanalyse" (Datenstand, Cluster-Verteilung, Segment-Verteilung, Pool-Konzentration mit Top-6, Altersverteilung, qualitative Auffaelligkeiten), "Maklerpool-Konzentration" (kompakte Tabelle ALLER Pools mit Vorgaengen/Anteil/BU/Reminder/Auto-Quote/Top-Makler), je ein "Pool: <Name>"-Sub-Sheet fuer die Top-5 Maklerpools (Mini-KPI + Top-Makler im Pool + alle Vorgaenge dieses Pools), "Business-Case" (ROI-Rechnung mit editierbaren Annahme-Zellen: Mails/Woche, Token-Preis, Stundensatz, Zeitersparnis je Vorgangstyp; rechnet Brutto-Einsparung, Tool-Kosten, Netto-ROI und Payback per Excel-Formeln; Quoten kommen aus aktuellem Lauf). v2.26 - Neues Feld "Forward an Zielpostfach" im Workshop-UI. Wenn gesetzt, wird jede angereicherte Mail nach dem SaveAs zusaetzlich per Outlook-Forward+Send an diese Adresse geschickt. Hinweis: der Absender ist dann das eigene Postfach (kein echter Redirect ueber Outlook-OM moeglich); fuer Mensch-zu-Mensch-Workflows reicht das. v2.25 - Workshop-Frontend aufgeraeumt: Buttons Batch / Chunked-Batch / Kombi-PDF / Testmodus + die Erklaerungs-Box darunter ausgeblendet. Nur noch der grosse "Analyse starten"-Button sichtbar. Die Funktionen selbst bleiben im Code (per Hotkey o.ae. erreichbar), nur das UI ist auf den Default-Pfad reduziert. v2.24 - (a) Cluster-Key nutzt jetzt Union(Agentur,Vermittler) statt "Agentur/Vermittler" - wenn dieselbe Maklernummer einmal in Agentur und einmal in Vermittler steht (LLM-Klassifikations-Unschaerfe), entsteht jetzt derselbe Cluster-Schluessel. (b) Mails ohne KI-Notiz (Analyse-Fehler / Save-Fehler) werden als Original-.msg in Unterordner _Fehler_ohne_KI-Notiz kopiert - per Drag-Drop wieder in Outlook importierbar. (c) Word-Performance: ScreenUpdating, Pagination, Grammatik/Rechtschreib-Background-Checks und AutoFormat-Quotes abgeschaltet beim Word-Init - spart ~50-200ms pro PDF, sichtbar bei vielen Mails. v2.23 - FERTIG-Log-Zeile enthaelt jetzt den Fortschritt "FERTIG (X/Y)" statt nur "FERTIG", so dass auf einen Blick zu sehen ist, wie viele der Parallel-Mails schon durch sind. v2.22 - Token-Caps wieder gelockert: harte Zeichengrenzen je Feld zurueck auf vorherige weiche Vorgaben ("1-2 Saetze" statt "max 140 Zeichen"). Globale "max ~1500 Tokens"-Anweisung raus. Begruendung: mit dem robusten Truncation-Recovery-Parser (v2.18) und dem entfernten naechster_schritt (v2.21) ist Puffer da; die harten Caps waren ueberkautelarisch und schraenkten die LLM-Antwort unnoetig ein. Die Anweisung "knapp + praezise, keine PDF-Zitate ins JSON" bleibt. v2.21 - Schema-Umbau: (a) neues Feld "mv_datum" = Datum der Maklervollmacht-Unterschrift durch den Kunden (TT.MM.JJJJ), abgegrenzt vom "auftrag_datum" (Datum des Pool-Anschreibens). Eigene Spalte "MV Datum" im Excel. (b) Spalte "Datum" umbenannt zu "Mail Datum" - klarer abgegrenzt von MV_Datum und Auftrag_Datum. (c) "naechster_schritt" komplett aus LLM-Schema entfernt (war nicht benoetigt, sparte Token). (d) "Zusammenfassung" wieder in der Excel-Spalte UND in der KI-Notiz-PDF. v2.20 - Workshop-Excel: Spalten "Zusammenfassung" und "Naechster_Schritt" entfernt (nicht benoetigt, machten die Tabelle nur breit). Die Felder bleiben im LLM-Schema und in der KI-Notiz-PDF erhalten. v2.19 - Token-Limit-Truncation an der Wurzel angepackt: alle Freitext-Felder im JSON-Schema haben jetzt explizite Zeichengrenzen (klassifikation_grund 140, zusammenfassung 140, naechster_schritt 100, hinweis 80, mv_einschraenkungen 120, unterlagen_liste 150). Plus globale Anweisung im Prompt: max ~1500 Tokens Gesamtantwort, keine PDF-Zitate ins JSON. Vorher schrieb das Modell teils 500+ Zeichen pro Begruendung und hat sich damit selbst ins Token-Limit gefahren. v2.18 - JSON-Parser kann jetzt auch HARTE Truncation (mitten im Key/Value am Token-Limit abgeschnitten) reparieren: scant rueckwaerts bis zur letzten kompletten Property, kappt dort sauber und schliesst die Klammern. Vorher war nur fehlende } am Ende reparierbar - wenn der LLM mitten in einem String aufhoerte, war die ganze Antwort verloren. Zusaetzliche Perf-Optimierung: wsLog nutzt jetzt createElement statt innerHTML += (war bei vielen Mails quadratisch langsam) und cached den FSO statt ihn pro Log-Zeile neu anzulegen. Cap auf letzte 1500 Log-Zeilen. Macht Parallel-Prep + Analyse deutlich fluessiger. v2.17 - KI-Notiz-PDF wird nur noch im TEMP angelegt, in die .msg eingebettet und danach geloescht. Vorher lag pro Vorgang ein redundantes KI-Notiz_BÜ-KI-NNN.pdf neben der .msg - das war ueberfluessig, weil die Notiz in der .msg selbst steckt. v2.16 - Zustellfehler-Meldungen (Unzustellbarkeitsberichte / NDR / Bounce-Mails) werden VOR dem LLM-Aufruf erkannt und lokal klassifiziert (Absender postmaster/mailer-daemon/ITERGO-Security, Betreff "Nachricht nicht zustellbar", .eml-Anhang + Body-Hinweise). Kein API-Call mehr -> spart Token UND vermeidet JSON-Parse-Fehler durch die eingebetteten MIME-Header der originalen Mail im .eml-Anhang. Begriff "Bounce-NDR" umbenannt in deutsches "Zustellfehler" in allen Prompts und Spalten. v2.15 - JSON-Parser robuster: Smart-Quotes (“ ” ’) werden auf ASCII normalisiert, trailing Kommas vor } und ] werden entfernt, abgeschnittene Antworten (Token-Limit) bekommen fehlende } automatisch nachgesetzt. Wenn der Parse trotzdem scheitert, steht jetzt im Log + in der Excel-Fehlerspalte die LLM-Antwort (250 Zeichen) - so sieht man direkt, was der LLM zurueckgegeben hat. v2.14 - .msg-Speichern tick-basiert (eine Mail pro setTimeout-Tick) statt synchroner Schleife: HTA bricht nicht mehr ab wenn Outlook eine Sicherheitsabfrage zeigt, Progress + Log laufen live mit, jede Mail hat ihr eigenes try/catch. Echte Parallelisierung von Outlook/Word geht nicht (Single-Thread-Apartment, wuerde Kontention erzeugen). Excel-Schriftart jetzt Open Sans (mit Fallback Calibri). Lfd-Nr-Spalte verbreitert (13 Zeichen), damit BÜ-KI-001 einzeilig passt. v2.13 - Cluster-Match jetzt ueber Agentur-/Vermittler-Nummer (verlaesslicher als Name) - Ricci Sabrina bei gleicher Agentur 8903235 wird auch dann ein Cluster, wenn der Maklerfirma-Name unterschiedlich geschrieben ist. Zusaetzlich Angleicher: gleicht "Finanzguru" / "Finanzguru Versicherungsservice GmbH" automatisch auf die kuerzeste Variante an (Stem-Match nach Lowercase/Punctuation/Rechtsform-Strip). v2.12 - Workshop-Excel: (1) Versicherungsnummern werden als TEXT geschrieben (kein Komma-Punkt-Swap, kein E+17 mehr bei langen Nummern). (2) Mehrere Vertragsnummern pro Mail: bei \'BUe Kundenverbindung\' werden ALLE explizit benannten VNRen kommagetrennt erfasst. (3) Cluster-Spalte mit IDs 001a/001b/...: gleicher Makler + Kunde -> gemeinsame Pastell-Zeilenfarbe, Vorgaenge sortiert nebeneinander. (4) Freeze-Pane jetzt auf B2 - Header-Zeile UND Spalte A (Lfd_Nr) bleiben beim Scrollen sichtbar. (5) LLM-Platzhalter \"leer\"/\"k.A.\"/\"-\" werden zu wirklich leeren Zellen. v2.11 - Parallel-Modus friert nicht mehr ein: der Prep-Loop (Outlook-OpenSharedItem + Anhang-Save + Conv-Create-Fire fuer alle Mails) lief synchron in einer Schleife -&amp;gt; HTA blockierte je nach Anzahl/Anhaengen 20-40 s ohne Log-Update. Jetzt EINE Mail pro setTimeout-Tick: Log/Progress/Buttons bleiben live, Fenster klickbar. v2.10 - Workshop kann jetzt direkt einen OUTLOOK-ORDNER anklicken, alle Mails landen als .msg im Workshop-Ergebnisordner (eine Mail pro setTimeout-Tick, kein Freeze). v2.09 - Kombi wieder SCHNELL: laeuft wie vor v2.04 ueber den warmen In-HTA-Async-Pfad statt eines kalten wscript-Subprozesses (der pro Lauf Proxy neu aufloeste/authentifizierte = der Bremsfaktor). Antwort wird weiterhin nur EINMAL gelesen/geparst (kein Crash). v2.08 - Workshop-Log: echte deutsche Umlaute (ü/ä/ö/ß statt ue/ae/oe) + Leerzeichen zwischen Uhrzeit und Log-Text (MSHTA kennt kein flex-gap, jetzt margin). v2.07 - FIX Stream HTTP 403: der Streaming-VBS-Worker sendet jetzt denselben Browser-User-Agent + Accept-Language wie der funktionierende Nicht-Stream-Pfad (das ERGO-Gateway blockt Requests ohne Browser-UA mit 403). v2.06 - FIX Stream-Start "Datenquelle in anderer Domaene": kein ADODB.Stream mehr im HTA-Prozess (vom Netzlaufwerk = Internet-Zone gesperrt). Payload + Antwort laufen ueber FSO-Unicode; der VBS-Subprozess macht die UTF-16/UTF-8-Umwandlung. v2.05 - Mail-Level-Skip: enthaelt eine Mail AUCH NUR EINE Foto-/Scan-PDF, wird die GESAMTE Mail nicht analysiert (auch Text-PDFs darin nicht) - laeuft nur ueber den Body, als manuell-pruefen markiert. Plus Stream-Start-Instrumentierung (granulares Log bis zum genauen Crash-Schritt) + try/catch um wsStreamAnswerStart. v2.04 - CRASH-FIX Kombi-Streaming: Log in Workshop-Log_*.txt, WinHttp-Subprozess, Parse genau einmal
 -->
-            <div class="ver" title="ERGO Vorgang-Analyse">v2.48</div>
+            <div class="ver" title="ERGO Vorgang-Analyse">v2.49</div>
         </div>
 
         <!-- Cookie - v2.38: nur Status. Cookie kommt automatisch aus Cookie.txt
@@ -563,6 +564,11 @@ v2.37 - EIN-TOOL-KONSOLIDIERUNG (Workshop-Excel-Punkte ins Hauptsheet): (1) Clus
                     style="background: #6b7280; color: white;"
                     title="Oeffnet die bestehende analyse.xlsx im _KI-Analyse-Ordner.">
                 &amp;#128196; Cache laden
+            </button>
+            <button class="btn" id="btnCountTokens" onclick="countWordsTokens()"
+                    style="background: #7c3aed; color: white;"
+                    title="Zaehlt OHNE KI den Mail-Body + Betreff + echten PDF-Text (via Word) aller .msg im gewaehlten Ordner und schaetzt die Tokens. Ergebnis als neues Excel-Sheet 'Token-Schaetzung'. Tipp: vorher per Zufallsstichprobe z.B. 150 Vorgaenge in einen Ordner kopieren.">
+                &amp;#128290; Woerter/Token zaehlen (ohne KI)
             </button>
             <button class="btn btn-success" id="btnExcel" onclick="exportToExcel()" disabled>
                 &amp;#128202; Excel-Export
@@ -3020,6 +3026,156 @@ function liveUpdateClusters() {
             try { applyHighlightsToLiveRow(rowIdx, r); } catch(eHl) {}
         }
     }
+}
+
+// ============================================================================
+// v2.49 - WORT-/TOKEN-ZAEHLER (ohne KI). Zaehlt Mail-Body+Betreff + echten
+// PDF-Text (via Word) aller .msg im gewaehlten Ordner und schaetzt die Tokens.
+// Tick-basiert (eine Mail pro setTimeout-Tick, kein Freeze). Ergebnis als
+// eigenes Excel-Workbook "Token-Schaetzung".
+// ============================================================================
+var tokState = null;
+
+function countWordsTokens() {
+    if (!state.folderPath || !state.msgFiles || state.msgFiles.length === 0) {
+        showError("Bitte zuerst einen Ordner mit .msg-Dateien waehlen (Drop-Bereich / Ordner waehlen).");
+        return;
+    }
+    if (tokState &amp;&amp; tokState.running) { showInfo("Die Zaehlung laeuft bereits."); return; }
+    hideStatus();
+    clearAiLog();
+    var word = null;
+    try {
+        word = new ActiveXObject("Word.Application");
+        word.Visible = false;
+        try { word.DisplayAlerts = 0; } catch(e) {}
+        try { word.Options.ConfirmConversions = false; } catch(e) {}
+        try { word.Options.CheckGrammarAsYouType = false; word.Options.CheckSpellingAsYouType = false; } catch(e) {}
+    } catch(eW) { word = null; }
+    if (!word) { showError("Word.Application nicht verfuegbar - fuer die genaue PDF-Textzaehlung wird Word benoetigt."); return; }
+
+    tokState = {
+        running: true, idx: 0, files: state.msgFiles.slice(0),
+        word: word, fso: new ActiveXObject("Scripting.FileSystemObject"), rows: [],
+        tWordsMail: 0, tCharsMail: 0, tWordsPdf: 0, tCharsPdf: 0, tPdfs: 0, tPdfErr: 0,
+        tempDir: getEnv("TEMP") + "\\ergo_tok_" + new Date().getTime()
+    };
+    try { if (!tokState.fso.FolderExists(tokState.tempDir)) tokState.fso.CreateFolder(tokState.tempDir); } catch(e) {}
+    document.getElementById("progressContainer").style.display = "block";
+    appendAiLog("OK", "", "Wort-/Token-Zaehlung gestartet: " + tokState.files.length + " Vorgaenge (Mail-Body + PDF-Text via Word, ohne KI)");
+    setTimeout(tokTick, 10);
+}
+
+function tokCountWords(s) {
+    s = String(s || "").replace(/^\s+|\s+$/g, "");
+    if (!s) return 0;
+    return s.split(/\s+/).length;
+}
+
+function tokPdfText(path) {
+    var txt = "";
+    try {
+        var doc = tokState.word.Documents.Open(path, false, true);  // ConfirmConversions=false, ReadOnly=true
+        try { txt = String(doc.Content.Text || ""); } catch(eT) { txt = ""; }
+        try { doc.Close(0); } catch(eC) {}
+    } catch(e) { txt = ""; tokState.tPdfErr++; }
+    return txt;
+}
+
+function tokTick() {
+    if (!tokState || !tokState.running) return;
+    if (tokState.idx >= tokState.files.length) { tokFinalize(); return; }
+    var path = tokState.files[tokState.idx];
+    var fso = tokState.fso;
+    var fname = path.substr(path.lastIndexOf("\\") + 1);
+    var mailWords = 0, mailChars = 0, pdfWords = 0, pdfChars = 0, pdfCount = 0;
+    try {
+        var it = outlookApp.Session.OpenSharedItem(path);
+        var subj = "", body = "";
+        try { subj = String(it.Subject || ""); } catch(e) {}
+        try { body = String(it.Body || ""); } catch(e) {}
+        var mailText = subj + "\n" + body;
+        mailWords = tokCountWords(mailText); mailChars = mailText.length;
+        var attCount = 0; try { attCount = it.Attachments.Count; } catch(e) {}
+        for (var a = 1; a <= attCount; a++) {
+            try {
+                var att = it.Attachments.Item(a);
+                var an = String(att.FileName || "");
+                if (an.toLowerCase().substr(-4) === ".pdf") {
+                    pdfCount++;
+                    var outP = tokState.tempDir + "\\" + sanitizeFilename(an);
+                    att.SaveAsFile(outP);
+                    if (fso.FileExists(outP)) {
+                        var t = tokPdfText(outP);
+                        pdfWords += tokCountWords(t); pdfChars += t.length;
+                        try { fso.DeleteFile(outP, true); } catch(e) {}
+                    }
+                }
+            } catch(e) {}
+        }
+        try { it.Close(1); } catch(e) {}
+    } catch(eMsg) {
+        appendAiLog("FEHLER", path, (eMsg.message || eMsg));
+    }
+    tokState.rows.push({ datei: fname, mw: mailWords, mc: mailChars, pn: pdfCount, pw: pdfWords, pc: pdfChars });
+    tokState.tWordsMail += mailWords; tokState.tCharsMail += mailChars;
+    tokState.tWordsPdf += pdfWords; tokState.tCharsPdf += pdfChars; tokState.tPdfs += pdfCount;
+    tokState.idx++;
+    updateProgress(tokState.idx, tokState.files.length, fname.substr(0, 40));
+    appendAiLog("OK", path, "Mail " + mailWords + "W / " + pdfCount + " PDF (" + pdfWords + "W)");
+    setTimeout(tokTick, 0);
+}
+
+function tokFinalize() {
+    tokState.running = false;
+    try { tokState.word.Quit(); } catch(e) {}
+    try { tokState.fso.DeleteFolder(tokState.tempDir, true); } catch(e) {}
+    document.getElementById("progressContainer").style.display = "none";
+    var n = tokState.rows.length;
+    var totW = tokState.tWordsMail + tokState.tWordsPdf;
+    var totC = tokState.tCharsMail + tokState.tCharsPdf;
+    var estTok = Math.round(totC / 4);       // grobe Heuristik ~Zeichen/4
+    var estTokW = Math.round(totW * 1.4);    // alternative ~Woerter*1,4
+    var avgTok = n > 0 ? Math.round(estTok / n) : 0;
+    try { tokBuildSheet(estTok, estTokW, avgTok); } catch(eS) { showError("Token-Sheet konnte nicht erstellt werden: " + (eS.message || eS)); }
+    showSuccess("Token-Schaetzung fertig: " + n + " Vorgaenge, ~" + estTok + " Tokens gesamt (~" + avgTok + " je Vorgang). PDF-Lesefehler: " + tokState.tPdfErr + ". Ergebnis-Excel geoeffnet.");
+}
+
+function tokBuildSheet(estTok, estTokW, avgTok) {
+    var excel = new ActiveXObject("Excel.Application");
+    excel.Visible = true;
+    var wb = excel.Workbooks.Add();
+    var sh = wb.Worksheets(1);
+    try { sh.Name = "Token-Schaetzung"; } catch(e) {}
+    var n = tokState.rows.length;
+    sh.Cells(1, 1).Value = "ERGO Vorgang-Analyse - Wort-/Token-Schaetzung (ohne KI)";
+    try { sh.Cells(1, 1).Font.Bold = true; sh.Cells(1, 1).Font.Size = 13; } catch(e) {}
+    sh.Cells(2, 1).Value = "Ordner:"; sh.Cells(2, 2).Value = state.folderPath;
+    sh.Cells(3, 1).Value = "Vorgaenge gezaehlt:"; sh.Cells(3, 2).Value = n;
+    sh.Cells(4, 1).Value = "PDFs gesamt:"; sh.Cells(4, 2).Value = tokState.tPdfs;
+    sh.Cells(5, 1).Value = "Woerter gesamt (Mail+PDF):"; sh.Cells(5, 2).Value = (tokState.tWordsMail + tokState.tWordsPdf);
+    sh.Cells(6, 1).Value = "Zeichen gesamt (Mail+PDF):"; sh.Cells(6, 2).Value = (tokState.tCharsMail + tokState.tCharsPdf);
+    sh.Cells(7, 1).Value = "Geschaetzte Tokens gesamt (~Zeichen/4):"; sh.Cells(7, 2).Value = estTok;
+    sh.Cells(8, 1).Value = "Alternative Schaetzung (~Woerter x1,4):"; sh.Cells(8, 2).Value = estTokW;
+    sh.Cells(9, 1).Value = "Durchschnitt Tokens / Vorgang:"; sh.Cells(9, 2).Value = avgTok;
+    sh.Cells(10, 1).Value = "Hinweis:";
+    sh.Cells(10, 2).Value = "Schaetzung des reinen INHALTS (Mail-Betreff+Body + PDF-Textebene). System-Prompt/JSON-Schema kommen pro Lauf zusaetzlich dazu. Scans ohne Textebene zaehlen ~0 Woerter.";
+    try { sh.Cells(1, 1).Font.Bold = true; } catch(e) {}
+    for (var s = 2; s <= 9; s++) { try { sh.Cells(s, 1).Font.Bold = true; } catch(e) {} }
+    var hr = 12;
+    var heads = ["Datei", "Mail_Woerter", "Mail_Zeichen", "PDF_Anzahl", "PDF_Woerter", "PDF_Zeichen", "Gesamt_Woerter", "Gesamt_Zeichen", "Est_Tokens(Z/4)"];
+    for (var c = 0; c < heads.length; c++) { sh.Cells(hr, c + 1).Value = heads[c]; }
+    try { var hrng = sh.Range(sh.Cells(hr, 1), sh.Cells(hr, heads.length)); hrng.Font.Bold = true; hrng.Interior.Color = rgb(14, 116, 144); hrng.Font.Color = rgb(255, 255, 255); } catch(e) {}
+    for (var i = 0; i < tokState.rows.length; i++) {
+        var r = tokState.rows[i]; var rr = hr + 1 + i;
+        var gw = r.mw + r.pw, gc = r.mc + r.pc;
+        sh.Cells(rr, 1).Value = r.datei;
+        sh.Cells(rr, 2).Value = r.mw; sh.Cells(rr, 3).Value = r.mc;
+        sh.Cells(rr, 4).Value = r.pn; sh.Cells(rr, 5).Value = r.pw; sh.Cells(rr, 6).Value = r.pc;
+        sh.Cells(rr, 7).Value = gw; sh.Cells(rr, 8).Value = gc; sh.Cells(rr, 9).Value = Math.round(gc / 4);
+    }
+    try { sh.Columns(1).ColumnWidth = 45; sh.Columns("B:I").ColumnWidth = 14; } catch(e) {}
+    try { sh.Range("A" + (hr + 1)).Select(); excel.ActiveWindow.FreezePanes = true; } catch(e) {}
 }
 
 // ============================================================================
