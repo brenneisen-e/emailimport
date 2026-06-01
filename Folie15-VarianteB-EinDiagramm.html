@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="UTF-8"><title>Folie 15 — Variante B: 1 Diagramm × 4 Lanes, alle Optionen</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#E5E7EB;padding:24px}
+  .slide{width:1600px;height:900px;background:#FFF;margin:0 auto;padding:26px 44px;position:relative;
+    box-shadow:0 8px 32px rgba(0,0,0,.12);border-radius:4px;font-size:13px;color:#0F172A;display:flex;flex-direction:column}
+  .mini-h{font-size:11px;letter-spacing:.10em;color:#475569;font-weight:500;margin-bottom:4px}
+  .title{font-size:22px;font-weight:700;color:#E30613;line-height:1.2;max-width:1150px}
+  .subt{font-size:14px;font-weight:600;color:#E30613;margin-top:3px;max-width:1150px}
+  .logo{position:absolute;top:24px;right:44px;text-align:right}
+  .logo .name{font-size:28px;font-weight:800;color:#E30613;letter-spacing:-.02em}.logo .sub{font-size:8px;color:#475569;margin-top:1px}
+  /* Legend */
+  .legend{display:flex;gap:24px;margin-top:14px;align-items:center}
+  .legend .it{display:flex;align-items:center;gap:8px;font-size:12px;color:#334155}
+  .legend .ln{width:30px;height:0;border-top-width:3px;border-top-style:solid}
+  .legend .ln.h{border-color:#94A3B8}.legend .ln.a{border-color:#00838F}.legend .ln.b{border-color:#F59E0B}
+  .legend .it b{font-weight:700}
+  .stage{flex:1;display:flex;flex-direction:column;margin-top:12px}
+  .diag{flex:1;border:1px solid #CBD5E1;border-radius:9px;overflow:hidden;display:flex}
+  .labels{width:172px;display:flex;flex-direction:column;border-right:3px solid #E2E8F0}
+  .ll{flex:1;display:flex;align-items:center;padding:6px 8px 6px 13px;border-top:1px solid #F1F5F9;font-size:12px;font-weight:700;color:#0F172A;line-height:1.18}
+  .ll:first-child{border-top:none}
+  .ll .c{width:6px;height:32px;border-radius:3px;margin-right:10px;flex-shrink:0}
+  .ll .t{display:flex;flex-direction:column}.ll .s{font-size:9px;color:#64748B;font-weight:500;margin-top:1px}
+  .ll.pk{background:#EFF8FF;border-left:6px solid #0EA5E9;padding-left:7px}
+  .ll.botlane{background:#FFF1F2;border-left:6px solid #DC2626;padding-left:7px}
+  .c.out{background:#0078D4}.c.kwad{background:#4F46E5}.c.pk{background:#0EA5E9}.c.bot{background:#DC2626}
+  .track{flex:1;position:relative;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(4,1fr)}
+  .rbg{grid-column:1/9;border-top:1px solid #F4F6F9}.rbg.pkb{background:#F6FBFF}.rbg.botb{background:#FFF6F6}
+  .track svg{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+  .step{z-index:2;align-self:center;justify-self:stretch;margin:8px 12px;background:#FFF;border:1.6px solid #CBD5E1;border-radius:8px;
+    padding:8px 9px;font-size:11.5px;color:#334155;text-align:center;font-weight:500;line-height:1.22;box-shadow:0 2px 6px rgba(15,23,42,.09);position:relative}
+  .step .tag{position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:700;color:#FFF;padding:1px 8px;border-radius:10px;letter-spacing:.05em;white-space:nowrap}
+  .step.A{background:linear-gradient(135deg,#CFFAFE,#E0F2FE);border:2px solid #00838F;font-weight:600}.step.A .tag{background:#00838F}
+  .step.B{background:linear-gradient(135deg,#FEF3C7,#FFEDD5);border:2px solid #F59E0B;font-weight:600}.step.B .tag{background:#F59E0B}
+  .takeaway{background:linear-gradient(90deg,#E30613,#B91C1C);color:#FFF;padding:11px 18px;border-radius:8px;font-size:12px;font-weight:500;line-height:1.45;display:flex;gap:14px;align-items:center;margin-top:12px}
+  .takeaway .tag2{background:rgba(255,255,255,.2);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.08em;flex-shrink:0}
+  .takeaway .a{color:#7FDBE0;font-weight:700}.takeaway .b{color:#FCD34D;font-weight:700}
+  .footer{position:absolute;bottom:14px;left:44px;right:44px;display:flex;justify-content:space-between;border-top:1px solid #E2E8F0;padding-top:5px;font-size:9px;color:#94A3B8}
+</style></head>
+<body><div class="slide">
+  <div class="logo"><div class="name">ERGO</div><div class="sub">A Munich Re company</div></div>
+  <div class="mini-h">STRUKTURIERUNG · ARCHITEKTUR (SYSTEMSICHT)  ·  VARIANTE B — ein Diagramm</div>
+  <div class="title">Ein Bild, drei Wege: heutiger Prozess + zwei Andockpunkte des KI-Bots</div>
+  <div class="subt">Die graue Linie ist der heutige Prozess — die neuen Bots werden in der Bots-Lane eingezeichnet (Ⓐ früh / Ⓑ spät)</div>
+
+  <div class="legend">
+    <div class="it"><span class="ln h"></span><b>Heute</b> — Prozess ohne KI-Bot</div>
+    <div class="it"><span class="ln a"></span><b>Ⓐ Option 1 · Präferenz</b> — KI-Bot vor KWAD (greift ins Routing)</div>
+    <div class="it"><span class="ln b"></span><b>Ⓑ Option 2 · Fallback</b> — KI-Bot am Postkorb (Routing wie heute)</div>
+  </div>
+
+  <div class="stage">
+    <div class="diag">
+      <div class="labels">
+        <div class="ll"><span class="c out"></span><span class="t">Outlook<span class="s">5 GP + Routing</span></span></div>
+        <div class="ll"><span class="c kwad"></span><span class="t">Eingangsmanagement<span class="s">KWAD@ergo.de</span></span></div>
+        <div class="ll pk"><span class="c pk"></span><span class="t">Postkorb<span class="s">Einstellen · Abarbeiten</span></span></div>
+        <div class="ll botlane"><span class="c bot"></span><span class="t">Bots<span class="s">KI-Bot · 72H · Themenbot</span></span></div>
+      </div>
+      <div class="track">
+        <div class="rbg" style="grid-row:1"></div><div class="rbg" style="grid-row:2"></div>
+        <div class="rbg pkb" style="grid-row:3"></div><div class="rbg botb" style="grid-row:4"></div>
+
+        <svg viewBox="0 0 800 80" preserveAspectRatio="none">
+          <defs>
+            <marker id="mh" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#94A3B8"/></marker>
+            <marker id="ma" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#00838F"/></marker>
+            <marker id="mb" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#F59E0B"/></marker>
+          </defs>
+          <!-- HEUTE backbone (grau) -->
+          <g stroke="#94A3B8" stroke-width="2" fill="none" vector-effect="non-scaling-stroke" marker-end="url(#mh)">
+            <line x1="92" y1="10" x2="108" y2="10"/>
+            <line x1="150" y1="17" x2="308" y2="30"/>
+            <line x1="350" y1="37" x2="408" y2="50"/>
+            <line x1="492" y1="50" x2="608" y2="50"/>
+            <line x1="650" y1="57" x2="708" y2="70"/>
+          </g>
+          <!-- OPTION 1 (teal) Detour: Outlook -> Bot(A) -> KWAD -->
+          <g stroke="#00838F" stroke-width="2.6" fill="none" vector-effect="non-scaling-stroke" marker-end="url(#ma)" stroke-dasharray="0">
+            <line x1="150" y1="17" x2="208" y2="70"/>
+            <line x1="250" y1="63" x2="308" y2="30"/>
+          </g>
+          <!-- OPTION 2 (amber) Detour: Einstellen -> Bot(B) -> Abarbeiten -->
+          <g stroke="#F59E0B" stroke-width="2.6" fill="none" vector-effect="non-scaling-stroke" marker-end="url(#mb)">
+            <line x1="450" y1="57" x2="508" y2="70"/>
+            <line x1="550" y1="63" x2="608" y2="50"/>
+          </g>
+        </svg>
+
+        <!-- Backbone boxes -->
+        <div class="step" style="grid-area:1/1">5 Gruppen-<br>postfächer</div>
+        <div class="step" style="grid-area:1/2">Routing</div>
+        <div class="step" style="grid-area:2/4">Sichten ·<br>Indizieren</div>
+        <div class="step" style="grid-area:3/5">Einstellen</div>
+        <div class="step" style="grid-area:3/7">Abarbeiten</div>
+        <div class="step" style="grid-area:4/8">72H- /<br>Themenbot</div>
+        <!-- Neue Bots in der Bots-Lane -->
+        <div class="step A" style="grid-area:4/3">KI-Strukturierungs-Bot<span class="tag">Ⓐ OPTION 1</span></div>
+        <div class="step B" style="grid-area:4/6">KI-Strukturierungs-Bot<span class="tag">Ⓑ OPTION 2</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <span class="tag2">TAKE-AWAY</span>
+    <span><strong class="a">Ⓐ Option 1 (Präferenz):</strong> KI-Bot dockt früh an (Outlook → Bot → KWAD) — greift ins Routing, 240 MV-Fehlrouter/Woche entfallen, KWAD &amp; Postkorb arbeiten strukturiert. &nbsp;<strong class="b">Ⓑ Option 2 (Fallback):</strong> KI-Bot dockt erst im Postkorb an (Einstellen → Bot → Abarbeiten) — Routing bleibt wie heute, Strukturierung wirkt erst dort. Beide nutzen dieselbe Bots-Lane.</span>
+  </div>
+
+  <div class="footer"><div>ERGO | Makler BÜ meets KI — Zwischenbericht Phase 1 · 10.06.2026</div><div>15</div></div>
+</div></body></html>
