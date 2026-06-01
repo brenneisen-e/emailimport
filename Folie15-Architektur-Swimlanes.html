@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Folie 15 — Architektur Swimlanes</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+         background: #E5E7EB; padding: 24px; }
+  .slide {
+    width: 1600px; height: 900px; background: #FFFFFF;
+    margin: 0 auto; padding: 28px 44px;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    border-radius: 4px;
+    font-size: 13px; color: #0F172A;
+  }
+
+  /* === HEADER === */
+  .mini-header { font-size: 11px; letter-spacing: 0.10em;
+                 color: #475569; font-weight: 500; margin-bottom: 6px; }
+  .title { font-size: 22px; font-weight: 700; color: #E30613;
+           line-height: 1.25; max-width: 1180px; }
+  .title-sub { font-size: 14px; font-weight: 600; color: #E30613;
+               margin-top: 3px; max-width: 1180px; }
+  .logo { position: absolute; top: 24px; right: 44px; text-align: right; }
+  .logo .name { font-size: 28px; font-weight: 800; color: #E30613; letter-spacing: -0.02em; }
+  .logo .sub { font-size: 8px; color: #475569; margin-top: 1px; }
+
+  /* === Swimlane Diagram === */
+  .diagram {
+    margin-top: 14px;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .diag-head {
+    padding: 8px 18px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: #475569; font-weight: 600;
+  }
+  .diag-head .lbl { letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
+  .diag-head .name { font-size: 14px; color: #0F172A; font-weight: 700; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+  }
+  .badge.pref     { background: #00838F; color: #FFF; }
+  .badge.fallback { background: #F59E0B; color: #FFF; }
+  .badge.today    { background: #94A3B8; color: #FFF; }
+
+  /* Swimlanes Body */
+  .lanes { display: grid; }
+  .lane {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    border-top: 1px solid #F1F5F9;
+    min-height: 38px;
+  }
+  .lane:first-child { border-top: none; }
+  .lane-label {
+    display: flex; align-items: center;
+    padding: 6px 10px 6px 14px;
+    background: #F8FAFC;
+    border-right: 3px solid #E2E8F0;
+    font-size: 11px; font-weight: 600;
+    color: #334155;
+    line-height: 1.3;
+  }
+  .lane-label .lane-color { width: 6px; height: 26px; border-radius: 3px; margin-right: 9px; flex-shrink: 0; }
+  .lane-track {
+    position: relative;
+    padding: 6px 12px;
+    display: flex; align-items: center; gap: 6px;
+    background: repeating-linear-gradient(90deg,
+      transparent 0, transparent 99px,
+      #F8FAFC 99px, #F8FAFC 100px);
+  }
+
+  /* Steps */
+  .step {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 6px 11px 6px 11px;
+    font-size: 11px;
+    color: #334155;
+    display: inline-flex; align-items: center; gap: 7px;
+    min-height: 28px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    position: relative;
+    line-height: 1.25;
+  }
+  .step.muted { color: #94A3B8; background: #F8FAFC; }
+  .step.new-pref {
+    background: linear-gradient(135deg, #CFFAFE 0%, #E0F2FE 100%);
+    border-color: #00838F; color: #0F172A; font-weight: 600;
+  }
+  .step.new-pref::before { content: 'NEU'; position: absolute; top: -7px; right: -6px;
+    background: #00838F; color: #FFF; font-size: 8px; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px; letter-spacing: 0.05em; }
+  .step.new-fb {
+    background: linear-gradient(135deg, #FEF3C7 0%, #FFEDD5 100%);
+    border-color: #F59E0B; color: #0F172A; font-weight: 600;
+  }
+  .step.new-fb::before { content: 'NEU'; position: absolute; top: -7px; right: -6px;
+    background: #F59E0B; color: #FFF; font-size: 8px; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px; letter-spacing: 0.05em; }
+  .step .icon { width: 14px; height: 14px; flex-shrink: 0; color: #94A3B8; }
+  .step.new-pref .icon { color: #00838F; }
+  .step.new-fb .icon { color: #B45309; }
+
+  .arrow {
+    color: #CBD5E1;
+    flex-shrink: 0;
+  }
+  .arrow svg { width: 18px; height: 12px; display: block; }
+
+  /* Lane-Color-Coding */
+  .lane-color.eingang { background: #475569; }
+  .lane-color.ki      { background: #00838F; }
+  .lane-color.ki-fb   { background: #F59E0B; }
+  .lane-color.sachb   { background: #0EA5E9; }
+  .lane-color.bots    { background: #DC2626; }
+
+  /* Hervorgehobene KI-Lane */
+  .lane.ki-lane.pref .lane-label { background: #ECFEFF; border-right-color: #00838F; }
+  .lane.ki-lane.fb   .lane-label { background: #FEF3C7; border-right-color: #F59E0B; }
+  .lane.ki-lane.pref .lane-track { background: repeating-linear-gradient(90deg,
+      #F0FDFF 0, #F0FDFF 99px, #DBF5F8 99px, #DBF5F8 100px); }
+  .lane.ki-lane.fb   .lane-track { background: repeating-linear-gradient(90deg,
+      #FFFBEB 0, #FFFBEB 99px, #FEF3C7 99px, #FEF3C7 100px); }
+
+  /* Heute kompakt */
+  .today .lane { min-height: 32px; }
+  .today .lane-label { font-size: 10px; }
+  .today .step { font-size: 10px; padding: 4px 8px; min-height: 24px; }
+
+  /* Eval row right in diag-head */
+  .eval-inline { display: flex; gap: 16px; }
+  .eval-inline .e {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #475569; font-weight: 500;
+  }
+  .eval-inline .e .ico { width: 14px; height: 14px; }
+  .eval-inline .e .ico.ok { color: #16A34A; }
+  .eval-inline .e .ico.no { color: #DC2626; }
+
+  /* Take-away */
+  .takeaway {
+    margin-top: 14px;
+    background: linear-gradient(90deg, #E30613 0%, #B91C1C 100%);
+    color: #FFFFFF;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 12px; font-weight: 500;
+    line-height: 1.45;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .takeaway .ta-tag {
+    background: rgba(255,255,255,0.20);
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    flex-shrink: 0;
+  }
+
+  .footer {
+    position: absolute; bottom: 14px; left: 44px; right: 44px;
+    display: flex; justify-content: space-between;
+    border-top: 1px solid #E2E8F0; padding-top: 5px;
+    font-size: 9px; color: #94A3B8;
+  }
+
+  /* Legende */
+  .legend {
+    display: flex; align-items: center; gap: 16px;
+    margin-top: 6px;
+    font-size: 10px; color: #64748B;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="slide">
+  <div class="logo">
+    <div class="name">ERGO</div>
+    <div class="sub">A Munich Re company</div>
+  </div>
+
+  <div class="mini-header">STRUKTURIERUNG  ·  ARCHITEKTUR</div>
+  <div class="title">Strukturierungs-Bot als eigene Lane vor dem Postkorb (Option 1) — Fallback: Bot-Lane innerhalb der Sachbearbeitung (Option 2)</div>
+  <div class="title-sub">Gleiche Bot-Funktionalität, unterschiedlicher Andockpunkt — Option 1 greift zusätzlich ins Routing ein</div>
+
+  <!-- AKTUELLER PROZESS -->
+  <div class="diagram today">
+    <div class="diag-head">
+      <div><span class="lbl">Aktueller Prozess heute</span>  <span class="badge today">REFERENZ</span></div>
+      <div class="eval-inline">
+        <span class="e">Keine KI im Eingang  ·  manuelle Indizierung  ·  unsortierter Postkorb</span>
+      </div>
+    </div>
+    <div class="lanes">
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color eingang"></div>Eingangsmanagement</div>
+        <div class="lane-track">
+          <div class="step muted">📧 Eingang Outlook</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step muted">Routing  ·  KWAD@ERGO</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step muted">Indizierung manuell (Schlagwort)</div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color sachb"></div>Sachbearbeitung</div>
+        <div class="lane-track">
+          <div style="width: 460px"></div>
+          <div class="step muted">Postkorb (unsortiert)</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step muted">Vorgangs-Bearbeitung</div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color bots"></div>BÜ-Automatisierung</div>
+        <div class="lane-track">
+          <div style="width: 820px"></div>
+          <div class="step muted">BÜ-Bots 72H  (BluePrism)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION 1: PRÄFERENZ -->
+  <div class="diagram">
+    <div class="diag-head" style="background: #ECFEFF;">
+      <div><span class="lbl" style="color: #00838F;">Option 1</span>  <span class="name">Bot vor dem Postkorb · neues Gruppenpostfach</span>  <span class="badge pref">✓ PRÄFERENZ</span></div>
+      <div class="eval-inline">
+        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Routing-Hebel: 240 MV-Fehl-Routings/Wo weg</span>
+        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Adressiert alle 4 Herausforderungen</span>
+        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Prüfbot-fähig</span>
+      </div>
+    </div>
+    <div class="lanes">
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color eingang"></div>Eingangsmanagement</div>
+        <div class="lane-track">
+          <div class="step">📧 Eingang Outlook</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step">Routing  ·  KWAD@ERGO</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step new-pref">📧 Neues Gruppenpostfach  ·  @KI</div>
+        </div>
+      </div>
+      <div class="lane ki-lane pref">
+        <div class="lane-label"><div class="lane-color ki"></div>KI-Strukturierungs-Bot  <span style="color:#00838F; font-size:9px; margin-left:4px;">(NEU)</span></div>
+        <div class="lane-track">
+          <div style="width: 500px"></div>
+          <div class="step new-pref">Strukturierung  ·  KI-Beiblatt</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step new-pref">Cluster-Match  ·  Vorqualifizierung</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step new-pref">Indizierung + KI-Notiz</div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color sachb"></div>Sachbearbeitung</div>
+        <div class="lane-track">
+          <div style="width: 900px"></div>
+          <div class="step new-pref">Postkorb + Cluster-Sicht</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step">Vorgangs-Bearbeitung</div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color bots"></div>BÜ-Automatisierung</div>
+        <div class="lane-track">
+          <div style="width: 1080px"></div>
+          <div class="step">BÜ-Bots 72H</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step new-pref">Prüfbot  ·  Dunkelverarbeitung</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION 2: FALLBACK -->
+  <div class="diagram">
+    <div class="diag-head" style="background: #FFFBEB;">
+      <div><span class="lbl" style="color: #B45309;">Option 2</span>  <span class="name">Bot im Postkorb  ·  Fallback</span>  <span class="badge fallback">⚠ FALLBACK</span></div>
+      <div class="eval-inline">
+        <span class="e"><svg class="ico no" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg> Routing bleibt wie heute  ·  Fehl-Routings bleiben</span>
+        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Cluster-Sicht trotzdem verfügbar</span>
+        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> 3 von 4 Herausforderungen adressiert</span>
+      </div>
+    </div>
+    <div class="lanes">
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color eingang"></div>Eingangsmanagement</div>
+        <div class="lane-track">
+          <div class="step">📧 Eingang Outlook</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step">Routing  ·  KWAD@ERGO (wie heute)</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step">Indizierung (wie heute)</div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color sachb"></div>Sachbearbeitung</div>
+        <div class="lane-track">
+          <div style="width: 580px"></div>
+          <div class="step">Postkorb (unsortiert)</div>
+        </div>
+      </div>
+      <div class="lane ki-lane fb">
+        <div class="lane-label"><div class="lane-color ki-fb"></div>KI-Strukturierungs-Bot  <span style="color:#B45309; font-size:9px; margin-left:4px;">(NEU)</span></div>
+        <div class="lane-track">
+          <div style="width: 740px"></div>
+          <div class="step new-fb">Bot dockt am Postkorb an</div>
+          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+          <div class="step new-fb">KI-Beiblatt + Cluster-Match</div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color sachb"></div>Sachbearbeitung (Forts.)</div>
+        <div class="lane-track">
+          <div style="width: 1080px"></div>
+          <div class="step new-fb">Bearbeitung mit KI-Beiblatt</div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lane-label"><div class="lane-color bots"></div>BÜ-Automatisierung</div>
+        <div class="lane-track">
+          <div style="width: 1320px"></div>
+          <div class="step">BÜ-Bots 72H</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <span class="ta-tag">TAKE-AWAY</span>
+    <span><strong>Option 1 ist die erste Wahl:</strong> die KI-Bot-Lane sitzt vor der Sachbearbeitung — der Bot greift damit zusätzlich ins Routing ein und eliminiert 240 MV-Fehl-Routings pro Woche.  <strong>Option 2 bleibt umsetzbar</strong>, falls ein neues Gruppenpostfach organisatorisch nicht durchsetzbar ist — dann wirkt die KI-Bot-Lane innerhalb der Sachbearbeitung.</span>
+  </div>
+
+  <div class="footer">
+    <div>ERGO  |  Makler BÜ meets KI — Zwischenbericht Phase 1 · 10.06.2026</div>
+    <div>15</div>
+  </div>
+</div>
+
+</body>
+</html>
