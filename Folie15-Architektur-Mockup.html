@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Folie 15 — Architektur Vorschlag</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+         background: #E5E7EB; padding: 24px; min-height: 100vh; }
+  .slide {
+    width: 1600px;
+    height: 900px;
+    background: #FFFFFF;
+    margin: 0 auto;
+    padding: 32px 48px;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    border-radius: 4px;
+    font-size: 14px;
+    color: #0F172A;
+  }
+
+  /* === HEADER === */
+  .mini-header { font-size: 12px; letter-spacing: 0.08em;
+                 color: #475569; font-weight: 500; margin-bottom: 8px; }
+  .title { font-size: 24px; font-weight: 700; color: #E30613;
+           line-height: 1.25; max-width: 1100px; }
+  .title-sub { font-size: 17px; font-weight: 600; color: #E30613;
+               margin-top: 4px; max-width: 1100px; }
+  .logo { position: absolute; top: 28px; right: 48px; text-align: right; }
+  .logo .name { font-size: 30px; font-weight: 800; color: #E30613; letter-spacing: -0.02em; }
+  .logo .sub { font-size: 9px; color: #475569; margin-top: 2px; }
+
+  /* === HEUTE (Reference Bar) === */
+  .today-section { margin-top: 28px; }
+  .today-label { font-size: 11px; letter-spacing: 0.08em;
+                 color: #94A3B8; font-weight: 600; margin-bottom: 10px;
+                 text-transform: uppercase; }
+  .today-flow { display: flex; align-items: center; gap: 4px; }
+  .today-step {
+    flex: 1;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    padding: 10px 14px;
+    border-radius: 6px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: #475569;
+  }
+  .today-step svg { flex-shrink: 0; width: 16px; height: 16px; color: #94A3B8; }
+  .today-arrow svg { width: 20px; height: 14px; color: #CBD5E1; }
+
+  /* === COMPARISON SECTION === */
+  .question {
+    text-align: center;
+    margin: 20px 0 14px;
+    font-size: 13px;
+    color: #475569;
+    font-weight: 500;
+  }
+  .question .arrow-down { display: block; margin: 0 auto 6px; color: #94A3B8; }
+  .question strong { color: #0F172A; font-weight: 600; }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  .opt {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid;
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+  }
+  .opt-pref { border-color: #00838F; }
+  .opt-fallback { border-color: #F59E0B; }
+
+  .opt-head {
+    padding: 14px 22px;
+    color: #FFFFFF;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .opt-pref .opt-head { background: #00838F; }
+  .opt-fallback .opt-head { background: #F59E0B; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.18);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .opt-title { font-size: 16px; font-weight: 700; }
+  .opt-subtitle { font-size: 12px; opacity: 0.9; font-weight: 400; margin-top: 2px; }
+
+  .opt-body { padding: 18px 22px; flex: 1; display: flex; flex-direction: column; }
+
+  /* === Prozess-Flow innerhalb der Option === */
+  .flow { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+  .step {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #334155;
+    position: relative;
+  }
+  .step.is-new {
+    background: linear-gradient(90deg, #ECFEFF 0%, #F8FAFC 100%);
+    border-color: #00838F;
+    color: #0F172A;
+    font-weight: 600;
+  }
+  .opt-fallback .step.is-new {
+    background: linear-gradient(90deg, #FEF3C7 0%, #F8FAFC 100%);
+    border-color: #F59E0B;
+  }
+  .step .icon { width: 18px; height: 18px; flex-shrink: 0; color: #64748B; }
+  .step.is-new .icon { color: #00838F; }
+  .opt-fallback .step.is-new .icon { color: #B45309; }
+  .step .label { flex: 1; }
+  .step .new-tag {
+    font-size: 9px; font-weight: 700; padding: 2px 7px;
+    border-radius: 4px; background: #00838F; color: #FFFFFF;
+    letter-spacing: 0.05em;
+  }
+  .opt-fallback .step.is-new .new-tag { background: #F59E0B; }
+  .step-arrow {
+    align-self: center;
+    color: #CBD5E1;
+    line-height: 0;
+  }
+
+  /* === Bewertung === */
+  .eval { margin-top: auto; padding-top: 12px; border-top: 1px solid #E2E8F0; }
+  .eval-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 6px 0;
+    font-size: 12px;
+    color: #334155;
+    line-height: 1.4;
+  }
+  .eval-row .ico { flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; }
+  .eval-row .ico.ok { color: #16A34A; }
+  .eval-row .ico.no { color: #DC2626; }
+  .eval-row strong { color: #0F172A; font-weight: 600; }
+
+  /* === Take-away === */
+  .takeaway {
+    margin-top: 20px;
+    background: linear-gradient(90deg, #E30613 0%, #B91C1C 100%);
+    color: #FFFFFF;
+    padding: 14px 22px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .takeaway .ta-tag {
+    background: rgba(255,255,255,0.20);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+  }
+
+  /* === Footer === */
+  .footer {
+    position: absolute; bottom: 18px; left: 48px; right: 48px;
+    display: flex; justify-content: space-between;
+    border-top: 1px solid #E2E8F0;
+    padding-top: 6px;
+    font-size: 9px;
+    color: #94A3B8;
+  }
+</style>
+</head>
+<body>
+
+<div class="slide">
+  <!-- Logo -->
+  <div class="logo">
+    <div class="name">ERGO</div>
+    <div class="sub">A Munich Re company</div>
+  </div>
+
+  <!-- Header -->
+  <div class="mini-header">STRUKTURIERUNG  ·  ARCHITEKTUR</div>
+  <div class="title">Strukturierungs-Bot vor dem Postkorb über ein neues Gruppenpostfach (Option 1) —</div>
+  <div class="title-sub">Fallback: Bot im Postkorb (Option 2), falls neues Gruppenpostfach organisatorisch nicht möglich</div>
+
+  <!-- HEUTE -->
+  <div class="today-section">
+    <div class="today-label">Aktueller Prozess heute</div>
+    <div class="today-flow">
+      <div class="today-step">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 8l9 6 9-6M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg>
+        Eingang (Outlook-Postfächer)
+      </div>
+      <div class="today-arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></div>
+      <div class="today-step">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 7h10M7 12h10M7 17h6"/></svg>
+        Routing (KWAD@ERGO)
+      </div>
+      <div class="today-arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></div>
+      <div class="today-step">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5v4h6V5M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+        Indizierung (manuell)
+      </div>
+      <div class="today-arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></div>
+      <div class="today-step">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16v10H4z M4 7l8 6 8-6"/></svg>
+        Postkorb (unsortiert)
+      </div>
+      <div class="today-arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></div>
+      <div class="today-step">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>
+        Sachbearbeitung
+      </div>
+      <div class="today-arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></div>
+      <div class="today-step">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="12" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg>
+        BÜ-Bots (72H)
+      </div>
+    </div>
+  </div>
+
+  <!-- Question divider -->
+  <div class="question">
+    <svg class="arrow-down" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-6-6 6 6 6-6"/></svg>
+    <strong>Wo dockt der Strukturierungs-Bot an?</strong>  ·  Gleicher Bot, zwei Andockpunkte
+  </div>
+
+  <!-- Comparison -->
+  <div class="compare">
+
+    <!-- OPTION 1 -->
+    <div class="opt opt-pref">
+      <div class="opt-head">
+        <div>
+          <div class="opt-title">Option 1  ·  Bot vor dem Postkorb</div>
+          <div class="opt-subtitle">über neues Gruppenpostfach</div>
+        </div>
+        <div class="badge">✓  PRÄFERENZ</div>
+      </div>
+      <div class="opt-body">
+        <div class="flow">
+          <div class="step">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 8l9 6 9-6M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg>
+            <span class="label">Eingang (Outlook)</span>
+          </div>
+          <div class="step is-new">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 8l9 6 9-6M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg>
+            <span class="label">Neues Gruppenpostfach @KI</span>
+            <span class="new-tag">NEU</span>
+          </div>
+          <div class="step is-new">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9.66 19a4 4 0 1 1 .27-7.99A6 6 0 0 1 17 9.16 5 5 0 0 1 17 19H9.66z"/><path d="M11 13l2 2 4-4"/></svg>
+            <span class="label">Strukturierungs-Bot  ·  KI-Beiblatt + Cluster-Match</span>
+            <span class="new-tag">NEU</span>
+          </div>
+          <div class="step is-new">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5v4h6V5"/></svg>
+            <span class="label">Routing + KI-Notiz an KWAD@ERGO</span>
+            <span class="new-tag">VERB.</span>
+          </div>
+          <div class="step is-new">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16v10H4z M4 7l8 6 8-6"/></svg>
+            <span class="label">Postkorb mit Cluster-Sicht</span>
+            <span class="new-tag">VERB.</span>
+          </div>
+          <div class="step">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>
+            <span class="label">Sachbearbeitung</span>
+          </div>
+          <div class="step is-new">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="12" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>
+            <span class="label">BÜ-Bots 72H  +  Prüfbot (Dunkelverarb.)</span>
+            <span class="new-tag">NEU</span>
+          </div>
+        </div>
+        <div class="eval">
+          <div class="eval-row">
+            <svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <div><strong>Routing wird verbessert</strong> — 240 MV-Fehl-Routings/Wo fallen weg</div>
+          </div>
+          <div class="eval-row">
+            <svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <div><strong>Postkorb sauberer</strong> — nur echte BÜ-Anfragen landen drin</div>
+          </div>
+          <div class="eval-row">
+            <svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <div><strong>Adressiert alle 4 Herausforderungen</strong> aus Folie 13 + ermöglicht Prüfbot</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPTION 2 -->
+    <div class="opt opt-fallback">
+      <div class="opt-head">
+        <div>
+          <div class="opt-title">Option 2  ·  Bot im Postkorb</div>
+          <div class="opt-subtitle">falls neues Gruppenpostfach nicht durchsetzbar</div>
+        </div>
+        <div class="badge">⚠  FALLBACK</div>
+      </div>
+      <div class="opt-body">
+        <div class="flow">
+          <div class="step">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 8l9 6 9-6M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg>
+            <span class="label">Eingang (Outlook)</span>
+          </div>
+          <div class="step">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 7h10M7 12h10M7 17h6"/></svg>
+            <span class="label">Routing  ·  KWAD@ERGO (wie heute)</span>
+          </div>
+          <div class="step">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5v4h6V5"/></svg>
+            <span class="label">Indizierung (wie heute)</span>
+          </div>
+          <div class="step">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16v10H4z M4 7l8 6 8-6"/></svg>
+            <span class="label">Postkorb (unsortiert)</span>
+          </div>
+          <div class="step is-new">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9.66 19a4 4 0 1 1 .27-7.99A6 6 0 0 1 17 9.16 5 5 0 0 1 17 19H9.66z"/><path d="M11 13l2 2 4-4"/></svg>
+            <span class="label">Strukturierungs-Bot dockt am Postkorb an</span>
+            <span class="new-tag">NEU</span>
+          </div>
+          <div class="step is-new">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>
+            <span class="label">Sachbearbeitung (mit KI-Beiblatt + Cluster-Sicht)</span>
+            <span class="new-tag">VERB.</span>
+          </div>
+          <div class="step">
+            <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="12" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg>
+            <span class="label">BÜ-Bots 72H  (Prüfbot später nachrüstbar)</span>
+          </div>
+        </div>
+        <div class="eval">
+          <div class="eval-row">
+            <svg class="ico no" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+            <div><strong>Routing bleibt wie heute</strong> — 240 MV-Fehl-Routings/Wo bleiben im Postkorb</div>
+          </div>
+          <div class="eval-row">
+            <svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <div><strong>Cluster-Sicht + Vorqualifizierung</strong> trotzdem verfügbar (am Postkorb)</div>
+          </div>
+          <div class="eval-row">
+            <svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <div><strong>Adressiert 3 von 4 Herausforderungen</strong> — Routing-Hebel fehlt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Take-away -->
+  <div class="takeaway">
+    <span class="ta-tag">TAKE-AWAY</span>
+    <span><strong>Option 1 ist die erste Wahl:</strong> der Bot greift zusätzlich ins Routing ein und eliminiert 240 MV-Fehl-Routings pro Woche. <strong>Option 2 bleibt umsetzbar</strong>, falls ein neues Gruppenpostfach organisatorisch nicht durchsetzbar ist — dann wirkt der Bot nur ab Postkorb.</span>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>ERGO  |  Makler BÜ meets KI – Zwischenbericht Phase 1 · 10.06.2026</div>
+    <div>15</div>
+  </div>
+</div>
+
+</body>
+</html>
