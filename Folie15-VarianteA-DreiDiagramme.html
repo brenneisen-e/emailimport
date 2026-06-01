@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="UTF-8"><title>Folie 15 — Variante A: 3 Diagramme × 4 Lanes</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#E5E7EB;padding:24px}
+  .slide{width:1600px;height:900px;background:#FFF;margin:0 auto;padding:24px 40px;position:relative;
+    box-shadow:0 8px 32px rgba(0,0,0,.12);border-radius:4px;font-size:12px;color:#0F172A;display:flex;flex-direction:column}
+  .mini-h{font-size:11px;letter-spacing:.10em;color:#475569;font-weight:500;margin-bottom:4px}
+  .title{font-size:20px;font-weight:700;color:#E30613;line-height:1.18;max-width:1150px}
+  .subt{font-size:12.5px;font-weight:600;color:#E30613;margin-top:2px;max-width:1150px}
+  .logo{position:absolute;top:20px;right:40px;text-align:right}
+  .logo .name{font-size:25px;font-weight:800;color:#E30613;letter-spacing:-.02em}.logo .sub{font-size:8px;color:#475569;margin-top:1px}
+  .stage{flex:1;display:flex;flex-direction:column;margin-top:9px;gap:9px}
+  .diag{border:1px solid #CBD5E1;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;flex:1}
+  .dh{padding:5px 13px;display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:600;border-bottom:1px solid #E2E8F0}
+  .dh .l{display:flex;align-items:center;gap:9px}.dh .opt{font-size:12.5px;font-weight:800}.dh .nm{font-size:12px;color:#0F172A;font-weight:700}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:16px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#FFF}
+  .badge.pref{background:#00838F}.badge.fb{background:#F59E0B}.badge.tod{background:#94A3B8}
+  .ev{font-size:9.5px;color:#475569;font-weight:500;display:flex;gap:12px;align-items:center}
+  .ev .ico{width:11px;height:11px}.ico.ok{color:#16A34A}.ico.no{color:#DC2626}
+  .bf{flex:1;display:flex}
+  .labels{width:160px;display:flex;flex-direction:column;border-right:3px solid #E2E8F0}
+  .ll{flex:1;display:flex;align-items:center;padding:3px 7px 3px 11px;border-top:1px solid #F1F5F9;font-size:10.5px;font-weight:700;color:#0F172A;line-height:1.12}
+  .ll:first-child{border-top:none}
+  .ll .c{width:5px;height:22px;border-radius:2px;margin-right:8px;flex-shrink:0}
+  .ll .t{display:flex;flex-direction:column}.ll .s{font-size:8px;color:#64748B;font-weight:500}
+  .ll.pk{background:#EFF8FF;border-left:5px solid #0EA5E9;padding-left:6px}
+  .ll.botlane{background:#FFF1F2;border-left:5px solid #DC2626;padding-left:6px}
+  .c.out{background:#0078D4}.c.kwad{background:#4F46E5}.c.pk{background:#0EA5E9}.c.bot{background:#DC2626}
+  .track{flex:1;position:relative;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(4,1fr)}
+  .rbg{grid-column:1/9;border-top:1px solid #F4F6F9}.rbg.pkb{background:#F6FBFF}.rbg.botb{background:#FFF6F6}
+  .track svg{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+  .step{z-index:2;align-self:center;justify-self:stretch;margin:4px 7px;background:#FFF;border:1.4px solid #CBD5E1;border-radius:6px;
+    padding:5px 6px;font-size:9.5px;color:#334155;text-align:center;font-weight:500;line-height:1.15;box-shadow:0 1px 3px rgba(15,23,42,.08);position:relative}
+  .step .tag{position:absolute;top:-7px;right:-4px;font-size:6.5px;font-weight:700;color:#FFF;padding:1px 4px;border-radius:3px}
+  .step.np{background:linear-gradient(135deg,#CFFAFE,#E0F2FE);border-color:#00838F;font-weight:600}.step.np .tag{background:#00838F}
+  .step.nf{background:linear-gradient(135deg,#FEF3C7,#FFEDD5);border-color:#F59E0B;font-weight:600}.step.nf .tag{background:#F59E0B}
+  .step.vb{background:linear-gradient(135deg,#DBEAFE,#EFF6FF);border-color:#2563EB;font-weight:600}.step.vb .tag{background:#2563EB}
+  .step.mut{color:#94A3B8;background:#F8FAFC}
+  .footer{position:absolute;bottom:11px;left:40px;right:40px;display:flex;justify-content:space-between;border-top:1px solid #E2E8F0;padding-top:3px;font-size:8.5px;color:#94A3B8}
+</style></head>
+<body><div class="slide">
+  <div class="logo"><div class="name">ERGO</div><div class="sub">A Munich Re company</div></div>
+  <div class="mini-h">STRUKTURIERUNG · ARCHITEKTUR (SYSTEMSICHT)  ·  VARIANTE A — drei Diagramme</div>
+  <div class="title">Heute · Option 1 · Option 2 im Vergleich — vier Systeme, neue Bots in der Bots-Lane</div>
+  <div class="subt">Option 1 (präferiert): KI-Bot früh, vor KWAD · Option 2 (Fallback): KI-Bot spät, am Postkorb</div>
+  <div class="stage" id="stage"></div>
+  <div class="footer"><div>ERGO | Makler BÜ meets KI — Zwischenbericht Phase 1 · 10.06.2026</div><div>15</div></div>
+</div>
+<script>
+const LANES=[
+ {c:'out', n:'Outlook', s:'5 GP + Routing'},
+ {c:'kwad',n:'Eingangsmanagement', s:'KWAD@ergo.de'},
+ {c:'pk',  n:'Postkorb', s:'Einstellen · Abarbeiten', cls:'pk'},
+ {c:'bot', n:'Bots', s:'KI-Bot · 72H · Themenbot', cls:'botlane'},
+];
+const DIAG=[
+ {who:'Heute', head:'Aktueller Prozess', badge:'tod', badgeTxt:'REFERENZ', col:'#94A3B8',
+  ev:'<span>Bots-Lane fast leer — nur 72H-Bot am Ende · keine Strukturierung</span>',
+  steps:[[1,1,'5 Gruppen-<br>postfächer','mut'],[1,2,'Routing → KWAD','mut'],
+         [2,4,'Sichten ·<br>Indizieren','mut'],[3,5,'Einstellen','mut'],[3,7,'Abarbeiten','mut'],[4,8,'72H-Bot','mut']],
+  flow:[[92,10,108,10],[150,17,308,30],[350,37,408,50],[492,50,608,50],[650,57,708,70]]},
+ {who:'Option 1', head:'KI-Bot früh — vor KWAD (neues Gruppenpostfach)', badge:'pref', badgeTxt:'✓ PRÄFERENZ', col:'#00838F',
+  ev:'<span><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> 240 Fehlrouter/Wo weg · alle Folge-Systeme strukturiert</span>',
+  steps:[[1,1,'5 Gruppen-<br>postfächer',''],[1,2,'Routing →<br>KI-Postfach','vb'],
+         [4,3,'KI-Struktur.-<br>Bot','np'],[2,4,'Indizieren<br>+ Beiblatt','vb'],
+         [3,5,'Einstellen<br>+ Cluster','np'],[3,7,'Abarbeiten<br>prio','np'],[4,8,'72H + Prüf-/<br>Themenbot','np']],
+  flow:[[92,10,108,10],[150,17,208,70],[250,63,308,30],[350,37,408,50],[492,50,608,50],[650,57,708,70]]},
+ {who:'Option 2', head:'KI-Bot spät — am Postkorb (Fallback)', badge:'fb', badgeTxt:'⚠ FALLBACK', col:'#F59E0B',
+  ev:'<span><svg class="ico no" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg> Routing wie heute · Strukturierung erst am Postkorb</span>',
+  steps:[[1,1,'5 Gruppen-<br>postfächer',''],[1,2,'Routing →<br>KWAD',''],
+         [2,4,'Sichten ·<br>Indizieren',''],[3,5,'Einstellen',''],
+         [4,6,'KI-Struktur.-<br>Bot','nf'],[3,7,'Abarbeiten<br>+ Beiblatt','nf'],[4,8,'72H-Bot','']],
+  flow:[[92,10,108,10],[150,17,308,30],[350,37,408,50],[450,57,508,70],[550,63,608,50],[650,57,708,70]]},
+];
+function lanesHTML(){return LANES.map(l=>`<div class="ll ${l.cls||''}"><span class="c ${l.c}"></span><span class="t">${l.n}<span class="s">${l.s}</span></span></div>`).join('')}
+function trackHTML(d,i){
+  let rbg='';for(let r=1;r<=4;r++)rbg+=`<div class="rbg ${r==3?'pkb':r==4?'botb':''}" style="grid-row:${r}"></div>`;
+  let mk='mk'+i;
+  let svg=`<svg viewBox="0 0 800 80" preserveAspectRatio="none"><defs><marker id="${mk}" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="${d.col}"/></marker></defs><g stroke="${d.col}" stroke-width="2.1" fill="none" vector-effect="non-scaling-stroke" marker-end="url(#${mk})">`;
+  d.flow.forEach(f=>svg+=`<line x1="${f[0]}" y1="${f[1]}" x2="${f[2]}" y2="${f[3]}"/>`);svg+='</g></svg>';
+  let steps=d.steps.map(s=>`<div class="step ${s[3]}" style="grid-area:${s[0]}/${s[1]}">${s[2]}${(s[3]&&s[3]!='mut')?'<span class="tag">'+(s[3]=='vb'?'VERB.':'NEU')+'</span>':''}</div>`).join('');
+  return `<div class="track">${rbg}${svg}${steps}</div>`;
+}
+document.getElementById('stage').innerHTML=DIAG.map((d,i)=>`
+  <div class="diag"><div class="dh" style="background:${d.badge=='pref'?'#ECFEFF':d.badge=='fb'?'#FFFBEB':'#F8FAFC'}">
+    <div class="l"><span class="opt" style="color:${d.col}">${d.who}</span><span class="nm">${d.head}</span><span class="badge ${d.badge}">${d.badgeTxt}</span></div>
+    <div class="ev">${d.ev}</div></div>
+    <div class="bf"><div class="labels">${lanesHTML()}</div>${trackHTML(d,i)}</div></div>`).join('');
+</script></body></html>
