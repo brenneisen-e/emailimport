@@ -2,14 +2,14 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Folie 15 — Architektur Swimlanes (fachlich korrigiert)</title>
+<title>Folie 15 — Architektur Swimlanes (Postkorb als System)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
          background: #E5E7EB; padding: 24px; }
   .slide {
     width: 1600px; height: 900px; background: #FFFFFF;
-    margin: 0 auto; padding: 26px 40px;
+    margin: 0 auto; padding: 24px 40px;
     position: relative;
     box-shadow: 0 8px 32px rgba(0,0,0,0.12);
     border-radius: 4px;
@@ -18,10 +18,10 @@
 
   /* === HEADER === */
   .mini-header { font-size: 11px; letter-spacing: 0.10em;
-                 color: #475569; font-weight: 500; margin-bottom: 5px; }
-  .title { font-size: 21px; font-weight: 700; color: #E30613;
+                 color: #475569; font-weight: 500; margin-bottom: 4px; }
+  .title { font-size: 20px; font-weight: 700; color: #E30613;
            line-height: 1.22; max-width: 1180px; }
-  .title-sub { font-size: 13px; font-weight: 600; color: #E30613;
+  .title-sub { font-size: 12.5px; font-weight: 600; color: #E30613;
                margin-top: 3px; max-width: 1180px; }
   .logo { position: absolute; top: 22px; right: 40px; text-align: right; }
   .logo .name { font-size: 26px; font-weight: 800; color: #E30613; letter-spacing: -0.02em; }
@@ -29,24 +29,24 @@
 
   /* === Diagramm === */
   .diagram {
-    margin-top: 10px;
+    margin-top: 8px;
     border: 1px solid #E2E8F0;
     border-radius: 7px;
     overflow: hidden;
   }
   .diag-head {
-    padding: 7px 16px;
+    padding: 6px 14px;
     background: #F8FAFC;
     border-bottom: 1px solid #E2E8F0;
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 11px; color: #475569; font-weight: 600;
+    font-size: 10.5px; color: #475569; font-weight: 600;
   }
   .diag-head .lbl { letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
-  .diag-head .name { font-size: 13px; color: #0F172A; font-weight: 700; }
+  .diag-head .name { font-size: 12.5px; color: #0F172A; font-weight: 700; }
   .badge {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 20px;
-    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+    padding: 2px 7px; border-radius: 18px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
   }
   .badge.pref     { background: #00838F; color: #FFF; }
   .badge.fallback { background: #F59E0B; color: #FFF; }
@@ -56,31 +56,61 @@
   .lanes { display: grid; }
   .lane {
     display: grid;
-    grid-template-columns: 175px 1fr;
+    grid-template-columns: 170px 1fr;
     border-top: 1px solid #F1F5F9;
-    min-height: 40px;
+    min-height: 34px;
   }
   .lane:first-child { border-top: none; }
   .lane-label {
     display: flex; align-items: center;
-    padding: 5px 10px 5px 12px;
+    padding: 4px 10px 4px 12px;
     background: #F8FAFC;
     border-right: 3px solid #E2E8F0;
-    font-size: 11px; font-weight: 600;
+    font-size: 10.5px; font-weight: 600;
     color: #334155;
-    line-height: 1.25;
+    line-height: 1.22;
   }
-  .lane-label .lane-color { width: 5px; height: 26px; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
+  .lane-label .lane-color { width: 4px; height: 22px; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
   .lane-label .ll-text { display: flex; flex-direction: column; }
-  .lane-label .ll-sub { font-size: 9px; color: #64748B; font-weight: 500; margin-top: 1px; }
+  .lane-label .ll-sub { font-size: 8.5px; color: #64748B; font-weight: 500; margin-top: 1px; }
   .lane-track {
     position: relative;
-    padding: 6px 12px;
+    padding: 5px 10px;
     display: flex; align-items: center; gap: 4px;
     background: repeating-linear-gradient(90deg,
       transparent 0, transparent 119px,
       #F8FAFC 119px, #F8FAFC 120px);
-    min-height: 40px;
+    min-height: 34px;
+  }
+
+  /* === Postkorb-System (Gruppen-Container) === */
+  .pk-system {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    border-top: 2px solid #94A3B8;
+    background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%);
+  }
+  .pk-spine {
+    background: #475569;
+    color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-align: center;
+    padding: 4px 0;
+  }
+  .pk-spine .pk-icon {
+    margin-bottom: 6px; transform: rotate(180deg);
+  }
+  .pk-lanes { display: grid; }
+  .pk-lanes .lane {
+    grid-template-columns: 146px 1fr;
+  }
+  .pk-lanes .lane:first-child { border-top: 1px solid #CBD5E1; }
+  .pk-lanes .lane-label {
+    background: #F1F5F9;
+    border-right: 2px solid #CBD5E1;
   }
 
   /* Steps */
@@ -88,11 +118,11 @@
     background: #FFFFFF;
     border: 1px solid #CBD5E1;
     border-radius: 5px;
-    padding: 5px 9px;
+    padding: 4px 9px;
     font-size: 10.5px;
     color: #334155;
     display: inline-flex; align-items: center; gap: 6px;
-    min-height: 26px;
+    min-height: 24px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     position: relative;
     line-height: 1.25;
@@ -121,26 +151,18 @@
     background: #2563EB; color: #FFF; font-size: 7px; font-weight: 700;
     padding: 1px 4px; border-radius: 3px; letter-spacing: 0.05em; }
 
-  .arrow {
-    color: #CBD5E1;
-    flex-shrink: 0;
-  }
+  .arrow { color: #CBD5E1; flex-shrink: 0; }
   .arrow svg { width: 14px; height: 10px; display: block; }
 
-  /* Empty-Lane Notiz */
-  .empty-note {
-    color: #94A3B8;
-    font-style: italic;
-    font-size: 11px;
-    padding-left: 6px;
-  }
+  .empty-note { color: #94A3B8; font-style: italic; font-size: 10.5px; padding-left: 6px; }
 
   /* Lane-Color */
   .lane-color.mail    { background: #64748B; }
   .lane-color.ki      { background: #00838F; }
   .lane-color.ki-fb   { background: #F59E0B; }
   .lane-color.kwad    { background: #6366F1; }
-  .lane-color.sachb   { background: #0EA5E9; }
+  .lane-color.einst   { background: #6366F1; }
+  .lane-color.bear    { background: #0EA5E9; }
   .lane-color.bots    { background: #DC2626; }
 
   /* KI-Lane Hervorhebung */
@@ -155,9 +177,11 @@
       #FAFAFA 0, #FAFAFA 8px, #F1F5F9 8px, #F1F5F9 9px); }
 
   /* Today kompakt */
-  .today .lane { min-height: 32px; }
+  .today .lane { min-height: 30px; }
   .today .step { font-size: 10px; padding: 3px 8px; min-height: 22px; }
-  .today .lane-track { min-height: 32px; padding: 4px 12px; }
+  .today .lane-track { min-height: 30px; padding: 4px 10px; }
+  .today .pk-lanes .lane { min-height: 28px; }
+  .today .pk-lanes .lane-track { min-height: 28px; }
 
   /* Eval inline header */
   .eval-inline { display: flex; gap: 12px; }
@@ -171,12 +195,12 @@
 
   /* Take-away */
   .takeaway {
-    margin-top: 12px;
+    margin-top: 10px;
     background: linear-gradient(90deg, #E30613 0%, #B91C1C 100%);
     color: #FFFFFF;
-    padding: 10px 16px;
+    padding: 9px 16px;
     border-radius: 7px;
-    font-size: 11.5px; font-weight: 500;
+    font-size: 11px; font-weight: 500;
     line-height: 1.42;
     display: flex; align-items: center; gap: 12px;
   }
@@ -212,7 +236,7 @@
     <div class="diag-head">
       <div><span class="lbl">Aktueller Prozess heute</span>  <span class="badge today">REFERENZ</span></div>
       <div class="eval-inline">
-        <span class="e">KI-Lane heute leer — KWAD indiziert manuell, Postkörbe unsortiert</span>
+        <span class="e">KI-Lane heute leer — KWAD indiziert manuell, Postkorb-System ohne KI-Unterstützung</span>
       </div>
     </div>
     <div class="lanes">
@@ -232,7 +256,7 @@
       <div class="lane ki-empty">
         <div class="lane-label">
           <div class="lane-color ki" style="opacity:0.3"></div>
-          <div class="ll-text"><span style="color:#94A3B8">KI-Strukturierungs-Bot</span><span class="ll-sub">— heute nicht vorhanden —</span></div>
+          <div class="ll-text"><span style="color:#94A3B8">KI-Strukturierungs-Bot</span><span class="ll-sub">heute nicht vorhanden</span></div>
         </div>
         <div class="lane-track"><div class="empty-note">— heute nicht vorhanden —</div></div>
       </div>
@@ -242,34 +266,52 @@
           <div class="ll-text"><span>Eingangsmanagement</span><span class="ll-sub">KWAD@ergo.de</span></div>
         </div>
         <div class="lane-track">
-          <div style="width: 800px"></div>
+          <div style="width: 540px"></div>
           <div class="step muted">Sichten</div>
           <div class="step muted">Indizieren (manuell)</div>
           <div class="step muted">Archivieren</div>
-          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
-          <div class="step muted">In Postkorb einstellen</div>
         </div>
       </div>
-      <div class="lane">
-        <div class="lane-label">
-          <div class="lane-color sachb"></div>
-          <div class="ll-text"><span>Sachbearbeitung</span><span class="ll-sub">Postkorb-Bearbeitung</span></div>
-        </div>
-        <div class="lane-track">
-          <div style="width: 1100px"></div>
-          <div class="step muted">Postkorb (unsortiert)</div>
-          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
-          <div class="step muted">Bearbeitung</div>
-        </div>
+    </div>
+
+    <!-- POSTKORB-SYSTEM heute -->
+    <div class="pk-system">
+      <div class="pk-spine">
+        <svg class="pk-icon" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16v10H4z M4 7l8 6 8-6"/></svg>
+        POSTKORB-SYSTEM
       </div>
-      <div class="lane">
-        <div class="lane-label">
-          <div class="lane-color bots"></div>
-          <div class="ll-text"><span>BÜ-Automatisierung</span><span class="ll-sub">BluePrism</span></div>
+      <div class="pk-lanes">
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color einst"></div>
+            <div class="ll-text"><span>Einstellen</span><span class="ll-sub">durch KWAD</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 870px"></div>
+            <div class="step muted">Vorgang einstellen</div>
+          </div>
         </div>
-        <div class="lane-track">
-          <div style="width: 1280px"></div>
-          <div class="step muted">BÜ-Bots 72H</div>
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color bear"></div>
+            <div class="ll-text"><span>Bearbeitung</span><span class="ll-sub">Sachbearbeiter</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 1040px"></div>
+            <div class="step muted">Vorgang holen</div>
+            <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+            <div class="step muted">Bearbeitung</div>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color bots"></div>
+            <div class="ll-text"><span>Bot</span><span class="ll-sub">BluePrism 72H</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 1240px"></div>
+            <div class="step muted">BÜ-Bots 72H</div>
+          </div>
         </div>
       </div>
     </div>
@@ -305,7 +347,7 @@
           <div class="ll-text"><span style="color:#00838F">KI-Strukturierungs-Bot</span><span class="ll-sub">vor Eingangsmanagement</span></div>
         </div>
         <div class="lane-track">
-          <div style="width: 580px"></div>
+          <div style="width: 540px"></div>
           <div class="step new-pref">Mail + Anhänge lesen</div>
           <div class="step new-pref">Strukturierung · 50 Felder</div>
           <div class="step new-pref">Cluster-Match</div>
@@ -319,33 +361,51 @@
           <div class="ll-text"><span>Eingangsmanagement</span><span class="ll-sub">KWAD@ergo.de</span></div>
         </div>
         <div class="lane-track">
-          <div style="width: 1080px"></div>
+          <div style="width: 1010px"></div>
           <div class="step verb">Empfang + verbesserte Indizierung</div>
-          <div class="step verb">Archivierung mit KI-Beiblatt</div>
-          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
-          <div class="step verb">In Postkorb einstellen</div>
+          <div class="step verb">Archivierung mit Beiblatt</div>
         </div>
       </div>
-      <div class="lane">
-        <div class="lane-label">
-          <div class="lane-color sachb"></div>
-          <div class="ll-text"><span>Sachbearbeitung</span><span class="ll-sub">Postkorb-Bearbeitung</span></div>
-        </div>
-        <div class="lane-track">
-          <div style="width: 1280px"></div>
-          <div class="step new-pref">Postkorb + Cluster-Sicht</div>
-        </div>
+    </div>
+
+    <!-- POSTKORB-SYSTEM Option 1 -->
+    <div class="pk-system">
+      <div class="pk-spine">
+        <svg class="pk-icon" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16v10H4z M4 7l8 6 8-6"/></svg>
+        POSTKORB-SYSTEM
       </div>
-      <div class="lane">
-        <div class="lane-label">
-          <div class="lane-color bots"></div>
-          <div class="ll-text"><span>BÜ-Automatisierung</span><span class="ll-sub">BluePrism + Prüfbot</span></div>
+      <div class="pk-lanes">
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color einst"></div>
+            <div class="ll-text"><span>Einstellen</span><span class="ll-sub">durch KWAD</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 1255px"></div>
+            <div class="step verb">Vorgang + KI-Beiblatt einstellen</div>
+          </div>
         </div>
-        <div class="lane-track">
-          <div style="width: 1280px"></div>
-          <div class="step">BÜ-Bots 72H</div>
-          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
-          <div class="step new-pref">Prüfbot</div>
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color bear"></div>
+            <div class="ll-text"><span>Bearbeitung</span><span class="ll-sub">Sachbearbeiter</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 1255px"></div>
+            <div class="step new-pref">Postkorb mit Cluster-Sicht</div>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color bots"></div>
+            <div class="ll-text"><span>Bot</span><span class="ll-sub">BluePrism + Prüfbot</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 1255px"></div>
+            <div class="step">BÜ-Bots 72H</div>
+            <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
+            <div class="step new-pref">Prüfbot</div>
+          </div>
         </div>
       </div>
     </div>
@@ -357,7 +417,7 @@
       <div><span class="lbl" style="color:#B45309;">Option 2</span>  <span class="name">Bot am Postkorb — Fallback</span>  <span class="badge fallback">⚠ FALLBACK</span></div>
       <div class="eval-inline">
         <span class="e"><svg class="ico no" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg> Routing bleibt wie heute</span>
-        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Cluster-Sicht + KI-Beiblatt verfügbar</span>
+        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> KI-Beiblatt + Cluster-Sicht verfügbar</span>
         <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> 3 von 4 Herausforderungen adressiert</span>
       </div>
     </div>
@@ -375,50 +435,68 @@
           <div class="step">an KWAD@ergo.de</div>
         </div>
       </div>
-      <div class="lane">
-        <div class="lane-label">
-          <div class="lane-color kwad"></div>
-          <div class="ll-text"><span>Eingangsmanagement</span><span class="ll-sub">KWAD@ergo.de</span></div>
-        </div>
-        <div class="lane-track">
-          <div style="width: 580px"></div>
-          <div class="step">Sichten</div>
-          <div class="step">Indizieren (wie heute)</div>
-          <div class="step">Archivieren</div>
-          <span class="arrow"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14m-4-4 4 4-4 4"/></svg></span>
-          <div class="step">In Postkorb einstellen</div>
-        </div>
-      </div>
       <div class="lane ki-active fb">
         <div class="lane-label">
           <div class="lane-color ki-fb"></div>
           <div class="ll-text"><span style="color:#B45309">KI-Strukturierungs-Bot</span><span class="ll-sub">am Postkorb</span></div>
         </div>
         <div class="lane-track">
-          <div style="width: 1080px"></div>
+          <div style="width: 1010px"></div>
           <div class="step new-fb">Vorgang aus Postkorb lesen</div>
-          <div class="step new-fb">Strukturierung · KI-Beiblatt</div>
-          <div class="step new-fb">Cluster-Match</div>
+          <div class="step new-fb">Strukturierung · 50 Felder</div>
+          <div class="step new-fb">KI-Beiblatt + Cluster-Match</div>
         </div>
       </div>
       <div class="lane">
         <div class="lane-label">
-          <div class="lane-color sachb"></div>
-          <div class="ll-text"><span>Sachbearbeitung</span><span class="ll-sub">Postkorb-Bearbeitung</span></div>
+          <div class="lane-color kwad"></div>
+          <div class="ll-text"><span>Eingangsmanagement</span><span class="ll-sub">KWAD@ergo.de</span></div>
         </div>
         <div class="lane-track">
-          <div style="width: 1280px"></div>
-          <div class="step new-fb">Bearbeitung mit KI-Beiblatt</div>
+          <div style="width: 540px"></div>
+          <div class="step">Sichten</div>
+          <div class="step">Indizieren (wie heute)</div>
+          <div class="step">Archivieren</div>
         </div>
       </div>
-      <div class="lane">
-        <div class="lane-label">
-          <div class="lane-color bots"></div>
-          <div class="ll-text"><span>BÜ-Automatisierung</span><span class="ll-sub">BluePrism</span></div>
+    </div>
+
+    <!-- POSTKORB-SYSTEM Option 2 -->
+    <div class="pk-system">
+      <div class="pk-spine">
+        <svg class="pk-icon" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16v10H4z M4 7l8 6 8-6"/></svg>
+        POSTKORB-SYSTEM
+      </div>
+      <div class="pk-lanes">
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color einst"></div>
+            <div class="ll-text"><span>Einstellen</span><span class="ll-sub">durch KWAD</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 875px"></div>
+            <div class="step">Vorgang einstellen (wie heute)</div>
+          </div>
         </div>
-        <div class="lane-track">
-          <div style="width: 1280px"></div>
-          <div class="step">BÜ-Bots 72H</div>
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color bear"></div>
+            <div class="ll-text"><span>Bearbeitung</span><span class="ll-sub">Sachbearbeiter</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 1255px"></div>
+            <div class="step new-fb">Bearbeitung mit KI-Beiblatt</div>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lane-label">
+            <div class="lane-color bots"></div>
+            <div class="ll-text"><span>Bot</span><span class="ll-sub">BluePrism 72H</span></div>
+          </div>
+          <div class="lane-track">
+            <div style="width: 1255px"></div>
+            <div class="step">BÜ-Bots 72H</div>
+          </div>
         </div>
       </div>
     </div>
@@ -426,7 +504,7 @@
 
   <div class="takeaway">
     <span class="ta-tag">TAKE-AWAY</span>
-    <span><strong>Option 1 ist die erste Wahl:</strong> Mails werden vor KWAD an ein neues KI-Postfach umgeleitet — der Bot strukturiert und qualifiziert vor; KWAD und Sachbearbeitung bekommen bereits strukturierte Vorgänge.  <strong>Option 2 bleibt umsetzbar</strong>, falls ein neues Gruppenpostfach organisatorisch nicht durchsetzbar ist — dann dockt der Bot erst am Postkorb an (Routing bleibt wie heute).</span>
+    <span><strong>Option 1 ist die erste Wahl:</strong> Mails werden vor KWAD an ein neues KI-Postfach umgeleitet — der Bot strukturiert und qualifiziert vor; KWAD stellt bereits strukturierte Vorgänge in den Postkorb ein.  <strong>Option 2 bleibt umsetzbar</strong>, falls ein neues Gruppenpostfach organisatorisch nicht durchsetzbar ist — dann liest der Bot Vorgänge aus dem Postkorb (Routing bleibt wie heute).</span>
   </div>
 
   <div class="footer">
