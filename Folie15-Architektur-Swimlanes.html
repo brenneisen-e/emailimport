@@ -2,298 +2,259 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Folie 15 — Architektur (Swimlane-Grid)</title>
+<title>Folie 15 — Architektur (eine Swimlane-Sicht)</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter','Segoe UI',system-ui,sans-serif; background:#E5E7EB; padding:24px; }
-  .slide {
-    width:1600px; height:900px; background:#FFF; margin:0 auto; padding:22px 40px;
-    position:relative; box-shadow:0 8px 32px rgba(0,0,0,.12); border-radius:4px;
-    font-size:12px; color:#0F172A;
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#E5E7EB;padding:24px}
+  .slide{
+    width:1600px;height:900px;background:#FFF;margin:0 auto;padding:26px 44px;
+    position:relative;box-shadow:0 8px 32px rgba(0,0,0,.12);border-radius:4px;
+    font-size:13px;color:#0F172A;display:flex;flex-direction:column;
   }
 
   /* Header */
-  .mini-header { font-size:11px; letter-spacing:.10em; color:#475569; font-weight:500; margin-bottom:4px; }
-  .title { font-size:20px; font-weight:700; color:#E30613; line-height:1.2; max-width:1180px; }
-  .title-sub { font-size:12.5px; font-weight:600; color:#E30613; margin-top:3px; max-width:1180px; }
-  .logo { position:absolute; top:20px; right:40px; text-align:right; }
-  .logo .name { font-size:26px; font-weight:800; color:#E30613; letter-spacing:-.02em; }
-  .logo .sub { font-size:8px; color:#475569; margin-top:1px; }
+  .mini-h{font-size:11px;letter-spacing:.10em;color:#475569;font-weight:500;margin-bottom:5px}
+  .title{font-size:22px;font-weight:700;color:#E30613;line-height:1.22;max-width:1180px}
+  .subt{font-size:14px;font-weight:600;color:#E30613;margin-top:4px;max-width:1180px}
+  .logo{position:absolute;top:24px;right:44px;text-align:right}
+  .logo .name{font-size:28px;font-weight:800;color:#E30613;letter-spacing:-.02em}
+  .logo .sub{font-size:8px;color:#475569;margin-top:1px}
 
-  /* Grid layout: label-col + 8 phase columns */
-  --labelw: 158px;
-  .gridrow {
+  /* Legende oben rechts unter dem Titel */
+  .legend{display:flex;gap:18px;margin-top:14px;font-size:11px;color:#475569;align-items:center}
+  .legend .item{display:flex;align-items:center;gap:6px}
+  .legend .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:18px;font-size:10px;font-weight:700;letter-spacing:.05em;color:#FFF}
+  .legend .pill.A{background:#00838F}
+  .legend .pill.B{background:#F59E0B}
+
+  /* Wrapper für Diagramm + Take-Away */
+  .body{flex:1;display:flex;flex-direction:column;margin-top:10px}
+
+  /* Swimlane diagram */
+  .diag{
+    flex:1;border:1px solid #CBD5E1;border-radius:8px;
     display:grid;
-    grid-template-columns:158px repeat(8, 1fr);
+    grid-template-rows:auto repeat(5, 1fr);
+    overflow:hidden;
+  }
+  .row{
+    display:grid;
+    grid-template-columns:170px repeat(6, 1fr);
     align-items:stretch;
   }
+  .row + .row{border-top:1px solid #E2E8F0}
 
-  /* Phase axis header (global) */
-  .phase-axis { margin-top:12px; }
-  .phase-axis .gridrow > div {
-    font-size:9.5px; font-weight:700; letter-spacing:.03em; color:#475569;
-    text-transform:uppercase; padding:6px 6px; text-align:center;
-    border-bottom:2px solid #CBD5E1;
+  /* Phase-axis-row (header) */
+  .axis{background:#F8FAFC;border-bottom:2px solid #94A3B8}
+  .axis > div{
+    padding:8px 10px;font-size:10.5px;font-weight:700;letter-spacing:.04em;
+    text-transform:uppercase;color:#0F172A;text-align:center;
+    border-right:1px solid #E2E8F0;
   }
-  .phase-axis .lbl-cell { text-align:left !important; color:#0F172A; }
-  .phase-axis .ph-eng  { background:#F1F5F9; }
-  .phase-axis .ph-ki   { background:#ECFEFF; color:#00838F; }
-  .phase-axis .ph-kwad { background:#EEF0FF; color:#4F46E5; }
-  .phase-axis .ph-pk   { background:#F0F9FF; color:#0369A1; }
+  .axis > div:last-child{border-right:none}
+  .axis > div:first-child{text-align:left;color:#475569}
+  .axis .ph-ki{color:#00838F}
+  .axis .ph-kwad{color:#4F46E5}
+  .axis .ph-pk{color:#0369A1}
 
-  /* Diagram block */
-  .diagram { margin-top:9px; border:1px solid #E2E8F0; border-radius:7px; overflow:hidden; }
-  .diag-head {
-    padding:5px 14px; background:#F8FAFC; border-bottom:1px solid #E2E8F0;
-    display:flex; align-items:center; justify-content:space-between;
-    font-size:10.5px; color:#475569; font-weight:600;
+  /* Lane label cell */
+  .lane-label{
+    background:#F8FAFC;border-right:3px solid #E2E8F0;
+    padding:8px 10px 8px 14px;display:flex;align-items:center;
+    font-size:12px;font-weight:600;color:#334155;line-height:1.25;
   }
-  .diag-head .lbl { letter-spacing:.05em; text-transform:uppercase; font-size:10px; }
-  .diag-head .name { font-size:12.5px; color:#0F172A; font-weight:700; }
-  .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:18px;
-           font-size:9.5px; font-weight:700; letter-spacing:.05em; }
-  .badge.pref{ background:#00838F; color:#FFF; } .badge.fallback{ background:#F59E0B; color:#FFF; }
-  .badge.today{ background:#94A3B8; color:#FFF; }
-  .eval-inline { display:flex; gap:12px; }
-  .eval-inline .e { display:flex; align-items:center; gap:5px; font-size:10px; color:#475569; font-weight:500; }
-  .eval-inline .e .ico { width:12px; height:12px; } .ico.ok{ color:#16A34A; } .ico.no{ color:#DC2626; }
+  .lane-label .lc{width:5px;height:30px;border-radius:3px;margin-right:10px;flex-shrink:0}
+  .lane-label .lt{display:flex;flex-direction:column}
+  .lane-label .lsub{font-size:10px;color:#64748B;font-weight:500;margin-top:1px}
+  .lc.mail{background:#64748B}
+  .lc.ki{background:#00838F}
+  .lc.kwad{background:#4F46E5}
+  .lc.einst{background:#0369A1}
+  .lc.bear{background:#0EA5E9}
+  .lc.bots{background:#DC2626}
 
-  /* Lane rows */
-  .lane { border-top:1px solid #F1F5F9; min-height:34px; }
-  .lane:first-of-type { border-top:none; }
-  .lane-cell {
-    display:flex; align-items:center; padding:4px 8px 4px 12px;
-    border-right:3px solid #E2E8F0; font-size:10px; font-weight:600; color:#334155; line-height:1.2;
-  }
-  .lane-cell .lc { width:4px; height:22px; border-radius:2px; margin-right:8px; flex-shrink:0; }
-  .lane-cell .lt { display:flex; flex-direction:column; }
-  .lane-cell .lsub { font-size:8px; color:#64748B; font-weight:500; margin-top:1px; }
-  .track-cell { padding:5px 5px; display:flex; align-items:center; }
+  /* track cell */
+  .cell{padding:8px 8px;display:flex;align-items:center;justify-content:center;
+        border-right:1px solid #F1F5F9;position:relative}
+  .cell:last-child{border-right:none}
 
-  /* phase-zone tints behind tracks */
-  .z-eng  { background:#FBFCFE; }
-  .z-ki   { background:#F4FEFF; }
-  .z-kwad { background:#FAFAFF; }
-  .z-pk   { background:#FAFDFF; }
+  /* zone tints */
+  .z-eng{background:#FBFCFE}
+  .z-ki{background:#F4FEFF}
+  .z-kwad{background:#FAFAFF}
+  .z-pk{background:#FAFDFF}
+
+  /* Postkorb grouping band */
+  .pk-band .lane-label{background:#EFF6FF;border-left:6px solid #0369A1;padding-left:11px}
 
   /* steps */
-  .step {
-    width:100%; background:#FFF; border:1px solid #CBD5E1; border-radius:5px;
-    padding:4px 7px; font-size:9.5px; color:#334155; min-height:24px;
-    display:flex; align-items:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,.04);
-    position:relative; line-height:1.2; text-align:left;
+  .step{
+    width:100%;background:#FFF;border:1.5px solid #CBD5E1;border-radius:6px;
+    padding:7px 10px;font-size:11px;color:#334155;text-align:center;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);line-height:1.25;font-weight:500;
   }
-  .step.muted{ color:#94A3B8; background:#F8FAFC; }
-  .step.new-pref{ background:linear-gradient(135deg,#CFFAFE,#E0F2FE); border-color:#00838F; color:#0F172A; font-weight:600; }
-  .step.new-pref::before{ content:'NEU'; position:absolute; top:-7px; right:-4px; background:#00838F; color:#FFF;
-    font-size:7px; font-weight:700; padding:1px 4px; border-radius:3px; }
-  .step.new-fb{ background:linear-gradient(135deg,#FEF3C7,#FFEDD5); border-color:#F59E0B; color:#0F172A; font-weight:600; }
-  .step.new-fb::before{ content:'NEU'; position:absolute; top:-7px; right:-4px; background:#F59E0B; color:#FFF;
-    font-size:7px; font-weight:700; padding:1px 4px; border-radius:3px; }
-  .step.verb{ background:linear-gradient(135deg,#DBEAFE,#EFF6FF); border-color:#2563EB; color:#0F172A; font-weight:600; }
-  .step.verb::before{ content:'VERB.'; position:absolute; top:-7px; right:-4px; background:#2563EB; color:#FFF;
-    font-size:7px; font-weight:700; padding:1px 4px; border-radius:3px; }
+  .step.muted{color:#94A3B8;background:#F8FAFC}
 
-  /* lane colors */
-  .lc.mail{ background:#64748B; } .lc.ki{ background:#00838F; } .lc.ki-fb{ background:#F59E0B; }
-  .lc.kwad{ background:#4F46E5; } .lc.einst{ background:#0369A1; } .lc.bear{ background:#0EA5E9; } .lc.bots{ background:#DC2626; }
+  /* Andockpunkt-Marker (A = Option 1 grün/teal, B = Option 2 amber) */
+  .andock{
+    width:100%;background:#FFF;border-radius:7px;padding:6px 8px;
+    box-shadow:0 4px 14px rgba(0,0,0,.10);text-align:center;font-size:10.5px;
+    color:#0F172A;font-weight:600;line-height:1.3;position:relative;
+  }
+  .andock.A{border:2.5px solid #00838F;background:linear-gradient(135deg,#CFFAFE,#E0F2FE)}
+  .andock.B{border:2.5px solid #F59E0B;background:linear-gradient(135deg,#FEF3C7,#FFEDD5)}
+  .andock .marker{
+    position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+    background:#FFF;border-radius:50%;width:24px;height:24px;display:flex;
+    align-items:center;justify-content:center;font-weight:800;font-size:13px;
+    box-shadow:0 2px 6px rgba(0,0,0,.18);
+  }
+  .andock.A .marker{color:#00838F;border:2px solid #00838F}
+  .andock.B .marker{color:#B45309;border:2px solid #F59E0B}
+  .andock .when{font-size:9px;font-weight:700;color:#64748B;letter-spacing:.08em;
+                text-transform:uppercase;margin-bottom:2px;display:block}
+  .andock.A .when{color:#00838F}
+  .andock.B .when{color:#B45309}
 
-  /* KI lane states */
-  .lane.ki-empty .lane-cell{ opacity:.55; }
-  .lane.ki-empty .track-cell .empty{ font-size:10px; font-style:italic; color:#94A3B8; padding-left:4px; }
-  .lane.ki-on-pref .lane-cell{ background:#ECFEFF; border-right-color:#00838F; }
-  .lane.ki-on-fb .lane-cell{ background:#FEF3C7; border-right-color:#F59E0B; }
-
-  /* Postkorb grouping: subtle band + bracket label */
-  .pk-band .lane-cell{ background:#F0F9FF; }
-  .pk-tag {
-    grid-column:1 / 2; background:#0369A1; color:#FFF; font-size:8.5px; font-weight:700;
-    letter-spacing:.08em; text-align:center; padding:2px; text-transform:uppercase;
+  /* Arrow zwischen Lanes (vertikal) — gestrichelte Übergabe */
+  .handover{
+    position:absolute;left:50%;transform:translateX(-50%);
+    color:#94A3B8;width:14px;height:14px;
   }
 
-  /* takeaway */
-  .takeaway { margin-top:10px; background:linear-gradient(90deg,#E30613,#B91C1C); color:#FFF;
-    padding:9px 16px; border-radius:7px; font-size:11px; font-weight:500; line-height:1.4;
-    display:flex; align-items:center; gap:12px; }
-  .takeaway .ta-tag{ background:rgba(255,255,255,.2); padding:3px 8px; border-radius:18px;
-    font-size:9.5px; font-weight:700; letter-spacing:.08em; flex-shrink:0; }
+  /* Take-Away unten */
+  .takeaway{
+    margin-top:14px;background:linear-gradient(90deg,#E30613,#B91C1C);color:#FFF;
+    padding:11px 18px;border-radius:8px;font-size:12px;font-weight:500;line-height:1.45;
+    display:flex;gap:14px;align-items:center;
+  }
+  .takeaway .tag{background:rgba(255,255,255,.20);padding:3px 10px;border-radius:20px;
+                 font-size:10px;font-weight:700;letter-spacing:.08em;flex-shrink:0}
+  .takeaway .a{color:#7FDBE0;font-weight:700}
+  .takeaway .b{color:#FCD34D;font-weight:700}
 
-  .footer { position:absolute; bottom:12px; left:40px; right:40px; display:flex; justify-content:space-between;
-    border-top:1px solid #E2E8F0; padding-top:4px; font-size:9px; color:#94A3B8; }
+  .footer{position:absolute;bottom:14px;left:44px;right:44px;display:flex;
+          justify-content:space-between;border-top:1px solid #E2E8F0;padding-top:5px;
+          font-size:9px;color:#94A3B8}
 </style>
 </head>
 <body>
 <div class="slide">
   <div class="logo"><div class="name">ERGO</div><div class="sub">A Munich Re company</div></div>
-  <div class="mini-header">STRUKTURIERUNG · ARCHITEKTUR</div>
-  <div class="title">Gleicher Strukturierungs-Bot, zwei Andockpunkte: vor dem Eingangsmanagement (Option 1) oder am Postkorb (Option 2)</div>
-  <div class="title-sub">Je früher der Bot greift, desto mehr Hebel — Option 1 wirkt zusätzlich auf das Routing</div>
 
-  <!-- ===== Globale Phasen-Achse ===== -->
-  <div class="phase-axis">
-    <div class="gridrow">
-      <div class="lbl-cell">Lane ↓  /  Phase →</div>
-      <div class="ph-eng">Mail-<br>Eingang</div>
-      <div class="ph-eng">Umleitung</div>
-      <div class="ph-ki">KI vor<br>KWAD</div>
-      <div class="ph-kwad">Eingangs-<br>mgmt. KWAD</div>
-      <div class="ph-pk">Postkorb:<br>Einstellen</div>
-      <div class="ph-ki">KI am<br>Postkorb</div>
-      <div class="ph-pk">Bearbei-<br>tung</div>
-      <div class="ph-pk">Bot 72H</div>
-    </div>
+  <div class="mini-h">STRUKTURIERUNG · ARCHITEKTUR</div>
+  <div class="title">Strukturierungs-Bot — zwei mögliche Andockpunkte im bestehenden BÜ-Prozess</div>
+  <div class="subt">Option 1 (präferiert) wirkt vor KWAD und greift ins Routing — Option 2 (Fallback) dockt am Postkorb an</div>
+
+  <div class="legend">
+    <div class="item"><span class="pill A">A</span> <strong>Option 1 · Präferenz</strong> &nbsp;Bot vor KWAD (neues Gruppenpostfach) — wirkt auf Routing, Indizierung, Cluster-Sicht und Prüfbot</div>
+    <div class="item"><span class="pill B">B</span> <strong>Option 2 · Fallback</strong> &nbsp;Bot am Postkorb — Routing bleibt wie heute, nur Cluster-Sicht und Beiblatt für Bearbeitung</div>
   </div>
 
-  <!-- ============ HEUTE ============ -->
-  <div class="diagram">
-    <div class="diag-head">
-      <div><span class="lbl">Aktueller Prozess heute</span> <span class="badge today">REFERENZ</span></div>
-      <div class="eval-inline"><span class="e">KI-Lane heute leer · KWAD indiziert manuell · Postkorb unsortiert</span></div>
-    </div>
-    <!-- Mail-Eingang -->
-    <div class="lane gridrow">
-      <div class="lane-cell"><span class="lc mail"></span><span class="lt">Mail-Eingang<span class="lsub">5 Gruppenpostfächer</span></span></div>
-      <div class="track-cell z-eng"><div class="step muted">📧 5 GPs</div></div>
-      <div class="track-cell z-eng"><div class="step muted">Outlook → KWAD</div></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <!-- KI-Bot (leer) -->
-    <div class="lane gridrow ki-empty">
-      <div class="lane-cell"><span class="lc ki"></span><span class="lt">KI-Strukturierungs-Bot<span class="lsub">heute nicht vorhanden</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div>
-      <div class="track-cell z-ki"><div class="empty">— nicht vorhanden —</div></div>
-      <div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <!-- KWAD -->
-    <div class="lane gridrow">
-      <div class="lane-cell"><span class="lc kwad"></span><span class="lt">Eingangsmanagement<span class="lsub">KWAD@ergo.de</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div>
-      <div class="track-cell z-kwad"><div class="step muted">Sichten · Indizieren · Archivieren</div></div>
-      <div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <!-- Postkorb: Einstellen -->
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc einst"></span><span class="lt">Postkorb · Einstellen<span class="lsub">durch KWAD</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div>
-      <div class="track-cell z-pk"><div class="step muted">Vorgang einstellen</div></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <!-- Postkorb: Bearbeitung -->
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc bear"></span><span class="lt">Postkorb · Bearbeitung<span class="lsub">Sachbearbeiter</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div>
-      <div class="track-cell z-pk"><div class="step muted">Bearbeitung</div></div>
-      <div class="track-cell z-pk"></div>
-    </div>
-    <!-- Postkorb: Bot -->
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc bots"></span><span class="lt">Postkorb · Bot<span class="lsub">BluePrism</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div>
-      <div class="track-cell z-pk"><div class="step muted">BÜ-Bots 72H</div></div>
-    </div>
-  </div>
+  <div class="body">
+    <div class="diag">
+      <!-- Phasen-Achse -->
+      <div class="row axis">
+        <div>Lane ↓ &nbsp;/&nbsp; Phase →</div>
+        <div>Mail-Eingang</div>
+        <div>Umleitung</div>
+        <div class="ph-ki">KI vor KWAD</div>
+        <div class="ph-kwad">Eingangs-mgmt. KWAD</div>
+        <div class="ph-pk">Postkorb</div>
+        <div class="ph-ki">KI am Postkorb</div>
+      </div>
 
-  <!-- ============ OPTION 1 ============ -->
-  <div class="diagram">
-    <div class="diag-head" style="background:#ECFEFF;">
-      <div><span class="lbl" style="color:#00838F;">Option 1</span> <span class="name">Bot vor KWAD · neues Gruppenpostfach</span> <span class="badge pref">✓ PRÄFERENZ</span></div>
-      <div class="eval-inline">
-        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> 240 MV-Fehl-Routings/Wo weg</span>
-        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> alle 4 Herausforderungen + Prüfbot</span>
+      <!-- Lane 1: Mail-Eingang -->
+      <div class="row">
+        <div class="lane-label">
+          <span class="lc mail"></span>
+          <span class="lt">Mail-Eingang<span class="lsub">5 Gruppenpostfächer</span></span>
+        </div>
+        <div class="cell z-eng"><div class="step">📧 5 Gruppen-<br>postfächer</div></div>
+        <div class="cell z-eng"><div class="step">Outlook-<br>Routine</div></div>
+        <div class="cell z-ki"></div>
+        <div class="cell z-kwad"></div>
+        <div class="cell z-pk"></div>
+        <div class="cell z-ki"></div>
+      </div>
+
+      <!-- Lane 2: KI-Bot (mit zwei Andockpunkten A und B) -->
+      <div class="row">
+        <div class="lane-label">
+          <span class="lc ki"></span>
+          <span class="lt">KI-Strukturierungs-Bot<span class="lsub">A vor KWAD · B am Postkorb</span></span>
+        </div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-ki">
+          <div class="andock A">
+            <div class="marker">A</div>
+            <span class="when">Option 1 — Präferenz</span>
+            Strukturierung · Cluster · Beiblatt<br>(über neues GP @KI vor KWAD)
+          </div>
+        </div>
+        <div class="cell z-kwad"></div>
+        <div class="cell z-pk"></div>
+        <div class="cell z-ki">
+          <div class="andock B">
+            <div class="marker">B</div>
+            <span class="when">Option 2 — Fallback</span>
+            Strukturierung · Cluster · Beiblatt<br>(dockt am Postkorb an)
+          </div>
+        </div>
+      </div>
+
+      <!-- Lane 3: KWAD -->
+      <div class="row">
+        <div class="lane-label">
+          <span class="lc kwad"></span>
+          <span class="lt">Eingangsmanagement<span class="lsub">KWAD@ergo.de</span></span>
+        </div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-ki"></div>
+        <div class="cell z-kwad"><div class="step">Sichten · Indizieren · Archivieren</div></div>
+        <div class="cell z-pk"></div>
+        <div class="cell z-ki"></div>
+      </div>
+
+      <!-- Lane 4: Postkorb · Einstellen -->
+      <div class="row pk-band">
+        <div class="lane-label">
+          <span class="lc einst"></span>
+          <span class="lt">Postkorb · Einstellen<span class="lsub">durch KWAD</span></span>
+        </div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-ki"></div>
+        <div class="cell z-kwad"></div>
+        <div class="cell z-pk"><div class="step">Vorgang in Postkorb einstellen</div></div>
+        <div class="cell z-ki"></div>
+      </div>
+
+      <!-- Lane 5: Postkorb · Bearbeitung + Bots -->
+      <div class="row pk-band">
+        <div class="lane-label">
+          <span class="lc bear"></span>
+          <span class="lt">Postkorb · Bearbeitung &amp; Bot<span class="lsub">Sachbearbeiter · BluePrism 72H</span></span>
+        </div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-eng"></div>
+        <div class="cell z-ki"></div>
+        <div class="cell z-kwad"></div>
+        <div class="cell z-pk"><div class="step">Bearbeitung · BÜ-Bots 72H</div></div>
+        <div class="cell z-ki"></div>
       </div>
     </div>
-    <div class="lane gridrow">
-      <div class="lane-cell"><span class="lc mail"></span><span class="lt">Mail-Eingang<span class="lsub">5 Gruppenpostfächer</span></span></div>
-      <div class="track-cell z-eng"><div class="step">📧 5 GPs</div></div>
-      <div class="track-cell z-eng"><div class="step verb">Outlook → KI-Postfach</div></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow ki-on-pref">
-      <div class="lane-cell"><span class="lc ki"></span><span class="lt" style="color:#00838F">KI-Strukturierungs-Bot<span class="lsub">vor Eingangsmanagement</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div>
-      <div class="track-cell z-ki"><div class="step new-pref">Strukturierung · Cluster · Beiblatt</div></div>
-      <div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow">
-      <div class="lane-cell"><span class="lc kwad"></span><span class="lt">Eingangsmanagement<span class="lsub">KWAD@ergo.de</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div>
-      <div class="track-cell z-kwad"><div class="step verb">Indizierung verbessert (Beiblatt)</div></div>
-      <div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc einst"></span><span class="lt">Postkorb · Einstellen<span class="lsub">durch KWAD</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div>
-      <div class="track-cell z-pk"><div class="step verb">Vorgang + Beiblatt</div></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc bear"></span><span class="lt">Postkorb · Bearbeitung<span class="lsub">Sachbearbeiter</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div>
-      <div class="track-cell z-pk"><div class="step new-pref">mit Cluster-Sicht</div></div>
-      <div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc bots"></span><span class="lt">Postkorb · Bot<span class="lsub">BluePrism + Prüfbot</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div>
-      <div class="track-cell z-pk"><div class="step new-pref">BÜ-Bots 72H + Prüfbot</div></div>
-    </div>
-  </div>
 
-  <!-- ============ OPTION 2 ============ -->
-  <div class="diagram">
-    <div class="diag-head" style="background:#FFFBEB;">
-      <div><span class="lbl" style="color:#B45309;">Option 2</span> <span class="name">Bot am Postkorb · Fallback</span> <span class="badge fallback">⚠ FALLBACK</span></div>
-      <div class="eval-inline">
-        <span class="e"><svg class="ico no" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg> Routing bleibt wie heute</span>
-        <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Cluster-Sicht verfügbar · 3 von 4</span>
-      </div>
+    <div class="takeaway">
+      <span class="tag">TAKE-AWAY</span>
+      <span><strong class="a">A · Präferenz:</strong> Bot wirkt vor KWAD über neues Gruppenpostfach — 240 MV-Fehl-Routings/Woche werden eliminiert, KWAD bekommt strukturierte Mail, Prüfbot wird möglich. &nbsp; <strong class="b">B · Fallback:</strong> Bot dockt am Postkorb an, falls neues Gruppenpostfach organisatorisch nicht durchsetzbar — Routing bleibt wie heute, aber Cluster-Sicht und Beiblatt sind verfügbar.</span>
     </div>
-    <div class="lane gridrow">
-      <div class="lane-cell"><span class="lc mail"></span><span class="lt">Mail-Eingang<span class="lsub">5 Gruppenpostfächer</span></span></div>
-      <div class="track-cell z-eng"><div class="step">📧 5 GPs</div></div>
-      <div class="track-cell z-eng"><div class="step">Outlook → KWAD</div></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow ki-on-fb">
-      <div class="lane-cell"><span class="lc ki-fb"></span><span class="lt" style="color:#B45309">KI-Strukturierungs-Bot<span class="lsub">am Postkorb</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div>
-      <div class="track-cell z-ki"><div class="step new-fb">Strukturierung · Beiblatt</div></div>
-      <div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow">
-      <div class="lane-cell"><span class="lc kwad"></span><span class="lt">Eingangsmanagement<span class="lsub">KWAD@ergo.de</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div>
-      <div class="track-cell z-kwad"><div class="step">Sichten · Indizieren (wie heute)</div></div>
-      <div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc einst"></span><span class="lt">Postkorb · Einstellen<span class="lsub">durch KWAD</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div>
-      <div class="track-cell z-pk"><div class="step">Vorgang einstellen</div></div>
-      <div class="track-cell z-ki"></div><div class="track-cell z-pk"></div><div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc bear"></span><span class="lt">Postkorb · Bearbeitung<span class="lsub">Sachbearbeiter</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div>
-      <div class="track-cell z-pk"><div class="step new-fb">mit KI-Beiblatt</div></div>
-      <div class="track-cell z-pk"></div>
-    </div>
-    <div class="lane gridrow pk-band">
-      <div class="lane-cell"><span class="lc bots"></span><span class="lt">Postkorb · Bot<span class="lsub">BluePrism</span></span></div>
-      <div class="track-cell z-eng"></div><div class="track-cell z-eng"></div><div class="track-cell z-ki"></div><div class="track-cell z-kwad"></div><div class="track-cell z-pk"></div><div class="track-cell z-ki"></div><div class="track-cell z-pk"></div>
-      <div class="track-cell z-pk"><div class="step">BÜ-Bots 72H</div></div>
-    </div>
-  </div>
-
-  <div class="takeaway">
-    <span class="ta-tag">TAKE-AWAY</span>
-    <span><strong>Option 1 ist die erste Wahl:</strong> der Bot greift bereits vor KWAD und eliminiert 240 MV-Fehl-Routings pro Woche — KWAD und Postkorb erhalten strukturierte Vorgänge. <strong>Option 2 bleibt umsetzbar</strong>, falls ein neues Gruppenpostfach organisatorisch nicht durchsetzbar ist; der Bot dockt dann am Postkorb an (Routing bleibt wie heute).</span>
   </div>
 
   <div class="footer">
-    <div>ERGO  |  Makler BÜ meets KI — Zwischenbericht Phase 1 · 10.06.2026</div><div>15</div>
+    <div>ERGO &nbsp;|&nbsp; Makler BÜ meets KI — Zwischenbericht Phase 1 · 10.06.2026</div><div>15</div>
   </div>
 </div>
 </body>
