@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Folie 17 — KI-Wirkung (Datenfluss)</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#E5E7EB;padding:24px}
+  .slide{width:1600px;height:900px;background:#FFF;margin:0 auto;padding:26px 44px;
+    position:relative;box-shadow:0 8px 32px rgba(0,0,0,.12);border-radius:4px;
+    font-size:13px;color:#0F172A;display:flex;flex-direction:column}
+
+  .mini-h{font-size:11px;letter-spacing:.10em;color:#475569;font-weight:500;margin-bottom:5px}
+  .title{font-size:22px;font-weight:700;color:#E30613;line-height:1.22;max-width:1180px}
+  .subt{font-size:14px;font-weight:600;color:#E30613;margin-top:4px;max-width:1180px}
+  .logo{position:absolute;top:24px;right:44px;text-align:right}
+  .logo .name{font-size:28px;font-weight:800;color:#E30613;letter-spacing:-.02em}
+  .logo .sub{font-size:9px;color:#475569;margin-top:1px}
+
+  .stage{flex:1;display:flex;flex-direction:column;margin-top:14px;gap:14px}
+
+  /* Sections */
+  .sec{flex:1;border:1px solid #E2E8F0;border-radius:10px;
+    background:#FFF;position:relative;display:flex;flex-direction:column;padding:14px 24px}
+  .sec-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .sec-num{
+    width:28px;height:28px;border-radius:50%;background:#E30613;color:#FFF;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;
+    flex-shrink:0;
+  }
+  .sec-title{font-size:15px;font-weight:700;color:#0F172A}
+  .sec-sub{font-size:12px;color:#64748B;margin-left:auto}
+
+  /* Phase 1 layout: 3 horizontal blocks with arrows */
+  .phase1{flex:1;display:grid;grid-template-columns:1fr 90px 1.05fr 90px 1fr;align-items:center;gap:0}
+
+  /* Phase 2 layout: 2 columns side by side */
+  .phase2{flex:1;display:grid;grid-template-columns:1fr 1px 1fr;gap:0;align-items:stretch}
+  .vsep{background:#E2E8F0;width:1px;margin:8px 0}
+
+  /* Card (input/output card) */
+  .card{
+    background:#E6E0D4;border-radius:8px;padding:12px 14px;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    box-shadow:0 1px 3px rgba(15,23,42,.08);
+  }
+  .card.in{background:#F1ECDE}
+  .card.out{background:#FFF;border:2px solid #00838F}
+  .card .lab{font-size:13px;font-weight:700;color:#0F172A;text-align:center;line-height:1.22}
+  .card .sub{font-size:10.5px;color:#64748B;font-weight:500;text-align:center;line-height:1.22}
+
+  .stack{display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;width:100%}
+
+  /* Central KI-Tool */
+  .ki-tool{
+    background:linear-gradient(135deg,#00838F 0%,#006B76 100%);color:#FFF;
+    border-radius:12px;padding:20px 18px;text-align:center;
+    box-shadow:0 4px 16px rgba(0,131,143,.3);position:relative
+  }
+  .ki-tool .robot{
+    width:46px;height:46px;background:#FFF;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 8px;
+  }
+  .ki-tool .robot svg{width:28px;height:28px;stroke:#00838F;fill:none;stroke-width:2}
+  .ki-tool .lab{font-size:14px;font-weight:800;letter-spacing:.02em}
+  .ki-tool .sub{font-size:10.5px;font-weight:500;opacity:.92;margin-top:2px}
+
+  /* Output cards (KI-Deckblatt / Excel) */
+  .out-cards{display:flex;flex-direction:column;gap:10px}
+
+  /* Icons (Mail, Deckblatt, Excel) - colored circles */
+  .pkg{display:flex;align-items:center;gap:5px}
+  .ico{
+    width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 3px rgba(0,0,0,.18);flex-shrink:0;
+  }
+  .ico svg{width:16px;height:16px;stroke:#FFF;fill:none;stroke-width:2}
+  .ico.mail{background:#00838F}
+  .ico.deck{background:#00838F}
+  .ico.excel{background:#E91E63}
+  .ico .ic-grid{width:14px;height:14px}
+
+  /* Pkg label = small caption under icon */
+  .pkg .l{font-size:10px;color:#334155;font-weight:600}
+
+  /* Arrows between cards */
+  .arrow{
+    display:flex;align-items:center;justify-content:center;position:relative;
+  }
+  .arrow svg{width:100%;height:30px;color:#00838F}
+
+  /* Application station (right side of each application column) */
+  .station{
+    background:linear-gradient(135deg,#ECFEFF 0%,#E0F2FE 100%);
+    border:2px solid #00838F;border-radius:10px;
+    padding:14px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;
+    min-width:200px;
+  }
+  .station .lab{font-size:13px;font-weight:800;color:#00838F;text-align:center;line-height:1.2}
+  .station .sub{font-size:10.5px;color:#0F172A;font-weight:500;text-align:center;line-height:1.25}
+
+  /* Application column */
+  .appcol{display:flex;align-items:center;gap:10px;padding:6px 16px;flex:1}
+  .pkg-stack{display:flex;flex-direction:column;gap:5px}
+  .pkg-stack .pkg-row{display:flex;align-items:center;gap:6px}
+  .pkg-stack .pkg-row .name{font-size:10.5px;color:#334155;font-weight:600}
+
+  .arr-block{flex-shrink:0;display:flex;align-items:center;color:#00838F;margin:0 4px}
+  .arr-block svg{width:36px;height:14px;stroke:currentColor;stroke-width:2.4;fill:none}
+
+  /* Take-away */
+  .takeaway{background:linear-gradient(90deg,#E30613,#B91C1C);color:#FFF;padding:10px 18px;
+    border-radius:8px;font-size:12px;font-weight:500;line-height:1.4;
+    display:flex;gap:14px;align-items:center;margin-top:2px}
+  .takeaway .tag{background:rgba(255,255,255,.20);padding:3px 10px;border-radius:20px;
+    font-size:10px;font-weight:700;letter-spacing:.08em;flex-shrink:0}
+
+  .footer{position:absolute;bottom:14px;left:44px;right:44px;display:flex;justify-content:space-between;
+    border-top:1px solid #E2E8F0;padding-top:5px;font-size:9px;color:#94A3B8}
+</style>
+</head>
+<body>
+<div class="slide">
+  <div class="logo"><div class="name">ERGO</div><div class="sub">A Munich Re company</div></div>
+
+  <div class="mini-h">ARCHITEKTUR · WIRKUNG DES KI-TOOLS</div>
+  <div class="title">Wie das KI-Tool wirkt: aus jeder Eingangsmail entsteht ein strukturiertes Beiblatt — und wird zweifach genutzt</div>
+  <div class="subt">Erst Strukturierung (Mail + Anhänge → Deckblatt + Excel) — dann zwei Anwendungen: KWAD-Indizierung und Prüfung</div>
+
+  <div class="stage">
+
+    <!-- ============================================================
+         SCHRITT 1: KI-Verarbeitung
+         Mail + Anhänge → KI-Tool → Deckblatt + Excel
+    ============================================================ -->
+    <div class="sec">
+      <div class="sec-head">
+        <div class="sec-num">1</div>
+        <div class="sec-title">KI-Verarbeitung — Strukturierung der Eingangsmail</div>
+        <div class="sec-sub">je Eingangsmail · 50 Datenfelder · einheitliches Format</div>
+      </div>
+
+      <div class="phase1">
+        <!-- Inputs (left) -->
+        <div class="stack">
+          <div class="card in">
+            <div class="ico mail"><svg viewBox="0 0 24 24"><path d="M3 8l9 6 9-6M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg></div>
+            <div class="lab">Original Mail</div>
+            <div class="sub">vom Makler</div>
+          </div>
+          <div class="card in" style="position:relative">
+            <div class="ico mail" style="background:#475569"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5v4h6V5M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg></div>
+            <div class="lab">Anhänge</div>
+            <div class="sub">i. d. R. Maklervollmacht</div>
+          </div>
+        </div>
+
+        <!-- Arrow 1 -->
+        <div class="arrow">
+          <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+            <defs><marker id="ar1" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#00838F"/></marker></defs>
+            <line x1="5" y1="15" x2="72" y2="15" stroke="#00838F" stroke-width="2.5" marker-end="url(#ar1)"/>
+          </svg>
+        </div>
+
+        <!-- KI-Tool -->
+        <div class="ki-tool">
+          <div class="robot">
+            <svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/><circle cx="9" cy="14" r="1" fill="#00838F"/><circle cx="15" cy="14" r="1" fill="#00838F"/></svg>
+          </div>
+          <div class="lab">KI-Layer</div>
+          <div class="sub">Claude Opus 4.7 · Strukturierung in 50 Felder · Cluster-Match</div>
+        </div>
+
+        <!-- Arrow 2 -->
+        <div class="arrow">
+          <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+            <line x1="5" y1="15" x2="72" y2="15" stroke="#00838F" stroke-width="2.5" marker-end="url(#ar1)"/>
+          </svg>
+        </div>
+
+        <!-- Outputs -->
+        <div class="stack">
+          <div class="card out">
+            <div class="ico deck"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg></div>
+            <div class="lab">KI-Deckblatt</div>
+            <div class="sub">strukturierte Felder zur Mail</div>
+          </div>
+          <div class="card out" style="border-color:#E91E63">
+            <div class="ico excel"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="14" y1="4" x2="14" y2="20"/></svg></div>
+            <div class="lab">Excel mit allen BÜ-Infos</div>
+            <div class="sub">übergreifende Cluster-Sicht</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SCHRITT 2: zwei Anwendungen
+    ============================================================ -->
+    <div class="sec" style="padding:14px 24px">
+      <div class="sec-head">
+        <div class="sec-num">2</div>
+        <div class="sec-title">Zwei Anwendungen — die KI-Outputs werden mehrfach genutzt</div>
+        <div class="sec-sub">selbe Bausteine (Mail · Deckblatt · Excel), unterschiedliche Empfänger</div>
+      </div>
+
+      <div class="phase2">
+
+        <!-- Anwendung A: KWAD -->
+        <div class="appcol">
+          <div class="pkg-stack" style="min-width:175px">
+            <div style="font-size:10.5px;color:#475569;font-weight:700;letter-spacing:.05em;margin-bottom:3px;text-transform:uppercase">Übergabepaket</div>
+            <div class="pkg-row"><div class="ico mail" style="width:26px;height:26px"><svg viewBox="0 0 24 24"><path d="M3 8l9 6 9-6M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg></div><span class="name">Original Mail</span></div>
+            <div class="pkg-row"><div class="ico deck" style="width:26px;height:26px"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg></div><span class="name">KI-Deckblatt</span></div>
+          </div>
+          <div class="arr-block">
+            <svg viewBox="0 0 40 14" preserveAspectRatio="none">
+              <defs><marker id="arA" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="currentColor"/></marker></defs>
+              <line x1="2" y1="7" x2="34" y2="7" marker-end="url(#arA)"/>
+            </svg>
+          </div>
+          <div class="station" style="flex:1">
+            <div class="lab">A · KWAD-Indizierung</div>
+            <div class="sub">Eingangsmanagement nutzt das Deckblatt für <strong>verbesserte Indizierung</strong> — strukturierte Felder ersetzen die Schlagwort-Suche</div>
+          </div>
+        </div>
+
+        <div class="vsep"></div>
+
+        <!-- Anwendung B: Prüfung -->
+        <div class="appcol">
+          <div class="pkg-stack" style="min-width:175px">
+            <div style="font-size:10.5px;color:#475569;font-weight:700;letter-spacing:.05em;margin-bottom:3px;text-transform:uppercase">Übergabepaket</div>
+            <div class="pkg-row"><div class="ico mail" style="width:26px;height:26px"><svg viewBox="0 0 24 24"><path d="M3 8l9 6 9-6M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/></svg></div><span class="name">Original Mail</span></div>
+            <div class="pkg-row"><div class="ico deck" style="width:26px;height:26px"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg></div><span class="name">KI-Deckblatt</span></div>
+            <div class="pkg-row"><div class="ico excel" style="width:26px;height:26px"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="14" y1="4" x2="14" y2="20"/></svg></div><span class="name">Excel (BÜ-Infos)</span></div>
+          </div>
+          <div class="arr-block">
+            <svg viewBox="0 0 40 14" preserveAspectRatio="none">
+              <line x1="2" y1="7" x2="34" y2="7" marker-end="url(#arA)"/>
+            </svg>
+          </div>
+          <div class="station" style="flex:1;background:linear-gradient(135deg,#FCE7F3 0%,#FBCFE8 100%);border-color:#E91E63">
+            <div class="lab" style="color:#9D174D">B · Prüfung (72H- / Themenbot)</div>
+            <div class="sub">Prüfbot nimmt Mail, Deckblatt und Excel — <strong>maschinelle Plausibilitäts- und Dublettenprüfung</strong> (Dunkelverarbeitung)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div class="takeaway">
+    <span class="tag">TAKE-AWAY</span>
+    <span>Aus einer einzelnen Eingangsmail entstehen über das KI-Tool zwei wiederverwendbare Bausteine — das <strong>KI-Deckblatt</strong> verbessert sofort die KWAD-Indizierung; <strong>Deckblatt und Excel</strong> liefern dem Prüfbot die strukturierte Basis für Dunkelverarbeitung.</span>
+  </div>
+
+  <div class="footer">
+    <div>ERGO &nbsp;|&nbsp; Makler BÜ meets KI — Zwischenbericht Phase 1 · 10.06.2026</div><div>17</div>
+  </div>
+</div>
+</body>
+</html>
