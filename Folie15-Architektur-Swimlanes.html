@@ -2,255 +2,189 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Folie 15 — Architektur (eine Swimlane-Sicht)</title>
+<title>Folie 15 — Architektur Swimlane-Flow</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#E5E7EB;padding:24px}
-  .slide{
-    width:1600px;height:900px;background:#FFF;margin:0 auto;padding:26px 44px;
+  .slide{width:1600px;height:900px;background:#FFF;margin:0 auto;padding:24px 40px;
     position:relative;box-shadow:0 8px 32px rgba(0,0,0,.12);border-radius:4px;
-    font-size:13px;color:#0F172A;display:flex;flex-direction:column;
-  }
+    font-size:12px;color:#0F172A;display:flex;flex-direction:column}
 
-  /* Header */
-  .mini-h{font-size:11px;letter-spacing:.10em;color:#475569;font-weight:500;margin-bottom:5px}
-  .title{font-size:22px;font-weight:700;color:#E30613;line-height:1.22;max-width:1180px}
-  .subt{font-size:14px;font-weight:600;color:#E30613;margin-top:4px;max-width:1180px}
-  .logo{position:absolute;top:24px;right:44px;text-align:right}
-  .logo .name{font-size:28px;font-weight:800;color:#E30613;letter-spacing:-.02em}
+  .mini-h{font-size:11px;letter-spacing:.10em;color:#475569;font-weight:500;margin-bottom:4px}
+  .title{font-size:21px;font-weight:700;color:#E30613;line-height:1.2;max-width:1180px}
+  .subt{font-size:13px;font-weight:600;color:#E30613;margin-top:3px;max-width:1180px}
+  .logo{position:absolute;top:22px;right:40px;text-align:right}
+  .logo .name{font-size:26px;font-weight:800;color:#E30613;letter-spacing:-.02em}
   .logo .sub{font-size:8px;color:#475569;margin-top:1px}
 
-  /* Legende oben rechts unter dem Titel */
-  .legend{display:flex;gap:18px;margin-top:14px;font-size:11px;color:#475569;align-items:center}
-  .legend .item{display:flex;align-items:center;gap:6px}
-  .legend .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:18px;font-size:10px;font-weight:700;letter-spacing:.05em;color:#FFF}
-  .legend .pill.A{background:#00838F}
-  .legend .pill.B{background:#F59E0B}
+  .stage{flex:1;display:flex;flex-direction:column;margin-top:10px;gap:10px}
 
-  /* Wrapper für Diagramm + Take-Away */
-  .body{flex:1;display:flex;flex-direction:column;margin-top:10px}
+  /* Diagramm */
+  .diag{border:1px solid #CBD5E1;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;flex:1}
+  .diag-head{padding:6px 14px;display:flex;align-items:center;justify-content:space-between;
+    font-size:11px;font-weight:600;border-bottom:1px solid #E2E8F0}
+  .diag-head .left{display:flex;align-items:center;gap:10px}
+  .diag-head .opt{font-size:13px;font-weight:800}
+  .diag-head .nm{font-size:12.5px;color:#0F172A;font-weight:700}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:18px;
+    font-size:9.5px;font-weight:700;letter-spacing:.05em;color:#FFF}
+  .badge.pref{background:#00838F}.badge.fb{background:#F59E0B}
+  .ev{display:flex;gap:14px}
+  .ev .e{display:flex;align-items:center;gap:5px;font-size:10px;color:#475569;font-weight:500}
+  .ev .ico{width:12px;height:12px}.ico.ok{color:#16A34A}.ico.no{color:#DC2626}
 
-  /* Swimlane diagram */
-  .diag{
-    flex:1;border:1px solid #CBD5E1;border-radius:8px;
-    display:grid;
-    grid-template-rows:auto repeat(5, 1fr);
-    overflow:hidden;
-  }
-  .row{
-    display:grid;
-    grid-template-columns:170px repeat(6, 1fr);
-    align-items:stretch;
-  }
-  .row + .row{border-top:1px solid #E2E8F0}
+  .body-flex{flex:1;display:flex}
+  /* Lane labels */
+  .labels{width:166px;display:flex;flex-direction:column;border-right:3px solid #E2E8F0}
+  .labels .ll{flex:1;display:flex;align-items:center;padding:4px 8px 4px 12px;
+    border-top:1px solid #F1F5F9;font-size:10.5px;font-weight:600;color:#334155;line-height:1.2}
+  .labels .ll:first-child{border-top:none}
+  .labels .ll .c{width:5px;height:24px;border-radius:2px;margin-right:9px;flex-shrink:0}
+  .labels .ll .t{display:flex;flex-direction:column}
+  .labels .ll .s{font-size:8.5px;color:#64748B;font-weight:500;margin-top:1px}
+  .c.mail{background:#64748B}.c.ki{background:#00838F}.c.kifb{background:#F59E0B}
+  .c.kwad{background:#4F46E5}.c.pk{background:#0EA5E9}
 
-  /* Phase-axis-row (header) */
-  .axis{background:#F8FAFC;border-bottom:2px solid #94A3B8}
-  .axis > div{
-    padding:8px 10px;font-size:10.5px;font-weight:700;letter-spacing:.04em;
-    text-transform:uppercase;color:#0F172A;text-align:center;
-    border-right:1px solid #E2E8F0;
-  }
-  .axis > div:last-child{border-right:none}
-  .axis > div:first-child{text-align:left;color:#475569}
-  .axis .ph-ki{color:#00838F}
-  .axis .ph-kwad{color:#4F46E5}
-  .axis .ph-pk{color:#0369A1}
+  /* Track with grid + svg overlay */
+  .track{flex:1;position:relative;display:grid;
+    grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(4,1fr)}
+  .track .cellbg{border-top:1px solid #F1F5F9;border-left:1px dashed #EEF2F7}
+  .track svg{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+  .step{z-index:2;align-self:center;justify-self:stretch;margin:5px 8px;
+    background:#FFF;border:1.5px solid #CBD5E1;border-radius:6px;padding:6px 9px;
+    font-size:10.5px;color:#334155;text-align:center;font-weight:500;line-height:1.2;
+    box-shadow:0 1px 3px rgba(0,0,0,.07);position:relative}
+  .step .tag{position:absolute;top:-8px;right:-6px;font-size:7px;font-weight:700;
+    color:#FFF;padding:1px 5px;border-radius:3px;letter-spacing:.04em}
+  .step.new-pref{background:linear-gradient(135deg,#CFFAFE,#E0F2FE);border-color:#00838F;font-weight:600}
+  .step.new-pref .tag{background:#00838F}
+  .step.new-fb{background:linear-gradient(135deg,#FEF3C7,#FFEDD5);border-color:#F59E0B;font-weight:600}
+  .step.new-fb .tag{background:#F59E0B}
+  .step.verb{background:linear-gradient(135deg,#DBEAFE,#EFF6FF);border-color:#2563EB;font-weight:600}
+  .step.verb .tag{background:#2563EB}
 
-  /* Lane label cell */
-  .lane-label{
-    background:#F8FAFC;border-right:3px solid #E2E8F0;
-    padding:8px 10px 8px 14px;display:flex;align-items:center;
-    font-size:12px;font-weight:600;color:#334155;line-height:1.25;
-  }
-  .lane-label .lc{width:5px;height:30px;border-radius:3px;margin-right:10px;flex-shrink:0}
-  .lane-label .lt{display:flex;flex-direction:column}
-  .lane-label .lsub{font-size:10px;color:#64748B;font-weight:500;margin-top:1px}
-  .lc.mail{background:#64748B}
-  .lc.ki{background:#00838F}
-  .lc.kwad{background:#4F46E5}
-  .lc.einst{background:#0369A1}
-  .lc.bear{background:#0EA5E9}
-  .lc.bots{background:#DC2626}
+  /* takeaway */
+  .takeaway{background:linear-gradient(90deg,#E30613,#B91C1C);color:#FFF;padding:10px 16px;
+    border-radius:8px;font-size:11.5px;font-weight:500;line-height:1.45;display:flex;gap:12px;align-items:center;margin-top:4px}
+  .takeaway .tag2{background:rgba(255,255,255,.2);padding:3px 9px;border-radius:18px;
+    font-size:10px;font-weight:700;letter-spacing:.08em;flex-shrink:0}
+  .takeaway .a{color:#7FDBE0;font-weight:700}.takeaway .b{color:#FCD34D;font-weight:700}
 
-  /* track cell */
-  .cell{padding:8px 8px;display:flex;align-items:center;justify-content:center;
-        border-right:1px solid #F1F5F9;position:relative}
-  .cell:last-child{border-right:none}
-
-  /* zone tints */
-  .z-eng{background:#FBFCFE}
-  .z-ki{background:#F4FEFF}
-  .z-kwad{background:#FAFAFF}
-  .z-pk{background:#FAFDFF}
-
-  /* Postkorb grouping band */
-  .pk-band .lane-label{background:#EFF6FF;border-left:6px solid #0369A1;padding-left:11px}
-
-  /* steps */
-  .step{
-    width:100%;background:#FFF;border:1.5px solid #CBD5E1;border-radius:6px;
-    padding:7px 10px;font-size:11px;color:#334155;text-align:center;
-    box-shadow:0 1px 3px rgba(0,0,0,.06);line-height:1.25;font-weight:500;
-  }
-  .step.muted{color:#94A3B8;background:#F8FAFC}
-
-  /* Andockpunkt-Marker (A = Option 1 grün/teal, B = Option 2 amber) */
-  .andock{
-    width:100%;background:#FFF;border-radius:7px;padding:6px 8px;
-    box-shadow:0 4px 14px rgba(0,0,0,.10);text-align:center;font-size:10.5px;
-    color:#0F172A;font-weight:600;line-height:1.3;position:relative;
-  }
-  .andock.A{border:2.5px solid #00838F;background:linear-gradient(135deg,#CFFAFE,#E0F2FE)}
-  .andock.B{border:2.5px solid #F59E0B;background:linear-gradient(135deg,#FEF3C7,#FFEDD5)}
-  .andock .marker{
-    position:absolute;top:-12px;left:50%;transform:translateX(-50%);
-    background:#FFF;border-radius:50%;width:24px;height:24px;display:flex;
-    align-items:center;justify-content:center;font-weight:800;font-size:13px;
-    box-shadow:0 2px 6px rgba(0,0,0,.18);
-  }
-  .andock.A .marker{color:#00838F;border:2px solid #00838F}
-  .andock.B .marker{color:#B45309;border:2px solid #F59E0B}
-  .andock .when{font-size:9px;font-weight:700;color:#64748B;letter-spacing:.08em;
-                text-transform:uppercase;margin-bottom:2px;display:block}
-  .andock.A .when{color:#00838F}
-  .andock.B .when{color:#B45309}
-
-  /* Arrow zwischen Lanes (vertikal) — gestrichelte Übergabe */
-  .handover{
-    position:absolute;left:50%;transform:translateX(-50%);
-    color:#94A3B8;width:14px;height:14px;
-  }
-
-  /* Take-Away unten */
-  .takeaway{
-    margin-top:14px;background:linear-gradient(90deg,#E30613,#B91C1C);color:#FFF;
-    padding:11px 18px;border-radius:8px;font-size:12px;font-weight:500;line-height:1.45;
-    display:flex;gap:14px;align-items:center;
-  }
-  .takeaway .tag{background:rgba(255,255,255,.20);padding:3px 10px;border-radius:20px;
-                 font-size:10px;font-weight:700;letter-spacing:.08em;flex-shrink:0}
-  .takeaway .a{color:#7FDBE0;font-weight:700}
-  .takeaway .b{color:#FCD34D;font-weight:700}
-
-  .footer{position:absolute;bottom:14px;left:44px;right:44px;display:flex;
-          justify-content:space-between;border-top:1px solid #E2E8F0;padding-top:5px;
-          font-size:9px;color:#94A3B8}
+  .footer{position:absolute;bottom:12px;left:40px;right:40px;display:flex;justify-content:space-between;
+    border-top:1px solid #E2E8F0;padding-top:4px;font-size:9px;color:#94A3B8}
 </style>
 </head>
 <body>
 <div class="slide">
   <div class="logo"><div class="name">ERGO</div><div class="sub">A Munich Re company</div></div>
-
   <div class="mini-h">STRUKTURIERUNG · ARCHITEKTUR</div>
-  <div class="title">Strukturierungs-Bot — zwei mögliche Andockpunkte im bestehenden BÜ-Prozess</div>
-  <div class="subt">Option 1 (präferiert) wirkt vor KWAD und greift ins Routing — Option 2 (Fallback) dockt am Postkorb an</div>
+  <div class="title">Wo greift der Strukturierungs-Bot in den BÜ-Prozess ein?</div>
+  <div class="subt">Option 1 (präferiert): vor dem Eingangsmanagement — Option 2 (Fallback): am Postkorb. Der Bot-Schritt wandert auf der Prozesskette nach hinten.</div>
 
-  <div class="legend">
-    <div class="item"><span class="pill A">A</span> <strong>Option 1 · Präferenz</strong> &nbsp;Bot vor KWAD (neues Gruppenpostfach) — wirkt auf Routing, Indizierung, Cluster-Sicht und Prüfbot</div>
-    <div class="item"><span class="pill B">B</span> <strong>Option 2 · Fallback</strong> &nbsp;Bot am Postkorb — Routing bleibt wie heute, nur Cluster-Sicht und Beiblatt für Bearbeitung</div>
+  <div class="stage">
+
+    <!-- ===================== OPTION 1 ===================== -->
+    <div class="diag">
+      <div class="diag-head" style="background:#ECFEFF">
+        <div class="left">
+          <span class="opt" style="color:#00838F">Option 1</span>
+          <span class="nm">Bot vor KWAD über neues Gruppenpostfach</span>
+          <span class="badge pref">✓ PRÄFERENZ</span>
+        </div>
+        <div class="ev">
+          <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> 240 MV-Fehl-Routings/Wo weg</span>
+          <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> KWAD bekommt strukturierte Mail · Prüfbot möglich</span>
+        </div>
+      </div>
+      <div class="body-flex">
+        <div class="labels">
+          <div class="ll"><span class="c mail"></span><span class="t">Mail-Eingang<span class="s">5 Gruppenpostfächer</span></span></div>
+          <div class="ll"><span class="c ki"></span><span class="t">KI-Strukturierungs-Bot<span class="s">vor KWAD</span></span></div>
+          <div class="ll"><span class="c kwad"></span><span class="t">Eingangsmanagement<span class="s">KWAD@ergo.de</span></span></div>
+          <div class="ll"><span class="c pk"></span><span class="t">Postkorb<span class="s">SB · BluePrism</span></span></div>
+        </div>
+        <div class="track">
+          <!-- background cells (24) -->
+          <!-- row1 --><div class="cellbg" style="grid-area:1/1"></div><div class="cellbg" style="grid-area:1/2"></div><div class="cellbg" style="grid-area:1/3"></div><div class="cellbg" style="grid-area:1/4"></div><div class="cellbg" style="grid-area:1/5"></div><div class="cellbg" style="grid-area:1/6"></div>
+          <!-- row2 --><div class="cellbg" style="grid-area:2/1"></div><div class="cellbg" style="grid-area:2/2"></div><div class="cellbg" style="grid-area:2/3"></div><div class="cellbg" style="grid-area:2/4"></div><div class="cellbg" style="grid-area:2/5"></div><div class="cellbg" style="grid-area:2/6"></div>
+          <!-- row3 --><div class="cellbg" style="grid-area:3/1"></div><div class="cellbg" style="grid-area:3/2"></div><div class="cellbg" style="grid-area:3/3"></div><div class="cellbg" style="grid-area:3/4"></div><div class="cellbg" style="grid-area:3/5"></div><div class="cellbg" style="grid-area:3/6"></div>
+          <!-- row4 --><div class="cellbg" style="grid-area:4/1"></div><div class="cellbg" style="grid-area:4/2"></div><div class="cellbg" style="grid-area:4/3"></div><div class="cellbg" style="grid-area:4/4"></div><div class="cellbg" style="grid-area:4/5"></div><div class="cellbg" style="grid-area:4/6"></div>
+
+          <!-- flow arrows -->
+          <svg viewBox="0 0 520 100" preserveAspectRatio="none">
+            <defs><marker id="aT" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#00838F"/></marker></defs>
+            <g stroke="#00838F" stroke-width="2" fill="none" vector-effect="non-scaling-stroke" marker-end="url(#aT)">
+              <line x1="79.7" y1="12.5" x2="92.7" y2="12.5"/>
+              <line x1="130" y1="21" x2="179.3" y2="37.5"/>
+              <line x1="216.7" y1="46" x2="266" y2="62.5"/>
+              <line x1="303.3" y1="71" x2="352.7" y2="87.5"/>
+              <line x1="426.3" y1="87.5" x2="439.3" y2="87.5"/>
+            </g>
+          </svg>
+
+          <!-- steps -->
+          <div class="step" style="grid-area:1/1">📧 5 Gruppen-<br>postfächer</div>
+          <div class="step verb" style="grid-area:1/2">Outlook-Routine<br>→ KI-Postfach<span class="tag">VERB.</span></div>
+          <div class="step new-pref" style="grid-area:2/3">Strukturierung ·<br>Cluster · Beiblatt<span class="tag">NEU</span></div>
+          <div class="step verb" style="grid-area:3/4">Indizieren +<br>Beiblatt<span class="tag">VERB.</span></div>
+          <div class="step new-pref" style="grid-area:4/5">Einstellen +<br>Cluster-Sicht<span class="tag">NEU</span></div>
+          <div class="step new-pref" style="grid-area:4/6">Bearbeitung ·<br>Bots · Prüfbot<span class="tag">NEU</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== OPTION 2 ===================== -->
+    <div class="diag">
+      <div class="diag-head" style="background:#FFFBEB">
+        <div class="left">
+          <span class="opt" style="color:#B45309">Option 2</span>
+          <span class="nm">Bot am Postkorb — Fallback</span>
+          <span class="badge fb">⚠ FALLBACK</span>
+        </div>
+        <div class="ev">
+          <span class="e"><svg class="ico no" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg> Routing bleibt wie heute</span>
+          <span class="e"><svg class="ico ok" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Cluster-Sicht + Beiblatt · 3 von 4 Herausforderungen</span>
+        </div>
+      </div>
+      <div class="body-flex">
+        <div class="labels">
+          <div class="ll"><span class="c mail"></span><span class="t">Mail-Eingang<span class="s">5 Gruppenpostfächer</span></span></div>
+          <div class="ll"><span class="c kifb"></span><span class="t">KI-Strukturierungs-Bot<span class="s">am Postkorb</span></span></div>
+          <div class="ll"><span class="c kwad"></span><span class="t">Eingangsmanagement<span class="s">KWAD@ergo.de</span></span></div>
+          <div class="ll"><span class="c pk"></span><span class="t">Postkorb<span class="s">SB · BluePrism</span></span></div>
+        </div>
+        <div class="track">
+          <div class="cellbg" style="grid-area:1/1"></div><div class="cellbg" style="grid-area:1/2"></div><div class="cellbg" style="grid-area:1/3"></div><div class="cellbg" style="grid-area:1/4"></div><div class="cellbg" style="grid-area:1/5"></div><div class="cellbg" style="grid-area:1/6"></div>
+          <div class="cellbg" style="grid-area:2/1"></div><div class="cellbg" style="grid-area:2/2"></div><div class="cellbg" style="grid-area:2/3"></div><div class="cellbg" style="grid-area:2/4"></div><div class="cellbg" style="grid-area:2/5"></div><div class="cellbg" style="grid-area:2/6"></div>
+          <div class="cellbg" style="grid-area:3/1"></div><div class="cellbg" style="grid-area:3/2"></div><div class="cellbg" style="grid-area:3/3"></div><div class="cellbg" style="grid-area:3/4"></div><div class="cellbg" style="grid-area:3/5"></div><div class="cellbg" style="grid-area:3/6"></div>
+          <div class="cellbg" style="grid-area:4/1"></div><div class="cellbg" style="grid-area:4/2"></div><div class="cellbg" style="grid-area:4/3"></div><div class="cellbg" style="grid-area:4/4"></div><div class="cellbg" style="grid-area:4/5"></div><div class="cellbg" style="grid-area:4/6"></div>
+
+          <svg viewBox="0 0 520 100" preserveAspectRatio="none">
+            <defs><marker id="aF" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#F59E0B"/></marker></defs>
+            <g stroke="#F59E0B" stroke-width="2" fill="none" vector-effect="non-scaling-stroke" marker-end="url(#aF)">
+              <line x1="79.7" y1="12.5" x2="92.7" y2="12.5"/>
+              <line x1="130" y1="21" x2="179.3" y2="62.5"/>
+              <line x1="216.7" y1="71" x2="266" y2="87.5"/>
+              <line x1="303.3" y1="79" x2="352.7" y2="37.5"/>
+              <line x1="390" y1="46" x2="439.3" y2="87.5"/>
+            </g>
+          </svg>
+
+          <div class="step" style="grid-area:1/1">📧 5 Gruppen-<br>postfächer</div>
+          <div class="step" style="grid-area:1/2">Outlook-Routine<br>→ KWAD</div>
+          <div class="step" style="grid-area:3/3">Sichten ·<br>Indizieren</div>
+          <div class="step" style="grid-area:4/4">Einstellen</div>
+          <div class="step new-fb" style="grid-area:2/5">Strukturierung ·<br>Cluster · Beiblatt<span class="tag">NEU</span></div>
+          <div class="step new-fb" style="grid-area:4/6">Bearbeitung +<br>Beiblatt · Bots<span class="tag">NEU</span></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="body">
-    <div class="diag">
-      <!-- Phasen-Achse -->
-      <div class="row axis">
-        <div>Lane ↓ &nbsp;/&nbsp; Phase →</div>
-        <div>Mail-Eingang</div>
-        <div>Umleitung</div>
-        <div class="ph-ki">KI vor KWAD</div>
-        <div class="ph-kwad">Eingangs-mgmt. KWAD</div>
-        <div class="ph-pk">Postkorb</div>
-        <div class="ph-ki">KI am Postkorb</div>
-      </div>
-
-      <!-- Lane 1: Mail-Eingang -->
-      <div class="row">
-        <div class="lane-label">
-          <span class="lc mail"></span>
-          <span class="lt">Mail-Eingang<span class="lsub">5 Gruppenpostfächer</span></span>
-        </div>
-        <div class="cell z-eng"><div class="step">📧 5 Gruppen-<br>postfächer</div></div>
-        <div class="cell z-eng"><div class="step">Outlook-<br>Routine</div></div>
-        <div class="cell z-ki"></div>
-        <div class="cell z-kwad"></div>
-        <div class="cell z-pk"></div>
-        <div class="cell z-ki"></div>
-      </div>
-
-      <!-- Lane 2: KI-Bot (mit zwei Andockpunkten A und B) -->
-      <div class="row">
-        <div class="lane-label">
-          <span class="lc ki"></span>
-          <span class="lt">KI-Strukturierungs-Bot<span class="lsub">A vor KWAD · B am Postkorb</span></span>
-        </div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-ki">
-          <div class="andock A">
-            <div class="marker">A</div>
-            <span class="when">Option 1 — Präferenz</span>
-            Strukturierung · Cluster · Beiblatt<br>(über neues GP @KI vor KWAD)
-          </div>
-        </div>
-        <div class="cell z-kwad"></div>
-        <div class="cell z-pk"></div>
-        <div class="cell z-ki">
-          <div class="andock B">
-            <div class="marker">B</div>
-            <span class="when">Option 2 — Fallback</span>
-            Strukturierung · Cluster · Beiblatt<br>(dockt am Postkorb an)
-          </div>
-        </div>
-      </div>
-
-      <!-- Lane 3: KWAD -->
-      <div class="row">
-        <div class="lane-label">
-          <span class="lc kwad"></span>
-          <span class="lt">Eingangsmanagement<span class="lsub">KWAD@ergo.de</span></span>
-        </div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-ki"></div>
-        <div class="cell z-kwad"><div class="step">Sichten · Indizieren · Archivieren</div></div>
-        <div class="cell z-pk"></div>
-        <div class="cell z-ki"></div>
-      </div>
-
-      <!-- Lane 4: Postkorb · Einstellen -->
-      <div class="row pk-band">
-        <div class="lane-label">
-          <span class="lc einst"></span>
-          <span class="lt">Postkorb · Einstellen<span class="lsub">durch KWAD</span></span>
-        </div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-ki"></div>
-        <div class="cell z-kwad"></div>
-        <div class="cell z-pk"><div class="step">Vorgang in Postkorb einstellen</div></div>
-        <div class="cell z-ki"></div>
-      </div>
-
-      <!-- Lane 5: Postkorb · Bearbeitung + Bots -->
-      <div class="row pk-band">
-        <div class="lane-label">
-          <span class="lc bear"></span>
-          <span class="lt">Postkorb · Bearbeitung &amp; Bot<span class="lsub">Sachbearbeiter · BluePrism 72H</span></span>
-        </div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-eng"></div>
-        <div class="cell z-ki"></div>
-        <div class="cell z-kwad"></div>
-        <div class="cell z-pk"><div class="step">Bearbeitung · BÜ-Bots 72H</div></div>
-        <div class="cell z-ki"></div>
-      </div>
-    </div>
-
-    <div class="takeaway">
-      <span class="tag">TAKE-AWAY</span>
-      <span><strong class="a">A · Präferenz:</strong> Bot wirkt vor KWAD über neues Gruppenpostfach — 240 MV-Fehl-Routings/Woche werden eliminiert, KWAD bekommt strukturierte Mail, Prüfbot wird möglich. &nbsp; <strong class="b">B · Fallback:</strong> Bot dockt am Postkorb an, falls neues Gruppenpostfach organisatorisch nicht durchsetzbar — Routing bleibt wie heute, aber Cluster-Sicht und Beiblatt sind verfügbar.</span>
-    </div>
+  <div class="takeaway">
+    <span class="tag2">TAKE-AWAY</span>
+    <span><strong class="a">Option 1:</strong> Der Bot-Schritt liegt früh in der Kette (vor KWAD) — die Mail ist schon strukturiert, bevor sie ins Eingangsmanagement geht. 240 MV-Fehl-Routings/Woche entfallen, Prüfbot wird möglich. &nbsp;<strong class="b">Option 2:</strong> Der Bot-Schritt wandert ans Ende (Umweg über den Postkorb) — Routing bleibt wie heute, aber Cluster-Sicht und Beiblatt sind verfügbar.</span>
   </div>
 
   <div class="footer">
