@@ -1,0 +1,218 @@
+EXCEL-AUSWERTUNG — Spalten und Bedeutungen
+======================================================================
+
+Hinweis: Die Excel ist KEIN KI-Output direkt — sie wird lokal aus den
+42 KI-Feldern (siehe ki_prompt.txt) generiert. Pro analysierter Mail
+entsteht eine Zeile.
+
+Aufbau Workbook:
+  · Tabelle 'Analyse' mit allen analysierten Mails (Spalten s.u.)
+  · KPI-Sheets (Cluster, Pool-Konzentration, Eingangskanal, Business-Case)
+
+ZEILE 1: Spaltenkopf (gefärbt nach Spaltengruppe)
+ZEILE 2: Beschreibungs-Zeile (Erklärung was die Spalte enthält)
+ZEILE 3..N: Daten
+
+──────────────────────────────────────────────────────────────────────
+SPALTEN (Stand v2.48, 50 Spalten)
+──────────────────────────────────────────────────────────────────────
+
+ 1. #
+     id=lfd
+     → Laufende Nummer im Sheet
+
+ 2. Cluster_ID
+     id=cluster_id
+     → gleicher Makler + gleicher Kunde -> gemeinsame ID (001a/001b...) + Pastell-Farbe
+
+ 3. Status
+     id=status
+     → Ampel: 'Neue BÜ' (gruen) = echter neuer BÜ-Erstvorgang / 'BÜ-Reminder' (gelb) = Wiedervorlage/Mahnung / 'Keine BÜ' (rot) = fachfremd oder kein Makler-Vorgang
+
+ 4. Typ
+     id=typ
+     → Makler = klassischer Makler mit Maklervollmacht / MFA = Mehrfachagent (Betreuungswechsel/Mandat, z.B. Jung DMS Pro GmbH, VPV) - dort ist der unterschriebene Betreuungswechsel die Bevollmaechtigung, keine MV noetig
+
+ 5. Versicherungsnummer
+     id=versicherungsnummer
+     → Vertrags-/Versicherungsnummer (TEXT, kommagetrennt bei Kundenverbindung) - wichtigste Spalte zum Auffinden des Vorgangs
+
+ 6. Sparte
+     id=sparte
+     → Komposit / Leben / KV / Mehrere / Unbekannt
+
+ 7. Kunde_Nachname
+     id=kunde_nachname
+     → Nachname des Endkunden (VN) - zeigt, woraus der Cluster gebildet wurde
+
+ 8. Kunde_Vorname
+     id=kunde_vorname
+     → Vorname des Endkunden
+
+ 9. Maklerpool
+     id=maklerpool
+     → Makler/Maklerpool: Pool/Abwickler (Jung DMS, Fonds Finanz, blau direkt, DEMA, ...) - bei Einzelmakler ohne Pool ggf. leer
+
+10. Untervermittler
+     id=untervermittler
+     → Angebundenes Maklerunternehmen unter dem Pool (z.B. Finanzguru, CLARK) - NICHT der Pool, NICHT die 'Kooperation mit'-Firma. Leer bei Einzelmaklern (natuerliche Person)
+
+11. Kooperation
+     id=makler_kooperation
+     → Firma aus 'handelnd in Kooperation mit der ...' in der Maklervollmacht (z.B. Reuther Consult Michael Walter GmbH & Co.KG)
+
+12. Makler_Nachname
+     id=makler_nachname
+     → NUR Nachname einer natuerlichen Person (handelnder Makler, z.B. Haase). Leer wenn der Makler eine Firma/Pool ist
+
+13. Makler_Vorname
+     id=makler_vorname
+     → NUR Vorname einer natuerlichen Person (handelnder Makler, z.B. Frank); leer bei Firmen/Pools
+
+14. Agentur_Nr
+     id=agentur_nr
+     → Agentur-Nr (6000.../890... = Agentur) als reine Ziffern/Kennung, deterministisch sortiert
+
+15. Vermittler_Nr
+     id=vermittler_nr
+     → Vermittler-Nr (alles ohne 6000/890-Praefix) als reine Ziffern/Kennung, deterministisch sortiert
+
+16. Kundennummer
+     id=kunde_nummer
+     → Kunden-/Partner-Nummer in ERGO-Systemen (KDNR/Partnernr - NICHT die Versicherungsnummer)
+
+17. Kunde_Geburtsdatum
+     id=kunde_geburtsdatum
+     → Geburtsdatum des VN laut Anschreiben (TT.MM.JJJJ, vereinheitlicht)
+
+18. Kunde_Adresse
+     id=kunde_adresse
+     → Anschrift des VN laut Anschreiben (ohne Komma)
+
+19. Geschaefts_Typ
+     id=geschaefts_typ
+     → einfacher Vertrag vs. Kundenverbindung (ganzes Kundenportfolio)
+
+20. Vorgangstyp
+     id=vorgangstyp
+     → Makler-Vorgang / Privat-Mail / Zustellfehler / Unbekannt
+
+21. Ist_Reminder
+     id=ist_reminder
+     → ja/nein: Wiedervorlage / 2. Mahnung / Sachstandsanfrage
+
+22. Klassifikation
+     id=klassifikation
+     → BUe-Vorgang / Schadenmeldung / Antrag-Aenderung / Anfrage-Ruecksprache / Nicht-Standard
+
+23. Makler_Adresse
+     id=makler_adresse
+     → Anschrift des Maklers laut Anschreiben (ohne Komma)
+
+24. Auftrag_Datum
+     id=auftrag_datum
+     → Datum des Pool-/Makler-Anschreibens an den Kunden (TT.MM.JJJJ, vereinheitlicht)
+
+25. Anhang_Typen
+     id=anhang_typen
+     → Anhangs-Datei-Typen / Dokument-Inventar
+
+26. PDF_Qualitaet
+     id=pdf_qualitaet
+     → Text-PDF (auto-tauglich) / Mixed / Scan (OCR/manuell) / keine PDFs
+
+27. MV_Enthalten
+     id=enthaelt_maklervollmacht
+     → ja/nein: ist eine Maklervollmacht im Anhang
+
+28. MV_Datum
+     id=mv_datum
+     → Datum der MV-Unterschrift durch den KUNDEN (TT.MM.JJJJ, vereinheitlicht) - NICHT das Anschreiben-Datum
+
+29. MV_Vollumfaenglich
+     id=mv_vollumfaenglich
+     → ja / teilweise / nein: MV deckt die Sparte vollumfaenglich
+
+30. MV_Status
+     id=mv_status
+     → Konsolidiert: OK / MV unvollstaendig / MV fehlt / kein Anhang / nicht pruefbar / Reminder (MV n.e.)
+
+31. MV_Makler_Name
+     id=mv_makler_name
+     → Makler/Firmenname laut MAKLERVOLLMACHT (Abgleich gegen Anschreiben)
+
+32. MV_Kunde_Name
+     id=mv_kunde_name
+     → VN/Kunde(n) laut MAKLERVOLLMACHT (mehrere kommagetrennt)
+
+33. Untervollmacht_Vorhanden
+     id=untervollmacht_vorhanden
+     → Untervollmacht an Makler/Maklerpool erteilt? ja/nein/nicht_pruefbar
+
+34. Unterschrift_Kunde
+     id=unterschrift_kunde
+     → ja/nein/unklar: hat der Kunde (VN) unterschrieben
+
+35. Unterschrift_Makler
+     id=unterschrift_makler
+     → ja/nein/unklar: hat der Makler unterschrieben
+
+36. Hinweis
+     id=hinweis
+     → LLM-Hinweis: Auffaelligkeiten / naechste Schritte / Sonderbeobachtung
+
+37. Mail_Zusammenfassung
+     id=mail_zusammenfassung
+     → Kurze KI-Zusammenfassung der Mail
+
+38. Fehler
+     id=fehler
+     → Fehler-Meldung wenn KI-Analyse fehlgeschlagen ist
+
+39. Segment
+     id=segment
+     → BU-Erst-Einzeln / BU-Reminder-Kundenverb / Schaden / Antrag / Anfrage / Nicht-Standard / Zustellfehler / Nicht-Makler
+
+40. Auto_Cluster
+     id=auto_cluster
+     → vollautomatisierbar / teilautomatisierbar / manuell (regelbasiert)
+
+41. Auto_Grund
+     id=auto_grund
+     → Kurz-Begruendung warum dieser Auto-Cluster
+
+42. Vorgang_Alter_Tage
+     id=vorgang_alter
+     → Tage seit Mail-Empfang (Rueckstandsalter)
+
+43. Makler_Key
+     id=makler_key
+     → Kanonischer Schluessel 'Pool | Nachname, Vorname | #Maklernummer'
+
+44. Datei
+     id=datei
+     → Dateiname der .msg im Quellordner
+
+45. Datum
+     id=datum
+     → Empfangsdatum der Mail (DateTimeReceived)
+
+46. Absender Name
+     id=absname
+     → Anzeigename des Absenders
+
+47. Absender Email
+     id=absmail
+     → Email-Adresse des Absenders
+
+48. Empfaenger
+     id=empfaenger
+     → Postfach an das die Mail ging
+
+49. Betreff
+     id=betreff
+     → Betreffzeile der Mail
+
+50. Anhaenge
+     id=anhaenge
+     → Alle Anhangs-Dateinamen, kommagetrennt
