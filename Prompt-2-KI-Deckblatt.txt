@@ -1,0 +1,71 @@
+KI-DECKBLATT — Inhalt und Struktur (HTML → PDF, 1 Seite A4)
+
+Hinweis: das Deckblatt ist KEIN Prompt; es wird lokal aus den 42 JSON-Feldern
+des KI-Prompts gerendert (Funktion wsBuildNotizHtml). Es zeigt je Vorgang
+genau die strukturierten Felder, die die KI extrahiert hat.
+
+────────────────────────────────────────────────────────────────────────
+KOPFZEILE
+────────────────────────────────────────────────────────────────────────
+  Titel       : "KI-Vorgangs-Analyse"
+  Lfd-Nr      : {Lfd-Nr aus Excel}  — Mapping Excel ↔ Vorgang
+  Status-Badge: "Neue BÜ" (grün) / "BÜ-Reminder" (gelb) / "Keine BÜ" (rot)
+  Typ-Badge   : "Makler" / "MFA" (Mehrfachagent)
+  Reminder-Badge (falls zutreffend)
+  MV-Status-Badge: OK / MV unvollständig / MV fehlt / Reminder (MV n.e.) / OK (MFA) / MFA – VN-Unterschrift prüfen
+
+────────────────────────────────────────────────────────────────────────
+SEKTIONEN (in dieser Reihenfolge auf dem Deckblatt)
+────────────────────────────────────────────────────────────────────────
+
+[ Klassifikation & Vorgang ] — rot
+  · Vorgangstyp                  (Makler-Vorgang / Zustellfehler / Ergo-Outbound / System-Mail / Werbung-Spam / Unklar)
+  · Klassifikation               (BÜ-Vorgang / Schadenmeldung / Antrag-Änderung / Anfrage-Rücksprache / Nicht-Standard / Kein-Makler-Vorgang)
+  · Reminder/Wiedervorlage       (ja/nein)
+  · Reminder-Quelle              (falls Reminder=ja: Mail-Betreff / Mail-Body / Anhang-Dateiname / Anhang-PDF-Inhalt)
+
+[ Makler ] — teal
+  · Maklerpool                   (kanonisch: JDC / Jung, DMS & Cie. · Fonds Finanz Maklerservice GmbH · …)
+  · Untervermittler              (Firma unter dem Pool, z.B. Finanzguru, CLARK)
+  · Kooperation                  (Firma aus 'handelnd in Kooperation mit der …')
+  · Makler (Person)              (Vor- + Nachname natürliche Person)
+  · Agentur-/Vermittlernummer    (HERVORGEHOBEN — orange)
+  · Makler-Adresse               (ohne Komma)
+  · Auftrag-Datum                (Datum des Anschreibens, TT.MM.JJJJ)
+  · Makler laut MV               (Name aus Maklervollmacht — Quervergleich)
+
+[ Kunde & Vertrag ] — blau
+  · Kunde (Name)                 (Vor- + Nachname VN)
+  · Geburtsdatum VN              (TT.MM.JJJJ)
+  · Kunde-Adresse                (ohne Komma)
+  · Kunden-/Partnernummer        (KDNR, NICHT Versicherungsnummer)
+  · Versicherungsnummer          (z.B. SV…, LF…, LV…, KR…, DA…; mehrere kommagetrennt)
+  · Sparte / Geschäfts-Typ       (Komposit/Leben/KV/Mehrere/Unbekannt + BÜ einfacher Vertrag / BÜ Kundenverbindung)
+  · Sonderfall                   (Flottengeschäft / Sondertarif / Kein Sonderfall)
+  · VN laut MV                   (Name aus Maklervollmacht — Quervergleich)
+
+[ Maklervollmacht & Unterschriften ] — lila
+  · MV enthalten / Status        (ja/nein + OK / MV unvollständig / MV fehlt / nicht_pruefbar / kein Anhang)
+  · MV vollumfänglich            (ja / teilweise / nein / nicht_pruefbar)
+  · MV-Einschränkungen           (Klartext, z.B. "KV ausgeschlossen", max 140 Z.)
+  · Unterschrift Kunde / Makler  (ja/nein/unklar je Partei)
+  · Untervollmacht erteilt       (ja/nein/nicht_pruefbar)
+
+[ Ergebnis ] — grün
+  · Zusammenfassung-Box (grün)   : 1-2 Sätze neutral was die Mail macht
+  · Hinweis-Box (gelb)           : Auffälligkeiten, ggf. leer wenn nichts
+
+────────────────────────────────────────────────────────────────────────
+FUSSZEILE
+────────────────────────────────────────────────────────────────────────
+  "Erstellt durch ERGO Vorgang-Analyse · {Zeitstempel}"
+
+────────────────────────────────────────────────────────────────────────
+TECHNISCH
+────────────────────────────────────────────────────────────────────────
+  Layout    : A4 hoch, 10 mm Rand, Segoe UI 10-11 pt, eine Seite
+  Erzeugung : HTML wird zu DOCX-Page über MS Word automatisiert,
+              dann als PDF in die Original-.msg eingebettet
+  Datenbasis: die 42 KI-Felder aus buildVorgangPrompt (s. ki_prompt.txt)
+              Nicht-ASCII-Zeichen werden als numerische HTML-Entities
+              kodiert (& #228; etc.), damit der Word-Export sauber rendert
