@@ -1,0 +1,309 @@
+/* =====================================================================
+   ERGO Vorgang-Analyse - Excel-Erzeugung aus dem KI-JSON (v2.53)
+
+   results = Array von {
+       data:{...KI-JSON (33 Felder)...},
+       datum, absName, absMail, empfaenger, betreff, anhangAlle, msgFile,
+       ok, errMsg, _clusterId, _clusterColor
+   }
+
+   Aufruf:  buildVorgangsSheet(results);
+   Umgebung: HTA / Windows Script Host (JScript) mit Excel via COM
+   ===================================================================== */
+
+/* ---------- (b) kleine Helfer ---------- */
+function sg(d, k){ if(!d) return ""; var v=d[k]; return (v==null) ? "" : String(v); }
+function rgb(r,g,b){ return r + g*256 + b*65536; }                                   // Excel-BGR
+function cellSafe(v){ v=(v==null?"":String(v)); return /^[=+\-@]/.test(v) ? ("'"+v) : v; }
+
+function normalizeGermanDate(s) {
+    if (s == null) return "";
+    var str = String(s).replace(/^\s+|\s+$/g, "");
+    if (!str) return "";
+    function p2(n){ n=String(n); return n.length<2 ? "0"+n : n; }
+    var m = str.match(/^(\d{1,2})[.\/\-](\d{1,2})[.\/\-](\d{2,4})$/);
+    if (m) {
+        var dd=parseInt(m[1],10), mm=parseInt(m[2],10), yy=parseInt(m[3],10);
+        if (m[3].length===2) yy+=2000;
+        if (dd>=1&&dd<=31&&mm>=1&&mm<=12&&yy>=2000&&yy<=2099) return p2(dd)+"."+p2(mm)+"."+yy;
+    }
+    var mi = str.match(/^(\d{4})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/);
+    if (mi) {
+        var yy2=parseInt(mi[1],10), mm2=parseInt(mi[2],10), dd2=parseInt(mi[3],10);
+        if (dd2>=1&&dd2<=31&&mm2>=1&&mm2<=12&&yy2>=2000&&yy2<=2099) return p2(dd2)+"."+p2(mm2)+"."+yy2;
+    }
+    return str;
+}
+
+/* ---------- Maklerpool-Erkennung (name + sigPatterns reichen den Helfern) ---------- */
+var POOL_RULES = [
+    { name:"Fonds Finanz Maklerservice GmbH", sigPatterns:[/Fonds[\s-]*Finanz/i] },
+    { name:"BCA AG", sigPatterns:[/\bBCA\s*AG\b/, /\bBCA\b.{0,40}\bMaklerservice/i] },
+    { name:"DEMA Deutsche Versicherungsmakler AG", sigPatterns:[/DEMA[\s-]*Deutsche[\s-]*Versicherungsmakler/i, /DEMA\s*AG/i, /DEMA\s*Maklerabteilung/i] },
+    { name:"JDC Group AG / Jung DMS", sigPatterns:[/JDC[\s-]*Group/i, /Jung[\s-]*DMS/i, /Jung,\s*DMS\s*&\s*Cie/i] },
+    { name:"Maxpool Maklerkooperation GmbH", sigPatterns:[/Maxpool[\s-]*Maklerkooperation/i, /\bMaxpool\b.{0,40}GmbH/i] },
+    { name:"blau direkt GmbH & Co. KG", sigPatterns:[/blau[\s-]*direkt/i] },
+    { name:"CHECK24 Vergleichsportal Versicherungen", sigPatterns:[/CHECK24/, /Check24/] },
+    { name:"Apella AG", sigPatterns:[/Apella[\s-]*AG/i] },
+    { name:"Hypoport AG", sigPatterns:[/Hypoport[\s-]*AG/i] },
+    { name:"Verifox GmbH", sigPatterns:[/Verifox/i] },
+    { name:"Impuls Finanzmanagement AG", sigPatterns:[/Impuls[\s-]*Finanzmanagement/i] },
+    { name:"ROLAND Versicherungsmakler", sigPatterns:[/ROLAND[\s-]*Versicherungsmakler/i] },
+    { name:"WIFO Wirtschafts- und Finanzkontor", sigPatterns:[/WIFO[\s-]*Wirtschafts/i, /\bWIFO\b.{0,40}Finanzkontor/i] },
+    { name:"Aruna GmbH", sigPatterns:[/\bAruna\s*GmbH\b/i] },
+    { name:"Phoenix Maklergesellschaft", sigPatterns:[/Ph(o|oe|ö)nix[\s-]*Maklergesellschaft/i] },
+    { name:"24-Vorsorge GmbH", sigPatterns:[/24[\s-]*Vorsorge/i] }
+];
+
+/* ---------- (d) Ableitungs-Helfer ---------- */
+// Pool / Untervermittler-Firma / natuerliche Person sauber trennen
+function deriveMaklerParteien(r) {
+    var out = { pool:"", untervermittler:"", kooperation:"", nachname:"", vorname:"" };
+    if (!r || !r.data) return out;
+    var d = r.data;
+    function cln(v){ var s=String(v==null?"":v).replace(/^\s+|\s+$/g,""); if(/^(leer|-|k\.?\s?a\.?|n\/a|na|none|null|undefined|nicht[ _]pruefbar|keine?)$/i.test(s)) return ""; return s; }
+    function isFirma(s){ return !!s && /(gmbh|\bag\b|\bkg\b|\bse\b|mbh|ohg|\bug\b|e\.?\s?k\b|&\s*co|versicherungsmakler|versicherungsservice|maklerservice|finanzdienst|finanzservice|finanzmanagement|assekuranz|consult|vertrieb|kooperation|\bgruppe\b|holding|aktiengesellschaft)/i.test(s); }
+    function isPoolName(s){ if(!s) return false;
+        for (var i=0;i<POOL_RULES.length;i++){ var ps=POOL_RULES[i].sigPatterns||[];
+            for (var j=0;j<ps.length;j++){ try{ if(ps[j].test(s)) return true; }catch(e){} } } return false; }
+    function stem(s){ return String(s||"").toLowerCase().replace(/niederlassung[\s\S]*$/,"").replace(/\b(gmbh|ag|kg|se|mbh|ohg|ug|co|kgaa|cie|ek|versicherungsmakler|versicherungsservice|finanzdienstleistungen?|finanzservice|maklerservice|assekuranz|aktiengesellschaft)\b/g,"").replace(/[^a-z0-9]/g,""); }
+    function sameFirm(a,b){ var sa=stem(a),sb=stem(b); if(sa.length<4||sb.length<4) return false; return sa===sb||sa.indexOf(sb)>=0||sb.indexOf(sa)>=0; }
+    var pool=cln(sg(d,"maklerpool")), nach=cln(sg(d,"makler_nachname")), vor=cln(sg(d,"makler_vorname"));
+    var uv=cln(sg(d,"untervermittler")), koop=cln(sg(d,"makler_kooperation")), mvName=cln(sg(d,"mv_makler_name"));
+    out.pool = pool;
+    if (!out.pool) { var pc=[uv,mvName,nach,koop]; for(var pi=0;pi<pc.length;pi++){ if(pc[pi]&&isPoolName(pc[pi])){ out.pool=pc[pi]; break; } } }
+    function isPool(s){ return !!s && (isPoolName(s) || (out.pool && sameFirm(s,out.pool))); }
+    if (nach && !isFirma(nach) && !isPool(nach)) { out.nachname=nach; out.vorname=vor; }
+    out.kooperation = (koop && !isPool(koop)) ? koop : "";
+    if (uv && !isPool(uv) && !(out.kooperation && sameFirm(uv,out.kooperation))) { out.untervermittler=uv; }
+    else { var cand=[mvName,nach]; for(var k=0;k<cand.length;k++){ var c=cand[k];
+        if (c && isFirma(c) && !isPool(c) && !(out.kooperation && sameFirm(c,out.kooperation))) { out.untervermittler=c; break; } } }
+    return out;
+}
+
+// Agentur-Nr (6000/890...) von Vermittler-/Personalnummer trennen, Dubletten raus
+function deriveMaklernummern(r) {
+    var out = { agentur:"", vermittler:"" };
+    if (!r || !r.data) return out;
+    var d = r.data;
+    function cl(v){ var s=String(v==null?"":v).replace(/^\s+|\s+$/g,""); if(/^(leer|-|k\.?\s?a\.?|n\/a|na|none|null|undefined|nicht[ _]pruefbar|keine?)$/i.test(s)) return ""; return s; }
+    var ag=cl(sg(d,"agentur_nummer")), vm=cl(sg(d,"vermittler_nummer")), raw=cl(sg(d,"makler_nummer"));
+    if (!ag) { var ma=raw.match(/agentur[\s\-]*(?:nr\.?|nummer)?[\s:.\-]*([A-Za-z]?\d[\d\-\/]*)/i); if(ma) ag=ma[1]; }
+    if (!vm) { var mv=raw.match(/vermittler[\s\-]*(?:nr\.?|nummer)?[\s:.\-]*([A-Za-z]?\d[\d\-\/]*)/i); if(mv) vm=mv[1]; }
+    var bare=""; if (!ag && !vm && raw) { var mb=raw.match(/([A-Za-z]?\d[\d\-\/]{3,})/); if(mb) bare=mb[1]; }
+    function digitsOnly(s){ return String(s==null?"":s).replace(/[^0-9]/g,""); }
+    function isAgenturNr(s){ var dd=digitsOnly(s); return dd.length>=4 && (dd.indexOf("6000")===0 || dd.indexOf("890")===0); }
+    var cand=[];
+    function pushCand(v){ v=cl(v); if(!v) return; var sig=digitsOnly(v); if(!sig) return;
+        for(var ci=0;ci<cand.length;ci++){ if(digitsOnly(cand[ci])===sig) return; } cand.push(v); }
+    pushCand(ag); pushCand(vm); pushCand(bare);
+    var fAg="", fVm="";
+    for (var i=0;i<cand.length;i++){ if(isAgenturNr(cand[i])){ if(!fAg) fAg=cand[i]; } else { if(!fVm) fVm=cand[i]; } }
+    out.agentur=fAg; out.vermittler=fVm;
+    if (!out.agentur && !out.vermittler) { out.agentur=ag; out.vermittler=vm; }
+    return out;
+}
+
+function deriveGrundkategorie(r) {
+    if (!r || !r.data) return "Nicht-Makler/Sonstiges";
+    var d = r.data, vt = sg(d,"vorgangstyp");
+    if (vt && vt !== "Makler-Vorgang") return "Nicht-Makler/Sonstiges";
+    if (sg(d,"klassifikation") === "BUe-Vorgang") return (sg(d,"ist_reminder")==="ja") ? "BUe-Reminder" : "BUe-Erstvorgang";
+    return "Fachfremd (kein BUe)";
+}
+function deriveBuStatusLabel(r) {
+    var g = deriveGrundkategorie(r);
+    if (g === "BUe-Erstvorgang") return "Neue BÜ";
+    if (g === "BUe-Reminder")    return "BÜ-Reminder";
+    return "Keine BÜ";
+}
+function deriveBuStatusColor(r) {
+    var g = deriveGrundkategorie(r);
+    if (g === "BUe-Erstvorgang") return [34, 197, 94];    // Gruen
+    if (g === "BUe-Reminder")    return [254, 240, 138];  // Gelb
+    return [248, 113, 113];                               // Rot
+}
+function deriveMaklerTyp(r) {
+    if (!r || !r.data) return "";
+    var d = r.data, vt = sg(d,"vorgangstyp");
+    if (vt && vt !== "Makler-Vorgang") return "";
+    var mfa = (sg(d,"ist_mehrfachagent")||"").toLowerCase();
+    if (mfa === "ja") return "MFA";
+    if (mfa === "nein") return "Makler";
+    var blob = [sg(d,"maklerpool"), sg(d,"untervermittler"), sg(d,"mv_makler_name"),
+                sg(d,"anhang_typen"), sg(d,"hinweis"), sg(d,"mail_zusammenfassung"), (r.betreff||"")].join(" ");
+    if (/mehrfachagent|betreuungswechsel|\bpro gmbh\b|vpv\s*finanz|empfehlungsgeber/i.test(blob)) return "MFA";
+    return "Makler";
+}
+function computeMvStatus(r) {
+    if (!r || !r.data) return "";
+    var d = r.data;
+    var isRem = (sg(d,"ist_reminder")||"").toLowerCase() === "ja";
+    var anhang = String(r.anhangAlle||"").replace(/^\s+|\s+$/g,"");
+    var enth = (sg(d,"enthaelt_maklervollmacht")||"").toLowerCase();
+    var voll = (sg(d,"mv_vollumfaenglich")||"").toLowerCase();
+    if (deriveMaklerTyp(r) === "MFA") {
+        if (!anhang) return "kein Anhang";
+        var ukm = (sg(d,"unterschrift_kunde")||"").toLowerCase();
+        if (ukm === "ja") return "OK (MFA)";
+        if (ukm === "nein") return "MFA - VN-Unterschrift fehlt";
+        return "MFA - pruefen";
+    }
+    var base;
+    if (!anhang) base = "kein Anhang";
+    else if (enth === "nein") base = "MV fehlt";
+    else if (voll === "ja") base = "OK";
+    else if (voll === "teilweise") base = "MV unvollstaendig";
+    else if (voll === "nein") base = "MV unvollstaendig";
+    else base = "nicht pruefbar";
+    if (isRem && (base === "MV fehlt" || base === "kein Anhang")) return "Reminder (MV n.e.)";
+    return base;
+}
+function deriveUnterlagenPruefung(r) {
+    if (!r || !r.data) return "";
+    var d = r.data, vt = sg(d,"vorgangstyp");
+    if (vt && vt !== "Makler-Vorgang") return "";
+    if (sg(d,"klassifikation") !== "BUe-Vorgang") return "";
+    if ((sg(d,"ist_reminder")||"").toLowerCase() === "ja") return "Reminder - keine Vollst.-Pruefung";
+    var miss = [];
+    if ((sg(d,"bue_wunsch_vorhanden")||"").toLowerCase() !== "ja") miss.push("BÜ-Wunsch fehlt");
+    var mvSt = computeMvStatus(r);
+    if (mvSt === "MV fehlt" || mvSt === "kein Anhang") miss.push("MV fehlt");
+    else if (mvSt === "MV unvollstaendig") miss.push("MV unvollständig");
+    return (miss.length === 0) ? "Vollständig" : miss.join(", ");
+}
+
+/* ---------- (a) Spaltenmodell ---------- */
+var COL_GROUP_COLORS = {
+    stamm:[30,64,175], kunde:[14,116,144], triage:[76,29,149], klass:[15,118,110],
+    zb:[31,41,55], makler:[22,101,52], unter:[154,52,18], anhang:[154,52,18],
+    mv:[159,18,57], erg:[21,128,61], fehler:[127,29,29]
+};
+
+var EXCEL_COLS = [
+  { id:"lfd", h:"#", g:"stamm", w:5, num:true, get:function(r,d,ctx){ return ctx.lfd; } },
+  { id:"cluster_id", h:"Cluster_ID", g:"zb", w:11, get:function(r,d){ return r._clusterId||""; } },
+  { id:"status", h:"Status", g:"zb", w:14, get:function(r,d){ return deriveBuStatusLabel(r); } },
+  { id:"typ", h:"Typ", g:"triage", w:8, get:function(r,d){ return deriveMaklerTyp(r); } },
+  { id:"versicherungsnummer", h:"Versicherungsnummer", g:"kunde", w:20, fmt:"@",
+    get:function(r,d){ return sg(d,"versicherungsnummer"); }, set:function(r,d,v){ d.versicherungsnummer=v; } },
+  { id:"sparte", h:"Sparte", g:"kunde", w:12,
+    get:function(r,d){ return sg(d,"sparte"); }, set:function(r,d,v){ d.sparte=v; } },
+  { id:"kunde_nachname", h:"Kunde_Nachname", g:"kunde", w:18,
+    get:function(r,d){ return sg(d,"kunde_nachname"); }, set:function(r,d,v){ d.kunde_nachname=v; } },
+  { id:"kunde_vorname", h:"Kunde_Vorname", g:"kunde", w:16,
+    get:function(r,d){ return sg(d,"kunde_vorname"); }, set:function(r,d,v){ d.kunde_vorname=v; } },
+  { id:"kunde_geburtsdatum", h:"Kunde_Geburtsdatum", g:"kunde", w:14, fmt:"@",
+    get:function(r,d){ return normalizeGermanDate(sg(d,"kunde_geburtsdatum")); }, set:function(r,d,v){ d.kunde_geburtsdatum=v; } },
+  { id:"kunde_adresse", h:"Kunde_Adresse", g:"kunde", w:32,
+    get:function(r,d){ return sg(d,"kunde_adresse"); }, set:function(r,d,v){ d.kunde_adresse=v; } },
+  { id:"maklerpool", h:"Pool", g:"makler", w:28,
+    get:function(r,d){ return deriveMaklerParteien(r).pool; }, set:function(r,d,v){ d.maklerpool=v; } },
+  { id:"vermittler", h:"Vermittler", g:"makler", w:26,
+    get:function(r,d){ var p=deriveMaklerParteien(r); if(p.untervermittler) return p.untervermittler;
+      return ((p.vorname||"")+" "+(p.nachname||"")).replace(/\s+/g," ").replace(/^\s+|\s+$/g,""); } },
+  { id:"agentur_nr", h:"Agentur_Nr", g:"makler", w:14, fmt:"@",
+    get:function(r,d){ return deriveMaklernummern(r).agentur; }, set:function(r,d,v){ d.agentur_nummer=v; } },
+  { id:"vermittler_nr", h:"Personalnummer", g:"makler", w:14, fmt:"@",
+    get:function(r,d){ return deriveMaklernummern(r).vermittler; }, set:function(r,d,v){ d.vermittler_nummer=v; } },
+  { id:"bue_eingangsdatum", h:"BÜ-Eingangsdatum", g:"stamm", w:16, fmt:"@",
+    get:function(r,d){ return r.datum; }, set:function(r,d,v){ r.datum=v; } },
+  { id:"mv_datum", h:"MV_Datum", g:"mv", w:14, fmt:"@",
+    get:function(r,d){ return normalizeGermanDate(sg(d,"mv_datum")); }, set:function(r,d,v){ d.mv_datum=v; } },
+  { id:"bue_wunsch_vorhanden", h:"BÜ-Wunsch_vorhanden", g:"triage", w:14,
+    get:function(r,d){ return sg(d,"bue_wunsch_vorhanden"); }, set:function(r,d,v){ d.bue_wunsch_vorhanden=v; } },
+  { id:"makler_adresse", h:"Makler_Adresse", g:"makler", w:32,
+    get:function(r,d){ return sg(d,"makler_adresse"); }, set:function(r,d,v){ d.makler_adresse=v; } },
+  { id:"kunde_nummer", h:"Kundennummer", g:"kunde", w:16, fmt:"@",
+    get:function(r,d){ return sg(d,"kunde_nummer"); }, set:function(r,d,v){ d.kunde_nummer=v; } },
+  { id:"pruefung_unterlagen", h:"Prüfung_Unterlagen", g:"zb", w:24,
+    get:function(r,d){ return deriveUnterlagenPruefung(r); } },
+  { id:"enthaelt_maklervollmacht", h:"MV_Enthalten", g:"mv", w:11,
+    get:function(r,d){ return sg(d,"enthaelt_maklervollmacht"); }, set:function(r,d,v){ d.enthaelt_maklervollmacht=v; } },
+  { id:"mv_auf_makler_ausgestellt", h:"MV_auf_Makler_ausgestellt", g:"mv", w:14,
+    get:function(r,d){ return sg(d,"mv_auf_makler_ausgestellt"); }, set:function(r,d,v){ d.mv_auf_makler_ausgestellt=v; } },
+  { id:"mv_vollumfaenglich", h:"MV_Vollumfaenglich", g:"mv", w:13,
+    get:function(r,d){ return sg(d,"mv_vollumfaenglich"); }, set:function(r,d,v){ d.mv_vollumfaenglich=v; } },
+  { id:"mv_status", h:"MV_Status", g:"mv", w:16, get:function(r,d){ return computeMvStatus(r); } },
+  { id:"unterschrift_kunde", h:"Unterschrift_Kunde", g:"mv", w:13,
+    get:function(r,d){ return sg(d,"unterschrift_kunde"); }, set:function(r,d,v){ d.unterschrift_kunde=v; } },
+  { id:"hinweis", h:"Zusammenfassung_Hinweis", g:"erg", w:60,
+    get:function(r,d){
+        if (r && r.ok === false) return "FEHLER: " + (r.errMsg||"");
+        var zt = sg(d,"mail_zusammenfassung").replace(/^\s+|\s+$/g,"");
+        var ht = sg(d,"hinweis").replace(/^\s+|\s+$/g,"");
+        if (zt && ht) return zt + "  |  Hinweis: " + ht;
+        return zt || ht;
+    }, set:function(r,d,v){ d.hinweis=v; } },
+  { id:"datei", h:"Datei", g:"stamm", w:40, get:function(r,d){ return r.msgFile; }, set:function(r,d,v){ r.msgFile=v; } },
+  { id:"absname", h:"Absender Name", g:"stamm", w:20, get:function(r,d){ return r.absName; }, set:function(r,d,v){ r.absName=v; } },
+  { id:"absmail", h:"Absender Email", g:"stamm", w:20, get:function(r,d){ return r.absMail; }, set:function(r,d,v){ r.absMail=v; } },
+  { id:"empfaenger", h:"Empfaenger", g:"stamm", w:20, get:function(r,d){ return r.empfaenger; }, set:function(r,d,v){ r.empfaenger=v; } },
+  { id:"betreff", h:"Betreff", g:"stamm", w:40, get:function(r,d){ return r.betreff; }, set:function(r,d,v){ r.betreff=v; } },
+  { id:"anhaenge", h:"Anhaenge", g:"stamm", w:30, get:function(r,d){ return r.anhangAlle; }, set:function(r,d,v){ r.anhangAlle=v; } }
+];
+
+var COLIX = (function(){ var m={}; for (var i=0;i<EXCEL_COLS.length;i++) m[EXCEL_COLS[i].id]=i+1; return m; })();
+
+/* ---------- (c) Schreibroutine: results -> Excel ---------- */
+function buildVorgangsSheet(results) {
+    var excel = new ActiveXObject("Excel.Application");
+    excel.Visible = true;
+    var wb = excel.Workbooks.Add();
+    var sh = wb.ActiveSheet;
+    try { sh.Name = "Analyse"; } catch(e){}
+    var nCols = EXCEL_COLS.length;
+
+    // Zeile 1: Ueberschriften, gruppenweise eingefaerbt + Spaltenformat/-breite
+    for (var c = 0; c < nCols; c++) {
+        var col = EXCEL_COLS[c];
+        sh.Cells(1, c+1).Value = col.h;
+        var gc = COL_GROUP_COLORS[col.g] || [55,65,81];
+        sh.Cells(1, c+1).Interior.Color = rgb(gc[0], gc[1], gc[2]);
+        try { sh.Columns(c+1).ColumnWidth = Math.max(col.w, col.h.length + 2); } catch(e){}
+        if (col.fmt) { try { sh.Columns(c+1).NumberFormat = col.fmt; } catch(e){} }  // "@" = TEXT
+    }
+    var hr = sh.Range(sh.Cells(1,1), sh.Cells(1,nCols));
+    hr.Font.Bold = true; hr.Font.Color = rgb(255,255,255);
+
+    // Ab Zeile 2: Datenzeilen
+    for (var i = 0; i < results.length; i++) {
+        var r = results[i], d = r.data || {}, ctx = { lfd: i+1 }, row = i + 2;
+        for (var k = 0; k < nCols; k++) {
+            var cc = EXCEL_COLS[k];
+            var val = cc.get(r, d, ctx);                 // <-- KI-JSON -> Zelle
+            sh.Cells(row, k+1).Value = cc.num ? val : cellSafe(val);
+        }
+        if (r._clusterColor) {                            // Cluster-Pastell als Zeilenbasis
+            sh.Range(sh.Cells(row,1), sh.Cells(row,nCols)).Interior.Color =
+                rgb(r._clusterColor[0], r._clusterColor[1], r._clusterColor[2]);
+        }
+        if (COLIX.status) {                               // Status-Ampel
+            var sc = deriveBuStatusColor(r);
+            sh.Cells(row, COLIX.status).Interior.Color = rgb(sc[0], sc[1], sc[2]);
+        }
+        if ((!r.ok || r.errMsg) && COLIX.hinweis) {       // Fehler rot
+            sh.Cells(row, COLIX.hinweis).Interior.Color = rgb(252,165,165);
+        }
+        if (COLIX.mv_status) {                             // MV-Status gruen/rot
+            var mv = computeMvStatus(r);
+            if (mv.indexOf("OK") === 0)                                sh.Cells(row, COLIX.mv_status).Interior.Color = rgb(187,247,208);
+            else if (mv === "MV fehlt" || mv === "MV unvollstaendig")  sh.Cells(row, COLIX.mv_status).Interior.Color = rgb(252,165,165);
+        }
+    }
+
+    // Kopf + Spalte A beim Scrollen fixieren (Freeze auf B2)
+    try { excel.ActiveWindow.FreezePanes = false; sh.Range("B2").Select(); excel.ActiveWindow.FreezePanes = true; } catch(e){}
+    return wb;
+}
+
+/* =====================================================================
+   HINWEISE
+   - ist_mehrfachagent: wird von deriveMaklerTyp gelesen, ist aber im
+     aktuellen Prompt KEIN Feld -> es greift die Heuristik. Fuer exaktes
+     "Typ" muesste das Feld im Prompt ergaenzt werden.
+   - POOL_RULES ist auf name + sigPatterns reduziert (nur die nutzen die
+     Helfer). Im Original gibt es zusaetzlich domains/subjectPatterns.
+   - Datenzeilen starten hier ab Zeile 2. Im vollen Tool gibt es zusaetzlich
+     eine Beschreibungs-Zeile 2 (Spalten-Erklaerung), Daten dann ab Zeile 3.
+   ===================================================================== */
