@@ -1588,25 +1588,6 @@
                             </div>
                         </details>
 
-                        <!-- ERGO Workshop (eigenstaendiges HTA, startet direkt im Workshop-Frontend) -->
-                        <details open>
-                            <summary>
-                                ERGO Workshop (eigenstaendiges HTA)
-                                <span class="tool-tag">HTA / ErgoGPT</span>
-                            </summary>
-                            <div class="tool-body">
-                                <p><strong>Eigenstaendiges Workshop-Tool</strong> &mdash; gleiche Engine wie die Vorgang-Analyse, startet aber direkt im <strong>weissen Workshop-Frontend</strong>. Voraussetzung: <code>Cookie.txt</code> neben der HTA. Ablauf: Doppelklick &rarr; (Schritt 1) Ordner mit Demo-Mails waehlen &rarr; (Schritt 2) Analyse starten. Ergebnis: <strong>Excel mit Spalte Lfd_Nr</strong>; je Vorgang wird die <strong>Original-Mail als .msg</strong> gespeichert (fuehrend) und die <strong>KI-Notiz als PDF</strong> zusaetzlich angehaengt; die Lfd-Nr steht auch in der KI-Notiz &rarr; Excel-Zeile &harr; Vorgang eindeutig mappbar.</p>
-                                <div class="tool-actions">
-                                    <a href="workshop-source.html" class="btn-download" style="background: linear-gradient(135deg, #c8102e, #a30d24);">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                        Workshop-Quellcode-Seite oeffnen (Code kopieren / als .hta speichern)
-                                    </a>
-                                </div>
-                                <div style="font-size: 11px; color: #fbbf24; margin-top: 6px;">Quellcode-Seite mit Copy-Button + Browser-Download (umgeht Proxy-Filter). Als <code>ergo-workshop.hta</code> in einen lokalen Ordner speichern (nicht direkt vom Netzlaufwerk starten).</div>
-                                <div class="tool-meta">workshop.hta (abgeleitet aus ergo-vorgang-analyse.hta v2.11) | <strong>v2.11:</strong> Parallel-Modus friert das Fenster nicht mehr ein - der Prep-Loop (Outlook-OpenSharedItem + Anhang-SaveAsFile + Conv-Create-Fire fuer alle Mails) lief vorher synchron in einer Schleife, das blockierte mshta bei 30 Mails ~20-40 s am Stueck ohne Log-/Progress-Update. Jetzt wird EINE Mail pro <code>setTimeout</code>-Tick vorbereitet (5 ms Pause dazwischen): mshta yieldet, das Log tickt live mit, Progress-Bar laeuft, Buttons bleiben klickbar. Gesamtdauer praktisch identisch (die echten Bremsen sind Outlook-IO und der Server-Roundtrip, nicht der Tick-Overhead). <strong>v2.10:</strong> Neuer Knopf <strong>&quot;Outlook-Ordner exportieren...&quot;</strong> - Outlook-Ordnerbaum-Picker (PickFolder), alle Mails darin werden als <code>.msg</code> nach <code>%USERPROFILE%\Downloads\Workshop-Export_&lt;Ordnername&gt;_&lt;Stempel&gt;</code> exportiert (Originalbetreff = Dateiname, Sanitize nur fuer Pfadzeichen, Dedup-Suffix) und direkt als Workshop-Input gesetzt. Anreicherte <code>Vorgang_*.msg</code> aus dem _KI-Vorgaenge-Ordner ziehst du am Ende per Drag-Drop zurueck in den gewuenschten Outlook-Ordner. <strong>v2.09:</strong> Kombi wieder schnell (warmer In-HTA-Pfad statt kaltem Subprozess). <strong>v2.08:</strong> Workshop-Log mit echten Umlauten + Leerzeichen Uhrzeit/Text. <strong>v2.07:</strong> FIX Stream HTTP 403 - Streaming-Subprozess sendet jetzt Browser-User-Agent (sonst blockt das ERGO-Gateway). <strong>v2.06:</strong> FIX Stream-Start-Fehler "Datenquelle in einer anderen Dom&auml;ne" - kein ADODB.Stream mehr im HTA-Prozess. | Voraussetzung: Outlook + ErgoGPT-Cookie aus Cookie.txt (neben der HTA). <strong>Nur das Workshop-Frontend</strong> - grosse Hauptmaske komplett ausgeblendet. Knoepfe Parallel / Batch (1 Prompt) / <strong>Chunked-Batch (4er, parallel - empfohlen)</strong> / Batch (1 kombinierte PDF) / Testmodus. Lfd-Nr B&Uuml;-KI-001; Original-Mail als .msg + KI-Notiz-PDF + Excel im selben Ergebnis-Ordner.</div>
-                            </div>
-                        </details>
-
                         <!-- ERGO Vorgang-Analyse - Browser-KI (Claude API direkt)
                              DEAKTIVIERT: falscher Weg, ERGO nutzt ErgoGPT intern, nicht Claude (USA).
                              Bei Bedarf claude-analyse.html direkt aufrufen.
@@ -1629,7 +1610,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 11.54
+                Version 11.55
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->
