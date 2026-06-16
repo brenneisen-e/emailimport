@@ -1,0 +1,299 @@
+/* =====================================================================
+   ERGO Vorgang-Analyse - KI-Deckblatt + .msg-Anreicherung (v2.53)
+
+   Pipeline pro Vorgang:
+     1) wsBuildNotizHtml(data, lfdNr)  -> 1-seitiges Deckblatt als HTML
+     2) Word-COM: HTML oeffnen -> A4 + schmale Raender -> als PDF speichern
+     3) Outlook-COM: Original-.msg oeffnen -> PDF als Anlage anhaengen
+        -> SaveAs "Vorgang_<Nr>_<Betreff>.msg" (Original bleibt fuehrend)
+        -> (optional) Forward an Zielpostfach
+
+   Aufruf:  enrichMsgWithDeckblatt(processed, outDir [, forwardTo]);
+
+   ABHAENGIGKEITEN (aus ergo-excel-code.txt uebernehmen!):
+     sg(), deriveMaklerTyp(), deriveMaklerParteien(), deriveMaklernummern()
+   Umgebung: HTA / Windows (JScript) mit Word + Outlook per COM.
+
+   processed = Array von {
+       data:{...KI-JSON...}, msgPath (Pfad zur Original-.msg),
+       betreff, fileName
+   }
+   outDir    = Zielordner fuer die angereicherten Vorgang_*.msg
+   forwardTo = optional: Empfaengeradresse fuer automatischen Forward
+   ===================================================================== */
+
+/* ---------- Lfd-Nr Formatierung (BÜ-KI-001 ...) ---------- */
+function wsLfdNr(i) {
+    var n = String(i + 1);
+    while (n.length < 3) n = "0" + n;
+    return "BÜ-KI-" + n;
+}
+
+/* ---------- (1) Deckblatt-Renderer: data -> 1-Seiten-HTML ----------
+   Reihenfolge wie in der Excel: Kunde & Vertrag -> Makler -> Klassifikation
+   -> Maklervollmacht -> Ergebnis. Badges oben (BÜ-Ampel/Typ/Klassifikation/MV).
+   Alle Nicht-ASCII-Zeichen werden am Ende als numerische HTML-Entities
+   kodiert, damit Outlook/Word sie charset-unabhaengig korrekt rendern. */
+function wsBuildNotizHtml(data, lfdNr) {
+    var d = data || {};
+    var lfd = (lfdNr == null ? "" : String(lfdNr));
+    function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+    function clean(v) {
+        var s = String(v == null ? "" : v).replace(/^\s+|\s+$/g, "");
+        if (/^(leer|-|k\.?\s?a\.?|n\/a|na|none|null|undefined|nicht[ _]pruefbar|keine?)$/i.test(s)) return "";
+        return s;
+    }
+    function rowFn(label, value) {
+        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val">' + esc(clean(value) || "-") + '</td></tr>';
+    }
+    function combine(a, b) { return (clean(a) + " " + clean(b)).replace(/\s+/g, " ").replace(/^\s+|\s+$/g, ""); }
+    function cut(v, n) { var s = clean(v); if (s.length > n) return s.substring(0, n - 1) + "…"; return s; }
+    function rowCut(label, value, n) {
+        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val">' + esc(cut(value, n) || "-") + '</td></tr>';
+    }
+    var isRem = (d.ist_reminder === "ja");
+    var _typNote = deriveMaklerTyp({ data: d });
+    // MV-Status MFA-gerecht: beim Mehrfachagent zaehlt die Kundenunterschrift
+    var mvStatusTxt, mvOk;
+    if (_typNote === "MFA") { mvOk = (clean(d.unterschrift_kunde) === "ja"); mvStatusTxt = mvOk ? "OK (MFA)" : "MFA - VN-Unterschrift pruefen"; }
+    else { mvStatusTxt = d.mv_status || "-"; mvOk = (d.mv_status === "OK"); }
+    var _mp = deriveMaklerParteien({ data: d });
+    var maklerName = combine(_mp.vorname, _mp.nachname);
+    var kundeName = combine(d.kunde_vorname, d.kunde_nachname) || clean(d.kunde_name);
+    var klassBadge = '<span class="badge badge-blue">' + esc(d.klassifikation || "(leer)") + '</span>';
+    var typBadge = (_typNote ? ' <span class="badge ' + (_typNote === "MFA" ? "badge-amber" : "badge-blue") + '">' + _typNote + '</span>' : "");
+    var remBadge = isRem ? ' <span class="badge badge-amber">Reminder</span>' : "";
+    var mvBadge = '<span class="badge ' + (mvOk ? "badge-green" : "badge-red") + '">' + esc(mvStatusTxt) + '</span>';
+    // BUe-Ampel-Badge (analog Status-Spalte der Excel)
+    var isMaklerNote = (!clean(d.vorgangstyp) || d.vorgangstyp === "Makler-Vorgang");
+    var isBueNote = (d.klassifikation === "BUe-Vorgang");
+    var buTxt, buCls;
+    if (!isMaklerNote) { buTxt = "Keine BÜ"; buCls = "badge-red"; }
+    else if (isBueNote) { buTxt = isRem ? "BÜ-Reminder" : "Neue BÜ"; buCls = isRem ? "badge-amber" : "badge-green"; }
+    else { buTxt = "Keine BÜ"; buCls = "badge-red"; }
+    var buBadge = '<span class="badge ' + buCls + '">' + buTxt + '</span>';
+    function rowHi(label, value) {
+        return '<tr><td class="lbl">' + esc(label) + '</td><td class="val" style="background:#fff7ed;color:#9a3412;font-weight:700;">' + esc(clean(value) || "-") + '</td></tr>';
+    }
+
+    var _h = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>KI-Analyse</title>' +
+'<style>@page{size:A4 portrait;margin:10mm;}' +
+'body{font-family:"Segoe UI",sans-serif;color:#1f2937;background:#fff;margin:0;padding:14px 18px;max-width:900px;}' +
+'h1{font-size:15px;color:#111827;margin:0 0 4px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;}' +
+'.sub{color:#6b7280;font-size:10.5px;margin-bottom:8px;}' +
+'.badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:600;margin-right:4px;}' +
+'.badge-blue{background:#dbeafe;color:#1e40af;}' +
+'.badge-amber{background:#fef3c7;color:#92400e;}' +
+'.badge-green{background:#dcfce7;color:#15803d;}' +
+'.badge-red{background:#fee2e2;color:#b91c1c;}' +
+'.sec{color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:3px 9px;border-radius:4px;margin:8px 0 2px;}' +
+'table{border-collapse:collapse;width:100%;font-size:10.5px;margin-bottom:2px;}' +
+'td{padding:2px 9px;border-bottom:1px solid #f3f4f6;vertical-align:top;line-height:1.25;}' +
+'td.lbl{color:#6b7280;width:165px;}td.val{color:#1f2937;font-weight:500;}' +
+'.box{border-radius:5px;padding:6px 10px;margin:3px 0 2px;font-size:10.5px;line-height:1.3;}' +
+'.box .bt{display:block;font-size:9.5px;font-weight:700;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;}' +
+'.footer{margin-top:10px;color:#9ca3af;font-size:9px;text-align:center;}</style></head><body>' +
+(function(){
+  var C = { meta:"#374151", klass:"#c8102e", makler:"#0f766e", kunde:"#1e40af", unter:"#9a3412", mv:"#6d28d9", erg:"#15803d" };
+  function sec(t, c) { return '<div class="sec" style="background:' + c + ';">' + t + '</div>'; }
+  var html = '';
+  html += '<h1>KI-Vorgangs-Analyse' + (lfd ? ' <span style="float:right;font-size:15px;background:#c8102e;color:#fff;padding:4px 12px;border-radius:6px;">Lfd-Nr ' + esc(lfd) + '</span>' : '') + '</h1>';
+  html += (lfd ? '<div style="font-size:13px;color:#6b7280;margin-bottom:8px;">Vorgangs-Nr. <strong>' + esc(lfd) + '</strong> &mdash; identisch zur Spalte <strong>Lfd_Nr</strong> in der Excel-Auswertung (Mapping Excel &harr; Vorgang). Farbgruppen wie in der Excel.</div>' : '');
+  html += '<div class="sub">' + buBadge + typBadge + ' ' + klassBadge + remBadge + ' &nbsp;Maklervollmacht: ' + mvBadge + '</div>';
+
+  // Reihenfolge wie in der Excel:
+  var _mnr = deriveMaklernummern({ data: d });
+  var _agVm = ((_mnr.agentur ? "Agentur " + _mnr.agentur : "") + (_mnr.vermittler ? (_mnr.agentur ? " / " : "") + "Personalnr " + _mnr.vermittler : ""));
+  var _vermittler = clean(_mp.untervermittler) || maklerName;
+
+  // Pruefung Unterlagen (abgeleitet, nur fuer echte BÜ-Vorgaenge)
+  var _pruef = "";
+  if ((!clean(d.vorgangstyp) || d.vorgangstyp === "Makler-Vorgang") && d.klassifikation === "BUe-Vorgang") {
+    if (isRem) { _pruef = "Reminder - keine Vollst.-Pruefung"; }
+    else {
+      var _miss = [];
+      if ((clean(d.bue_wunsch_vorhanden) || "").toLowerCase() !== "ja") _miss.push("BÜ-Wunsch fehlt");
+      var _ms = String(d.mv_status || "").toLowerCase();
+      if (_ms.indexOf("mv fehlt") >= 0 || _ms.indexOf("kein anhang") >= 0) _miss.push("MV fehlt");
+      else if (_ms.indexOf("unvollst") >= 0) _miss.push("MV unvollständig");
+      _pruef = (_miss.length === 0) ? "Vollständig" : _miss.join(", ");
+    }
+  }
+
+  html += sec("Kunde &amp; Vertrag", C.kunde) + '<table>' +
+    rowFn("Kunde (Name)", kundeName) +
+    (clean(d.kunde_geburtsdatum) ? rowFn("Geburtsdatum VN", d.kunde_geburtsdatum) : "") +
+    (clean(d.kunde_adresse) ? rowFn("Kunde-Adresse", d.kunde_adresse) : "") +
+    rowFn("Versicherungsnummer", d.versicherungsnummer) +
+    rowFn("Sparte", d.sparte) +
+    (clean(d.kunde_nummer) ? rowFn("Kunden-/Partnernummer", d.kunde_nummer) : "") +
+    (clean(d.mv_kunde_name) ? rowFn("VN laut MV", d.mv_kunde_name) : "") +
+    '</table>';
+
+  html += sec("Makler", C.makler) + '<table>' +
+    rowFn("Pool", _mp.pool) +
+    (clean(_vermittler) ? rowFn("Vermittler", _vermittler) : "") +
+    rowHi("Agentur-/Personalnummer", _agVm) +
+    (clean(d.makler_adresse) ? rowFn("Makler-Adresse", d.makler_adresse) : "") +
+    (clean(d.auftrag_datum) ? rowFn("Auftrag-Datum", d.auftrag_datum) : "") +
+    '</table>';
+
+  html += sec("Klassifikation &amp; Vorgang", C.klass) + '<table>' +
+    rowFn("Vorgangstyp", d.vorgangstyp) +
+    rowFn("Klassifikation", d.klassifikation) +
+    rowFn("BÜ-Wunsch vorhanden", d.bue_wunsch_vorhanden) +
+    (_pruef ? rowFn("Prüfung Unterlagen", _pruef) : "") +
+    rowFn("Reminder/Wiedervorlage", isRem ? "ja" : "nein") +
+    (isRem ? rowFn("Reminder-Quelle", d.reminder_quelle) : "") +
+    '</table>';
+
+  html += sec("Maklervollmacht &amp; Unterschriften", C.mv) + '<table>' +
+    rowFn("MV enthalten / Status", combine(d.enthaelt_maklervollmacht, d.mv_status ? "(" + d.mv_status + ")" : "")) +
+    (clean(d.mv_auf_makler_ausgestellt) ? rowFn("MV auf Makler ausgestellt", d.mv_auf_makler_ausgestellt) : "") +
+    rowFn("MV vollumfänglich", d.mv_vollumfaenglich) +
+    (clean(d.mv_einschraenkungen) ? rowCut("MV-Einschränkungen", d.mv_einschraenkungen, 140) : "") +
+    rowFn("Unterschrift Kunde / Makler", combine(d.unterschrift_kunde, "/ " + (clean(d.unterschrift_makler) || "-"))) +
+    (clean(d.untervollmacht_vorhanden) && d.untervollmacht_vorhanden !== "nein" ? rowFn("Untervollmacht erteilt", d.untervollmacht_vorhanden) : "") +
+    '</table>';
+
+  html += sec("Ergebnis", C.erg);
+  html += '<div class="box" style="background:#f0fdf4;border:1px solid #bbf7d0;color:#14532d;"><span class="bt" style="color:#15803d;">Zusammenfassung</span>' + esc(cut(d.mail_zusammenfassung, 280) || "-") + '</div>';
+  html += (clean(d.hinweis) ? '<div class="box" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;"><span class="bt" style="color:#d97706;">Hinweis</span>' + esc(cut(d.hinweis, 220)) + '</div>' : "");
+
+  html += '<div class="footer">Erstellt durch ERGO Vorgang-Analyse &middot; ' + new Date().toLocaleString() + '</div>';
+  return html;
+})() +
+'</body></html>';
+    return _h.replace(new RegExp('[\\u0080-\\uFFFF]','g'), function(ch){ return '&#' + ch.charCodeAt(0) + ';'; });
+}
+
+/* ---------- Word-Instanz fuer die PDF-Erzeugung (Perf-getunt) ---------- */
+function wsInitWord() {
+    var word = null;
+    try {
+        word = new ActiveXObject("Word.Application");
+        word.Visible = false;
+        try { word.DisplayAlerts = 0; } catch(e){}
+        try { word.AutomationSecurity = 3; } catch(e){}            // msoAutomationSecurityForceDisable (Makros aus)
+        try { word.ScreenUpdating = false; } catch(e){}
+        try { word.Options.CheckGrammarAsYouType = false; } catch(e){}
+        try { word.Options.CheckSpellingAsYouType = false; } catch(e){}
+        try { word.Options.AutoFormatAsYouTypeReplaceQuotes = false; } catch(e){}
+        try { word.Options.Pagination = false; } catch(e){}
+        try { word.Options.SaveInterval = 0; } catch(e){}
+        try { word.Options.AnimateScreenMovements = false; } catch(e){}
+    } catch(e) {
+        word = null;  // Word nicht da -> Fallback: HTML statt PDF anhaengen
+    }
+    return word;
+}
+
+/* ---------- (2)+(3) Hauptroutine: pro Vorgang Deckblatt -> PDF -> .msg ----------
+   Hinweis: Outlook/Word laufen single-threaded; im echten HTA wird das
+   tick-basiert (1 Mail pro setTimeout) gemacht, damit das Fenster nicht
+   einfriert und Sicherheits-Dialoge den Lauf nicht abbrechen. Hier als
+   uebersichtliche Schleife. */
+function enrichMsgWithDeckblatt(processed, outDir, forwardTo) {
+    var fso     = new ActiveXObject("Scripting.FileSystemObject");
+    var shell   = new ActiveXObject("WScript.Shell");
+    var outlook = new ActiveXObject("Outlook.Application");
+    var word    = wsInitWord();
+    var temp    = shell.ExpandEnvironmentStrings("%TEMP%");
+    var ok = 0, fail = 0, forwarded = 0;
+
+    for (var i = 0; i < processed.length; i++) {
+        var p = processed[i];
+        var lfd = wsLfdNr(i);
+        var tmpHtml = "", keepPath = "", item = null;
+        try {
+            // 1) Deckblatt-HTML in TEMP schreiben
+            var noteHtml = wsBuildNotizHtml(p.data, lfd);
+            var stamp = lfd + "_" + new Date().getTime() + "_" + Math.floor(Math.random() * 100000);
+            tmpHtml = temp + "\\KI-Notiz_" + stamp + ".html";
+            var nf = fso.CreateTextFile(tmpHtml, true, false);
+            nf.Write(noteHtml); nf.Close();
+
+            // 2) HTML -> PDF via Word (A4, schmale Raender, 1 Seite)
+            var pdfPath = temp + "\\KI-Notiz_" + stamp + ".pdf";
+            if (word) {
+                try {
+                    try { if (fso.FileExists(pdfPath)) fso.DeleteFile(pdfPath, true); } catch(e){}
+                    var doc = word.Documents.Open(tmpHtml, false, true);   // ReadOnly
+                    try {
+                        var ps = doc.PageSetup;
+                        ps.TopMargin = 28; ps.BottomMargin = 22;           // pt (1 cm ~ 28.35 pt)
+                        ps.LeftMargin = 34; ps.RightMargin = 34;
+                        try { ps.PageHeight = 842; ps.PageWidth = 595; } catch(e){}  // A4 in pt
+                    } catch(e){}
+                    doc.SaveAs2(pdfPath, 17);   // 17 = wdFormatPDF
+                    doc.Close(0);               // 0 = wdDoNotSaveChanges
+                } catch(ePdf) {
+                    pdfPath = "";               // -> HTML-Fallback unten
+                }
+            }
+
+            // PDF wenn vorhanden, sonst HTML als Anlage
+            if (pdfPath && fso.FileExists(pdfPath)) {
+                keepPath = pdfPath;
+            } else {
+                keepPath = temp + "\\KI-Notiz_" + stamp + ".html";
+                try { if (fso.FileExists(keepPath)) fso.DeleteFile(keepPath, true); } catch(e){}
+                var hf = fso.CreateTextFile(keepPath, true, false);
+                hf.Write(noteHtml); hf.Close();
+            }
+
+            // 3) Original-.msg oeffnen, Deckblatt als Anlage anhaengen, SaveAs
+            item = outlook.Session.OpenSharedItem(p.msgPath);
+            var isPdf = (keepPath.substr(-4).toLowerCase() === ".pdf");
+            item.Attachments.Add(keepPath, 1, 1, "KI-Notiz_" + lfd + (isPdf ? ".pdf" : ".html"));  // 1 = olByValue
+
+            var safeBetreff = String(p.betreff || p.fileName || "Vorgang")
+                                .replace(/[\\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").substring(0, 60);
+            var target = String(outDir).replace(/\\+$/, "") + "\\Vorgang_" + lfd + "_" + safeBetreff + ".msg";
+            item.SaveAs(target, 9);   // 9 = olMSGUnicode
+
+            // 3b) Optionaler Forward an Zielpostfach (Absender = eigenes Postfach;
+            //     Outlook-Security fragt evtl. beim 1. Send "Zugriff zulassen")
+            if (forwardTo) {
+                try {
+                    var fwd = item.Forward();
+                    fwd.To = forwardTo;
+                    try { fwd.Recipients.ResolveAll(); } catch(e){}
+                    fwd.Send();
+                    forwarded++;
+                } catch(eFwd) {}
+            }
+
+            ok++;
+        } catch(eItem) {
+            fail++;
+            // Im echten Tool: Original-.msg als Kopie in Unterordner "_Fehler_ohne_KI-Notiz"
+        } finally {
+            try { if (item) item.Close(1); } catch(e){}        // 1 = olDiscard
+            try { if (tmpHtml && fso.FileExists(tmpHtml)) fso.DeleteFile(tmpHtml, true); } catch(e){}
+            try { if (keepPath && fso.FileExists(keepPath)) fso.DeleteFile(keepPath, true); } catch(e){}  // PDF steckt nach SaveAs in der .msg
+        }
+    }
+
+    try { if (word) word.Quit(0); } catch(e){}
+    return { ok: ok, fail: fail, forwarded: forwarded };
+}
+
+/* =====================================================================
+   WICHTIGE COM-KONSTANTEN (zur Orientierung)
+     Word  SaveAs2 Format:   17 = wdFormatPDF
+     Word  Document.Close:    0 = wdDoNotSaveChanges
+     Outlook Attachments.Add: 1 = olByValue (echte Einbettung)
+     Outlook MailItem.SaveAs: 9 = olMSGUnicode
+     Outlook MailItem.Close:  1 = olDiscard
+
+   HINWEISE
+   - Braucht installiertes Word UND Outlook. Ohne Word wird das Deckblatt
+     ersatzweise als HTML-Datei angehaengt (statt PDF).
+   - OpenSharedItem(msgPath) oeffnet eine .msg-Datei vom Dateisystem.
+   - Das Original bleibt fuehrend: es wird die Original-Mail geoeffnet und
+     unter neuem Namen (Vorgang_<Nr>_<Betreff>.msg) MIT angehaengtem
+     Deckblatt gespeichert; die TEMP-PDF/HTML wird danach geloescht.
+   - deriveMaklerTyp / deriveMaklerParteien / deriveMaklernummern / sg
+     stammen aus ergo-excel-code.txt - beide Dateien zusammen verwenden.
+   ===================================================================== */
