@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool-Bibliothek &middot; Downloads</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#11015;&#65039;</text></svg>">
+    <style>
+        :root {
+            --accent: #4f46e5;
+            --accent-dark: #4338ca;
+            --accent-soft: #eef2ff;
+            --ink: #1d2030;
+            --ink-2: #565b73;
+            --ink-3: #8a8fa6;
+            --line: #ececf1;
+            --line-2: #e3e4ec;
+            --bg: #ffffff;
+            --bg-soft: #f7f8fb;
+            --ok: #0d9f6e;
+            --ok-soft: #e7f7f0;
+            --radius: 16px;
+            --shadow-sm: 0 1px 2px rgba(20,22,40,.04), 0 1px 3px rgba(20,22,40,.06);
+            --shadow-md: 0 8px 24px rgba(30,32,60,.10), 0 2px 6px rgba(30,32,60,.06);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: var(--ink);
+            background: var(--bg);
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+        a { color: inherit; text-decoration: none; }
+
+        /* ---------- Top bar ---------- */
+        .topbar {
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(255,255,255,.82);
+            backdrop-filter: saturate(1.6) blur(12px);
+            border-bottom: 1px solid var(--line);
+        }
+        .topbar-inner {
+            max-width: 1080px; margin: 0 auto;
+            padding: 14px 24px;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .brand { display: flex; align-items: center; gap: 11px; }
+        .brand-mark {
+            width: 34px; height: 34px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #7c6cf0);
+            display: grid; place-items: center; color: #fff; flex: none;
+            box-shadow: 0 4px 12px rgba(79,70,229,.35);
+        }
+        .brand-mark svg { width: 18px; height: 18px; }
+        .brand-name { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+        .brand-sub { font-size: 12px; color: var(--ink-3); margin-top: -2px; }
+        .topbar-spacer { flex: 1; }
+        .back-link {
+            font-size: 13px; font-weight: 550; color: var(--ink-2);
+            padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line-2);
+            display: inline-flex; align-items: center; gap: 7px; transition: .15s;
+            background: #fff;
+        }
+        .back-link:hover { border-color: var(--accent); color: var(--accent); }
+        .back-link svg { width: 15px; height: 15px; }
+
+        /* ---------- Hero ---------- */
+        .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+        .hero { padding: 56px 0 28px; }
+        .hero h1 {
+            font-size: clamp(28px, 4vw, 40px); font-weight: 720;
+            letter-spacing: -.025em; line-height: 1.1;
+        }
+        .hero p { margin-top: 12px; font-size: 16px; color: var(--ink-2); max-width: 56ch; }
+
+        /* ---------- Controls ---------- */
+        .controls {
+            position: sticky; top: 63px; z-index: 40;
+            background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+            padding: 14px 0 16px; margin-bottom: 8px;
+            display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+        }
+        .search {
+            position: relative; flex: 1 1 260px; min-width: 200px;
+        }
+        .search svg {
+            position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+            width: 16px; height: 16px; color: var(--ink-3); pointer-events: none;
+        }
+        .search input {
+            width: 100%; font: inherit; font-size: 14px;
+            padding: 11px 14px 11px 38px;
+            border: 1px solid var(--line-2); border-radius: 12px;
+            background: #fff; color: var(--ink); outline: none; transition: .15s;
+        }
+        .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+        .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+        .pill {
+            font: inherit; font-size: 13px; font-weight: 550; cursor: pointer;
+            padding: 9px 15px; border-radius: 999px;
+            border: 1px solid var(--line-2); background: #fff; color: var(--ink-2);
+            transition: .15s; display: inline-flex; align-items: center; gap: 7px;
+        }
+        .pill:hover { border-color: var(--accent); color: var(--accent); }
+        .pill.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+        .pill .count {
+            font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+            background: var(--bg-soft); color: var(--ink-3);
+        }
+        .pill.active .count { background: rgba(255,255,255,.2); color: #fff; }
+
+        /* ---------- Group heading ---------- */
+        .group-head {
+            display: flex; align-items: baseline; gap: 10px;
+            margin: 30px 0 14px; padding-top: 6px;
+        }
+        .group-head h2 { font-size: 14px; font-weight: 680; letter-spacing: .02em; text-transform: uppercase; color: var(--ink); }
+        .group-head .desc { font-size: 13px; color: var(--ink-3); }
+
+        /* ---------- Grid + cards ---------- */
+        .grid {
+            display: grid; gap: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        }
+        .card {
+            border: 1px solid var(--line); border-radius: var(--radius);
+            background: #fff; padding: 20px; display: flex; flex-direction: column;
+            box-shadow: var(--shadow-sm); transition: box-shadow .18s, transform .18s, border-color .18s;
+        }
+        .card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--line-2); }
+        .card-top { display: flex; align-items: flex-start; gap: 12px; }
+        .card-icon {
+            width: 40px; height: 40px; border-radius: 11px; flex: none;
+            display: grid; place-items: center; color: var(--accent);
+            background: var(--accent-soft);
+        }
+        .card-icon svg { width: 20px; height: 20px; }
+        .card-icon.green { color: var(--ok); background: var(--ok-soft); }
+        .card-title { font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; }
+        .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .tag {
+            font-size: 11px; font-weight: 600; letter-spacing: .01em;
+            padding: 2px 8px; border-radius: 6px;
+            background: var(--bg-soft); color: var(--ink-2); border: 1px solid var(--line);
+        }
+        .badge-new {
+            margin-left: auto; font-size: 11px; font-weight: 700;
+            color: var(--ok); background: var(--ok-soft);
+            padding: 3px 9px; border-radius: 999px; flex: none;
+        }
+        .summary { margin-top: 14px; font-size: 14px; color: var(--ink-2); }
+        .requires {
+            margin-top: 12px; font-size: 12px; color: var(--ink-3);
+            display: flex; align-items: center; gap: 7px;
+        }
+        .requires svg { width: 13px; height: 13px; flex: none; }
+        .card-foot { margin-top: 16px; display: flex; align-items: center; gap: 10px; }
+        .btn {
+            font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+            border: none; border-radius: 11px; padding: 10px 16px;
+            display: inline-flex; align-items: center; gap: 8px; transition: .15s;
+        }
+        .btn svg { width: 16px; height: 16px; }
+        .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(79,70,229,.28); }
+        .btn-primary:hover { background: var(--accent-dark); }
+        .btn-green { background: var(--ok); color: #fff; box-shadow: 0 4px 12px rgba(13,159,110,.25); }
+        .btn-green:hover { filter: brightness(.95); }
+        .btn-ghost { background: #fff; color: var(--ink-2); border: 1px solid var(--line-2); }
+        .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ---------- Details disclosure ---------- */
+        .disclosure { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+        .disclosure-toggle {
+            font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2);
+            background: none; border: none; cursor: pointer; padding: 0;
+            display: inline-flex; align-items: center; gap: 6px; transition: color .15s;
+        }
+        .disclosure-toggle:hover { color: var(--accent); }
+        .disclosure-toggle svg { width: 14px; height: 14px; transition: transform .2s; }
+        .disclosure-toggle.open svg { transform: rotate(90deg); }
+        .disclosure-body { margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+        .disclosure-body p + p { margin-top: 8px; }
+        .kv { font-size: 12px; color: var(--ink-3); margin-top: 10px; }
+        .kv code {
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 11.5px; background: var(--bg-soft); padding: 1px 5px; border-radius: 5px;
+            color: var(--ink-2);
+        }
+        .history { margin-top: 12px; }
+        .history-list { list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .history-list li { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 9px; }
+        .history-list .v {
+            flex: none; font-weight: 700; color: var(--accent);
+            font-family: ui-monospace, monospace; font-size: 11.5px;
+            background: var(--accent-soft); padding: 1px 7px; border-radius: 6px; height: fit-content;
+        }
+
+        /* ---------- Empty + footer ---------- */
+        .empty { text-align: center; padding: 60px 0; color: var(--ink-3); }
+        .empty svg { width: 40px; height: 40px; margin-bottom: 12px; opacity: .5; }
+        .footer {
+            margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--line);
+            text-align: center; color: var(--ink-3); font-size: 12px;
+        }
+        @media (max-width: 560px) {
+            .hero { padding: 36px 0 20px; }
+            .grid { grid-template-columns: 1fr; }
+            .topbar-inner, .wrap { padding-left: 16px; padding-right: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="vendor/react.production.min.js"></script>
+    <script src="vendor/react-dom.production.min.js"></script>
+    <script src="vendor/htm.umd.js"></script>
+    <script>
+    (function () {
+        const html = htm.bind(React.createElement);
+        const { useState, useMemo } = React;
+
+        /* ---------- Icons (inline, no external deps) ---------- */
+        const Icon = {
+            mail: html`<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>`,
+            download: html`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`,
+            file: html`<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>`,
+            grid: html`<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>`,
+            upload: html`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>`,
+            cpu: html`<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>`,
+            search: html`<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
+            chevron: html`<polyline points="9 18 15 12 9 6"/>`,
+            back: html`<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>`,
+            check: html`<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>`,
+            code: html`<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>`,
+            box: html`<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>`,
+        };
+        function Svg(props) {
+            return html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width=${props.sw || 2} stroke-linecap="round" stroke-linejoin="round">${props.children}</svg>`;
+        }
+
+        /* ---------- Data: functional groups (whitelabel, no brand names) ---------- */
+        const GROUPS = [
+            { id: 'export',  label: 'E-Mail-Export',     icon: Icon.mail, desc: 'Mails aus Outlook als JSON / Excel herausziehen' },
+            { id: 'process', label: 'PDF & Verarbeitung', icon: Icon.box,  desc: 'Dateien zuordnen, umbenennen, als PDF ablegen, hochladen' },
+            { id: 'ai',      label: 'KI-Analyse',         icon: Icon.cpu,  desc: 'Vorgänge automatisch klassifizieren' },
+        ];
+
+        const TOOLS = [
+            {
+                id: 'outlook-export', group: 'export', icon: Icon.mail,
+                title: 'Outlook Export',
+                tags: ['HTA'],
+                summary: 'Postfach und Ordner wählen, alle Mails extrahieren und als JSON für das Review-Tool speichern.',
+                action: { kind: 'download', href: 'Email-Export-Tool.zip', as: 'E-Mail-Export.zip' },
+                requires: 'Outlook',
+                details: 'Splittet jede Mail in Betreff, Text, Absender und Anhang-Namen. Die JSON-Datei lässt sich anschließend direkt im Web-Review-Tool laden.',
+                meta: 'Enthält: HTA + JS-Module',
+            },
+            {
+                id: 'selection-export', group: 'export', icon: Icon.mail,
+                title: 'Markierte Mails exportieren',
+                tags: ['HTA'],
+                summary: 'Exportiert nur die aktuell in Outlook markierten Mails – ideal für einzelne Vorgänge.',
+                action: { kind: 'download', href: 'Selection-Export-Tool.zip', as: 'Markierte-Mails-Export.zip' },
+                requires: 'Outlook',
+                details: 'Schnellweg ohne Ordner-Auswahl: markierte Mails in Outlook auswählen, Tool starten, JSON erhalten.',
+                meta: 'Enthält: HTA',
+            },
+            {
+                id: 'batch-export', group: 'export', icon: Icon.mail,
+                title: 'Batch-Export',
+                tags: ['HTA'],
+                whatsNew: 'v1.1',
+                summary: 'Postfach und Zeitraum (Von/Bis) wählen, alle Mails in einer Tabelle anzeigen und als Excel oder JSON exportieren.',
+                action: { kind: 'download', href: 'ERGO-Email-Batch-v1.1.zip', as: 'Batch-Export-v1.1.zip' },
+                requires: 'Outlook (MAPI), Excel für den Excel-Export',
+                details: 'Splittet in Betreff, Text, Absender und Anhang-Namen. Neu in v1.1: Mails als MSG/EML auf die Platte legen und später per Excel-Makro „Ordner scannen“ wieder einlesen.',
+                meta: 'Enthält: HTA',
+            },
+            {
+                id: 'batch-excel', group: 'export', icon: Icon.check,
+                title: 'Batch-Export (Excel-Makro)',
+                tags: ['XLSM', 'VBA'],
+                whatsNew: 'Citrix',
+                summary: 'Citrix-taugliches Excel-VBA-Makro für den Mail-Abruf, wenn keine HTA erlaubt ist.',
+                action: { kind: 'download', href: 'ERGO-Excel-Tool-v1.1.zip', as: 'Batch-Export-Excel-v1.1.zip' },
+                requires: 'Excel, Outlook',
+                details: 'Drei Modi: (1) Outlook live (Ordner + Tage zurück), (2) Ordner-Scan für .msg / .eml vom Laufwerk, (3) Mails als MSG/EML auf die Platte speichern. Output: Tabellenblatt „Emails“ + JSON für das Web-Tool. Einmal-Setup in 3 Klicks: Excel öffnen → als .xlsm speichern → Modul importieren.',
+                meta: 'Enthält: VBA-Modul + Anleitung',
+            },
+            {
+                id: 'extraktion', group: 'process', icon: Icon.box,
+                title: 'Mail-Extraktion & Zuordnung',
+                tags: ['HTA'],
+                summary: 'Verarbeitet MSG/EML-Dateien aus einem Ordner: ordnet zu, benennt um und erstellt PDFs.',
+                action: { kind: 'download', href: 'BGAV-Testmail-Extraktion.zip', as: 'Mail-Extraktion.zip' },
+                requires: 'Optional: Word (für PDF), Outlook (für MSG)',
+                details: 'Ordnet Empfänger per Excel-Abgleich die passende Vorgangsnummer zu, benennt die Dateien um und erstellt PDFs. Nicht zugeordnete Dateien bleiben unangetastet im Quell-Ordner liegen.',
+                meta: 'Enthält: HTA',
+            },
+            {
+                id: 'pdf-upload', group: 'process', icon: Icon.upload,
+                title: 'PDF-Massenupload',
+                tags: ['HTA', 'Java'],
+                summary: 'Scannt einen Ordner nach Dashboard-PDFs und erzeugt eine Upload-CSV für die Workflow-API.',
+                action: { kind: 'download', href: 'PDF-Massenupload.zip', as: 'PDF-Massenupload.zip' },
+                requires: 'Keine Abhängigkeiten für die HTA',
+                details: 'Erkennt Dateien nach dem Muster Dashboard_XXXXXXXX_DDMMYYYY.pdf, liest die Vorgangsnummer aus dem Dateinamen und erzeugt eine fertige Upload-CSV für die Workflow-API.',
+                meta: 'Enthält: HTA + Java-Batch-Upload',
+            },
+            {
+                id: 'analyse-excel', group: 'ai', icon: Icon.cpu,
+                title: 'Vorgang-Analyse (KI)',
+                tags: ['XLSM', 'VBA', 'KI-Gateway'],
+                whatsNew: 'v2.13',
+                summary: 'KI-Klassifikation von Vorgängen inklusive Anhang-Analyse – als Excel-Makro.',
+                action: { kind: 'download', href: 'ERGO-Vorgang-Analyse-v2.13.zip', as: 'Vorgang-Analyse-v2.13.zip' },
+                requires: 'Outlook + gültiger KI-Gateway-Cookie',
+                details: 'Legt das .xlsm in den Ordner mit den .msg-Dateien, scannt den Ordner, öffnet jede Mail über Outlook, extrahiert Anhänge und lädt bis zu 3 PDFs (max. 20 MB) ins KI-Gateway. Klassifiziert mit Triage-Feld (Bounce/NDR werden erkannt) in 14 Felder – inkl. Anhang-Typen und Vollmacht-Prüfung. Selbstständig: kein separates Modul nötig.',
+                meta: 'Enthält: VBA-Modul + Anleitung',
+                history: [
+                    { v: 'v2.13', text: 'Bis zu 6 parallele Antwort-Calls in der Pipeline (Default 3) – typisch 2,5× schneller; Modell-ID-Test eingebaut.' },
+                ],
+            },
+            {
+                id: 'analyse-hta', group: 'ai', icon: Icon.code, iconGreen: true,
+                title: 'Vorgang-Analyse (Standalone)',
+                tags: ['HTA', 'KI-Gateway'],
+                whatsNew: 'v2.11',
+                summary: 'Dieselbe KI-Analyse ohne Excel: als HTA, ohne Makro-Aktivierung, resume-fähig.',
+                action: { kind: 'open', href: 'hta-source.html', label: 'Quellcode-Seite öffnen' },
+                actionNote: 'Öffnet die Quellcode-Seite mit Copy-Button und Browser-Download (umgeht Proxy-Filter). Datei lokal unter C:\\… speichern, nicht direkt vom Netzlaufwerk starten.',
+                requires: 'Outlook (nur für KI-Modus und kleinen Pool-Modus)',
+                details: 'Doppelklick auf die .hta → Cookie einfügen → Ordner wählen → Analyse starten. Resume-fähig: bei Abbruch oder Neustart wird ein Cache pro Ordner gespeichert, bereits analysierte Mails werden übersprungen. Der Abbrechen-Button stoppt sauber und sichert alle bisherigen Ergebnisse. Parallel-Pipeline (Default 3, max 6). Excel-/JSON-Export am Ende.',
+                meta: 'Quelle: HTA',
+                history: [
+                    { v: 'v2.11', text: 'Parallel-Modus friert das Fenster nicht mehr ein – eine Mail pro Tick, Log und Fortschritt laufen live mit.' },
+                    { v: 'v2.10', text: 'Ordner direkt auswählen: alle Mails werden als .msg exportiert und als Eingabe gesetzt.' },
+                    { v: 'v2.09', text: 'Kombi-Modus wieder schnell (warmer In-Process-Pfad statt kaltem Subprozess).' },
+                    { v: 'v2.07', text: 'Fix Streaming HTTP 403 – sendet jetzt den passenden Browser-User-Agent.' },
+                    { v: 'v2.00', text: 'Option „Scan-/Foto-PDFs überspringen“ – per Heuristik erkannt und als „manuell prüfen“ markiert.' },
+                ],
+            },
+        ];
+
+        /* ---------- Components ---------- */
+        function Tag({ children }) {
+            return html`<span class="tag">${children}</span>`;
+        }
+
+        function ToolCard({ tool }) {
+            const [open, setOpen] = useState(false);
+            const [showHist, setShowHist] = useState(false);
+            const a = tool.action;
+            return html`
+                <div class="card">
+                    <div class="card-top">
+                        <div class=${'card-icon' + (tool.iconGreen ? ' green' : '')}>
+                            <${Svg}>${tool.icon}<//>
+                        </div>
+                        <div style=${{ flex: 1, minWidth: 0 }}>
+                            <div style=${{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div class="card-title">${tool.title}</div>
+                                ${tool.whatsNew && html`<span class="badge-new">${tool.whatsNew}</span>`}
+                            </div>
+                            <div class="tags">
+                                ${tool.tags.map((t) => html`<${Tag} key=${t}>${t}<//>`)}
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="summary">${tool.summary}</p>
+
+                    ${tool.requires && html`
+                        <div class="requires">
+                            <${Svg}>${Icon.check}<//>
+                            <span>${tool.requires}</span>
+                        </div>`}
+
+                    <div class="card-foot">
+                        ${a.kind === 'download'
+                            ? html`<a class="btn btn-primary" href=${a.href} download=${a.as}>
+                                    <${Svg}>${Icon.download}<//> Herunterladen
+                                </a>`
+                            : html`<a class="btn btn-green" href=${a.href} target="_blank" rel="noopener">
+                                    <${Svg}>${Icon.code}<//> ${a.label}
+                                </a>`}
+                    </div>
+
+                    <div class="disclosure">
+                        <button class=${'disclosure-toggle' + (open ? ' open' : '')} onClick=${() => setOpen(!open)}>
+                            <${Svg}>${Icon.chevron}<//> ${open ? 'Weniger anzeigen' : 'Details'}
+                        </button>
+                        ${open && html`
+                            <div class="disclosure-body">
+                                <p>${tool.details}</p>
+                                ${tool.actionNote && html`<p style=${{ color: 'var(--ink-3)' }}>${tool.actionNote}</p>`}
+                                ${tool.meta && html`<div class="kv">${tool.meta}</div>`}
+                                ${tool.history && html`
+                                    <div class="history">
+                                        <button class=${'disclosure-toggle' + (showHist ? ' open' : '')}
+                                                onClick=${() => setShowHist(!showHist)}>
+                                            <${Svg}>${Icon.chevron}<//> Versionsverlauf
+                                        </button>
+                                        ${showHist && html`
+                                            <ul class="history-list">
+                                                ${tool.history.map((h) => html`
+                                                    <li key=${h.v}><span class="v">${h.v}</span><span>${h.text}</span></li>`)}
+                                            </ul>`}
+                                    </div>`}
+                            </div>`}
+                    </div>
+                </div>`;
+        }
+
+        function App() {
+            const [query, setQuery] = useState('');
+            const [active, setActive] = useState('all');
+
+            const q = query.trim().toLowerCase();
+            const matches = (t) =>
+                !q ||
+                t.title.toLowerCase().includes(q) ||
+                t.summary.toLowerCase().includes(q) ||
+                t.tags.join(' ').toLowerCase().includes(q);
+
+            const visible = useMemo(
+                () => TOOLS.filter((t) => (active === 'all' || t.group === active) && matches(t)),
+                [active, q]
+            );
+
+            const counts = useMemo(() => {
+                const c = { all: TOOLS.filter(matches).length };
+                GROUPS.forEach((g) => { c[g.id] = TOOLS.filter((t) => t.group === g.id && matches(t)).length; });
+                return c;
+            }, [q]);
+
+            const groupsToRender = GROUPS.filter(
+                (g) => (active === 'all' || active === g.id) && visible.some((t) => t.group === g.id)
+            );
+
+            return html`
+                <div class="topbar">
+                    <div class="topbar-inner">
+                        <a class="brand" href="index.html">
+                            <div class="brand-mark"><${Svg}>${Icon.download}<//></div>
+                            <div>
+                                <div class="brand-name">Tool-Bibliothek</div>
+                                <div class="brand-sub">Downloads &amp; Werkzeuge</div>
+                            </div>
+                        </a>
+                        <div class="topbar-spacer"></div>
+                        <a class="back-link" href="index.html">
+                            <${Svg}>${Icon.back}<//> Zum Review-Tool
+                        </a>
+                    </div>
+                </div>
+
+                <div class="wrap">
+                    <header class="hero">
+                        <h1>Werkzeuge zum Herunterladen</h1>
+                        <p>Helfer für Export, Verarbeitung und KI-Analyse von E-Mail-Vorgängen.
+                           Wähle ein Werkzeug – Details zeigst du nur ein, wenn du sie brauchst.</p>
+                    </header>
+
+                    <div class="controls">
+                        <div class="search">
+                            <${Svg}>${Icon.search}<//>
+                            <input type="search" placeholder="Werkzeug suchen …"
+                                   value=${query} onInput=${(e) => setQuery(e.target.value)} />
+                        </div>
+                        <div class="pills">
+                            <button class=${'pill' + (active === 'all' ? ' active' : '')} onClick=${() => setActive('all')}>
+                                <${Svg}>${Icon.grid}<//> Alle <span class="count">${counts.all}</span>
+                            </button>
+                            ${GROUPS.map((g) => html`
+                                <button key=${g.id} class=${'pill' + (active === g.id ? ' active' : '')}
+                                        onClick=${() => setActive(g.id)}>
+                                    <${Svg}>${g.icon}<//> ${g.label} <span class="count">${counts[g.id]}</span>
+                                </button>`)}
+                        </div>
+                    </div>
+
+                    ${groupsToRender.length === 0
+                        ? html`<div class="empty">
+                                <${Svg}>${Icon.search}<//>
+                                <div>Kein Werkzeug gefunden für „${query}“.</div>
+                            </div>`
+                        : groupsToRender.map((g) => html`
+                            <section key=${g.id}>
+                                <div class="group-head">
+                                    <h2>${g.label}</h2>
+                                    <span class="desc">${g.desc}</span>
+                                </div>
+                                <div class="grid">
+                                    ${visible.filter((t) => t.group === g.id).map((t) => html`<${ToolCard} key=${t.id} tool=${t} />`)}
+                                </div>
+                            </section>`)}
+
+                    <footer class="footer">
+                        Interne Werkzeugsammlung · alle Tools laufen lokal · keine Daten verlassen den Arbeitsplatz
+                        <div style=${{ marginTop: '6px', opacity: .8 }}>Version 11.56</div>
+                    </footer>
+                </div>`;
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
+    })();
+    </script>
+</body>
+</html>
