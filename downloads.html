@@ -236,6 +236,7 @@
             back: html`<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>`,
             check: html`<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>`,
             code: html`<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>`,
+            copy: html`<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>`,
             box: html`<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>`,
         };
         function Svg(props) {
@@ -354,15 +355,62 @@
                 whatsNew: 'v1.0',
                 summary: 'Erstellt per Klick eine neue Excel-Mappe mit allen 193 UN-Mitgliedstaaten – alphabetisch sortiert, formatiert, mit Autofilter.',
                 action: { kind: 'download', href: 'UN-Laenderliste-Excel.zip', as: 'UN-Laenderliste-Excel.zip' },
+                copySrc: 'un-laenderliste-excel.hta',
                 requires: 'Microsoft Excel',
                 details: 'Öffnet Excel per COM-Automation, legt eine neue Arbeitsmappe an und schreibt die offiziellen deutschen Ländernamen aller 193 UN-Mitgliedstaaten alphabetisch sortiert in Spalte A. Die Überschrift wird fett (Schriftgröße 14) und leicht grau hinterlegt, die Spaltenbreite automatisch angepasst, der Autofilter aktiviert und die Kopfzeile eingefroren. Läuft vollständig lokal, keine Netzwerkzugriffe.',
+                actionNote: '„Quellcode kopieren“ legt den kompletten HTA-Code in die Zwischenablage – in eine neue Textdatei einfügen und als un-laenderliste-excel.hta speichern (Dateiendung .hta, nicht .txt), dann per Doppelklick starten.',
                 meta: 'Enthält: HTA',
             },
         ];
 
+        /* ---------- Clipboard helper (secure-context first, execCommand fallback) ---------- */
+        async function copyTextToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.top = '-1000px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (!ok) throw new Error('execCommand copy fehlgeschlagen');
+        }
+
         /* ---------- Components ---------- */
         function Tag({ children }) {
             return html`<span class="tag">${children}</span>`;
+        }
+
+        /* Copy-Button: laedt den Quellcode und legt ihn in die Zwischenablage. */
+        function CopySourceButton({ src }) {
+            const [state, setState] = useState('idle'); // idle | busy | done | error
+            async function onCopy() {
+                setState('busy');
+                try {
+                    const res = await fetch(src, { cache: 'no-store' });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    await copyTextToClipboard(await res.text());
+                    setState('done');
+                    window.setTimeout(() => setState('idle'), 2500);
+                } catch (e) {
+                    setState('error');
+                    window.setTimeout(() => setState('idle'), 3500);
+                }
+            }
+            const label = state === 'done'  ? 'Kopiert!'
+                        : state === 'busy'  ? 'Kopiere …'
+                        : state === 'error' ? 'Fehler – erneut?'
+                        : 'Quellcode kopieren';
+            return html`<button class="btn btn-ghost" onClick=${onCopy} disabled=${state === 'busy'}
+                                 title="HTA-Quellcode in die Zwischenablage kopieren">
+                <${Svg}>${state === 'done' ? Icon.check : Icon.copy}<//> ${label}
+            </button>`;
         }
 
         function ToolCard({ tool }) {
@@ -402,6 +450,7 @@
                             : html`<a class="btn btn-green" href=${a.href} target="_blank" rel="noopener">
                                     <${Svg}>${Icon.code}<//> ${a.label}
                                 </a>`}
+                        ${tool.copySrc && html`<${CopySourceButton} src=${tool.copySrc} />`}
                     </div>
 
                     <div class="disclosure">
@@ -516,7 +565,7 @@
 
                     <footer class="footer">
                         Interne Werkzeugsammlung · alle Tools laufen lokal · keine Daten verlassen den Arbeitsplatz
-                        <div style=${{ marginTop: '6px', opacity: .8 }}>Version 11.57</div>
+                        <div style=${{ marginTop: '6px', opacity: .8 }}>Version 11.58</div>
                     </footer>
                 </div>`;
         }
