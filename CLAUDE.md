@@ -41,6 +41,13 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-email-batch.bas` + `ANLEITUNG-ERGO-EXCEL.txt` | `ERGO-Excel-Tool-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-vorgang-analyse.bas` + `ANLEITUNG-ERGO-VORGANG-ANALYSE.txt` | `ERGO-Vorgang-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 
+> **Zusatz `un-laenderliste-excel.hta`:** Der „Quellcode kopieren"-Button auf
+> `downloads.html` kopiert den HTA-Code aus einer **Inline-Base64-Kopie**
+> (`EMBEDDED_SOURCES`) — ohne Netzwerk-Fetch, weil Corporate-Proxys `.hta`-Requests
+> wegfiltern. Nach **jeder** Aenderung an `un-laenderliste-excel.hta` deshalb
+> zusaetzlich zum ZIP die Einbettung neu bauen:
+> `./scripts/build-embedded-sources.sh` (ersetzt den Base64-String in `downloads.html`).
+
 #### Versionierte ERGO-ZIPs bauen
 Das ERGO-Tool fuehrt die Versionsnummer **im ZIP-Dateinamen UND im Dateinamen der
 enthaltenen Dateien**. Der Source-Dateiname im Repo bleibt unversioniert
