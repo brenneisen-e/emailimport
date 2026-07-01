@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.0"
+        VERSION="1.1"
         WINDOWSTATE="normal"
     />
     <style>
@@ -95,7 +95,7 @@
             <div class="logo">🌍</div>
             <h1>UN-Länderliste nach Excel</h1>
             <div class="subtitle">Alle 193 Mitgliedstaaten der Vereinten Nationen &ndash; direkt in Excel</div>
-            <div class="ver">v1.0</div>
+            <div class="ver">v1.1</div>
         </div>
 
         <div class="info">
@@ -104,7 +104,7 @@
             formatierter &Uuml;berschrift, Autofilter und eingefrorener Kopfzeile.
         </div>
 
-        <button class="action" id="btnCreate" onclick="StartExport()">Excel-Liste erstellen</button>
+        <button class="action" id="btnCreate">Excel-Liste erstellen</button>
 
         <div id="status"></div>
 
@@ -168,6 +168,18 @@ Sub SetButtonEnabled(bEnabled)
     Else
         btn.innerHTML = "Bitte warten &hellip;"
     End If
+End Sub
+
+
+' ---------------------------------------------------------------------
+'  Button-Klick. Bindung ueber die VBScript-Namenskonvention
+'  <ElementID>_OnClick (Element-ID "btnCreate"). WICHTIG: KEIN Inline-
+'  onclick-Attribut verwenden - Inline-Event-Attribute werden in HTAs als
+'  JScript ausgewertet und wuerden die VBScript-Prozedur nicht finden
+'  ("StartExport ist undefiniert").
+' ---------------------------------------------------------------------
+Sub btnCreate_OnClick()
+    StartExport
 End Sub
 
 

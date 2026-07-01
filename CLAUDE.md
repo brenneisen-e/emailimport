@@ -11,7 +11,7 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 - `outlook-selection-export.hta` → VERSION in Zeile ~19
 - `pdf-massenupload.hta` → VERSION in Zeile ~19
 - `ergo-email-batch.hta` → VERSION in Zeile ~19 (aktuell **1.1**)
-- `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.0**)
+- `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.1**)
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
