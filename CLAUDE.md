@@ -11,6 +11,7 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 - `outlook-selection-export.hta` → VERSION in Zeile ~19
 - `pdf-massenupload.hta` → VERSION in Zeile ~19
 - `ergo-email-batch.hta` → VERSION in Zeile ~19 (aktuell **1.1**)
+- `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.0**)
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
@@ -35,6 +36,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `outlook-export-modular.hta` + `js/` + `css/` | `Email-Export-Tool.zip` | `zip -r Email-Export-Tool.zip outlook-export-modular.hta js/ css/` |
 | `outlook-selection-export.hta` | `Selection-Export-Tool.zip` | `zip -j Selection-Export-Tool.zip outlook-selection-export.hta` |
 | `pdf-massenupload.hta` | `PDF-Massenupload.zip` | `zip -j PDF-Massenupload.zip pdf-massenupload.hta` |
+| `un-laenderliste-excel.hta` | `UN-Laenderliste-Excel.zip` | `zip -j UN-Laenderliste-Excel.zip un-laenderliste-excel.hta` |
 | `ergo-email-batch.hta` | `ERGO-Email-Batch-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-email-batch.bas` + `ANLEITUNG-ERGO-EXCEL.txt` | `ERGO-Excel-Tool-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-vorgang-analyse.bas` + `ANLEITUNG-ERGO-VORGANG-ANALYSE.txt` | `ERGO-Vorgang-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |

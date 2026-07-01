@@ -248,6 +248,7 @@
             { id: 'export',  label: 'E-Mail-Export',     icon: Icon.mail, desc: 'Mails aus Outlook als JSON / Excel herausziehen' },
             { id: 'process', label: 'PDF & Verarbeitung', icon: Icon.box,  desc: 'Dateien zuordnen, umbenennen, als PDF ablegen, hochladen' },
             { id: 'ai',      label: 'KI-Analyse',         icon: Icon.cpu,  desc: 'Vorgänge automatisch klassifizieren' },
+            { id: 'daten',   label: 'Daten & Vorlagen',   icon: Icon.grid, desc: 'Referenzdaten und Tabellen-Vorlagen direkt in Excel erzeugen' },
         ];
 
         const TOOLS = [
@@ -345,6 +346,17 @@
                     { v: 'v2.07', text: 'Fix Streaming HTTP 403 – sendet jetzt den passenden Browser-User-Agent.' },
                     { v: 'v2.00', text: 'Option „Scan-/Foto-PDFs überspringen“ – per Heuristik erkannt und als „manuell prüfen“ markiert.' },
                 ],
+            },
+            {
+                id: 'un-laender', group: 'daten', icon: Icon.grid,
+                title: 'UN-Länderliste nach Excel',
+                tags: ['HTA', 'VBScript', 'Excel'],
+                whatsNew: 'v1.0',
+                summary: 'Erstellt per Klick eine neue Excel-Mappe mit allen 193 UN-Mitgliedstaaten – alphabetisch sortiert, formatiert, mit Autofilter.',
+                action: { kind: 'download', href: 'UN-Laenderliste-Excel.zip', as: 'UN-Laenderliste-Excel.zip' },
+                requires: 'Microsoft Excel',
+                details: 'Öffnet Excel per COM-Automation, legt eine neue Arbeitsmappe an und schreibt die offiziellen deutschen Ländernamen aller 193 UN-Mitgliedstaaten alphabetisch sortiert in Spalte A. Die Überschrift wird fett (Schriftgröße 14) und leicht grau hinterlegt, die Spaltenbreite automatisch angepasst, der Autofilter aktiviert und die Kopfzeile eingefroren. Läuft vollständig lokal, keine Netzwerkzugriffe.',
+                meta: 'Enthält: HTA',
             },
         ];
 
@@ -504,7 +516,7 @@
 
                     <footer class="footer">
                         Interne Werkzeugsammlung · alle Tools laufen lokal · keine Daten verlassen den Arbeitsplatz
-                        <div style=${{ marginTop: '6px', opacity: .8 }}>Version 11.56</div>
+                        <div style=${{ marginTop: '6px', opacity: .8 }}>Version 11.57</div>
                     </footer>
                 </div>`;
         }
