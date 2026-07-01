@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.1"
+        VERSION="1.2"
         WINDOWSTATE="normal"
     />
     <style>
@@ -95,7 +95,7 @@
             <div class="logo">🌍</div>
             <h1>UN-Länderliste nach Excel</h1>
             <div class="subtitle">Alle 193 Mitgliedstaaten der Vereinten Nationen &ndash; direkt in Excel</div>
-            <div class="ver">v1.1</div>
+            <div class="ver">v1.2</div>
         </div>
 
         <div class="info">
@@ -104,403 +104,326 @@
             formatierter &Uuml;berschrift, Autofilter und eingefrorener Kopfzeile.
         </div>
 
-        <button class="action" id="btnCreate">Excel-Liste erstellen</button>
+        <button class="action" id="btnCreate" onclick="createExcelList()">Excel-Liste erstellen</button>
 
         <div id="status"></div>
 
         <div class="foot">Ben&ouml;tigt Microsoft Excel &middot; l&auml;uft vollst&auml;ndig lokal</div>
     </div>
 
-<script language="VBScript">
-' =====================================================================
-'  UN-Länderliste nach Excel  (HTA / VBScript / COM-Automation)
-' ---------------------------------------------------------------------
-'  Erstellt beim Klick auf "Excel-Liste erstellen" eine neue
-'  Excel-Arbeitsmappe und schreibt alle 193 aktuellen UN-Mitgliedstaaten
-'  alphabetisch sortiert in Spalte A. Ueberschrift wird formatiert,
-'  Spaltenbreite angepasst, Autofilter aktiviert und die Kopfzeile
-'  eingefroren.
-'
-'  Keine externen Abhaengigkeiten, keine Netzwerkzugriffe.
-' =====================================================================
+<script language="JScript">
+/* =====================================================================
+   UN-Länderliste nach Excel  (HTA / JScript / COM-Automation)
+   ---------------------------------------------------------------------
+   Erstellt beim Klick auf "Excel-Liste erstellen" eine neue
+   Excel-Arbeitsmappe und schreibt alle 193 aktuellen UN-Mitgliedstaaten
+   alphabetisch sortiert in Spalte A. Ueberschrift wird formatiert,
+   Spaltenbreite angepasst, Autofilter aktiviert, Kopfzeile eingefroren.
 
-Option Explicit
+   JScript + ActiveXObject("Excel.Application") -- identisches, bewaehrtes
+   COM-Muster wie in den uebrigen Modulen (ergo-email-batch.hta u.a.).
+   Keine externen Abhaengigkeiten, keine Netzwerkzugriffe.
+   ===================================================================== */
 
+/* Fenstergroesse beim Start (kleines, zentriertes Fenster). */
+window.onload = function () {
+    try {
+        window.resizeTo(620, 500);
+        var l = Math.max(0, Math.floor((screen.availWidth  - 620) / 2));
+        var t = Math.max(0, Math.floor((screen.availHeight - 500) / 2));
+        window.moveTo(l, t);
+    } catch (e) {}
+};
 
-' ---------------------------------------------------------------------
-'  Fenstergroesse beim Start festlegen (kleines, kompaktes Fenster)
-' ---------------------------------------------------------------------
-Sub Window_OnLoad()
-    On Error Resume Next
-    window.resizeTo 620, 500
-    ' Fenster grob zentrieren
-    Dim l, t
-    l = (screen.availWidth  - 620) \ 2
-    t = (screen.availHeight - 500) \ 2
-    If l < 0 Then l = 0
-    If t < 0 Then t = 0
-    window.moveTo l, t
-    On Error GoTo 0
-End Sub
+/* Statusbereich in der HTA aktualisieren. kind: "info" | "success" | "error" */
+function setStatus(text, kind) {
+    var el = document.getElementById("status");
+    el.className = "show " + kind;
+    el.innerHTML = text;
+}
 
+/* Erstellen-Button aktivieren / deaktivieren. */
+function setButtonEnabled(enabled) {
+    var btn = document.getElementById("btnCreate");
+    btn.disabled = !enabled;
+    btn.innerHTML = enabled ? "Excel-Liste erstellen" : "Bitte warten &hellip;";
+}
 
-' ---------------------------------------------------------------------
-'  Statusbereich in der HTA aktualisieren.
-'  sKind: "info" | "success" | "error"
-' ---------------------------------------------------------------------
-Sub SetStatus(sText, sKind)
-    Dim el
-    Set el = document.getElementById("status")
-    el.className = "show " & sKind
-    el.innerHTML = sText
-End Sub
+/* Liefert alle 193 aktuellen UN-Mitgliedstaaten als bereits alphabetisch
+   sortiertes Array (offizielle deutsche Laendernamen, DIN 5007-1). */
+function getUNMemberStates() {
+    return [
+            "Afghanistan",
+            "Ägypten",
+            "Albanien",
+            "Algerien",
+            "Andorra",
+            "Angola",
+            "Antigua und Barbuda",
+            "Äquatorialguinea",
+            "Argentinien",
+            "Armenien",
+            "Aserbaidschan",
+            "Äthiopien",
+            "Australien",
+            "Bahamas",
+            "Bahrain",
+            "Bangladesch",
+            "Barbados",
+            "Belarus",
+            "Belgien",
+            "Belize",
+            "Benin",
+            "Bhutan",
+            "Bolivien",
+            "Bosnien und Herzegowina",
+            "Botsuana",
+            "Brasilien",
+            "Brunei",
+            "Bulgarien",
+            "Burkina Faso",
+            "Burundi",
+            "Chile",
+            "China",
+            "Costa Rica",
+            "Côte d'Ivoire",
+            "Dänemark",
+            "Deutschland",
+            "Dominica",
+            "Dominikanische Republik",
+            "Dschibuti",
+            "Ecuador",
+            "El Salvador",
+            "Eritrea",
+            "Estland",
+            "Eswatini",
+            "Fidschi",
+            "Finnland",
+            "Frankreich",
+            "Gabun",
+            "Gambia",
+            "Georgien",
+            "Ghana",
+            "Grenada",
+            "Griechenland",
+            "Guatemala",
+            "Guinea",
+            "Guinea-Bissau",
+            "Guyana",
+            "Haiti",
+            "Honduras",
+            "Indien",
+            "Indonesien",
+            "Irak",
+            "Iran",
+            "Irland",
+            "Island",
+            "Israel",
+            "Italien",
+            "Jamaika",
+            "Japan",
+            "Jemen",
+            "Jordanien",
+            "Kambodscha",
+            "Kamerun",
+            "Kanada",
+            "Kap Verde",
+            "Kasachstan",
+            "Katar",
+            "Kenia",
+            "Kirgisistan",
+            "Kiribati",
+            "Kolumbien",
+            "Komoren",
+            "Kongo, Demokratische Republik",
+            "Kongo, Republik",
+            "Kroatien",
+            "Kuba",
+            "Kuwait",
+            "Laos",
+            "Lesotho",
+            "Lettland",
+            "Libanon",
+            "Liberia",
+            "Libyen",
+            "Liechtenstein",
+            "Litauen",
+            "Luxemburg",
+            "Madagaskar",
+            "Malawi",
+            "Malaysia",
+            "Malediven",
+            "Mali",
+            "Malta",
+            "Marokko",
+            "Marshallinseln",
+            "Mauretanien",
+            "Mauritius",
+            "Mexiko",
+            "Mikronesien",
+            "Moldau",
+            "Monaco",
+            "Mongolei",
+            "Montenegro",
+            "Mosambik",
+            "Myanmar",
+            "Namibia",
+            "Nauru",
+            "Nepal",
+            "Neuseeland",
+            "Nicaragua",
+            "Niederlande",
+            "Niger",
+            "Nigeria",
+            "Nordkorea",
+            "Nordmazedonien",
+            "Norwegen",
+            "Oman",
+            "Österreich",
+            "Osttimor",
+            "Pakistan",
+            "Palau",
+            "Panama",
+            "Papua-Neuguinea",
+            "Paraguay",
+            "Peru",
+            "Philippinen",
+            "Polen",
+            "Portugal",
+            "Ruanda",
+            "Rumänien",
+            "Russland",
+            "Salomonen",
+            "Sambia",
+            "Samoa",
+            "San Marino",
+            "São Tomé und Príncipe",
+            "Saudi-Arabien",
+            "Schweden",
+            "Schweiz",
+            "Senegal",
+            "Serbien",
+            "Seychellen",
+            "Sierra Leone",
+            "Simbabwe",
+            "Singapur",
+            "Slowakei",
+            "Slowenien",
+            "Somalia",
+            "Spanien",
+            "Sri Lanka",
+            "St. Kitts und Nevis",
+            "St. Lucia",
+            "St. Vincent und die Grenadinen",
+            "Südafrika",
+            "Sudan",
+            "Südkorea",
+            "Südsudan",
+            "Suriname",
+            "Syrien",
+            "Tadschikistan",
+            "Tansania",
+            "Thailand",
+            "Togo",
+            "Tonga",
+            "Trinidad und Tobago",
+            "Tschad",
+            "Tschechien",
+            "Tunesien",
+            "Türkei",
+            "Turkmenistan",
+            "Tuvalu",
+            "Uganda",
+            "Ukraine",
+            "Ungarn",
+            "Uruguay",
+            "Usbekistan",
+            "Vanuatu",
+            "Venezuela",
+            "Vereinigte Arabische Emirate",
+            "Vereinigte Staaten",
+            "Vereinigtes Königreich",
+            "Vietnam",
+            "Zentralafrikanische Republik",
+            "Zypern"
+    ];
+}
 
+/* Kernlogik: Excel starten, Mappe aufbauen, Laender schreiben,
+   formatieren und abschliessen. */
+function createExcelList() {
+    setButtonEnabled(false);
+    setStatus("Excel wird ge&ouml;ffnet &hellip;", "info");
 
-' ---------------------------------------------------------------------
-'  Erstellen-Button aktivieren / deaktivieren
-' ---------------------------------------------------------------------
-Sub SetButtonEnabled(bEnabled)
-    Dim btn
-    Set btn = document.getElementById("btnCreate")
-    btn.disabled = Not bEnabled
-    If bEnabled Then
-        btn.innerHTML = "Excel-Liste erstellen"
-    Else
-        btn.innerHTML = "Bitte warten &hellip;"
-    End If
-End Sub
+    var states = getUNMemberStates();
+    var excel = null, wb = null, sheet = null;
 
+    /* 1) Excel per COM starten (gezielte Fehlerbehandlung). */
+    try {
+        excel = new ActiveXObject("Excel.Application");
+    } catch (e) {
+        setStatus("<b>Microsoft Excel konnte nicht gestartet werden.</b><br>" +
+                  "Bitte pr&uuml;fen, ob Excel installiert ist.<br>" +
+                  "<span style='opacity:.7'>(" + e.message + ")</span>", "error");
+        setButtonEnabled(true);
+        return;
+    }
 
-' ---------------------------------------------------------------------
-'  Button-Klick. Bindung ueber die VBScript-Namenskonvention
-'  <ElementID>_OnClick (Element-ID "btnCreate"). WICHTIG: KEIN Inline-
-'  onclick-Attribut verwenden - Inline-Event-Attribute werden in HTAs als
-'  JScript ausgewertet und wuerden die VBScript-Prozedur nicht finden
-'  ("StartExport ist undefiniert").
-' ---------------------------------------------------------------------
-Sub btnCreate_OnClick()
-    StartExport
-End Sub
+    /* 2) Mappe aufbauen. */
+    try {
+        excel.Visible = true;             // Excel sichtbar machen
+        excel.DisplayAlerts = false;
 
+        wb = excel.Workbooks.Add();        // neue Arbeitsmappe + erstes Blatt
+        sheet = wb.ActiveSheet;
+        try { sheet.Name = "UN-Mitgliedstaaten"; } catch (eName) {}
 
-' ---------------------------------------------------------------------
-'  Einstiegspunkt fuer den Button-Klick.
-'  Trennt UI-Update (sofort sichtbar) vom eigentlichen Export, damit
-'  die Statusmeldung "Excel wird geoeffnet" auch wirklich erscheint,
-'  bevor der blockierende COM-Aufruf startet.
-' ---------------------------------------------------------------------
-Sub StartExport()
-    SetButtonEnabled False
-    SetStatus "Excel wird ge&ouml;ffnet &hellip;", "info"
-    ' Kurzer Tick, damit der Browser das Status-Update rendert,
-    ' bevor der synchrone Excel-Aufbau die HTA blockiert.
-    window.setTimeout GetRef("CreateExcelList"), 60
-End Sub
+        /* Ueberschrift in A1 + Formatierung. */
+        sheet.Cells(1, 1).Value = "Mitgliedstaaten der Vereinten Nationen";
+        try {
+            var head = sheet.Cells(1, 1);
+            head.Font.Bold = true;
+            head.Font.Size = 14;
+            head.Interior.Color = 0xDCDCDC;   // leicht grau (RGB 220,220,220)
+        } catch (eHead) {}
 
+        /* Staaten ab Zeile 2 (Liste ist bereits sortiert). */
+        for (var i = 0; i < states.length; i++) {
+            sheet.Cells(i + 2, 1).Value = states[i];
+        }
+        var lastRow = states.length + 1;
 
-' ---------------------------------------------------------------------
-'  Kernlogik: Excel starten, Mappe aufbauen, Laender schreiben,
-'  formatieren und abschliessen.
-' ---------------------------------------------------------------------
-Sub CreateExcelList()
-    Dim excelApp, workbook, sheet, dataRange
-    Dim states, i, lastRow
+        /* Spaltenbreite automatisch anpassen. */
+        try { sheet.Columns(1).AutoFit(); } catch (eFit) {}
 
-    ' Bereits alphabetisch sortierte Liste der UN-Mitgliedstaaten holen
-    states = GetUNMemberStates()
+        /* Autofilter ueber Kopfzeile + Datenbereich. */
+        try {
+            sheet.Range(sheet.Cells(1, 1), sheet.Cells(lastRow, 1)).AutoFilter();
+        } catch (eFilter) {}
 
-    ' --- 1) Excel per COM starten (gezielte Fehlerbehandlung) ---------
-    On Error Resume Next
-    Set excelApp = CreateObject("Excel.Application")
-    If Err.Number <> 0 Or excelApp Is Nothing Then
-        On Error GoTo 0
-        SetStatus "<b>Microsoft Excel konnte nicht gestartet werden.</b><br>" & _
-                  "Bitte pr&uuml;fen, ob Excel installiert ist.", "error"
-        SetButtonEnabled True
-        Exit Sub
-    End If
-    On Error GoTo 0
+        /* Erste Zeile einfrieren (bewaehrtes Select+FreezePanes-Muster). */
+        try {
+            sheet.Range("A1").Select();
+            excel.ActiveWindow.FreezePanes = false;
+            sheet.Range("A2").Select();
+            excel.ActiveWindow.FreezePanes = true;
+        } catch (eFreeze) {}
 
-    ' Excel sichtbar machen
-    excelApp.Visible = True
+        excel.DisplayAlerts = true;
 
-    ' --- 2) Aufbau der Mappe (gezielte Fehlerbehandlung) --------------
-    On Error Resume Next
-    excelApp.ScreenUpdating = False   ' schnellerer, flackerfreier Aufbau
-    excelApp.DisplayAlerts = False
+        setStatus("<b>Fertig!</b><br>" + states.length + " UN-Mitgliedstaaten wurden " +
+                  "nach Excel geschrieben. Die Arbeitsmappe ist ge&ouml;ffnet.", "success");
+    } catch (e) {
+        setStatus("<b>Beim Aufbau der Excel-Mappe ist ein Fehler aufgetreten.</b><br>" +
+                  "<span style='opacity:.7'>(" + e.message + ")</span>", "error");
+    } finally {
+        /* COM-Referenzen freigeben. Excel bleibt fuer den Anwender sichtbar
+           geoeffnet (kein Quit) -- nur unsere Referenzen werden aufgeloest. */
+        sheet = null; wb = null; excel = null;
+    }
 
-    ' Neue Arbeitsmappe + erstes Arbeitsblatt verwenden
-    Set workbook = excelApp.Workbooks.Add
-    Set sheet = workbook.Worksheets(1)
-    sheet.Name = "UN-Mitgliedstaaten"
-
-    ' Ueberschrift in A1 + Formatierung
-    sheet.Cells(1, 1).Value = "Mitgliedstaaten der Vereinten Nationen"
-    sheet.Cells(1, 1).Font.Bold = True
-    sheet.Cells(1, 1).Font.Size = 14
-    sheet.Cells(1, 1).Interior.Color = RGB(220, 220, 220)   ' leicht grau
-
-    ' Staaten ab Zeile 2 eintragen (Liste ist bereits sortiert)
-    For i = 0 To UBound(states)
-        sheet.Cells(i + 2, 1).Value = states(i)
-    Next
-    lastRow = UBound(states) + 2
-
-    ' Spaltenbreite automatisch anpassen
-    sheet.Columns(1).AutoFit
-
-    ' Autofilter ueber Kopfzeile + Datenbereich aktivieren
-    Set dataRange = sheet.Range(sheet.Cells(1, 1), sheet.Cells(lastRow, 1))
-    dataRange.AutoFilter
-
-    ' Erste Zeile einfrieren
-    excelApp.ActiveWindow.SplitRow = 1
-    excelApp.ActiveWindow.FreezePanes = True
-
-    ' Cursor auf A1 setzen
-    sheet.Cells(1, 1).Select
-
-    excelApp.ScreenUpdating = True
-    excelApp.DisplayAlerts = True
-
-    If Err.Number <> 0 Then
-        On Error GoTo 0
-        SetStatus "<b>Beim Aufbau der Excel-Mappe ist ein Fehler aufgetreten.</b><br>" & _
-                  "Die Mappe wurde ggf. nur teilweise gef&uuml;llt.", "error"
-        ' COM-Objekte trotzdem freigeben
-        ReleaseObjects dataRange, sheet, workbook, excelApp
-        SetButtonEnabled True
-        Exit Sub
-    End If
-    On Error GoTo 0
-
-    ' --- 3) Erfolg melden + COM-Objekte freigeben ---------------------
-    Dim anzahl
-    anzahl = UBound(states) + 1
-    SetStatus "<b>Fertig!</b><br>" & anzahl & " UN-Mitgliedstaaten wurden nach Excel " & _
-              "geschrieben. Die Arbeitsmappe ist ge&ouml;ffnet.", "success"
-
-    ' Excel bleibt fuer den Anwender sichtbar geoeffnet; wir loesen nur
-    ' unsere Referenzen sauber auf, damit keine COM-Objekte haengen bleiben.
-    ReleaseObjects dataRange, sheet, workbook, excelApp
-
-    SetButtonEnabled True
-End Sub
-
-
-' ---------------------------------------------------------------------
-'  Hilfsroutine: COM-Objektreferenzen sauber freigeben.
-' ---------------------------------------------------------------------
-Sub ReleaseObjects(oRange, oSheet, oBook, oApp)
-    Set oRange = Nothing
-    Set oSheet = Nothing
-    Set oBook  = Nothing
-    Set oApp   = Nothing
-End Sub
-
-
-' ---------------------------------------------------------------------
-'  Liefert alle 193 aktuellen UN-Mitgliedstaaten als bereits
-'  alphabetisch sortiertes Array (offizielle deutsche Laendernamen).
-'  Umlaute (Ä/Ö/Ü) werden nach DIN 5007-1 wie A/O/U einsortiert.
-' ---------------------------------------------------------------------
-Function GetUNMemberStates()
-    GetUNMemberStates = Array( _
-        "Afghanistan", _
-        "Ägypten", _
-        "Albanien", _
-        "Algerien", _
-        "Andorra", _
-        "Angola", _
-        "Antigua und Barbuda", _
-        "Äquatorialguinea", _
-        "Argentinien", _
-        "Armenien", _
-        "Aserbaidschan", _
-        "Äthiopien", _
-        "Australien", _
-        "Bahamas", _
-        "Bahrain", _
-        "Bangladesch", _
-        "Barbados", _
-        "Belarus", _
-        "Belgien", _
-        "Belize", _
-        "Benin", _
-        "Bhutan", _
-        "Bolivien", _
-        "Bosnien und Herzegowina", _
-        "Botsuana", _
-        "Brasilien", _
-        "Brunei", _
-        "Bulgarien", _
-        "Burkina Faso", _
-        "Burundi", _
-        "Chile", _
-        "China", _
-        "Costa Rica", _
-        "Côte d'Ivoire", _
-        "Dänemark", _
-        "Deutschland", _
-        "Dominica", _
-        "Dominikanische Republik", _
-        "Dschibuti", _
-        "Ecuador", _
-        "El Salvador", _
-        "Eritrea", _
-        "Estland", _
-        "Eswatini", _
-        "Fidschi", _
-        "Finnland", _
-        "Frankreich", _
-        "Gabun", _
-        "Gambia", _
-        "Georgien", _
-        "Ghana", _
-        "Grenada", _
-        "Griechenland", _
-        "Guatemala", _
-        "Guinea", _
-        "Guinea-Bissau", _
-        "Guyana", _
-        "Haiti", _
-        "Honduras", _
-        "Indien", _
-        "Indonesien", _
-        "Irak", _
-        "Iran", _
-        "Irland", _
-        "Island", _
-        "Israel", _
-        "Italien", _
-        "Jamaika", _
-        "Japan", _
-        "Jemen", _
-        "Jordanien", _
-        "Kambodscha", _
-        "Kamerun", _
-        "Kanada", _
-        "Kap Verde", _
-        "Kasachstan", _
-        "Katar", _
-        "Kenia", _
-        "Kirgisistan", _
-        "Kiribati", _
-        "Kolumbien", _
-        "Komoren", _
-        "Kongo, Demokratische Republik", _
-        "Kongo, Republik", _
-        "Kroatien", _
-        "Kuba", _
-        "Kuwait", _
-        "Laos", _
-        "Lesotho", _
-        "Lettland", _
-        "Libanon", _
-        "Liberia", _
-        "Libyen", _
-        "Liechtenstein", _
-        "Litauen", _
-        "Luxemburg", _
-        "Madagaskar", _
-        "Malawi", _
-        "Malaysia", _
-        "Malediven", _
-        "Mali", _
-        "Malta", _
-        "Marokko", _
-        "Marshallinseln", _
-        "Mauretanien", _
-        "Mauritius", _
-        "Mexiko", _
-        "Mikronesien", _
-        "Moldau", _
-        "Monaco", _
-        "Mongolei", _
-        "Montenegro", _
-        "Mosambik", _
-        "Myanmar", _
-        "Namibia", _
-        "Nauru", _
-        "Nepal", _
-        "Neuseeland", _
-        "Nicaragua", _
-        "Niederlande", _
-        "Niger", _
-        "Nigeria", _
-        "Nordkorea", _
-        "Nordmazedonien", _
-        "Norwegen", _
-        "Oman", _
-        "Österreich", _
-        "Osttimor", _
-        "Pakistan", _
-        "Palau", _
-        "Panama", _
-        "Papua-Neuguinea", _
-        "Paraguay", _
-        "Peru", _
-        "Philippinen", _
-        "Polen", _
-        "Portugal", _
-        "Ruanda", _
-        "Rumänien", _
-        "Russland", _
-        "Salomonen", _
-        "Sambia", _
-        "Samoa", _
-        "San Marino", _
-        "São Tomé und Príncipe", _
-        "Saudi-Arabien", _
-        "Schweden", _
-        "Schweiz", _
-        "Senegal", _
-        "Serbien", _
-        "Seychellen", _
-        "Sierra Leone", _
-        "Simbabwe", _
-        "Singapur", _
-        "Slowakei", _
-        "Slowenien", _
-        "Somalia", _
-        "Spanien", _
-        "Sri Lanka", _
-        "St. Kitts und Nevis", _
-        "St. Lucia", _
-        "St. Vincent und die Grenadinen", _
-        "Südafrika", _
-        "Sudan", _
-        "Südkorea", _
-        "Südsudan", _
-        "Suriname", _
-        "Syrien", _
-        "Tadschikistan", _
-        "Tansania", _
-        "Thailand", _
-        "Togo", _
-        "Tonga", _
-        "Trinidad und Tobago", _
-        "Tschad", _
-        "Tschechien", _
-        "Tunesien", _
-        "Türkei", _
-        "Turkmenistan", _
-        "Tuvalu", _
-        "Uganda", _
-        "Ukraine", _
-        "Ungarn", _
-        "Uruguay", _
-        "Usbekistan", _
-        "Vanuatu", _
-        "Venezuela", _
-        "Vereinigte Arabische Emirate", _
-        "Vereinigte Staaten", _
-        "Vereinigtes Königreich", _
-        "Vietnam", _
-        "Zentralafrikanische Republik", _
-        "Zypern" _
-    )
-End Function
+    setButtonEnabled(true);
+}
 </script>
 </body>
 </html>
