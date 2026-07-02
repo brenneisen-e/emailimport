@@ -12,6 +12,7 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 - `pdf-massenupload.hta` → VERSION in Zeile ~19
 - `ergo-email-batch.hta` → VERSION in Zeile ~19 (aktuell **1.1**)
 - `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.2**, JScript-COM wie die uebrigen Module)
+- `ergo-mail-statistik.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; KW-Statistik fuer bis zu 2 Postfaecher mit Stichwort-Flagging)
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
@@ -40,13 +41,16 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-email-batch.hta` | `ERGO-Email-Batch-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-email-batch.bas` + `ANLEITUNG-ERGO-EXCEL.txt` | `ERGO-Excel-Tool-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-vorgang-analyse.bas` + `ANLEITUNG-ERGO-VORGANG-ANALYSE.txt` | `ERGO-Vorgang-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
+| `ergo-mail-statistik.hta` | `ERGO-Mail-Statistik-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 
-> **Zusatz `un-laenderliste-excel.hta`:** Der „Quellcode kopieren"-Button auf
-> `downloads.html` kopiert den HTA-Code aus einer **Inline-Base64-Kopie**
-> (`EMBEDDED_SOURCES`) — ohne Netzwerk-Fetch, weil Corporate-Proxys `.hta`-Requests
-> wegfiltern. Nach **jeder** Aenderung an `un-laenderliste-excel.hta` deshalb
-> zusaetzlich zum ZIP die Einbettung neu bauen:
-> `./scripts/build-embedded-sources.sh` (ersetzt den Base64-String in `downloads.html`).
+> **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
+> „Quellcode kopieren"-Buttons kopieren den HTA-Code aus einer **Inline-Base64-Kopie**
+> — ohne Netzwerk-Fetch, weil Corporate-Proxys `.hta`-Requests wegfiltern.
+> Eingebettet sind aktuell `un-laenderliste-excel.hta` und `ergo-mail-statistik.hta`.
+> Nach **jeder** Aenderung an einer dieser Dateien deshalb zusaetzlich zum ZIP
+> die Einbettung neu bauen: `./scripts/build-embedded-sources.sh`
+> (ersetzt alle Base64-Strings in `downloads.html`; neue Dateien dort im
+> Skript-Array `FILES` + als Key in `EMBEDDED_SOURCES` ergaenzen).
 
 #### Versionierte ERGO-ZIPs bauen
 Das ERGO-Tool fuehrt die Versionsnummer **im ZIP-Dateinamen UND im Dateinamen der
@@ -82,6 +86,17 @@ cp ANLEITUNG-ERGO-VORGANG-ANALYSE.txt /tmp/ergo-va-build/
 (cd /tmp/ergo-va-build && \
    zip -j "$OLDPWD/ERGO-Vorgang-Analyse-v$VA_VER.zip" \
        ergo-vorgang-analyse-v$VA_VER.bas ANLEITUNG-ERGO-VORGANG-ANALYSE.txt)
+```
+
+Fuer das Mail-Statistik-Tool analog (eigene Versionsnummer, nur die HTA im ZIP):
+
+```bash
+MS_VER=1.0
+rm -f ERGO-Mail-Statistik-v*.zip
+mkdir -p /tmp/ergo-ms-build
+cp ergo-mail-statistik.hta /tmp/ergo-ms-build/ergo-mail-statistik-v$MS_VER.hta
+(cd /tmp/ergo-ms-build && \
+   zip -j "$OLDPWD/ERGO-Mail-Statistik-v$MS_VER.zip" ergo-mail-statistik-v$MS_VER.hta)
 ```
 
 **Anschliessend in `index.html` die Download-Links auf die neue Versionsnummer anpassen**

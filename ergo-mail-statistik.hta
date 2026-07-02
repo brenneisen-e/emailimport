@@ -1,0 +1,863 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>ERGO Mail-Statistik (Kalenderwochen)</title>
+    <HTA:APPLICATION
+        ID="ERGO_Mail_Statistik"
+        APPLICATIONNAME="ERGO Mail-Statistik"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .container { max-width: 860px; margin: 0 auto; }
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .header { text-align: center; margin-bottom: 1.25rem; }
+        .logo { font-size: 42px; margin-bottom: 0.25rem; }
+        h2 { color: #f1f5f9; margin-bottom: 0.25rem; }
+        .subtitle { color: #94a3b8; font-size: 13px; }
+        .ver { color: #64748b; font-size: 11px; margin-top: 4px; }
+
+        .section {
+            background: rgba(0,0,0,0.22);
+            border: 1px solid rgba(148,163,184,0.15);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1rem;
+        }
+        .section-title {
+            font-size: 13px; font-weight: 600; color: #e2e8f0;
+            margin-bottom: 0.75rem;
+        }
+        .section-title .tag {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            color: #94a3b8; border: 1px solid #475569; border-radius: 6px;
+            padding: 1px 7px; margin-left: 8px; vertical-align: 1px;
+        }
+
+        label {
+            display: block; margin-bottom: 0.35rem;
+            color: #cbd5e1; font-size: 12px; font-weight: 500;
+        }
+        select, input[type="text"] {
+            width: 100%; padding: 9px 12px;
+            border: 1px solid #475569; border-radius: 8px;
+            background: #1e293b; color: #f1f5f9; font-size: 13px;
+            margin-bottom: 0.8rem;
+        }
+        select:focus, input:focus { outline: none; border-color: #ef4444; }
+        select:disabled { opacity: 0.5; }
+        .row { display: flex; gap: 0.75rem; }
+        .row > * { flex: 1; }
+        .hint { font-size: 11px; color: #94a3b8; margin-top: -0.4rem; margin-bottom: 0.6rem; line-height: 1.45; }
+
+        .quick { margin-bottom: 0.6rem; }
+        .quick button {
+            padding: 5px 11px; margin-right: 6px; border: 1px solid #475569;
+            border-radius: 7px; background: transparent; color: #cbd5e1;
+            font-size: 11.5px; cursor: pointer;
+        }
+        .quick button:hover { border-color: #ef4444; color: #fff; }
+
+        .chk { display: block; color: #cbd5e1; font-size: 12.5px; margin-bottom: 0.3rem; cursor: pointer; }
+        .chk input { margin-right: 7px; }
+
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 14px; font-weight: 600;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+
+        .progress-container { display: none; margin: 1rem 0 0.25rem; }
+        .progress-bar { height: 8px; background: #374151; border-radius: 4px; overflow: hidden; }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, #ef4444, #f97316);
+            width: 0%; transition: width 0.3s;
+        }
+        .progress-text { font-size: 12px; color: #94a3b8; margin-top: 0.5rem; text-align: center; }
+
+        .status { display: none; padding: 0.85rem 1rem; border-radius: 8px; margin: 0.85rem 0 0; font-size: 13px; line-height: 1.5; }
+        .status.success { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; }
+        .status.error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+        .status.info { background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #93c5fd; }
+
+        .foot { text-align: center; color: #64748b; font-size: 11px; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">&#128202;</div>
+                <h2>ERGO Mail-Statistik</h2>
+                <div class="subtitle">Mail-Aufkommen je Kalenderwoche und Tag &ndash; mit Stichwort-Flagging &ndash; als Excel</div>
+                <div class="ver">v1.0</div>
+            </div>
+
+            <!-- Postfach 1 -->
+            <div class="section">
+                <div class="section-title">Postfach 1 <span class="tag">Pflicht</span></div>
+                <div class="row">
+                    <div>
+                        <label for="mailbox1">Postfach</label>
+                        <select id="mailbox1" onchange="loadFoldersFor(1)">
+                            <option value="">-- Postfach w&auml;hlen --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="folder1">Ordner</label>
+                        <select id="folder1" disabled onchange="updateStartButton()">
+                            <option value="">-- Ordner w&auml;hlen --</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Postfach 2 -->
+            <div class="section">
+                <div class="section-title">Postfach 2 <span class="tag">Optional</span></div>
+                <div class="row">
+                    <div>
+                        <label for="mailbox2">Postfach</label>
+                        <select id="mailbox2" onchange="loadFoldersFor(2)">
+                            <option value="">-- kein zweites Postfach --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="folder2">Ordner</label>
+                        <select id="folder2" disabled onchange="updateStartButton()">
+                            <option value="">-- Ordner w&auml;hlen --</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zeitraum -->
+            <div class="section">
+                <div class="section-title">Zeitraum</div>
+                <div class="quick">
+                    <button onclick="setQuickWeeks(4)">4 Wochen</button>
+                    <button onclick="setQuickWeeks(8)">8 Wochen</button>
+                    <button onclick="setQuickWeeks(12)">12 Wochen</button>
+                    <button onclick="setYearStart()">seit Jahresanfang</button>
+                </div>
+                <div class="row">
+                    <div>
+                        <label for="dateFrom">Von (JJJJ-MM-TT)</label>
+                        <input type="text" id="dateFrom" placeholder="2026-05-01">
+                    </div>
+                    <div>
+                        <label for="dateTo">Bis (JJJJ-MM-TT)</label>
+                        <input type="text" id="dateTo" placeholder="2026-07-02">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stichwoerter -->
+            <div class="section">
+                <div class="section-title">Stichw&ouml;rter</div>
+                <label for="keywords">Kommagetrennt &ndash; gesucht in Betreff und Mailtext</label>
+                <input type="text" id="keywords" value="B&Uuml;, Bestands&uuml;bertragung">
+                <div class="hint">
+                    Kurze Stichw&ouml;rter (bis 3 Zeichen, z.&nbsp;B. &bdquo;B&Uuml;&ldquo;) werden nur als ganzes Wort
+                    gez&auml;hlt, l&auml;ngere auch als Wortbestandteil (&bdquo;Bestands&uuml;bertragungen&ldquo; z&auml;hlt mit).
+                </div>
+                <label class="chk">
+                    <input type="checkbox" id="chkBody" checked>
+                    Auch Mailtext durchsuchen (gr&uuml;ndlicher, aber langsamer &ndash; ohne Haken nur Betreff)
+                </label>
+            </div>
+
+            <button class="btn btn-primary" id="btnStart" onclick="startAnalysis()" disabled>Analyse starten &amp; Excel erstellen</button>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText"></div>
+            </div>
+
+            <div class="status" id="status"></div>
+
+            <div class="foot">Ben&ouml;tigt Outlook (MAPI) und Excel &middot; l&auml;uft vollst&auml;ndig lokal, keine Daten verlassen den Arbeitsplatz</div>
+        </div>
+    </div>
+
+<script language="JScript">
+/* =====================================================================
+   ERGO Mail-Statistik  (HTA / JScript / COM-Automation)
+   ---------------------------------------------------------------------
+   Kombi-Tool auf Basis der bewaehrten ERGO-Module:
+   - bis zu ZWEI Postfaecher + Ordner aus Outlook waehlen (MAPI)
+   - Zeitraum waehlen, Mails je Kalenderwoche (ISO 8601) und je Tag zaehlen
+   - Stichwoerter (Default: BUe, Bestandsuebertragung) in Betreff und
+     Mailtext flaggen und mitzaehlen
+   - Ergebnis als Excel-Arbeitsmappe mit 3 Blaettern:
+       1) KW-Uebersicht   2) Tage   3) Stichwort-Treffer (Detail)
+
+   JScript + ActiveXObject wie in ergo-email-batch.hta. Der Scan laeuft
+   in kleinen Bloecken pro setTimeout-Tick, damit die HTA nicht haengt
+   und Fortschritt sichtbar bleibt.
+   ===================================================================== */
+
+var outlookApp = null;
+var outlookNS = null;
+
+var scanState = null;           // Zustand des laufenden Scans
+var CHUNK_SIZE = 50;            // Mails pro setTimeout-Tick
+var DETAIL_MAX = 1500;          // max. Zeilen im Detail-Blatt (Schutz)
+
+/* ---------------- Init ---------------- */
+window.onload = function () {
+    try { window.resizeTo(900, 940); } catch (e) {}
+    setQuickWeeks(8);
+    try {
+        outlookApp = new ActiveXObject("Outlook.Application");
+        outlookNS = outlookApp.GetNamespace("MAPI");
+        loadMailboxes();
+    } catch (e) {
+        showError("Outlook konnte nicht verbunden werden. Bitte stelle sicher, dass Outlook ge&ouml;ffnet ist. (" + esc(e.message) + ")");
+    }
+};
+
+/* ---------------- UI-Helfer ---------------- */
+function esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+function trim(s) { return String(s || '').replace(/^\s+|\s+$/g, ''); }
+
+function showStatus(cls, html) {
+    var el = document.getElementById('status');
+    el.className = 'status ' + cls;
+    el.style.display = 'block';
+    el.innerHTML = html;
+}
+function showError(html)   { showStatus('error', html); }
+function showInfo(html)    { showStatus('info', html); }
+function showSuccess(html) { showStatus('success', html); }
+function hideStatus() { document.getElementById('status').style.display = 'none'; }
+
+function showProgress(text) {
+    document.getElementById('progressContainer').style.display = 'block';
+    setProgress(0, text);
+}
+function setProgress(pct, text) {
+    if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').innerHTML = text;
+}
+function hideProgress() {
+    document.getElementById('progressContainer').style.display = 'none';
+}
+
+/* ---------------- Datum / Kalenderwoche ---------------- */
+function isoDate(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+function parseIsoDate(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trim(s));
+    if (!m) return null;
+    var d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    return isNaN(d.getTime()) ? null : d;
+}
+function setQuickWeeks(weeks) {
+    var to = new Date();
+    var from = new Date();
+    from.setDate(from.getDate() - weeks * 7);
+    document.getElementById('dateFrom').value = isoDate(from);
+    document.getElementById('dateTo').value = isoDate(to);
+}
+function setYearStart() {
+    var to = new Date();
+    document.getElementById('dateFrom').value = to.getFullYear() + '-01-01';
+    document.getElementById('dateTo').value = isoDate(to);
+}
+
+/* ISO-8601-Kalenderwoche: Woche des Donnerstags, KW1 = Woche mit 4. Januar. */
+function isoWeek(d) {
+    var date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var day = (date.getDay() + 6) % 7;              // Mo=0 .. So=6
+    date.setDate(date.getDate() - day + 3);          // Donnerstag dieser Woche
+    var thursday = date.getTime();
+    var jan4 = new Date(date.getFullYear(), 0, 4);
+    var jan4day = (jan4.getDay() + 6) % 7;
+    var week1Thu = new Date(jan4.getFullYear(), 0, 4 - jan4day + 3).getTime();
+    var week = 1 + Math.round((thursday - week1Thu) / (7 * 24 * 3600 * 1000));
+    return { year: date.getFullYear(), week: week };
+}
+function kwKey(d) {
+    var w = isoWeek(d);
+    return w.year + '-KW' + pad(w.week);
+}
+function mondayOf(d) {
+    var date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    return date;
+}
+function fmtDE(d) {
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear();
+}
+var WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+/* ---------------- Postfaecher + Ordner laden ---------------- */
+function loadMailboxes() {
+    try {
+        var stores = outlookNS.Stores;
+        var sel1 = document.getElementById('mailbox1');
+        var sel2 = document.getElementById('mailbox2');
+        sel1.innerHTML = '<option value="">-- Postfach w&auml;hlen --</option>';
+        sel2.innerHTML = '<option value="">-- kein zweites Postfach --</option>';
+        for (var i = 1; i <= stores.Count; i++) {
+            try {
+                var store = stores.Item(i);
+                var o1 = document.createElement('option');
+                o1.value = i; o1.text = store.DisplayName;
+                sel1.appendChild(o1);
+                var o2 = document.createElement('option');
+                o2.value = i; o2.text = store.DisplayName;
+                sel2.appendChild(o2);
+            } catch (e) {}
+        }
+    } catch (e) {
+        showError("Postf&auml;cher konnten nicht geladen werden: " + esc(e.message));
+    }
+}
+
+function loadFoldersFor(nr) {
+    var mailboxSel = document.getElementById('mailbox' + nr);
+    var folderSel = document.getElementById('folder' + nr);
+    folderSel.innerHTML = '<option value="">-- Ordner w&auml;hlen --</option>';
+    folderSel.disabled = true;
+    updateStartButton();
+
+    if (!mailboxSel.value) return;
+    try {
+        var store = outlookNS.Stores.Item(parseInt(mailboxSel.value, 10));
+        var rootFolder = store.GetRootFolder();
+        var folders = rootFolder.Folders;
+        for (var i = 1; i <= folders.Count; i++) {
+            try {
+                var folder = folders.Item(i);
+                var opt = document.createElement('option');
+                opt.value = folder.EntryID;
+                opt.text = folder.Name;
+                folderSel.appendChild(opt);
+                addSubfolders(folder, folderSel, ' ');
+            } catch (e) {}
+        }
+        folderSel.disabled = false;
+    } catch (e) {
+        showError("Ordner konnten nicht geladen werden: " + esc(e.message));
+    }
+}
+
+function addSubfolders(parentFolder, select, indent) {
+    try {
+        var subFolders = parentFolder.Folders;
+        for (var i = 1; i <= subFolders.Count; i++) {
+            try {
+                var folder = subFolders.Item(i);
+                var opt = document.createElement('option');
+                opt.value = folder.EntryID;
+                opt.text = indent + folder.Name;
+                select.appendChild(opt);
+                addSubfolders(folder, select, indent + ' ');
+            } catch (e) {}
+        }
+    } catch (e) {}
+}
+
+function updateStartButton() {
+    var ok = !!document.getElementById('folder1').value;
+    var mb2 = document.getElementById('mailbox2').value;
+    if (mb2 && !document.getElementById('folder2').value) ok = false;
+    document.getElementById('btnStart').disabled = !ok;
+}
+
+/* ---------------- Stichwoerter ---------------- */
+function parseKeywords(str) {
+    var parts = String(str || '').split(',');
+    var out = [], seen = {};
+    for (var i = 0; i < parts.length; i++) {
+        var kw = trim(parts[i]);
+        if (!kw) continue;
+        var lower = kw.toLowerCase();
+        if (seen[lower]) continue;
+        seen[lower] = true;
+        out.push({ text: kw, lower: lower, whole: lower.length <= 3 });
+    }
+    return out;
+}
+
+/* Ist Zeichen Teil eines Wortes? (inkl. deutscher Umlaute) */
+function isWordChar(ch) {
+    if (!ch) return false;
+    return /[0-9a-zäöüß]/.test(ch);
+}
+
+/* Kommt Stichwort im (bereits kleingeschriebenen) Text vor?
+   Kurze Stichwoerter (whole=true) nur als ganzes Wort. */
+function matchesKeyword(textLower, kw) {
+    if (!textLower) return false;
+    if (!kw.whole) return textLower.indexOf(kw.lower) !== -1;
+    var idx = textLower.indexOf(kw.lower);
+    while (idx !== -1) {
+        var before = idx > 0 ? textLower.charAt(idx - 1) : '';
+        var after = textLower.charAt(idx + kw.lower.length);
+        if (!isWordChar(before) && !isWordChar(after)) return true;
+        idx = textLower.indexOf(kw.lower, idx + 1);
+    }
+    return false;
+}
+
+/* ---------------- Analyse (Scan in Bloecken) ---------------- */
+function startAnalysis() {
+    hideStatus();
+
+    var fromDate = parseIsoDate(document.getElementById('dateFrom').value);
+    var toDate = parseIsoDate(document.getElementById('dateTo').value);
+    if (!fromDate || !toDate) { showError("Bitte g&uuml;ltige Daten eingeben (Format JJJJ-MM-TT)."); return; }
+    if (fromDate > toDate) { showError("Datum &bdquo;Von&ldquo; muss vor &bdquo;Bis&ldquo; liegen."); return; }
+    var toEnd = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59);
+
+    var keywords = parseKeywords(document.getElementById('keywords').value);
+    var searchBody = document.getElementById('chkBody').checked;
+
+    /* Jobs = gewaehlte Postfach/Ordner-Paare */
+    var jobs = [];
+    for (var nr = 1; nr <= 2; nr++) {
+        var mbSel = document.getElementById('mailbox' + nr);
+        var fSel = document.getElementById('folder' + nr);
+        if (!mbSel.value || !fSel.value) continue;
+        var mbName = mbSel.options[mbSel.selectedIndex].text;
+        var fName = trim(fSel.options[fSel.selectedIndex].text);
+        jobs.push({
+            nr: nr,
+            entryId: fSel.value,
+            mailbox: mbName,
+            folder: fName,
+            label: 'P' + nr,
+            days: {},        // 'yyyy-mm-dd' -> { t: gesamt, h: mit Stichwort }
+            total: 0,
+            hits: 0,
+            scanned: 0,
+            skippedErrors: 0
+        });
+    }
+    if (jobs.length === 0) { showError("Bitte mindestens Postfach 1 mit Ordner ausw&auml;hlen."); return; }
+
+    document.getElementById('btnStart').disabled = true;
+    showProgress("Ordner werden ge&ouml;ffnet &hellip;");
+
+    scanState = {
+        jobs: jobs,
+        jobIdx: 0,
+        items: null,
+        itemIdx: 1,
+        itemCount: 0,
+        fromDate: fromDate,
+        toDate: toEnd,
+        keywords: keywords,
+        searchBody: searchBody,
+        details: [],
+        detailsDropped: 0
+    };
+
+    window.setTimeout(scanTick, 60);
+}
+
+/* Ein Tick = ein Block Mails. Haelt die UI fluessig (siehe CLAUDE.md). */
+function scanTick() {
+    var st = scanState;
+    if (!st) return;
+
+    try {
+        /* Naechsten Job oeffnen, falls noetig */
+        if (st.items === null) {
+            if (st.jobIdx >= st.jobs.length) { finishScan(); return; }
+            var job = st.jobs[st.jobIdx];
+            var folder = outlookNS.GetFolderFromID(job.entryId);
+            st.items = folder.Items;
+            st.items.Sort("[ReceivedTime]", true);   // absteigend: neueste zuerst
+            st.itemCount = st.items.Count;
+            st.itemIdx = 1;
+            setProgress(jobPct(st), "Postfach " + job.nr + " (" + esc(job.mailbox) + "): 0 / " + st.itemCount + " Mails");
+        }
+
+        var job2 = st.jobs[st.jobIdx];
+        var end = Math.min(st.itemIdx + CHUNK_SIZE - 1, st.itemCount);
+        var jobDone = (st.itemIdx > st.itemCount);
+
+        for (var i = st.itemIdx; i <= end; i++) {
+            try {
+                var item = st.items.Item(i);
+                if (item.Class !== 43) continue;      // nur Mails (olMail)
+
+                var rt;
+                try { rt = new Date(item.ReceivedTime); } catch (eRt) { continue; }
+                if (isNaN(rt.getTime())) continue;
+
+                /* absteigend sortiert: aelter als "Von" -> Job fertig */
+                if (rt < st.fromDate) { jobDone = true; break; }
+                if (rt > st.toDate) continue;
+
+                job2.scanned++;
+                var dayKey = isoDate(rt);
+                if (!job2.days[dayKey]) job2.days[dayKey] = { t: 0, h: 0 };
+                job2.days[dayKey].t++;
+                job2.total++;
+
+                /* Stichwort-Pruefung */
+                if (st.keywords.length > 0) {
+                    var subject = '';
+                    try { subject = String(item.Subject || ''); } catch (eS) {}
+                    var subjLower = subject.toLowerCase();
+                    var bodyLower = null;   // Body nur bei Bedarf laden (Performance)
+
+                    var found = [], where = { betreff: false, text: false };
+                    for (var k = 0; k < st.keywords.length; k++) {
+                        var kw = st.keywords[k];
+                        var inSubj = matchesKeyword(subjLower, kw);
+                        var inBody = false;
+                        if (!inSubj && st.searchBody) {
+                            if (bodyLower === null) {
+                                var body = '';
+                                try { body = String(item.Body || ''); } catch (eB) {}
+                                bodyLower = body.toLowerCase();
+                            }
+                            inBody = matchesKeyword(bodyLower, kw);
+                        }
+                        if (inSubj || inBody) {
+                            found.push(kw.text);
+                            if (inSubj) where.betreff = true;
+                            if (inBody) where.text = true;
+                        }
+                    }
+
+                    if (found.length > 0) {
+                        job2.days[dayKey].h++;
+                        job2.hits++;
+                        if (st.details.length < DETAIL_MAX) {
+                            var sender = '';
+                            try { sender = String(item.SenderName || ''); } catch (eSn) {}
+                            if (!sender) { try { sender = String(item.SenderEmailAddress || ''); } catch (eSe) {} }
+                            st.details.push({
+                                datum: fmtDE(rt) + ' ' + pad(rt.getHours()) + ':' + pad(rt.getMinutes()),
+                                sortDate: rt.getTime(),
+                                kw: kwKey(rt),
+                                mailbox: job2.mailbox,
+                                folder: job2.folder,
+                                sender: sender,
+                                subject: subject,
+                                keywords: found.join(', '),
+                                fundort: (where.betreff && where.text) ? 'Betreff + Text' : (where.betreff ? 'Betreff' : 'Text')
+                            });
+                        } else {
+                            st.detailsDropped++;
+                        }
+                    }
+                }
+            } catch (eItem) {
+                st.jobs[st.jobIdx].skippedErrors++;
+            }
+        }
+
+        st.itemIdx = end + 1;
+        if (st.itemIdx > st.itemCount) jobDone = true;
+
+        setProgress(jobPct(st),
+            "Postfach " + job2.nr + " (" + esc(job2.mailbox) + "): " +
+            Math.min(st.itemIdx - 1, st.itemCount) + " / " + st.itemCount +
+            " Mails gepr&uuml;ft &ndash; im Zeitraum: " + job2.total + ", Stichwort-Treffer: " + job2.hits);
+
+        if (jobDone) {
+            st.jobIdx++;
+            st.items = null;
+        }
+
+        window.setTimeout(scanTick, 10);
+    } catch (e) {
+        hideProgress();
+        document.getElementById('btnStart').disabled = false;
+        scanState = null;
+        showError("Fehler beim Scannen: " + esc(e.message));
+    }
+}
+
+function jobPct(st) {
+    var perJob = 100 / st.jobs.length;
+    var inner = st.itemCount > 0 ? Math.min(1, (st.itemIdx - 1) / st.itemCount) : 0;
+    return Math.round(st.jobIdx * perJob + inner * perJob);
+}
+
+function finishScan() {
+    var st = scanState;
+    scanState = null;
+
+    var totalMails = 0, totalHits = 0;
+    for (var j = 0; j < st.jobs.length; j++) {
+        totalMails += st.jobs[j].total;
+        totalHits += st.jobs[j].hits;
+    }
+
+    setProgress(100, "Scan fertig &ndash; Excel wird erstellt &hellip;");
+
+    /* Kurzer Tick, damit der Fortschritt gerendert wird, bevor Excel-COM blockiert */
+    window.setTimeout(function () {
+        try {
+            buildExcel(st);
+            hideProgress();
+            var msg = "<b>Fertig!</b><br>" + totalMails + " Mails im Zeitraum, davon " + totalHits +
+                      " mit Stichwort-Treffer. Die Excel-Mappe ist ge&ouml;ffnet (3 Bl&auml;tter: KW-&Uuml;bersicht, Tage, Stichwort-Treffer). Bitte manuell speichern.";
+            if (st.detailsDropped > 0) {
+                msg += "<br><i>Hinweis: Detail-Blatt auf " + DETAIL_MAX + " Zeilen begrenzt, " +
+                       st.detailsDropped + " weitere Treffer nur in den Z&auml;hlungen enthalten.</i>";
+            }
+            var skipped = 0;
+            for (var j2 = 0; j2 < st.jobs.length; j2++) skipped += st.jobs[j2].skippedErrors;
+            if (skipped > 0) {
+                msg += "<br><i>" + skipped + " Element(e) konnten nicht gelesen werden und wurden &uuml;bersprungen.</i>";
+            }
+            showSuccess(msg);
+        } catch (e) {
+            hideProgress();
+            showError("Excel-Export fehlgeschlagen: " + esc(e.message));
+        }
+        document.getElementById('btnStart').disabled = false;
+    }, 60);
+}
+
+/* ---------------- Excel-Ausgabe ---------------- */
+/* Excel Interior.Color erwartet BGR-codierte Werte */
+function rgb(r, g, b) { return r + g * 256 + b * 65536; }
+
+function styleHeaderRow(sheet, excel, rowNr, colCount) {
+    try {
+        var hr = sheet.Range(sheet.Cells(rowNr, 1), sheet.Cells(rowNr, colCount));
+        hr.Font.Bold = true;
+        hr.Interior.Color = rgb(185, 28, 28);   // ERGO-Rot
+        hr.Font.Color = rgb(255, 255, 255);
+    } catch (e) {}
+}
+function freezeBelow(sheet, excel, rowNr) {
+    try {
+        sheet.Activate();
+        sheet.Range("A1").Select();
+        excel.ActiveWindow.FreezePanes = false;
+        sheet.Cells(rowNr + 1, 1).Select();
+        excel.ActiveWindow.FreezePanes = true;
+    } catch (e) {}
+}
+
+function buildExcel(st) {
+    var jobs = st.jobs;
+    var two = jobs.length === 2;
+
+    var excel = new ActiveXObject("Excel.Application");
+    excel.Visible = true;
+    excel.DisplayAlerts = false;
+
+    var wb = excel.Workbooks.Add();
+
+    /* Worksheets.Add() legt VOR dem aktiven Blatt an -> in umgekehrter
+       Reihenfolge anlegen, damit die Reihenfolge am Ende stimmt:
+       KW-Uebersicht | Tage | Stichwort-Treffer */
+    var shDetail = wb.ActiveSheet;
+    try { shDetail.Name = "Stichwort-Treffer"; } catch (e) {}
+    var shDays = wb.Worksheets.Add();
+    try { shDays.Name = "Tage"; } catch (e) {}
+    var shKW = wb.Worksheets.Add();
+    try { shKW.Name = "KW-Uebersicht"; } catch (e) {}
+
+    /* ---------- Blatt 1: KW-Uebersicht ---------- */
+    var kwText = st.keywords.length > 0 ? kwListText(st.keywords) : '(keine)';
+    shKW.Cells(1, 1).Value = "Mail-Statistik pro Kalenderwoche";
+    try { shKW.Cells(1, 1).Font.Bold = true; shKW.Cells(1, 1).Font.Size = 14; } catch (e) {}
+    shKW.Cells(2, 1).Value = "Zeitraum:";
+    shKW.Cells(2, 2).Value = fmtDE(st.fromDate) + " bis " + fmtDE(st.toDate);
+    shKW.Cells(3, 1).Value = "Postfach 1:";
+    shKW.Cells(3, 2).Value = jobs[0].mailbox + "  /  " + jobs[0].folder;
+    if (two) {
+        shKW.Cells(4, 1).Value = "Postfach 2:";
+        shKW.Cells(4, 2).Value = jobs[1].mailbox + "  /  " + jobs[1].folder;
+    }
+    shKW.Cells(5, 1).Value = "Stichwörter:";
+    shKW.Cells(5, 2).Value = kwText + (st.searchBody ? "  (Betreff + Mailtext)" : "  (nur Betreff)");
+    for (var m = 2; m <= 5; m++) { try { shKW.Cells(m, 1).Font.Bold = true; } catch (e) {} }
+
+    var headRow = 7;
+    var headers = ["KW", "Zeitraum (Mo–So)", "Mails P1", "davon Stichwort P1"];
+    if (two) headers = headers.concat(["Mails P2", "davon Stichwort P2", "Mails gesamt", "Stichwort gesamt"]);
+    for (var c = 0; c < headers.length; c++) shKW.Cells(headRow, c + 1).Value = headers[c];
+    styleHeaderRow(shKW, excel, headRow, headers.length);
+
+    /* Wochen im Zeitraum aufbauen (Montag fuer Montag) */
+    var weeks = [];
+    var wk = mondayOf(st.fromDate);
+    var endT = st.toDate.getTime();
+    while (wk.getTime() <= endT) {
+        var sunday = new Date(wk.getFullYear(), wk.getMonth(), wk.getDate() + 6);
+        weeks.push({ monday: new Date(wk.getTime()), sunday: sunday, key: kwKey(wk) });
+        wk.setDate(wk.getDate() + 7);
+    }
+
+    /* Tageswerte je Job in Wochen summieren */
+    var row = headRow + 1;
+    var sumT = [0, 0], sumH = [0, 0];
+    for (var w = 0; w < weeks.length; w++) {
+        var wkT = [0, 0], wkH = [0, 0];
+        for (var dd = 0; dd < 7; dd++) {
+            var day = new Date(weeks[w].monday.getFullYear(), weeks[w].monday.getMonth(), weeks[w].monday.getDate() + dd);
+            var key = isoDate(day);
+            for (var j = 0; j < jobs.length; j++) {
+                var e = jobs[j].days[key];
+                if (e) { wkT[j] += e.t; wkH[j] += e.h; }
+            }
+        }
+        shKW.Cells(row, 1).Value = weeks[w].key;
+        shKW.Cells(row, 2).Value = fmtDE(weeks[w].monday) + " – " + fmtDE(weeks[w].sunday);
+        shKW.Cells(row, 3).Value = wkT[0];
+        shKW.Cells(row, 4).Value = wkH[0];
+        if (two) {
+            shKW.Cells(row, 5).Value = wkT[1];
+            shKW.Cells(row, 6).Value = wkH[1];
+            shKW.Cells(row, 7).Value = wkT[0] + wkT[1];
+            shKW.Cells(row, 8).Value = wkH[0] + wkH[1];
+        }
+        for (var j2 = 0; j2 < jobs.length; j2++) { sumT[j2] += wkT[j2]; sumH[j2] += wkH[j2]; }
+        row++;
+    }
+
+    /* Summenzeile */
+    shKW.Cells(row, 1).Value = "Summe";
+    shKW.Cells(row, 3).Value = sumT[0];
+    shKW.Cells(row, 4).Value = sumH[0];
+    if (two) {
+        shKW.Cells(row, 5).Value = sumT[1];
+        shKW.Cells(row, 6).Value = sumH[1];
+        shKW.Cells(row, 7).Value = sumT[0] + sumT[1];
+        shKW.Cells(row, 8).Value = sumH[0] + sumH[1];
+    }
+    try {
+        var sr = shKW.Range(shKW.Cells(row, 1), shKW.Cells(row, headers.length));
+        sr.Font.Bold = true;
+        sr.Interior.Color = rgb(229, 231, 235);
+    } catch (e) {}
+
+    try { shKW.Range(shKW.Cells(headRow, 1), shKW.Cells(row - 1, headers.length)).AutoFilter(); } catch (e) {}
+    try { shKW.Columns("A:H").AutoFit(); } catch (e) {}
+    freezeBelow(shKW, excel, headRow);
+
+    /* ---------- Blatt 2: Tage ---------- */
+    var dHeaders = ["Datum", "Wochentag", "KW", "Mails P1", "davon Stichwort P1"];
+    if (two) dHeaders = dHeaders.concat(["Mails P2", "davon Stichwort P2", "Mails gesamt", "Stichwort gesamt"]);
+    for (var c2 = 0; c2 < dHeaders.length; c2++) shDays.Cells(1, c2 + 1).Value = dHeaders[c2];
+    styleHeaderRow(shDays, excel, 1, dHeaders.length);
+
+    var dRow = 2;
+    var cur = new Date(st.fromDate.getFullYear(), st.fromDate.getMonth(), st.fromDate.getDate());
+    while (cur.getTime() <= endT) {
+        var dKey = isoDate(cur);
+        var wd = (cur.getDay() + 6) % 7;
+        var t = [0, 0], h = [0, 0];
+        for (var j3 = 0; j3 < jobs.length; j3++) {
+            var de = jobs[j3].days[dKey];
+            if (de) { t[j3] = de.t; h[j3] = de.h; }
+        }
+        shDays.Cells(dRow, 1).Value = fmtDE(cur);
+        shDays.Cells(dRow, 2).Value = WEEKDAYS[wd];
+        shDays.Cells(dRow, 3).Value = kwKey(cur);
+        shDays.Cells(dRow, 4).Value = t[0];
+        shDays.Cells(dRow, 5).Value = h[0];
+        if (two) {
+            shDays.Cells(dRow, 6).Value = t[1];
+            shDays.Cells(dRow, 7).Value = h[1];
+            shDays.Cells(dRow, 8).Value = t[0] + t[1];
+            shDays.Cells(dRow, 9).Value = h[0] + h[1];
+        }
+        if (wd >= 5) {   // Wochenende leicht grau
+            try {
+                shDays.Range(shDays.Cells(dRow, 1), shDays.Cells(dRow, dHeaders.length)).Interior.Color = rgb(243, 244, 246);
+            } catch (e) {}
+        }
+        dRow++;
+        cur.setDate(cur.getDate() + 1);
+    }
+    try { shDays.Range(shDays.Cells(1, 1), shDays.Cells(dRow - 1, dHeaders.length)).AutoFilter(); } catch (e) {}
+    try { shDays.Columns("A:I").AutoFit(); } catch (e) {}
+    freezeBelow(shDays, excel, 1);
+
+    /* ---------- Blatt 3: Stichwort-Treffer (Detail) ---------- */
+    var tHeaders = ["Nr", "Datum", "KW", "Postfach", "Ordner", "Absender", "Betreff", "Stichwörter", "Fundort"];
+    for (var c3 = 0; c3 < tHeaders.length; c3++) shDetail.Cells(1, c3 + 1).Value = tHeaders[c3];
+    styleHeaderRow(shDetail, excel, 1, tHeaders.length);
+
+    /* Nach Datum aufsteigend sortieren */
+    st.details.sort(function (a, b) { return a.sortDate - b.sortDate; });
+    for (var d2 = 0; d2 < st.details.length; d2++) {
+        var det = st.details[d2];
+        var r2 = d2 + 2;
+        shDetail.Cells(r2, 1).Value = d2 + 1;
+        shDetail.Cells(r2, 2).Value = det.datum;
+        shDetail.Cells(r2, 3).Value = det.kw;
+        shDetail.Cells(r2, 4).Value = det.mailbox;
+        shDetail.Cells(r2, 5).Value = det.folder;
+        shDetail.Cells(r2, 6).Value = det.sender;
+        shDetail.Cells(r2, 7).Value = det.subject;
+        shDetail.Cells(r2, 8).Value = det.keywords;
+        shDetail.Cells(r2, 9).Value = det.fundort;
+    }
+    if (st.details.length === 0) {
+        shDetail.Cells(2, 2).Value = (st.keywords.length === 0)
+            ? "Keine Stichwörter angegeben."
+            : "Keine Stichwort-Treffer im Zeitraum.";
+    }
+    try {
+        shDetail.Columns("A:F").AutoFit();
+        shDetail.Columns("G:G").ColumnWidth = 60;
+        shDetail.Columns("H:I").AutoFit();
+    } catch (e) {}
+    try {
+        if (st.details.length > 0) {
+            shDetail.Range(shDetail.Cells(1, 1), shDetail.Cells(st.details.length + 1, tHeaders.length)).AutoFilter();
+        }
+    } catch (e) {}
+    freezeBelow(shDetail, excel, 1);
+
+    /* Erstes Blatt aktivieren, fertig */
+    try { shKW.Activate(); shKW.Range("A1").Select(); } catch (e) {}
+    excel.DisplayAlerts = true;
+}
+
+function kwListText(keywords) {
+    var parts = [];
+    for (var i = 0; i < keywords.length; i++) parts.push(keywords[i].text);
+    return parts.join(', ');
+}
+</script>
+</body>
+</html>
