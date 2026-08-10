@@ -97,8 +97,13 @@ Und weil die zweite Spalte über &bdquo;alles andere&ldquo; definiert ist,
 sammelt sie auch alles ein, was gar keine Personalnummer ist - etwa
 BD-Nummern, Beraterzeichen oder Pool-IDs.</p>
 
-<h3>Befüllung (4.329 BÜ-Vorgänge)</h3>
-{TAB_BEFUELLUNG}
+<h3>Befüllung: Agentur-Nr x Personalnummer (4.329 BÜ-Vorgänge)</h3>
+<p>Jeder Vorgang fällt in genau eines der vier inneren Felder, die Anteile
+addieren sich zu 100&nbsp;%.</p>
+{TAB_MATRIX}
+<p class="hint">Zum Vergleich: Eine Agentur-Nr ist in 3.431 Vorgängen (79,3 %)
+vorhanden, eine Personalnummer in 2.131 (49,2 %) - diese beiden Werte
+überschneiden sich und ergeben deshalb zusammen nicht 100 %.</p>
 
 <h3>Agentur-Nr: 3.431 Werte in 13 verschiedenen Schreibweisen</h3>
 {TAB_AGENTUR}
@@ -174,13 +179,15 @@ Ablage im Tool aber schon.</p>
 <p>Viele Grüße</p>
 </div>"""
 
-HTML = HTML.replace("{TAB_BEFUELLUNG}", tab(
-    ["", "Anzahl", "Anteil"],
-    [["Agentur-Nr vorhanden", "3.431", "79,3 %"],
-     ["Vermittler-/Personalnr vorhanden", "2.131", "49,2 %"],
-     ["beide vorhanden", "1.507", "34,8 %"],
-     ["keine von beiden", "274", "6,3 %"]],
-    num_spalten=(1, 2)))
+HTML = HTML.replace("{TAB_MATRIX}", tab(
+    ["", "Personalnummer vorhanden", "Personalnummer fehlt", "SUMME"],
+    [["<b>Agentur-Nr vorhanden</b>", "1.507 &nbsp;(34,8 %)", "1.924 &nbsp;(44,5 %)",
+      "<b>3.431 &nbsp;(79,3 %)</b>"],
+     ["<b>Agentur-Nr fehlt</b>", "624 &nbsp;(14,4 %)", "274 &nbsp;(6,3 %)",
+      "<b>898 &nbsp;(20,7 %)</b>"],
+     ["<b>SUMME</b>", "<b>2.131 &nbsp;(49,2 %)</b>", "<b>2.198 &nbsp;(50,8 %)</b>",
+      "<b>4.329 &nbsp;(100,0 %)</b>"]],
+    num_spalten=(1, 2, 3)))
 
 HTML = HTML.replace("{TAB_AGENTUR}", tab(
     ["Anteil", "Format", "Beispiel", "Anzahl"],

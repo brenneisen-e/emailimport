@@ -38,12 +38,23 @@ wird sie trotzdem als Agenturnummer abgelegt. Und weil die zweite Spalte über
 "alles andere" definiert ist, sammelt sie auch alles ein, was gar keine
 Personalnummer ist - etwa BD-Nummern, Beraterzeichen oder Pool-IDs.
 
-Befüllung (4.329 BÜ-Vorgänge)
------------------------------
-  Agentur-Nr vorhanden ................ 3.431  (79,3 %)
-  Vermittler-/Personalnr vorhanden .... 2.131  (49,2 %)
-  beide vorhanden ..................... 1.507  (34,8 %)
-  keine von beiden ...................... 274   (6,3 %)
+Befüllung: Agentur-Nr x Personalnummer (4.329 BÜ-Vorgänge)
+-----------------------------------------------------------
+Jeder Vorgang fällt in genau eines der vier inneren Felder, die Anteile
+addieren sich zu 100 %.
+
+                       Personalnr        Personalnr
+                        vorhanden            fehlt           SUMME
+  Agentur-Nr
+    vorhanden      1.507  (34,8 %)   1.924  (44,5 %)   3.431  (79,3 %)
+  Agentur-Nr
+    fehlt            624  (14,4 %)     274   (6,3 %)     898  (20,7 %)
+  ------------------------------------------------------------------------
+  SUMME            2.131  (49,2 %)   2.198  (50,8 %)   4.329 (100,0 %)
+
+Zum Vergleich: Eine Agentur-Nr ist in 3.431 Vorgängen (79,3 %) vorhanden, eine
+Personalnummer in 2.131 (49,2 %) - diese beiden Werte überschneiden sich und
+ergeben deshalb zusammen nicht 100 %.
 
 Agentur-Nr: 3.431 Werte in 13 verschiedenen Schreibweisen
 ---------------------------------------------------------

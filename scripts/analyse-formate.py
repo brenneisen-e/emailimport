@@ -512,18 +512,83 @@ for label, beschr, sp_wert, sp_maske in BEFUELLUNG:
     setz(zeile, 7, len({maske(v) for v in vals}), sz=10, fmt="#,##0", rahmen=True)
     zeile += 1
 
-setz(zeile, 1, "Agentur UND Vermittler gefüllt", sz=10, rahmen=True)
-setz(zeile, 2, "beide Nummern im selben Vorgang erkannt", sz=10, wrap=True, rahmen=True)
-setz(zeile, 3, cif([("Agentur_Nr", '"<>"'), ("Vermittler_Nr", '"<>"')]),
+setz(zeile, 1, "Die Zeilen oben überschneiden sich (ein Vorgang kann beide Nummern haben) "
+               "und ergeben deshalb zusammen nicht 100 %%. Die Matrix darunter teilt dieselben "
+               "%s Vorgänge überschneidungsfrei auf." % zahl(N_BUE),
+     sz=9, farbe="FF4B5563")
+zeile += 2
+
+# ---- Block 0b: Matrix Agentur x Personalnummer --------------------------
+titel("0b - Matrix: Agentur-Nr x Personalnummer",
+      "Jeder der %s BÜ-Vorgänge fällt in genau eines der vier inneren Felder - "
+      "die Anteile addieren sich zu 100 %%." % zahl(N_BUE))
+tabellenkopf(["", "Personalnummer vorhanden", "Personalnummer fehlt", "SUMME",
+              "", "", ""])
+
+matrix_start = zeile
+# Zeile 1: Agentur vorhanden
+setz(zeile, 1, "Agentur-Nr vorhanden", bold=True, sz=10, rahmen=True, fill=GRAU)
+setz(zeile, 2, cif([("Agentur_Nr", '"<>"'), ("Vermittler_Nr", '"<>"')]),
+     sz=10, fmt="#,##0", rahmen=True, fill=GRUEN)
+setz(zeile, 3, cif([("Agentur_Nr", '"<>"'), ("Vermittler_Nr", '""')]),
      sz=10, fmt="#,##0", rahmen=True)
-setz(zeile, 4, "=C%d/%d" % (zeile, N_BUE), sz=10, fmt="0.0%", rahmen=True)
+setz(zeile, 4, "=B%d+C%d" % (zeile, zeile), bold=True, sz=10, fmt="#,##0",
+     rahmen=True, fill=GRAU)
 zeile += 1
-setz(zeile, 1, "KEINE der beiden Nummern", sz=10, rahmen=True, fill=ROT)
-setz(zeile, 2, "Vorgang ohne jede Maklernummer - Makler nur über Name/Pool zuordenbar",
-     sz=10, wrap=True, rahmen=True, fill=ROT)
+# Zeile 2: Agentur fehlt
+setz(zeile, 1, "Agentur-Nr fehlt", bold=True, sz=10, rahmen=True, fill=GRAU)
+setz(zeile, 2, cif([("Agentur_Nr", '""'), ("Vermittler_Nr", '"<>"')]),
+     sz=10, fmt="#,##0", rahmen=True)
 setz(zeile, 3, cif([("Agentur_Nr", '""'), ("Vermittler_Nr", '""')]),
      sz=10, fmt="#,##0", rahmen=True, fill=ROT)
-setz(zeile, 4, "=C%d/%d" % (zeile, N_BUE), sz=10, fmt="0.0%", rahmen=True, fill=ROT)
+setz(zeile, 4, "=B%d+C%d" % (zeile, zeile), bold=True, sz=10, fmt="#,##0",
+     rahmen=True, fill=GRAU)
+zeile += 1
+# Summenzeile
+setz(zeile, 1, "SUMME", bold=True, sz=10, rahmen=True, fill=GRAU)
+for sp in ("B", "C", "D"):
+    setz(zeile, "ABCD".index(sp) + 1,
+         "=%s%d+%s%d" % (sp, matrix_start, sp, matrix_start + 1),
+         bold=True, sz=10, fmt="#,##0", rahmen=True, fill=GRAU)
+zeile += 2
+
+# Dieselbe Matrix in Prozent. Damit die vier Felder exakt 100 % ergeben,
+# wird ein Feld als Rest gerechnet (1 minus die drei anderen) - so stimmen
+# auch die Rand- und Gesamtsummen ohne Rundungsdifferenz.
+tabellenkopf(["Anteil an allen %s BÜ-Vorgängen" % zahl(N_BUE),
+              "Personalnummer vorhanden", "Personalnummer fehlt", "SUMME", "", "", ""])
+proz_start = zeile
+# Drei Felder auf die angezeigte Genauigkeit gerundet (0,1 Prozentpunkt =
+# 3 Nachkommastellen), das vierte als Rest -> die vier Felder ergeben in der
+# Anzeige exakt 100 %, und auch die Rand- und Gesamtsummen gehen auf.
+setz(zeile, 1, "Agentur-Nr vorhanden", bold=True, sz=10, rahmen=True, fill=GRAU)
+setz(zeile, 2, "=ROUND(B%d/$D$%d,3)" % (matrix_start, matrix_start + 2), sz=10,
+     fmt="0.0%", rahmen=True, fill=GRUEN)
+setz(zeile, 3, "=1-B%d-B%d-C%d" % (proz_start, proz_start + 1, proz_start + 1),
+     sz=10, fmt="0.0%", rahmen=True)
+setz(zeile, 4, "=B%d+C%d" % (zeile, zeile), bold=True, sz=10, fmt="0.0%",
+     rahmen=True, fill=GRAU)
+zeile += 1
+setz(zeile, 1, "Agentur-Nr fehlt", bold=True, sz=10, rahmen=True, fill=GRAU)
+setz(zeile, 2, "=ROUND(B%d/$D$%d,3)" % (matrix_start + 1, matrix_start + 2), sz=10,
+     fmt="0.0%", rahmen=True)
+setz(zeile, 3, "=ROUND(C%d/$D$%d,3)" % (matrix_start + 1, matrix_start + 2), sz=10,
+     fmt="0.0%", rahmen=True, fill=ROT)
+setz(zeile, 4, "=B%d+C%d" % (zeile, zeile), bold=True, sz=10, fmt="0.0%",
+     rahmen=True, fill=GRAU)
+zeile += 1
+setz(zeile, 1, "SUMME", bold=True, sz=10, rahmen=True, fill=GRAU)
+for sp in ("B", "C", "D"):
+    setz(zeile, "ABCD".index(sp) + 1,
+         "=%s%d+%s%d" % (sp, proz_start, sp, proz_start + 1),
+         bold=True, sz=10, fmt="0.0%", rahmen=True, fill=GRAU)
+zeile += 1
+setz(zeile, 1, "Lesehilfe: grün = beide Nummern vorhanden, rot = gar keine Maklernummer. "
+               "Drei Felder sind auf 0,1 Prozentpunkt gerundet, das Feld "
+               "'Agentur vorhanden / Personalnummer fehlt' ist der Rest zu 100 % - dadurch "
+               "ergeben die vier Felder in der Anzeige exakt 100 %, und die Rand- und "
+               "Gesamtsummen gehen ohne Rundungsdifferenz auf.",
+     sz=9, farbe="FF4B5563")
 zeile += 2
 
 
