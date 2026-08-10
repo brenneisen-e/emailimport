@@ -1,16 +1,23 @@
-Betreff: Formatanalyse Agentur- und Personalnummern (April-Lauf, 5.034 Vorgänge) - Bitte um fachliche Einordnung
+Betreff: Formatanalyse Agentur- und Personalnummern - Bitte um Einordnung
 
 Hallo zusammen,
 
 ich habe ausgewertet, in welchen Formaten die Agentur- und die Vermittler-/
-Personalnummer bei der Extraktion der 5.034 April-Vorgänge herausgekommen
-sind. Die Auswertung liegt in der beigefügten analyse.xlsx auf zwei neuen
-Blättern: "Format-Analyse" (Auswertung mit Kernaussagen oben) und
-"Format-Details" (jede Zeile einzeln mit erkanntem Muster, filterbar).
+Personalnummer bei der Extraktion der April-Vorgänge herausgekommen sind.
 
-Das Folgende ist rein beschreibend - es zeigt, was in diesem Lauf
-herausgekommen ist. Ob das den fachlichen Vorgaben entspricht, kann ich aus
-den Daten heraus nicht beurteilen; dafür brauchen wir eure Einordnung.
+Basis: Von den 5.034 analysierten Mails sind 4.329 als BÜ-Vorgang klassifiziert
+(4.000 Erstvorgänge und 329 Reminder). Nur diese sind ausgewertet. Die übrigen
+705 Mails - Antrag/Änderung, Anfrage/Rücksprache, Kein-Makler-Vorgang und
+Vorgänge ohne Klassifikation - sind vorher herausgefiltert worden.
+
+Die Auswertung liegt in der beigefügten analyse.xlsx auf zwei neuen Blättern:
+"Format-Analyse" (Auswertung mit Kernaussagen oben) und "Format-Details" (alle
+5.034 Zeilen einzeln mit erkanntem Muster; die Spalte BUe_Vorgang zeigt, welche
+Zeilen eingehen).
+
+Das Folgende ist rein beschreibend - es zeigt, was in diesem Lauf herausgekommen
+ist. Ob das den fachlichen Vorgaben entspricht, kann ich aus den Daten heraus
+nicht beurteilen; dafür brauchen wir eure Einordnung.
 
 Wie die beiden Spalten zustande kommen
 --------------------------------------
@@ -31,69 +38,72 @@ wird sie trotzdem als Agenturnummer abgelegt. Und weil die zweite Spalte über
 "alles andere" definiert ist, sammelt sie auch alles ein, was gar keine
 Personalnummer ist - etwa BD-Nummern, Beraterzeichen oder Pool-IDs.
 
-Befüllung (5.034 Vorgänge)
---------------------------
-  Agentur-Nr vorhanden ................ 3.648  (72,5 %)
-  Vermittler-/Personalnr vorhanden .... 2.339  (46,5 %)
-  beide vorhanden ..................... 1.703  (33,8 %)
-  keine von beiden ...................... 750  (14,9 %)
+Befüllung (4.329 BÜ-Vorgänge)
+-----------------------------
+  Agentur-Nr vorhanden ................ 3.431  (79,3 %)
+  Vermittler-/Personalnr vorhanden .... 2.131  (49,2 %)
+  beide vorhanden ..................... 1.507  (34,8 %)
+  keine von beiden ...................... 274   (6,3 %)
 
-Agentur-Nr: 3.648 Werte in 14 verschiedenen Schreibweisen
+Agentur-Nr: 3.431 Werte in 13 verschiedenen Schreibweisen
 ---------------------------------------------------------
-  46,2 %  7 Ziffern, beginnend mit 890 ............ 8903235      (1.684x)
-  45,3 %  9 Ziffern, beginnend mit 6000 ........... 600041633    (1.652x)
-   4,2 %  5 Ziffern + Bindestrich + 4 Ziffern ..... 60008-1364     (154x)
-   2,6 %  Buchstabe + 9 Ziffern ................... A600040124      (95x)
-   0,9 %  3 Ziffern + Bindestrich + 4 Ziffern ..... 890-3235        (34x)
+  47,8 %  9 Ziffern, beginnend mit 6000 ........... 600041633    (1.640x)
+  43,4 %  7 Ziffern, beginnend mit 890 ............ 8903235      (1.489x)
+   4,4 %  5 Ziffern + Bindestrich + 4 Ziffern ..... 60008-1364     (152x)
+   2,7 %  Buchstabe + 9 Ziffern ................... A600040124      (92x)
+   0,9 %  3 Ziffern + Bindestrich + 4 Ziffern ..... 890-3235        (30x)
    0,4 %  5 Ziffern + Schrägstrich + 4 Ziffern .... 60002/0753      (13x)
-   0,4 %  übrige Einzelfälle ...................... 8904, 890666    (16x)
+   0,1 %  Buchstabe + Leerzeichen + 9 Ziffern ..... A 600046012      (4x)
+   0,1 %  4 Ziffern ............................... 8904             (4x)
+   0,2 %  übrige Einzelfälle ...................... 890666           (7x)
 
   Nur nach Ziffernanzahl, ohne Trennzeichen und Buchstaben:
-   52,6 %  9 Stellen   |   47,1 %  7 Stellen   |   0,3 %  sonstige
+   55,5 %  9 Stellen   |   44,3 %  7 Stellen   |   0,2 %  sonstige
 
-Vermittler-/Personalnummer: 2.339 Werte in 41 verschiedenen Schreibweisen
+Vermittler-/Personalnummer: 2.131 Werte in 37 verschiedenen Schreibweisen
 ------------------------------------------------------------------------
-  74,9 %  6 Ziffern ............................... 811774       (1.752x)
-   5,3 %  9 Ziffern ............................... 005556562      (125x)
-   4,8 %  7 Ziffern ............................... 7947361        (113x)
-   4,5 %  3 Ziffern + Bindestrich + 4 Ziffern ..... 898-0003       (106x)
-   2,0 %  5 Ziffern + Bindestrich + 4 Ziffern ..... 88417-0384      (47x)
-   1,9 %  8 Ziffern ............................... 89420798        (45x)
-   1,6 %  Buchstabe + 9 Ziffern ................... A010004616      (37x)
-   1,5 %  5 Ziffern ............................... 85357           (34x)
-   3,4 %  übrige Einzelfälle, 33 weitere Muster .... V 85357 A 777-0503,
-                                                     893/4055, 70-581-1935,
-                                                     00 111 40 16    (80x)
+  73,1 %  6 Ziffern ............................... 811774       (1.557x)
+   5,8 %  9 Ziffern ............................... 005556562      (124x)
+   5,2 %  7 Ziffern ............................... 7947361        (110x)
+   5,0 %  3 Ziffern + Bindestrich + 4 Ziffern ..... 898-0003       (106x)
+   2,2 %  5 Ziffern + Bindestrich + 4 Ziffern ..... 88417-0384      (47x)
+   2,0 %  8 Ziffern ............................... 89420798        (43x)
+   1,7 %  Buchstabe + 9 Ziffern ................... A010004616      (36x)
+   1,6 %  5 Ziffern ............................... 85357           (34x)
+   3,5 %  übrige Einzelfälle, 29 weitere Muster ... V 85357 A 777-0503,
+                                                    893/4055,
+                                                    00 111 40 16    (74x)
 
   Nur nach Ziffernanzahl, ohne Trennzeichen und Buchstaben:
-   75,1 %  6 Stellen   |   10,2 %  7 Stellen   |   9,8 %  9 Stellen
-    2,2 %  8 Stellen   |    1,5 %  5 Stellen   |   1,2 %  sonstige
+   73,2 %  6 Stellen   |   11,0 %  7 Stellen   |   10,6 %  9 Stellen
+    2,3 %  8 Stellen   |    1,6 %  5 Stellen   |    1,3 %  sonstige
 
 Weitere Beobachtungen
 ---------------------
 - Dieselbe Nummer kommt in unterschiedlichen Schreibweisen an: 12 Agentur-
-  nummern (betrifft 1.776 Vorgänge) und 7 Personalnummern (1.745 Vorgänge)
-  tauchen in mindestens zwei Varianten auf, z. B. 60008-1364 neben 600081364
-  oder 8903235 neben 890-3235. Für jede nachgelagerte Auswertung sind das
-  aktuell zwei verschiedene Makler.
-- 173 Personalnummern (7,4 %) tragen führende Nullen, z. B. 008923555
-  gegenüber 8923555. Bei den Agenturnummern kommt das in diesem Lauf nicht vor.
-- Einzelne Werte enthalten noch Wortbestandteile oder einen unersetzten
-  Feldnamen, z. B. "Vermittler 891300", "Agentur 8887290", "{vermittlernummer}".
+  nummern (betrifft 1.576 Vorgänge) und 6 Personalnummern (221 Vorgänge)
+  tauchen in mindestens zwei Varianten auf. Beispiele: 60008-1364 (36x) neben
+  600081364 (12x), 8903235 (1.283x) neben 890-3235 (5x), 008923555 (23x)
+  neben 8923555 (5x). Für jede nachgelagerte Auswertung sind das aktuell
+  zwei verschiedene Makler.
+- 170 Personalnummern (8,0 %) tragen führende Nullen. Bei den Agenturnummern
+  kommt das in diesem Lauf nicht vor.
+- Einzelne Werte enthalten noch Wortbestandteile, z. B. "Vermittler 891300"
+  oder "Agentur 8887290".
 
 Führende Buchstaben - was in diesem Lauf passiert ist
 -----------------------------------------------------
 Im Prompt dieses Laufs war hinterlegt, dass nur die reine Nummer bzw. Kennung
 ohne Text übernommen wird, führende Buchstaben also entfallen sollten. In den
-Daten sieht das so aus: 100 Agentur-Werte tragen weiterhin ein führendes "A"
-(z. B. A600040124), bei den Personalnummern sind es 69 Werte mit A, V, P, E, D
-oder G. Die Nachverarbeitung im Tool lässt genau einen führenden Buchstaben
+Daten sieht das so aus: 97 Agentur-Werte tragen weiterhin ein führendes "A"
+(z. B. A600040124), bei den Personalnummern sind es 64 Werte mit A, V, P oder
+D. Die Nachverarbeitung im Tool lässt genau einen führenden Buchstaben
 ausdrücklich zu.
 
 Sichtbare Auswirkung: A600080766 (15 Vorgänge) und 600080766 (1 Vorgang)
-werden als zwei verschiedene Schlüssel geführt, ebenso E811774 gegenüber
-811774. Ob die Buchstaben zur Nummer gehören oder hätten wegfallen sollen,
-kann ich nicht beurteilen - das gehört zur Frage nach dem Sollformat.
+werden als zwei verschiedene Schlüssel geführt. Ob die Buchstaben zur Nummer
+gehören oder hätten wegfallen sollen, kann ich nicht beurteilen - das gehört
+zur Frage nach dem Sollformat.
 
 Bitte an Marcus
 ---------------
@@ -105,7 +115,7 @@ wären? Hilfreich wäre alles, was sich später als Prüfregel formulieren läss
   und 6000 eine feste Bedeutung, und gibt es weitere?
 - Führende Nullen: bedeutungstragend oder auffüllend? Ist 008923555 dieselbe
   Nummer wie 8923555?
-- Führende Buchstaben (A, V, P, E, D, G): Bestandteil der Nummer, separates
+- Führende Buchstaben (A, V, P, D): Bestandteil der Nummer, separates
   Kennzeichen oder wegzulassen?
 - Trennzeichen: Sind 60008-1364 und 60002/0753 offizielle Darstellungen oder
   reine Formatierung aus dem Anschreiben?

@@ -31,6 +31,8 @@ FONT = "Aptos"
 
 # Spalten (0-basiert) im Quellsheet
 C_NR, C_VNR, C_POOL, C_AG, C_VM, C_KDNR = 0, 4, 8, 13, 14, 15
+C_KLASS = 21                      # Spalte 'Klassifikation'
+BUE_WERT = "BUe-Vorgang"          # nur diese Vorgaenge werden ausgewertet
 
 BLAU = "FF1E40AF"
 LILA = "FF4C1D95"
@@ -137,6 +139,16 @@ def hat_text(s):
     return bool(re.search(r"[A-Za-zÄÖÜäöü]{3,}", s))
 
 
+def zahl(n):
+    """1234 -> '1.234' (deutsche Tausendertrennung)."""
+    return "{:,}".format(int(n)).replace(",", ".")
+
+
+def pz(x, nk=1):
+    """91.4 -> '91,4'"""
+    return ("%.*f" % (nk, x)).replace(".", ",")
+
+
 def normkey(s):
     z = ziffern(s)
     return z.lstrip("0") or z
@@ -158,13 +170,18 @@ for idx, row in enumerate(ws.iter_rows(min_row=KOPFZEILEN + 1, values_only=True)
         "ag": hole(C_AG),
         "vm": hole(C_VM),
         "kdnr": hole(C_KDNR),
+        "klass": hole(C_KLASS),
+        "bue": hole(C_KLASS) == BUE_WERT,
     })
 
-N = len(daten)
+N = len(daten)                       # alle Zeilen im Quellsheet
+BUE = [d for d in daten if d["bue"]]  # nur BUe-Vorgaenge
+N_BUE = len(BUE)
 
 
 def werte(feld):
-    return [d[feld] for d in daten if d[feld]]
+    """Werte des Feldes - ausschliesslich aus BUe-Vorgaengen."""
+    return [d[feld] for d in BUE if d[feld]]
 
 
 # --------------------------------------------------------------------------
@@ -176,7 +193,7 @@ for name in (SHEET_MAIN, SHEET_DET):
 
 det = wb.create_sheet(SHEET_DET)
 DET_HEAD = [
-    "Quellzeile", "Lfd_Nr",
+    "Quellzeile", "Lfd_Nr", "Klassifikation", "BUe_Vorgang",
     "Agentur_Nr", "Agentur_Muster", "Agentur_Beschreibung", "Agentur_Ziffern", "Agentur_Trenner",
     "Vermittler_Nr", "Vermittler_Muster", "Vermittler_Beschreibung", "Vermittler_Ziffern", "Vermittler_Trenner",
     "Versicherungsnummer", "VNR_Muster", "VNR_Familie",
@@ -199,7 +216,7 @@ def vnr_familie(v):
 
 for d in daten:
     det.append([
-        d["zeile"], d["lfd"],
+        d["zeile"], d["lfd"], d["klass"], "ja" if d["bue"] else "nein",
         d["ag"], maske(d["ag"]) if d["ag"] else "", beschreibung_von_rohwert(d["ag"]) if d["ag"] else "",
         len(ziffern(d["ag"])) if d["ag"] else "", trennzeichen(d["ag"]) if d["ag"] else "",
         d["vm"], maske(d["vm"]) if d["vm"] else "", beschreibung_von_rohwert(d["vm"]) if d["vm"] else "",
@@ -211,12 +228,12 @@ for d in daten:
 
 DET_LAST = 1 + N
 for c in range(1, len(DET_HEAD) + 1):
-    z = det.cell(row=1, column=c)
-    z.font = Font(name=FONT, sz=10, b=True, color=WEISS)
-    z.fill = PatternFill("solid", fgColor=LILA)
-    z.alignment = Alignment(vertical="center", wrap_text=True)
+    kopfzelle = det.cell(row=1, column=c)
+    kopfzelle.font = Font(name=FONT, sz=10, b=True, color=WEISS)
+    kopfzelle.fill = PatternFill("solid", fgColor=LILA)
+    kopfzelle.alignment = Alignment(vertical="center", wrap_text=True)
     det.column_dimensions[get_column_letter(c)].width = max(11, min(30, len(DET_HEAD[c - 1]) + 3))
-det.freeze_panes = "C2"
+det.freeze_panes = "E2"
 det.auto_filter.ref = "A1:%s%d" % (get_column_letter(len(DET_HEAD)), DET_LAST)
 for r in range(2, DET_LAST + 1):
     for c in range(1, len(DET_HEAD) + 1):
@@ -228,6 +245,13 @@ SP = {h: get_column_letter(i) for i, h in enumerate(DET_HEAD, 1)}
 
 def rng(spalte):
     return "'%s'!$%s$2:$%s$%d" % (SHEET_DET, SP[spalte], SP[spalte], DET_LAST)
+
+
+def cif(paare):
+    """COUNTIFS ueber die Detailzeilen - immer eingeschraenkt auf BUe-Vorgaenge."""
+    teile = ["%s,%s" % (rng(sp), kriterium) for sp, kriterium in paare]
+    teile.append('%s,"ja"' % rng("BUe_Vorgang"))
+    return "=COUNTIFS(%s)" % ",".join(teile)
 
 
 # --------------------------------------------------------------------------
@@ -283,9 +307,14 @@ zeile += 1
 setz(zeile, 1, "Welche Schreibweisen wurden bei Agentur-Nr, Vermittler-Nr, Versicherungsnummer "
                "und Kundennummer tatsächlich extrahiert?", sz=10, farbe="FF4B5563")
 zeile += 1
-setz(zeile, 1, "Quelle: Sheet '%s', Zeilen %d bis %d (%d Vorgänge). Alle Anzahlen sind "
-               "COUNTIF-Formeln auf das Hilfsblatt '%s' und rechnen sich neu."
-     % (QUELL_SHEET, KOPFZEILEN + 1, KOPFZEILEN + N, N, SHEET_DET), sz=10, farbe="FF4B5563")
+setz(zeile, 1, "Basis: nur BÜ-Vorgänge. Von den %s Zeilen im Sheet '%s' sind %s als "
+               "Klassifikation '%s' erfasst - nur diese werden hier ausgewertet, die "
+               "übrigen %s (Antrag/Änderung, Anfrage, Kein-Makler-Vorgang, ohne "
+               "Klassifikation) bleiben außen vor."
+     % (zahl(N), QUELL_SHEET, zahl(N_BUE), BUE_WERT, zahl(N - N_BUE)), sz=10, farbe="FF4B5563")
+zeile += 1
+setz(zeile, 1, "Alle Anzahlen sind COUNTIFS-Formeln auf das Hilfsblatt '%s' und immer auf "
+               "BUe_Vorgang='ja' eingeschränkt." % SHEET_DET, sz=10, farbe="FF4B5563")
 zeile += 2
 
 # ---- Kernaussagen -------------------------------------------------------
@@ -311,27 +340,17 @@ _vm_nullen = sum(1 for v in _vm if ziffern(v).startswith("0"))
 _defekt = sum(1 for v in _ag + _vm
               if hat_text(v) or v.startswith("{") or len(ziffern(v)) < 5 or len(ziffern(v)) > 9)
 
-def z(n):
-    """1234 -> '1.234' (deutsche Tausendertrennung)."""
-    return "{:,}".format(int(n)).replace(",", ".")
-
-
-def pz(x, nk=1):
-    """91.4 -> '91,4'"""
-    return ("%.*f" % (nk, x)).replace(".", ",")
-
-
 KERN = [
     ("Agentur_Nr ist fast einheitlich",
      "%s von %s Werten (%s %%) stehen in nur 2 kompakten Formaten: 7 Ziffern mit 890-Präfix "
      "und 9 Ziffern mit 6000-Präfix. Insgesamt nur %d verschiedene Muster."
-     % (z(_ag_top2), z(len(_ag)), pz(100.0 * _ag_top2 / len(_ag)),
+     % (zahl(_ag_top2), zahl(len(_ag)), pz(100.0 * _ag_top2 / len(_ag)),
         len({maske(v) for v in _ag}))),
     ("Vermittler_Nr ist das Auffangfeld",
      "%d verschiedene Muster bei nur %s Werten. Häufigster Fall: 6 Ziffern kompakt (%s Werte, "
      "%s %%) - der Rest verteilt sich auf Bindestrich-, Schrägstrich-, Leerzeichen- und "
      "Buchstaben-Varianten."
-     % (len({maske(v) for v in _vm}), z(len(_vm)), z(_vm_top1), pz(100.0 * _vm_top1 / len(_vm)))),
+     % (len({maske(v) for v in _vm}), zahl(len(_vm)), zahl(_vm_top1), pz(100.0 * _vm_top1 / len(_vm)))),
     ("Trennzeichen sind der Hauptunterschied, nicht die Nummer",
      "%s %% der Agentur- und %s %% der Vermittler-Werte sind reine Ziffernketten. Die "
      "übrigen enthalten dieselbe Nummer nur mit Bindestrich, Schrägstrich, Leerzeichen oder "
@@ -341,20 +360,20 @@ KERN = [
      "%d Agenturnummern (%s Vorgänge) und %d Vermittlernummern (%s Vorgänge) kommen in "
      "mindestens zwei Schreibweisen vor - z. B. 60008-1364 neben 600081364. Ohne "
      "Normalisierung zersplittert das Cluster und Makler-Auswertungen. Details in Block 5."
-     % (_ag_multi_n, z(_ag_multi_v), _vm_multi_n, z(_vm_multi_v))),
+     % (_ag_multi_n, zahl(_ag_multi_v), _vm_multi_n, zahl(_vm_multi_v))),
     ("Führende Nullen nur im Vermittler-Feld",
      "%s Vermittler-Werte beginnen mit einer 0 (008923555 vs. 8923555). Bei Agentur_Nr kommt "
-     "das nicht vor." % z(_vm_nullen)),
+     "das nicht vor." % zahl(_vm_nullen)),
     ("Echte Extraktionsfehler sind selten",
      "%d von %s Nummernwerten (%s %%) sind formal defekt: Textrest, Platzhalter, zu kurz "
      "oder zu lang. Die Extraktion selbst ist also stabil - der Aufwand liegt in der "
      "Vereinheitlichung, nicht in der Erkennung."
-     % (_defekt, z(len(_ag) + len(_vm)), pz(100.0 * _defekt / (len(_ag) + len(_vm)), 2))),
+     % (_defekt, zahl(len(_ag) + len(_vm)), pz(100.0 * _defekt / (len(_ag) + len(_vm)), 2))),
     ("Versicherungsnummer ist das heterogenste Feld",
      "%d verschiedene Rohmuster bei %s Werten, zusammengefasst zu %d Formatfamilien "
      "(Buchstaben-Präfix + Ziffernanzahl). Dominant: KV/SV/LF/KR/LV mit 8 oder 9 Ziffern. "
      "Siehe Block 7."
-     % (len({maske(v) for v in _vnr}), z(len(_vnr)), len({vnr_familie(v) for v in _vnr}))),
+     % (len({maske(v) for v in _vnr}), zahl(len(_vnr)), len({vnr_familie(v) for v in _vnr}))),
 ]
 
 titel("Kernaussagen", "Das Wichtigste aus den Blöcken 0 bis 8 auf einen Blick.")
@@ -428,7 +447,7 @@ PROMPT_BLOCK = [
      "Die Spaltenzuordnung: alle %s Agentur-Werte erfüllen die 6000/890-Regel, keine "
      "Vermischung mehr. Außerdem sind Label-Texte in aller Regel entfernt und "
      "Standard-Platzhalter geleert."
-     % z(sum(1 for v in _ag if ist_agenturnummer(v))), GRUEN),
+     % zahl(sum(1 for v in _ag if ist_agenturnummer(v))), GRUEN),
     ("Was der Prompt NICHT regelt",
      "Weder Prompt noch Nachverarbeitung schreiben eine Schreibweise vor. Bindestrich, "
      "Schrägstrich, Leerzeichen, führende Nullen und Buchstaben-Präfixe werden 1:1 aus dem "
@@ -465,7 +484,8 @@ zeile += 1
 
 # ---- Block 0: Befüllung ------------------------------------------------
 titel("0 - Befüllung der Nummernfelder",
-      "Wie oft hat die Extraktion überhaupt einen Wert geliefert?")
+      "Wie oft hat die Extraktion überhaupt einen Wert geliefert? Bezugsgröße sind die "
+      "%s BÜ-Vorgänge." % zahl(N_BUE))
 tabellenkopf(["Feld", "Beschreibung", "gefüllt", "Anteil", "leer", "verschiedene Werte", "verschiedene Muster"])
 
 BEFUELLUNG = [
@@ -485,25 +505,25 @@ for label, beschr, sp_wert, sp_maske in BEFUELLUNG:
     vals = werte(feld)
     setz(zeile, 1, label, bold=True, sz=10, rahmen=True)
     setz(zeile, 2, beschr, sz=10, wrap=True, rahmen=True)
-    setz(zeile, 3, '=COUNTIF(%s,"<>")' % rng(sp_wert), sz=10, fmt="#,##0", rahmen=True)
-    setz(zeile, 4, "=C%d/%d" % (zeile, N), sz=10, fmt="0.0%", rahmen=True)
-    setz(zeile, 5, "=%d-C%d" % (N, zeile), sz=10, fmt="#,##0", rahmen=True)
+    setz(zeile, 3, cif([(sp_wert, '"<>"')]), sz=10, fmt="#,##0", rahmen=True)
+    setz(zeile, 4, "=C%d/%d" % (zeile, N_BUE), sz=10, fmt="0.0%", rahmen=True)
+    setz(zeile, 5, "=%d-C%d" % (N_BUE, zeile), sz=10, fmt="#,##0", rahmen=True)
     setz(zeile, 6, len(set(vals)), sz=10, fmt="#,##0", rahmen=True)
     setz(zeile, 7, len({maske(v) for v in vals}), sz=10, fmt="#,##0", rahmen=True)
     zeile += 1
 
 setz(zeile, 1, "Agentur UND Vermittler gefüllt", sz=10, rahmen=True)
 setz(zeile, 2, "beide Nummern im selben Vorgang erkannt", sz=10, wrap=True, rahmen=True)
-setz(zeile, 3, '=COUNTIFS(%s,"<>",%s,"<>")' % (rng("Agentur_Nr"), rng("Vermittler_Nr")),
+setz(zeile, 3, cif([("Agentur_Nr", '"<>"'), ("Vermittler_Nr", '"<>"')]),
      sz=10, fmt="#,##0", rahmen=True)
-setz(zeile, 4, "=C%d/%d" % (zeile, N), sz=10, fmt="0.0%", rahmen=True)
+setz(zeile, 4, "=C%d/%d" % (zeile, N_BUE), sz=10, fmt="0.0%", rahmen=True)
 zeile += 1
 setz(zeile, 1, "KEINE der beiden Nummern", sz=10, rahmen=True, fill=ROT)
 setz(zeile, 2, "Vorgang ohne jede Maklernummer - Makler nur über Name/Pool zuordenbar",
      sz=10, wrap=True, rahmen=True, fill=ROT)
-setz(zeile, 3, '=COUNTIFS(%s,"",%s,"")' % (rng("Agentur_Nr"), rng("Vermittler_Nr")),
+setz(zeile, 3, cif([("Agentur_Nr", '""'), ("Vermittler_Nr", '""')]),
      sz=10, fmt="#,##0", rahmen=True, fill=ROT)
-setz(zeile, 4, "=C%d/%d" % (zeile, N), sz=10, fmt="0.0%", rahmen=True, fill=ROT)
+setz(zeile, 4, "=C%d/%d" % (zeile, N_BUE), sz=10, fmt="0.0%", rahmen=True, fill=ROT)
 zeile += 2
 
 
@@ -539,11 +559,12 @@ def formattabelle(feld, sp_wert, sp_maske, ueberschrift, hinweis, regelspalte=No
         setz(zeile, 2, beschreibung_von_rohwert(bsp[0]), sz=10, wrap=True, rahmen=True, fill=f)
         # Rein numerische Masken (z.B. "9") wuerde COUNTIF als Zahl interpretieren -
         # dort exakter Textvergleich per SUMPRODUCT/EXACT.
-        formel = ('=SUMPRODUCT(--EXACT(%s,"%s"))' % (rng(sp_maske), m)) if m.isdigit() \
-            else ('=COUNTIF(%s,"%s")' % (rng(sp_maske), crit(m)))
+        formel = ('=SUMPRODUCT(--EXACT(%s,"%s"),--(%s="ja"))'
+                  % (rng(sp_maske), m, rng("BUe_Vorgang"))) if m.isdigit() \
+            else cif([(sp_maske, '"%s"' % crit(m))])
         setz(zeile, 3, formel, sz=10, fmt="#,##0", rahmen=True, fill=f)
-        setz(zeile, 4, '=C%d/COUNTIF(%s,"<>")' % (zeile, rng(sp_wert)), sz=10, fmt="0.0%",
-             rahmen=True, fill=f)
+        setz(zeile, 4, '=C%d/%s' % (zeile, cif([(sp_wert, '"<>"')])[1:]), sz=10,
+             fmt="0.0%", rahmen=True, fill=f)
         setz(zeile, 5, zif, sz=10, fmt="0", rahmen=True, fill=f)
         setz(zeile, 6, tz, sz=10, rahmen=True, fill=f)
         setz(zeile, 7, ", ".join(bsp), sz=10, wrap=True, rahmen=True, fill=f)
@@ -569,7 +590,7 @@ formattabelle(
     "(deriveMaklernummern in ergo-vorgang-analyse.hta). Diese Regel greift sauber: %s von %s "
     "Werten (%s %%) erfüllen sie. Die Frage ist also nicht die Zuordnung, sondern die "
     "Schreibweise."
-    % (z(sum(1 for v in werte("ag") if ist_agenturnummer(v))), z(len(werte("ag"))),
+    % (zahl(sum(1 for v in werte("ag") if ist_agenturnummer(v))), zahl(len(werte("ag"))),
        pz(100.0 * sum(1 for v in werte("ag") if ist_agenturnummer(v)) / len(werte("ag")))))
 
 formattabelle(
@@ -606,13 +627,13 @@ for k in sorted(set(len_ag) | set(len_vm)):
     setz(zeile, 1, k, sz=10, fmt="0", rahmen=True, fill=f)
     setz(zeile, 2, BEDEUTUNG.get(k, "unplausibel - Fragment, Dopplung oder Textrest"),
          sz=10, wrap=True, rahmen=True, fill=f)
-    setz(zeile, 3, '=COUNTIFS(%s,%d)' % (rng("Agentur_Ziffern"), k), sz=10, fmt="#,##0",
+    setz(zeile, 3, cif([("Agentur_Ziffern", str(k))]), sz=10, fmt="#,##0",
          rahmen=True, fill=f)
-    setz(zeile, 4, '=IFERROR(C%d/COUNTIF(%s,"<>"),0)' % (zeile, rng("Agentur_Nr")),
+    setz(zeile, 4, '=IFERROR(C%d/%s,0)' % (zeile, cif([("Agentur_Nr", '"<>"')])[1:]),
          sz=10, fmt="0.0%", rahmen=True, fill=f)
-    setz(zeile, 5, '=COUNTIFS(%s,%d)' % (rng("Vermittler_Ziffern"), k), sz=10, fmt="#,##0",
+    setz(zeile, 5, cif([("Vermittler_Ziffern", str(k))]), sz=10, fmt="#,##0",
          rahmen=True, fill=f)
-    setz(zeile, 6, '=IFERROR(E%d/COUNTIF(%s,"<>"),0)' % (zeile, rng("Vermittler_Nr")),
+    setz(zeile, 6, '=IFERROR(E%d/%s,0)' % (zeile, cif([("Vermittler_Nr", '"<>"')])[1:]),
          sz=10, fmt="0.0%", rahmen=True, fill=f)
     setz(zeile, 7, ", ".join(bsp_len[k]), sz=10, wrap=True, rahmen=True, fill=f)
     zeile += 1
@@ -664,10 +685,10 @@ for label, merkmal, key in VARIANTEN:
     setz(zeile, 1, label, bold=True, sz=10, rahmen=True, fill=f)
     setz(zeile, 2, merkmal, sz=10, wrap=True, rahmen=True, fill=f)
     setz(zeile, 3, zaehle("ag"), sz=10, fmt="#,##0", rahmen=True, fill=f)
-    setz(zeile, 4, '=IFERROR(C%d/COUNTIF(%s,"<>"),0)' % (zeile, rng("Agentur_Nr")),
+    setz(zeile, 4, '=IFERROR(C%d/%s,0)' % (zeile, cif([("Agentur_Nr", '"<>"')])[1:]),
          sz=10, fmt="0.0%", rahmen=True, fill=f)
     setz(zeile, 5, zaehle("vm"), sz=10, fmt="#,##0", rahmen=True, fill=f)
-    setz(zeile, 6, '=IFERROR(E%d/COUNTIF(%s,"<>"),0)' % (zeile, rng("Vermittler_Nr")),
+    setz(zeile, 6, '=IFERROR(E%d/%s,0)' % (zeile, cif([("Vermittler_Nr", '"<>"')])[1:]),
          sz=10, fmt="0.0%", rahmen=True, fill=f)
     setz(zeile, 7, ", ".join(bsp), sz=10, wrap=True, rahmen=True, fill=f)
     zeile += 1
@@ -765,9 +786,9 @@ vnr_start = zeile
 for k, n in fam.most_common(30):
     setz(zeile, 1, k, sz=10, rahmen=True)
     setz(zeile, 2, beschreibung_von_rohwert(fam_bsp[k][0]), sz=10, wrap=True, rahmen=True)
-    setz(zeile, 3, '=COUNTIF(%s,"%s")' % (rng("VNR_Familie"), crit(k)),
-         sz=10, fmt="#,##0", rahmen=True)
-    setz(zeile, 4, '=C%d/COUNTIF(%s,"<>")' % (zeile, rng("Versicherungsnummer")),
+    setz(zeile, 3, cif([("VNR_Familie", '"%s"' % crit(k))]), sz=10, fmt="#,##0",
+         rahmen=True)
+    setz(zeile, 4, '=C%d/%s' % (zeile, cif([("Versicherungsnummer", '"<>"')])[1:]),
          sz=10, fmt="0.0%", rahmen=True)
     setz(zeile, 5, len(fam_masken[k]), sz=10, fmt="0", rahmen=True)
     setz(zeile, 6, None, rahmen=True)
@@ -786,10 +807,10 @@ titel("8 - Welcher Maklerpool liefert welches Nummernformat?",
 tabellenkopf(["Maklerpool", "Vorgänge", "häufigstes Agentur-Muster", "Beispiel",
               "häufigstes Vermittler-Muster", "Beispiel", "Muster-Vielfalt (Ag / Vm)"])
 
-pool_cnt = collections.Counter(d["pool"] for d in daten if d["pool"])
+pool_cnt = collections.Counter(d["pool"] for d in BUE if d["pool"])
 for pool, n in pool_cnt.most_common(20):
-    ags = [d["ag"] for d in daten if d["pool"] == pool and d["ag"]]
-    vms = [d["vm"] for d in daten if d["pool"] == pool and d["vm"]]
+    ags = [d["ag"] for d in BUE if d["pool"] == pool and d["ag"]]
+    vms = [d["vm"] for d in BUE if d["pool"] == pool and d["vm"]]
     m_ag = collections.Counter(maske(v) for v in ags).most_common(1)
     m_vm = collections.Counter(maske(v) for v in vms).most_common(1)
     setz(zeile, 1, pool, sz=10, wrap=True, rahmen=True)
@@ -813,12 +834,18 @@ LEGENDE = [
                             "'9x7' = sieben Ziffern hintereinander. Trennzeichen stehen "
                             "unverändert im Muster: '9x5-9x4' = fünf Ziffern, Bindestrich, "
                             "vier Ziffern."),
-    ("Anzahl-Spalten", "COUNTIF-Formeln auf das Hilfsblatt '%s'. Wer dort filtert oder "
-                       "Zeilen ergänzt, sieht die Auswertung sofort mitlaufen." % SHEET_DET),
+    ("Basis", "Ausgewertet werden ausschließlich BÜ-Vorgänge, also Zeilen mit "
+              "Klassifikation '%s' (%s von %s). Alles andere - Antrag/Änderung, "
+              "Anfrage/Rücksprache, Kein-Makler-Vorgang, ohne Klassifikation - ist "
+              "ausgeschlossen." % (BUE_WERT, zahl(N_BUE), zahl(N))),
+    ("Anzahl-Spalten", "COUNTIFS-Formeln auf das Hilfsblatt '%s', immer mit der Bedingung "
+                       "BUe_Vorgang='ja'. Wer dort filtert oder Zeilen ergänzt, sieht die "
+                       "Auswertung sofort mitlaufen." % SHEET_DET),
     ("Farben", "Gelb = Einzelfall oder uneinheitliche Schreibweise. Rot = formal fehlerhafte "
                "Extraktion. Grün = Prüfung ohne Befund."),
-    ("Hilfsblatt", "'%s' enthält pro Vorgangszeile Rohwert, Muster, Klartext-Beschreibung, "
-                   "Ziffernanzahl und Trennzeichen - zum Filtern und Nachschlagen." % SHEET_DET),
+    ("Hilfsblatt", "'%s' enthält ALLE %s Zeilen mit Rohwert, Muster, Klartext-Beschreibung, "
+                   "Ziffernanzahl und Trennzeichen. Die Spalte BUe_Vorgang zeigt, welche "
+                   "Zeilen in die Auswertung eingehen." % (SHEET_DET, zahl(N))),
 ]
 for a, b in LEGENDE:
     setz(zeile, 1, a, bold=True, sz=10, wrap=True, rahmen=True, fill=GRAU)

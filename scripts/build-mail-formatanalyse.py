@@ -62,11 +62,19 @@ HTML = """<div>
 <p>Hallo zusammen,</p>
 
 <p>ich habe ausgewertet, in welchen Formaten die Agentur- und die
-Vermittler-/Personalnummer bei der Extraktion der 5.034 April-Vorgänge
-herausgekommen sind. Die Auswertung liegt in der beigefügten
-<b>analyse.xlsx</b> auf zwei neuen Blättern: <b>Format-Analyse</b> (Auswertung
-mit Kernaussagen oben) und <b>Format-Details</b> (jede Zeile einzeln mit
-erkanntem Muster, filterbar).</p>
+Vermittler-/Personalnummer bei der Extraktion der April-Vorgänge
+herausgekommen sind.</p>
+
+<p><b>Basis:</b> Von den 5.034 analysierten Mails sind <b>4.329 als
+BÜ-Vorgang</b> klassifiziert (4.000 Erstvorgänge und 329 Reminder). Nur diese
+sind ausgewertet. Die übrigen 705 Mails - Antrag/Änderung, Anfrage/Rücksprache,
+Kein-Makler-Vorgang und Vorgänge ohne Klassifikation - sind vorher
+herausgefiltert worden.</p>
+
+<p>Die Auswertung liegt in der beigefügten <b>analyse.xlsx</b> auf zwei neuen
+Blättern: <b>Format-Analyse</b> (Auswertung mit Kernaussagen oben) und
+<b>Format-Details</b> (alle 5.034 Zeilen einzeln mit erkanntem Muster; die
+Spalte BUe_Vorgang zeigt, welche Zeilen eingehen).</p>
 
 <p>Das Folgende ist rein beschreibend - es zeigt, was in diesem Lauf
 herausgekommen ist. Ob das den fachlichen Vorgaben entspricht, kann ich aus
@@ -89,47 +97,46 @@ Und weil die zweite Spalte über &bdquo;alles andere&ldquo; definiert ist,
 sammelt sie auch alles ein, was gar keine Personalnummer ist - etwa
 BD-Nummern, Beraterzeichen oder Pool-IDs.</p>
 
-<h3>Befüllung (5.034 Vorgänge)</h3>
+<h3>Befüllung (4.329 BÜ-Vorgänge)</h3>
 {TAB_BEFUELLUNG}
 
-<h3>Agentur-Nr: 3.648 Werte in 14 verschiedenen Schreibweisen</h3>
+<h3>Agentur-Nr: 3.431 Werte in 13 verschiedenen Schreibweisen</h3>
 {TAB_AGENTUR}
 <p class="hint">Nur nach Ziffernanzahl, ohne Trennzeichen und Buchstaben:
-52,6 % neun Stellen, 47,1 % sieben Stellen, 0,3 % sonstige.</p>
+55,5 % neun Stellen, 44,3 % sieben Stellen, 0,2 % sonstige.</p>
 
-<h3>Vermittler-/Personalnummer: 2.339 Werte in 41 verschiedenen Schreibweisen</h3>
+<h3>Vermittler-/Personalnummer: 2.131 Werte in 37 verschiedenen Schreibweisen</h3>
 {TAB_VERMITTLER}
 <p class="hint">Nur nach Ziffernanzahl, ohne Trennzeichen und Buchstaben:
-75,1 % sechs Stellen, 10,2 % sieben, 9,8 % neun, 2,2 % acht, 1,5 % fünf,
-1,2 % sonstige.</p>
+73,2 % sechs Stellen, 11,0 % sieben, 10,6 % neun, 2,3 % acht, 1,6 % fünf,
+1,3 % sonstige.</p>
 
 <h3>Weitere Beobachtungen</h3>
 <ul>
 <li>Dieselbe Nummer kommt in unterschiedlichen Schreibweisen an: 12
-Agenturnummern (betrifft 1.776 Vorgänge) und 7 Personalnummern (1.745
-Vorgänge) tauchen in mindestens zwei Varianten auf, z.&nbsp;B.
-<code>60008-1364</code> neben <code>600081364</code> oder <code>8903235</code>
-neben <code>890-3235</code>. Für jede nachgelagerte Auswertung sind das
-aktuell zwei verschiedene Makler.</li>
-<li>173 Personalnummern (7,4 %) tragen führende Nullen, z.&nbsp;B.
-<code>008923555</code> gegenüber <code>8923555</code>. Bei den Agenturnummern
+Agenturnummern (betrifft 1.576 Vorgänge) und 6 Personalnummern (221 Vorgänge)
+tauchen in mindestens zwei Varianten auf. Beispiele: <code>60008-1364</code>
+(36x) neben <code>600081364</code> (12x), <code>8903235</code> (1.283x) neben
+<code>890-3235</code> (5x), <code>008923555</code> (23x) neben
+<code>8923555</code> (5x). Für jede nachgelagerte Auswertung sind das aktuell
+zwei verschiedene Makler.</li>
+<li>170 Personalnummern (8,0 %) tragen führende Nullen. Bei den Agenturnummern
 kommt das in diesem Lauf nicht vor.</li>
-<li>Einzelne Werte enthalten noch Wortbestandteile oder einen unersetzten
-Feldnamen, z.&nbsp;B. <code>Vermittler 891300</code>,
-<code>Agentur 8887290</code>, <code>{vermittlernummer}</code>.</li>
+<li>Einzelne Werte enthalten noch Wortbestandteile, z.&nbsp;B.
+<code>Vermittler 891300</code> oder <code>Agentur 8887290</code>.</li>
 </ul>
 
 <h3>Führende Buchstaben - was in diesem Lauf passiert ist</h3>
 <p>Im Prompt dieses Laufs war hinterlegt, dass nur die reine Nummer bzw.
 Kennung ohne Text übernommen wird, führende Buchstaben also entfallen sollten.
-In den Daten sieht das so aus: 100 Agentur-Werte tragen weiterhin ein
+In den Daten sieht das so aus: 97 Agentur-Werte tragen weiterhin ein
 führendes &bdquo;A&ldquo; (z.&nbsp;B. <code>A600040124</code>), bei den
-Personalnummern sind es 69 Werte mit A, V, P, E, D oder G. Die
+Personalnummern sind es 64 Werte mit A, V, P oder D. Die
 Nachverarbeitung im Tool lässt genau einen führenden Buchstaben
 ausdrücklich zu.</p>
 <p>Sichtbare Auswirkung: <code>A600080766</code> (15 Vorgänge) und
 <code>600080766</code> (1 Vorgang) werden als zwei verschiedene Schlüssel
-geführt, ebenso <code>E811774</code> gegenüber <code>811774</code>. Ob die
+geführt. Ob die
 Buchstaben zur Nummer gehören oder hätten wegfallen sollen, kann ich nicht
 beurteilen - das gehört zur Frage nach dem Sollformat.</p>
 
@@ -143,7 +150,7 @@ formulieren lässt:</p>
 Präfixe 890 und 6000 eine feste Bedeutung, und gibt es weitere?</li>
 <li><b>Führende Nullen:</b> bedeutungstragend oder auffüllend? Ist
 <code>008923555</code> dieselbe Nummer wie <code>8923555</code>?</li>
-<li><b>Führende Buchstaben</b> (A, V, P, E, D, G): Bestandteil der Nummer,
+<li><b>Führende Buchstaben</b> (A, V, P, D): Bestandteil der Nummer,
 separates Kennzeichen oder wegzulassen?</li>
 <li><b>Trennzeichen:</b> Sind <code>60008-1364</code> und
 <code>60002/0753</code> offizielle Darstellungen oder reine Formatierung aus
@@ -169,36 +176,38 @@ Ablage im Tool aber schon.</p>
 
 HTML = HTML.replace("{TAB_BEFUELLUNG}", tab(
     ["", "Anzahl", "Anteil"],
-    [["Agentur-Nr vorhanden", "3.648", "72,5 %"],
-     ["Vermittler-/Personalnr vorhanden", "2.339", "46,5 %"],
-     ["beide vorhanden", "1.703", "33,8 %"],
-     ["keine von beiden", "750", "14,9 %"]],
+    [["Agentur-Nr vorhanden", "3.431", "79,3 %"],
+     ["Vermittler-/Personalnr vorhanden", "2.131", "49,2 %"],
+     ["beide vorhanden", "1.507", "34,8 %"],
+     ["keine von beiden", "274", "6,3 %"]],
     num_spalten=(1, 2)))
 
 HTML = HTML.replace("{TAB_AGENTUR}", tab(
     ["Anteil", "Format", "Beispiel", "Anzahl"],
-    [["46,2 %", "7 Ziffern, beginnend mit 890", "<code>8903235</code>", "1.684"],
-     ["45,3 %", "9 Ziffern, beginnend mit 6000", "<code>600041633</code>", "1.652"],
-     ["4,2 %", "5 Ziffern + Bindestrich + 4 Ziffern", "<code>60008-1364</code>", "154"],
-     ["2,6 %", "Buchstabe + 9 Ziffern", "<code>A600040124</code>", "95"],
-     ["0,9 %", "3 Ziffern + Bindestrich + 4 Ziffern", "<code>890-3235</code>", "34"],
+    [["47,8 %", "9 Ziffern, beginnend mit 6000", "<code>600041633</code>", "1.640"],
+     ["43,4 %", "7 Ziffern, beginnend mit 890", "<code>8903235</code>", "1.489"],
+     ["4,4 %", "5 Ziffern + Bindestrich + 4 Ziffern", "<code>60008-1364</code>", "152"],
+     ["2,7 %", "Buchstabe + 9 Ziffern", "<code>A600040124</code>", "92"],
+     ["0,9 %", "3 Ziffern + Bindestrich + 4 Ziffern", "<code>890-3235</code>", "30"],
      ["0,4 %", "5 Ziffern + Schrägstrich + 4 Ziffern", "<code>60002/0753</code>", "13"],
-     ["0,4 %", "übrige Einzelfälle", "<code>8904</code>, <code>890666</code>", "16"]],
+     ["0,1 %", "Buchstabe + Leerzeichen + 9 Ziffern", "<code>A 600046012</code>", "4"],
+     ["0,1 %", "4 Ziffern", "<code>8904</code>", "4"],
+     ["0,2 %", "übrige Einzelfälle", "<code>890666</code>", "7"]],
     num_spalten=(0, 3)))
 
 HTML = HTML.replace("{TAB_VERMITTLER}", tab(
     ["Anteil", "Format", "Beispiel", "Anzahl"],
-    [["74,9 %", "6 Ziffern", "<code>811774</code>", "1.752"],
-     ["5,3 %", "9 Ziffern", "<code>005556562</code>", "125"],
-     ["4,8 %", "7 Ziffern", "<code>7947361</code>", "113"],
-     ["4,5 %", "3 Ziffern + Bindestrich + 4 Ziffern", "<code>898-0003</code>", "106"],
-     ["2,0 %", "5 Ziffern + Bindestrich + 4 Ziffern", "<code>88417-0384</code>", "47"],
-     ["1,9 %", "8 Ziffern", "<code>89420798</code>", "45"],
-     ["1,6 %", "Buchstabe + 9 Ziffern", "<code>A010004616</code>", "37"],
-     ["1,5 %", "5 Ziffern", "<code>85357</code>", "34"],
-     ["3,4 %", "übrige Einzelfälle, 33 weitere Muster",
+    [["73,1 %", "6 Ziffern", "<code>811774</code>", "1.557"],
+     ["5,8 %", "9 Ziffern", "<code>005556562</code>", "124"],
+     ["5,2 %", "7 Ziffern", "<code>7947361</code>", "110"],
+     ["5,0 %", "3 Ziffern + Bindestrich + 4 Ziffern", "<code>898-0003</code>", "106"],
+     ["2,2 %", "5 Ziffern + Bindestrich + 4 Ziffern", "<code>88417-0384</code>", "47"],
+     ["2,0 %", "8 Ziffern", "<code>89420798</code>", "43"],
+     ["1,7 %", "Buchstabe + 9 Ziffern", "<code>A010004616</code>", "36"],
+     ["1,6 %", "5 Ziffern", "<code>85357</code>", "34"],
+     ["3,5 %", "übrige Einzelfälle, 29 weitere Muster",
       "<code>V 85357 A 777-0503</code>, <code>893/4055</code>, "
-      "<code>00 111 40 16</code>", "80"]],
+      "<code>00 111 40 16</code>", "74"]],
     num_spalten=(0, 3)))
 
 msg = EmailMessage()
