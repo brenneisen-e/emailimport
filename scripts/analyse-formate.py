@@ -27,7 +27,7 @@ QUELL_SHEET = "Analyse"
 SHEET_MAIN = "Format-Analyse"
 SHEET_DET = "Format-Details"
 KOPFZEILEN = 2          # Zeile 1 = Header, Zeile 2 = Beschreibung
-FONT = "Open Sans"
+FONT = "Aptos"
 
 # Spalten (0-basiert) im Quellsheet
 C_NR, C_VNR, C_POOL, C_AG, C_VM, C_KDNR = 0, 4, 8, 13, 14, 15
@@ -263,7 +263,7 @@ def titel(text, unterzeile=""):
         setz(zeile, c, text if c == 1 else None, bold=True, sz=12, farbe=WEISS, fill=BLAU)
     zeile += 1
     if unterzeile:
-        setz(zeile, 1, unterzeile, sz=9, italic=True, farbe="FF4B5563", fill=GRAU)
+        setz(zeile, 1, unterzeile, sz=9, farbe="FF4B5563", fill=GRAU)
         for c in range(2, 8):
             setz(zeile, c, None, fill=GRAU)
         zeile += 1
@@ -281,7 +281,7 @@ def tabellenkopf(spalten):
 setz(zeile, 1, "Format-Analyse der extrahierten Nummern", bold=True, sz=16, farbe=BLAU)
 zeile += 1
 setz(zeile, 1, "Welche Schreibweisen wurden bei Agentur-Nr, Vermittler-Nr, Versicherungsnummer "
-               "und Kundennummer tatsächlich extrahiert?", sz=10, italic=True, farbe="FF4B5563")
+               "und Kundennummer tatsächlich extrahiert?", sz=10, farbe="FF4B5563")
 zeile += 1
 setz(zeile, 1, "Quelle: Sheet '%s', Zeilen %d bis %d (%d Vorgänge). Alle Anzahlen sind "
                "COUNTIF-Formeln auf das Hilfsblatt '%s' und rechnen sich neu."
@@ -368,10 +368,105 @@ for i, (kopf, text) in enumerate(KERN, 1):
     zeile += 1
 zeile += 1
 
+
+# ---- Verwendeter Prompt + Nachverarbeitung ------------------------------
+# Wortlaut aus ergo-vorgang-analyse.hta (buildPrompt / wsBuildBatchPrompt +
+# deriveMaklernummern). Der Prompt selbst ist ASCII-transliteriert (ue/ae/oe),
+# weil er genau so an das Modell geht - deshalb hier unveraendert uebernommen.
+PROMPT_AG = (
+    "[QUELLE: BUe-Wunsch/Anschreiben] 3a1) agentur_nummer - NUR die Agentur-Nr als "
+    "REINE NUMMER/Kennung OHNE Text (z.B. '8903235'). Leer wenn nicht genannt."
+)
+PROMPT_VM = (
+    "[QUELLE: BUe-Wunsch/Anschreiben] 3a2) vermittler_nummer - NUR die Vermittler-/"
+    "Personalnummer als REINE NUMMER/Kennung OHNE Text (z.B. '811774'). Sie ist i.d.R. "
+    "6-stellig (Personalnummer). Leer wenn nicht genannt."
+)
+PROMPT_GEMEINSAM = (
+    "WICHTIG: agentur_nummer und vermittler_nummer enthalten AUSSCHLIESSLICH die "
+    "Ziffern/Kennung - KEINE Woerter wie 'Agentur'/'Vermittler' und KEINE Vermischung "
+    "beider Nummern in einem Feld."
+)
+PROMPT_PRIO = (
+    "[QUELLE: BUe-Wunsch/Anschreiben] 3a) makler_nummer - Identifikator BEIM VERSICHERER. "
+    "STRENGE Priorisierung:\n"
+    "    1. 'Agentur-Nr.' / 'Vermittler-Nr.' im Briefkopf-Block (das ist die Wunsch-Nummer). "
+    "HINWEIS: die Agentur-/Vermittlernummer beginnt oft mit '6000' oder '890'.\n"
+    "    2. 'BD-Nummer' / 'Bestandsnummer' / 'Beraterzeichen' / 'PNR' / 'Personalnummer'.\n"
+    "    3. NUR Fallback: Pool-IDs wie 'MAKID','DEMMAK','BCA-ID' (sind pool-intern, NICHT "
+    "beim Versicherer)."
+)
+PROMPT_SCHEMA = (
+    '"agentur_nummer":"[QUELLE: BUe-Wunsch/Anschreiben] NUR der reine Agentur-Nummern-Wert '
+    'OHNE das Wort Agentur. WICHTIG: jede Nummer, die mit 6000 oder 890 beginnt, ist eine '
+    'AGENTURNUMMER und gehoert IMMER hierher (NICHT nach vermittler_nummer), z.B. 8903235, '
+    '600042497; leer wenn keine"\n'
+    '"vermittler_nummer":"[QUELLE: BUe-Wunsch/Anschreiben] NUR der reine Vermittler-/'
+    'BD-Nummern-Wert OHNE das Wort Vermittler. NUR Nummern, die NICHT mit 6000/890 beginnen '
+    '(z.B. 811774 oder 898-0003); eine 6000.../890...-Nummer NIEMALS hier ablegen; leer '
+    'wenn keine"'
+)
+
+_textrest = [v for v in _ag + _vm if hat_text(v)]
+_platzhalter = [v for v in _ag + _vm if v.startswith("{")]
+
+PROMPT_BLOCK = [
+    ("Prompt: Feld agentur_nummer", PROMPT_AG, GRAU),
+    ("Prompt: Feld vermittler_nummer", PROMPT_VM, GRAU),
+    ("Prompt: gemeinsame Regel", PROMPT_GEMEINSAM, GRAU),
+    ("Prompt: Priorisierung der Quelle", PROMPT_PRIO, GRAU),
+    ("Prompt: JSON-Schema im Batch-Lauf", PROMPT_SCHEMA, GRAU),
+    ("Nachverarbeitung im Tool",
+     "deriveMaklernummern() greift nach der KI-Antwort noch einmal ein: (1) Platzhalter wie "
+     "'leer', '-', 'k.A.', 'n/a', 'keine' werden geleert. (2) Fehlt ein Feld, wird die "
+     "kombinierte makler_nummer per Regex zerlegt (Muster: Label + optionaler Buchstabe + "
+     "Ziffern, Bindestrich und Schrägstrich erlaubt). (3) Doppelte Nummern innerhalb "
+     "desselben Vorgangs werden über den Ziffernvergleich entfernt, 008923555 gilt als "
+     "identisch mit 8923555. (4) Die 6000/890-Regel entscheidet abschließend, in welche "
+     "Spalte ein Wert kommt - unabhängig davon, in welchem KI-Feld er stand.", None),
+    ("Was dadurch schon vereinheitlicht ist",
+     "Die Spaltenzuordnung: alle %s Agentur-Werte erfüllen die 6000/890-Regel, keine "
+     "Vermischung mehr. Außerdem sind Label-Texte in aller Regel entfernt und "
+     "Standard-Platzhalter geleert."
+     % z(sum(1 for v in _ag if ist_agenturnummer(v))), GRUEN),
+    ("Was der Prompt NICHT regelt",
+     "Weder Prompt noch Nachverarbeitung schreiben eine Schreibweise vor. Bindestrich, "
+     "Schrägstrich, Leerzeichen, führende Nullen und Buchstaben-Präfixe werden 1:1 aus dem "
+     "Dokument übernommen - der Regex im Parser lässt Buchstaben, '-' und '/' sogar "
+     "ausdrücklich zu. Auch eine Sollstellenzahl (6-stellig, 7-stellig, 9-stellig) wird "
+     "nirgends erzwungen.", GELB),
+    ("Wo der Prompt nicht durchgegriffen hat",
+     "%d Werte enthalten trotz der Regel noch Wortbestandteile - Label, Verbindungswort "
+     "oder Kürzel-Zusatz (%s). %d Wert ist ein unersetzter "
+     "Feldname (%s) - dieser Platzhalter steht nicht in der Filterliste des Parsers und "
+     "rutscht deshalb durch."
+     % (len(_textrest), ", ".join(sorted(set(_textrest))[:4]),
+        len(_platzhalter), ", ".join(sorted(set(_platzhalter))) or "keiner"), ROT),
+    ("Ansatzpunkt",
+     "Die Formate im Rohdokument lassen sich nicht steuern - wohl aber die Ablage. Eine "
+     "Normalisierung in deriveMaklernummern() (nur Ziffern behalten, auf die Sollstellenzahl "
+     "auffüllen, Buchstaben-Präfix separat führen) würde die in Block 5 gelisteten Dubletten "
+     "auflösen, ohne dass der Prompt angefasst werden muss.", None),
+]
+
+titel("Verwendeter Prompt für Agentur- und Vermittlernummer",
+      "Wortlaut aus ergo-vorgang-analyse.hta. Der Prompt ist bewusst ohne Umlaute "
+      "geschrieben (ue/ae/oe), weil er genau so an das Modell geht.")
+for kopf, text, farbe in PROMPT_BLOCK:
+    setz(zeile, 1, kopf, bold=True, sz=10, wrap=True, rahmen=True, fill=GRAU)
+    setz(zeile, 2, text, sz=10, wrap=True, rahmen=True, fill=farbe)
+    for c in range(3, 8):
+        setz(zeile, c, None, rahmen=True, fill=farbe)
+    ms.merge_cells(start_row=zeile, start_column=2, end_row=zeile, end_column=7)
+    umbrueche = text.count("\n")
+    ms.row_dimensions[zeile].height = 14 * max(2, math.ceil(len(text) / 130.0) + umbrueche)
+    zeile += 1
+zeile += 1
+
 # ---- Block 0: Befüllung ------------------------------------------------
 titel("0 - Befüllung der Nummernfelder",
       "Wie oft hat die Extraktion überhaupt einen Wert geliefert?")
-tabellenkopf(["Feld", "Beschreibung", "gefüllt", "Anteil", "leer", "distinkte Werte", "distinkte Muster"])
+tabellenkopf(["Feld", "Beschreibung", "gefüllt", "Anteil", "leer", "verschiedene Werte", "verschiedene Muster"])
 
 BEFUELLUNG = [
     ("Agentur_Nr", "Agentur-/Vermittlernummer mit Präfix 6000 oder 890 (ERGO-Regel im Tool)",
@@ -463,7 +558,7 @@ def formattabelle(feld, sp_wert, sp_maske, ueberschrift, hinweis, regelspalte=No
         setz(zeile, c, None, fill=GRAU, rahmen=True)
     zeile += 1
     setz(zeile, 1, "Gelb hinterlegt = Einzelfall (max. 2 Treffer) oder Textrest/Platzhalter im Wert.",
-         sz=9, italic=True, farbe="FF92400E")
+         sz=9, farbe="FF92400E")
     zeile += 2
 
 
@@ -522,7 +617,7 @@ for k in sorted(set(len_ag) | set(len_vm)):
     setz(zeile, 7, ", ".join(bsp_len[k]), sz=10, wrap=True, rahmen=True, fill=f)
     zeile += 1
 setz(zeile, 1, "Rot = Länge außerhalb 5-9 Stellen, faktisch immer ein Extraktionsfehler.",
-     sz=9, italic=True, farbe="FF991B1B")
+     sz=9, farbe="FF991B1B")
 zeile += 2
 
 
@@ -578,7 +673,7 @@ for label, merkmal, key in VARIANTEN:
     zeile += 1
 setz(zeile, 1, "Anzahlen in diesem Block sind Werte (Klassifikation per Skript), keine Formeln - "
                "die Zuordnung lässt sich in '%s' Spalte Trenner nachvollziehen." % SHEET_DET,
-     sz=9, italic=True, farbe="FF4B5563")
+     sz=9, farbe="FF4B5563")
 zeile += 2
 
 
@@ -681,7 +776,7 @@ for k, n in fam.most_common(30):
 setz(zeile, 1, "Top 30 von %d Familien / %d Rohmustern. 'Muster-Varianten' = wie viele "
                "unterschiedliche Schreibweisen (mit/ohne Leerzeichen, Punkt, Bindestrich) "
                "in dieser Familie vorkommen." % (len(fam), len({maske(v) for v in werte("vnr")})),
-     sz=9, italic=True, farbe="FF4B5563")
+     sz=9, farbe="FF4B5563")
 zeile += 2
 
 
