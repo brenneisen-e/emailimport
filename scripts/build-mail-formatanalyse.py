@@ -14,6 +14,7 @@ Aufruf:  python3 scripts/build-mail-formatanalyse.py [ziel.eml]
 import mimetypes
 import os
 import sys
+from email import policy
 from email.message import EmailMessage
 
 ZIEL = sys.argv[1] if len(sys.argv) > 1 else "Formatanalyse-Agentur-Personalnummern.eml"
@@ -218,6 +219,9 @@ if os.path.exists(ANHANG):
 else:
     print("Hinweis: %s nicht gefunden - EML wird ohne Anhang gebaut." % ANHANG)
 
+# WICHTIG: mit policy.SMTP serialisieren -> CRLF-Zeilenenden. Mit blossen
+# LF-Zeilenenden verschluckt Outlook an den Quoted-Printable-Umbruechen
+# Zeichen ("vorhanden" wird zu "vor=anden", Tabellenzeilen verschmelzen).
 with open(ZIEL, "wb") as f:
-    f.write(msg.as_bytes())
+    f.write(msg.as_bytes(policy=policy.SMTP))
 print("OK - %s geschrieben (%.1f MB)" % (ZIEL, os.path.getsize(ZIEL) / 1048576.0))
