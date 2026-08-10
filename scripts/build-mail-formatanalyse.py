@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Baut die Mail zur Formatanalyse als .eml (Outlook-tauglich).
+
+- multipart/alternative: Klartext + HTML (Tabellen, Schrift Aptos)
+- analyse.xlsx als Anhang
+- Header "X-Unsent: 1", damit Outlook die Datei als unversendeten Entwurf
+  im Verfassen-Fenster oeffnet statt als empfangene Nachricht
+
+Aufruf:  python3 scripts/build-mail-formatanalyse.py [ziel.eml]
+"""
+
+import mimetypes
+import os
+import sys
+from email.message import EmailMessage
+
+ZIEL = sys.argv[1] if len(sys.argv) > 1 else "Formatanalyse-Agentur-Personalnummern.eml"
+ANHANG = "analyse.xlsx"
+# Betreff bewusst kurz gehalten (<= 64 Zeichen): laengere Betreffs werden beim
+# Schreiben der EML umgebrochen, was in manchen Clients doppelte Leerzeichen
+# erzeugt.
+BETREFF = "Formatanalyse Agentur- und Personalnummern - Bitte um Einordnung"
+
+TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "mail-formatanalyse.txt"), encoding="utf-8").read()
+# Betreffzeile aus dem Klartext entfernen - sie steht im Header
+TEXT = TEXT.split("\n", 1)[1].lstrip("\n") if TEXT.startswith("Betreff:") else TEXT
+
+CSS = """
+  body { font-family: Aptos, 'Segoe UI', Calibri, sans-serif; font-size: 11pt;
+         color: #111827; line-height: 1.45; }
+  h3 { font-size: 11.5pt; margin: 18px 0 6px 0; color: #1E40AF; }
+  p { margin: 8px 0; }
+  table { border-collapse: collapse; margin: 8px 0 14px 0; }
+  th, td { border: 1px solid #D1D5DB; padding: 4px 9px; font-size: 10.5pt;
+           text-align: left; vertical-align: top; }
+  th { background: #1E40AF; color: #FFFFFF; font-weight: 600; }
+  td.n { text-align: right; white-space: nowrap; }
+  code { font-family: Consolas, 'Courier New', monospace; font-size: 10pt; }
+  ul { margin: 6px 0 12px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .hint { color: #4B5563; }
+"""
+
+
+def tab(kopf, zeilen, num_spalten=()):
+    h = "".join("<th>%s</th>" % k for k in kopf)
+    body = ""
+    for zl in zeilen:
+        tds = ""
+        for i, wert in enumerate(zl):
+            klasse = ' class="n"' if i in num_spalten else ""
+            tds += "<td%s>%s</td>" % (klasse, wert)
+        body += "<tr>%s</tr>" % tds
+    return "<table><tr>%s</tr>%s</table>" % (h, body)
+
+
+HTML = """<div>
+<p>Hallo zusammen,</p>
+
+<p>ich habe ausgewertet, in welchen Formaten die Agentur- und die
+Vermittler-/Personalnummer bei der Extraktion der 5.034 April-Vorgänge
+herausgekommen sind. Die Auswertung liegt in der beigefügten
+<b>analyse.xlsx</b> auf zwei neuen Blättern: <b>Format-Analyse</b> (Auswertung
+mit Kernaussagen oben) und <b>Format-Details</b> (jede Zeile einzeln mit
+erkanntem Muster, filterbar).</p>
+
+<p>Das Folgende ist rein beschreibend - es zeigt, was in diesem Lauf
+herausgekommen ist. Ob das den fachlichen Vorgaben entspricht, kann ich aus
+den Daten heraus nicht beurteilen; dafür brauchen wir eure Einordnung.</p>
+
+<h3>Wie die beiden Spalten zustande kommen</h3>
+<p>Das passiert in zwei Schritten:</p>
+<p><b>Schritt 1 - Auslesen:</b> Die KI sucht im Anschreiben nach den Nummern,
+in der Regel im Briefkopf hinter &bdquo;Agentur-Nr.&ldquo; oder
+&bdquo;Vermittler-Nr.&ldquo;, und übernimmt sie so, wie sie im Dokument
+stehen.</p>
+<p><b>Schritt 2 - Einsortieren:</b> Danach entscheidet eine fest programmierte
+Regel, in welcher der beiden Spalten eine Nummer landet. Die Regel lautet:
+Beginnt die Nummer mit 6000 oder 890, ist es eine Agenturnummer. Jede andere
+Nummer gilt als Vermittler-/Personalnummer.</p>
+<p>Wichtig dabei: Diese Regel gilt immer, auch wenn im Anschreiben eine andere
+Beschriftung stand. Stand eine 890er-Nummer im Brief hinter
+&bdquo;Vermittler-Nr.&ldquo;, wird sie trotzdem als Agenturnummer abgelegt.
+Und weil die zweite Spalte über &bdquo;alles andere&ldquo; definiert ist,
+sammelt sie auch alles ein, was gar keine Personalnummer ist - etwa
+BD-Nummern, Beraterzeichen oder Pool-IDs.</p>
+
+<h3>Befüllung (5.034 Vorgänge)</h3>
+{TAB_BEFUELLUNG}
+
+<h3>Agentur-Nr: 3.648 Werte in 14 verschiedenen Schreibweisen</h3>
+{TAB_AGENTUR}
+<p class="hint">Nur nach Ziffernanzahl, ohne Trennzeichen und Buchstaben:
+52,6 % neun Stellen, 47,1 % sieben Stellen, 0,3 % sonstige.</p>
+
+<h3>Vermittler-/Personalnummer: 2.339 Werte in 41 verschiedenen Schreibweisen</h3>
+{TAB_VERMITTLER}
+<p class="hint">Nur nach Ziffernanzahl, ohne Trennzeichen und Buchstaben:
+75,1 % sechs Stellen, 10,2 % sieben, 9,8 % neun, 2,2 % acht, 1,5 % fünf,
+1,2 % sonstige.</p>
+
+<h3>Weitere Beobachtungen</h3>
+<ul>
+<li>Dieselbe Nummer kommt in unterschiedlichen Schreibweisen an: 12
+Agenturnummern (betrifft 1.776 Vorgänge) und 7 Personalnummern (1.745
+Vorgänge) tauchen in mindestens zwei Varianten auf, z.&nbsp;B.
+<code>60008-1364</code> neben <code>600081364</code> oder <code>8903235</code>
+neben <code>890-3235</code>. Für jede nachgelagerte Auswertung sind das
+aktuell zwei verschiedene Makler.</li>
+<li>173 Personalnummern (7,4 %) tragen führende Nullen, z.&nbsp;B.
+<code>008923555</code> gegenüber <code>8923555</code>. Bei den Agenturnummern
+kommt das in diesem Lauf nicht vor.</li>
+<li>Einzelne Werte enthalten noch Wortbestandteile oder einen unersetzten
+Feldnamen, z.&nbsp;B. <code>Vermittler 891300</code>,
+<code>Agentur 8887290</code>, <code>{vermittlernummer}</code>.</li>
+</ul>
+
+<h3>Führende Buchstaben - was in diesem Lauf passiert ist</h3>
+<p>Im Prompt dieses Laufs war hinterlegt, dass nur die reine Nummer bzw.
+Kennung ohne Text übernommen wird, führende Buchstaben also entfallen sollten.
+In den Daten sieht das so aus: 100 Agentur-Werte tragen weiterhin ein
+führendes &bdquo;A&ldquo; (z.&nbsp;B. <code>A600040124</code>), bei den
+Personalnummern sind es 69 Werte mit A, V, P, E, D oder G. Die
+Nachverarbeitung im Tool lässt genau einen führenden Buchstaben
+ausdrücklich zu.</p>
+<p>Sichtbare Auswirkung: <code>A600080766</code> (15 Vorgänge) und
+<code>600080766</code> (1 Vorgang) werden als zwei verschiedene Schlüssel
+geführt, ebenso <code>E811774</code> gegenüber <code>811774</code>. Ob die
+Buchstaben zur Nummer gehören oder hätten wegfallen sollen, kann ich nicht
+beurteilen - das gehört zur Frage nach dem Sollformat.</p>
+
+<h3>Bitte an Marcus</h3>
+<p>Marcus, kannst du bitte aufschreiben, wie die Agentur- und die
+Personalnummer fachlich eigentlich aufgebaut sind und welche Ausprüfungen
+daraus vorstellbar wären? Hilfreich wäre alles, was sich später als Prüfregel
+formulieren lässt:</p>
+<ul>
+<li><b>Aufbau und Länge:</b> Welche Stellenzahlen sind gültig? Haben die
+Präfixe 890 und 6000 eine feste Bedeutung, und gibt es weitere?</li>
+<li><b>Führende Nullen:</b> bedeutungstragend oder auffüllend? Ist
+<code>008923555</code> dieselbe Nummer wie <code>8923555</code>?</li>
+<li><b>Führende Buchstaben</b> (A, V, P, E, D, G): Bestandteil der Nummer,
+separates Kennzeichen oder wegzulassen?</li>
+<li><b>Trennzeichen:</b> Sind <code>60008-1364</code> und
+<code>60002/0753</code> offizielle Darstellungen oder reine Formatierung aus
+dem Anschreiben?</li>
+<li><b>Prüfziffer</b> oder Systematik, gegen die sich eine Nummer validieren
+lässt?</li>
+<li><b>Abgrenzung:</b> Ist &bdquo;beginnt mit 6000 oder 890&ldquo; die
+richtige Unterscheidung zwischen Agentur- und Personalnummer, oder gibt es
+Fälle, in denen das danebenliegt?</li>
+<li><b>Umgang mit Verstößen:</b> Soll ein Wert, der eine Prüfung nicht
+besteht, verworfen, geleert oder als &bdquo;zu prüfen&ldquo; markiert
+werden?</li>
+</ul>
+
+<p>Sobald das steht, können wir die Prüfung direkt in die Nachverarbeitung
+einbauen. Die Schreibweise im Originaldokument können wir nicht steuern, die
+Ablage im Tool aber schon.</p>
+
+<p>Rückfragen gerne jederzeit.</p>
+
+<p>Viele Grüße</p>
+</div>"""
+
+HTML = HTML.replace("{TAB_BEFUELLUNG}", tab(
+    ["", "Anzahl", "Anteil"],
+    [["Agentur-Nr vorhanden", "3.648", "72,5 %"],
+     ["Vermittler-/Personalnr vorhanden", "2.339", "46,5 %"],
+     ["beide vorhanden", "1.703", "33,8 %"],
+     ["keine von beiden", "750", "14,9 %"]],
+    num_spalten=(1, 2)))
+
+HTML = HTML.replace("{TAB_AGENTUR}", tab(
+    ["Anteil", "Format", "Beispiel", "Anzahl"],
+    [["46,2 %", "7 Ziffern, beginnend mit 890", "<code>8903235</code>", "1.684"],
+     ["45,3 %", "9 Ziffern, beginnend mit 6000", "<code>600041633</code>", "1.652"],
+     ["4,2 %", "5 Ziffern + Bindestrich + 4 Ziffern", "<code>60008-1364</code>", "154"],
+     ["2,6 %", "Buchstabe + 9 Ziffern", "<code>A600040124</code>", "95"],
+     ["0,9 %", "3 Ziffern + Bindestrich + 4 Ziffern", "<code>890-3235</code>", "34"],
+     ["0,4 %", "5 Ziffern + Schrägstrich + 4 Ziffern", "<code>60002/0753</code>", "13"],
+     ["0,4 %", "übrige Einzelfälle", "<code>8904</code>, <code>890666</code>", "16"]],
+    num_spalten=(0, 3)))
+
+HTML = HTML.replace("{TAB_VERMITTLER}", tab(
+    ["Anteil", "Format", "Beispiel", "Anzahl"],
+    [["74,9 %", "6 Ziffern", "<code>811774</code>", "1.752"],
+     ["5,3 %", "9 Ziffern", "<code>005556562</code>", "125"],
+     ["4,8 %", "7 Ziffern", "<code>7947361</code>", "113"],
+     ["4,5 %", "3 Ziffern + Bindestrich + 4 Ziffern", "<code>898-0003</code>", "106"],
+     ["2,0 %", "5 Ziffern + Bindestrich + 4 Ziffern", "<code>88417-0384</code>", "47"],
+     ["1,9 %", "8 Ziffern", "<code>89420798</code>", "45"],
+     ["1,6 %", "Buchstabe + 9 Ziffern", "<code>A010004616</code>", "37"],
+     ["1,5 %", "5 Ziffern", "<code>85357</code>", "34"],
+     ["3,4 %", "übrige Einzelfälle, 33 weitere Muster",
+      "<code>V 85357 A 777-0503</code>, <code>893/4055</code>, "
+      "<code>00 111 40 16</code>", "80"]],
+    num_spalten=(0, 3)))
+
+msg = EmailMessage()
+msg["Subject"] = BETREFF
+msg["To"] = ""
+msg["X-Unsent"] = "1"          # Outlook oeffnet die Datei als Entwurf
+msg.set_content(TEXT)
+msg.add_alternative(
+    "<html><head><meta charset=\"utf-8\"><style>%s</style></head><body>%s</body></html>"
+    % (CSS, HTML), subtype="html")
+
+if os.path.exists(ANHANG):
+    typ, _ = mimetypes.guess_type(ANHANG)
+    haupt, unter = (typ or "application/octet-stream").split("/", 1)
+    with open(ANHANG, "rb") as f:
+        msg.add_attachment(f.read(), maintype=haupt, subtype=unter,
+                           filename=os.path.basename(ANHANG))
+else:
+    print("Hinweis: %s nicht gefunden - EML wird ohne Anhang gebaut." % ANHANG)
+
+with open(ZIEL, "wb") as f:
+    f.write(msg.as_bytes())
+print("OK - %s geschrieben (%.1f MB)" % (ZIEL, os.path.getsize(ZIEL) / 1048576.0))
