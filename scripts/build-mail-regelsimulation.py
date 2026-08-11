@@ -19,23 +19,14 @@ import collections
 import re
 
 import openpyxl
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
 from mailbau import baue_eml, tab
+from xlsxbau import GELB, GRUEN, ROT, abschluss, kopfzeile, schreibe, titel
 
 QUELLE = "analyse.xlsx"
 EXCEL = "Regelsimulation-Nummern.xlsx"
 EML = "Regelsimulation-Nummern.eml"
 BETREFF = "Nummern-Regeln am April-Extrakt durchgerechnet"
-
-FONT = "Aptos"
-BLAU = "FF1E40AF"
-LILA = "FF4C1D95"
-GRUEN = "FFDCFCE7"
-GELB = "FFFEF3C7"
-ROT = "FFFEE2E2"
-WEISS = "FFFFFFFF"
 
 KATEGORIEN = ("beide", "nur Agentur", "nur Vermittler", "keine")
 
@@ -168,35 +159,8 @@ def diff(neu, alt):
 
 
 # ---------------------------------------------------------------------------
-# Excel
+# Excel - Aufbau wie bei den uebrigen Anlagen (siehe xlsxbau.py)
 # ---------------------------------------------------------------------------
-def kopf(ws, spalten, breiten, zeile=1):
-    for i, (t, b) in enumerate(zip(spalten, breiten), 1):
-        z = ws.cell(row=zeile, column=i, value=t)
-        z.font = Font(name=FONT, sz=10, b=True, color=WEISS)
-        z.fill = PatternFill("solid", fgColor=LILA)
-        z.alignment = Alignment(vertical="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(i)].width = b
-
-
-def zeile_schreiben(ws, r, werte, fill=None):
-    for i, w in enumerate(werte, 1):
-        z = ws.cell(row=r, column=i, value=w)
-        z.font = Font(name=FONT, sz=10)
-        z.alignment = Alignment(vertical="top", wrap_text=True)
-        if fill:
-            z.fill = PatternFill("solid", fgColor=fill)
-
-
-def titelzeile(ws, text, unter=""):
-    ws["A1"] = text
-    ws["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
-    if unter:
-        ws["A2"] = unter
-        ws["A2"].font = Font(name=FONT, sz=10, color="FF4B5563")
-    ws.sheet_view.showGridLines = False
-
-
 VARIANTEN = [
     ("heute (Präfix-Regel 6000/890)", heute, None, None),
     ("A - Regeln wie vorgeschlagen", A_bef, A_OFFEN, None),
@@ -205,44 +169,61 @@ VARIANTEN = [
 ]
 
 xl = openpyxl.Workbook()
+
+# ---- Blatt 1: Varianten -------------------------------------------------
 ws = xl.active
 ws.title = "Varianten"
-titelzeile(ws, "Nummern-Regeln: drei Varianten im Vergleich",
-           "Basis: %s BÜ-Vorgänge aus dem April-Extrakt mit %s extrahierten Nummern."
-           % (tsd(N), tsd(WERTE)))
-kopf(ws, ["Variante", "beide", "nur Agentur", "nur Vermittler", "keine",
-          "Nummern ohne Zuordnung"], [50, 12, 14, 16, 12, 22], zeile=4)
-r = 5
+r = titel(ws, "Nummern-Regeln am April-Extrakt",
+          "Basis: %s BÜ-Vorgänge mit %s extrahierten Nummern. Regeln: bereinigen, "
+          "unter 7 Stellen = Vermittlernummer, 7 oder 9 Stellen = Agenturnummer."
+          % (tsd(N), tsd(WERTE)),
+          "Gelb = technische Ergänzung, grün = offene Entscheidung zu den "
+          "achtstelligen Nummern.")
+SP_V = ["Variante", "beide", "nur Agentur", "nur Vermittler", "keine",
+        "Nummern ohne Zuordnung"]
+BR_V = [50, 12, 14, 16, 12, 22]
+kopf_v = r + 1
+r = kopfzeile(ws, SP_V, BR_V, kopf_v)
 for name, bef, off, fill in VARIANTEN:
-    zeile_schreiben(ws, r, [name] + [bef[k] for k in KATEGORIEN] +
-                    ["" if off is None else off], fill=fill)
-    r += 1
+    r = schreibe(ws, r, [name] + [bef[k] for k in KATEGORIEN] +
+                 ["" if off is None else off], BR_V, fill=fill, fett_spalten=(1,))
+abschluss(ws, kopf_v, r - 1, len(SP_V), fixieren="B%d" % (kopf_v + 1))
 
+# ---- Blatt 2: Wechsler --------------------------------------------------
 ws2 = xl.create_sheet("Wechsler V nach A")
-titelzeile(ws2, "Nummern, die neu als Agenturnummer gelten",
-           "Heute Vermittlernummer, nach den neuen Regeln 7- oder 9-stellig. "
-           "%s Werte in %s Schreibweisen." % (tsd(N_WECHSLER), tsd(len(wechsler_liste))))
-kopf(ws2, ["Rohwert heute", "bereinigt", "Stellen", "Vorgänge", "Präfix 890/6000?"],
-     [26, 20, 10, 12, 18], zeile=4)
-r = 5
+r = titel(ws2, "Nummern, die neu als Agenturnummer gelten",
+          "Heute Vermittlernummer, nach den neuen Regeln 7- oder 9-stellig und damit "
+          "Agenturnummer. %s Werte in %s Schreibweisen."
+          % (tsd(N_WECHSLER), tsd(len(wechsler_liste))),
+          "Gelb = Nummer beginnt weder mit 890 noch mit 6000, hier weichen alte und "
+          "neue Regel voneinander ab.")
+SP_W = ["Rohwert heute", "bereinigt", "Stellen", "Vorgänge", "Präfix 890/6000?"]
+BR_W = [26, 20, 10, 12, 18]
+kopf_w = r + 1
+r = kopfzeile(ws2, SP_W, BR_W, kopf_w)
 for (roh, z), c in wechsler_liste.most_common():
     passt = "ja" if z.startswith(("890", "6000")) else "nein"
-    zeile_schreiben(ws2, r, [roh, z, len(z), c, passt], fill=GELB if passt == "nein" else None)
-    r += 1
+    r = schreibe(ws2, r, [roh, z, len(z), c, passt], BR_W,
+                 fill=GELB if passt == "nein" else None, fett_spalten=(1,))
+abschluss(ws2, kopf_w, r - 1, len(SP_W), fixieren="B%d" % (kopf_w + 1))
 
+# ---- Blatt 3: Ohne Zuordnung -------------------------------------------
 ws3 = xl.create_sheet("Ohne Zuordnung")
-titelzeile(ws3, "Nummern, die durch das Raster fallen",
-           "Weder unter 7 Stellen noch genau 7 oder 9 Stellen. Rechte Spalte: löst "
-           "Variante C den Fall?")
-kopf(ws3, ["Rohwert", "bereinigt", "Stellen", "Vorgänge", "in Variante C gelöst?"],
-     [28, 20, 10, 12, 22], zeile=4)
-r = 5
+r = titel(ws3, "Nummern, die durch das Raster fallen",
+          "Weder unter 7 Stellen noch genau 7 oder 9 Stellen - %s Werte."
+          % tsd(A_OFFEN),
+          "Grün = mit den beiden Ergänzungen (Felder mit zwei Nummern trennen, "
+          "achtstellige auffüllen) gelöst. Rot = bleibt offen.")
+SP_O = ["Rohwert", "bereinigt", "Stellen", "Vorgänge", "mit den Ergänzungen gelöst?"]
+BR_O = [28, 20, 10, 12, 26]
+kopf_o = r + 1
+r = kopfzeile(ws3, SP_O, BR_O, kopf_o)
 c_offen_roh = {k[0] for k in C_offen}
 for (roh, z, laenge), c in sorted(A_offen.items(), key=lambda x: (-x[1], x[0][2])):
     geloest = "nein" if roh in c_offen_roh else "ja"
-    zeile_schreiben(ws3, r, [roh, z, laenge, c, geloest],
-                    fill=GRUEN if geloest == "ja" else ROT)
-    r += 1
+    r = schreibe(ws3, r, [roh, z, laenge, c, geloest], BR_O,
+                 fill=GRUEN if geloest == "ja" else ROT, fett_spalten=(1,))
+abschluss(ws3, kopf_o, r - 1, len(SP_O), fixieren="B%d" % (kopf_o + 1))
 
 xl.calculation.fullCalcOnLoad = True
 xl.save(EXCEL)

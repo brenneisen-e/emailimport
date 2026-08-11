@@ -16,53 +16,15 @@ Aufruf:  python3 scripts/build-datenfelder-xlsx.py [ziel.xlsx]
 import sys
 
 import openpyxl
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
 
 from datenfelder import (ABSCHNITTE, BESONDERHEITEN, OFFEN, PRUEFUNG, SPARTEN,
                          SPARTEN_HINWEIS, SPARTEN_TEXT, rein)
-
-FONT = "Aptos"
-BLAU = "FF1E40AF"
-LILA = "FF4C1D95"
-GRAU = "FFF3F4F6"
-GRUEN = "FFDCFCE7"
-GELB = "FFFEF3C7"
-WEISS = "FFFFFFFF"
-
-THIN = Side(style="thin", color="FFD1D5DB")
-BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+from xlsxbau import (BLAU, FONT, GELB, GRAU, GRUEN, abschluss, hinweis, kopfzeile,
+                     schreibe, titel)
+from openpyxl.styles import Font
 
 STATUS_TEXT = {"neu": "NEU", "offen": "OFFEN", None: ""}
 STATUS_FARBE = {"neu": GRUEN, "offen": GELB, None: None}
-
-
-def kopfzeile(ws, spalten, breiten, zeile=1):
-    for i, (titel, breite) in enumerate(zip(spalten, breiten), 1):
-        z = ws.cell(row=zeile, column=i, value=titel)
-        z.font = Font(name=FONT, sz=10, b=True, color=WEISS)
-        z.fill = PatternFill("solid", fgColor=LILA)
-        z.alignment = Alignment(vertical="center", wrap_text=True)
-        z.border = BORDER
-        ws.column_dimensions[get_column_letter(i)].width = breite
-    ws.row_dimensions[zeile].height = 22
-
-
-def schreibe(ws, zeile, werte, fill=None, bold_erste=False):
-    for i, wert in enumerate(werte, 1):
-        z = ws.cell(row=zeile, column=i, value=wert)
-        z.font = Font(name=FONT, sz=10, b=(bold_erste and i == 1))
-        z.alignment = Alignment(vertical="top", wrap_text=True)
-        z.border = BORDER
-        if fill:
-            z.fill = PatternFill("solid", fgColor=fill)
-
-
-def hoehe(ws, zeile, texte, breiten):
-    """Zeilenhöhe grob aus dem laengsten Zellinhalt je Spaltenbreite."""
-    zeilen = max(1, max((len(t) // max(10, int(b * 1.05)) + 1)
-                        for t, b in zip(texte, breiten) if isinstance(t, str)) if texte else 1)
-    ws.row_dimensions[zeile].height = 14 * min(zeilen, 8)
 
 
 def baue_xlsx(ziel):
@@ -71,117 +33,77 @@ def baue_xlsx(ziel):
     # ---- Blatt 1: Datenfelder -------------------------------------------
     ws = wb.active
     ws.title = "Datenfelder"
-    ws["A1"] = "Datenfelder KI-Deckblatt - Zielbild"
-    ws["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
-    ws["A2"] = ("Alle Felder, die auf dem KI-Deckblatt erscheinen, inklusive der Anpassungen "
-                "aus dem Review 260807 Anpassung Deckblatt_V1.pdf. Zusatzspalten, die es nur "
-                "in der Excel-Auswertung gibt, sind nicht aufgeführt.")
-    ws["A2"].font = Font(name=FONT, sz=10, color="FF4B5563")
-    ws["A3"] = ("Schreibweise: In allen Adressfeldern wird \"Straße\" grundsätzlich als "
-                "\"Str.\" ausgegeben. Status NEU = neues, getrenntes oder geändertes Feld; "
-                "OFFEN = fachliche Vorgabe fehlt noch.")
-    ws["A3"].font = Font(name=FONT, sz=10, color="FF4B5563")
-
-    spalten = ["Abschnitt", "Feld", "Beschreibung", "Mögliche Ausprägungen / Format",
-               "Beispiel", "Anpassung", "Status"]
-    breiten = [26, 24, 46, 46, 30, 40, 9]
-    kopfzeile(ws, spalten, breiten, zeile=5)
-
-    zeile = 6
-    for titel, felder in ABSCHNITTE:
+    r = titel(ws, "Datenfelder KI-Deckblatt - Zielbild",
+              "Alle Felder, die auf dem KI-Deckblatt erscheinen, inklusive der "
+              "Anpassungen aus dem Review 260807 Anpassung Deckblatt_V1.pdf. "
+              "Zusatzspalten der Excel-Auswertung sind nicht aufgeführt.",
+              "Schreibweise: In allen Adressfeldern wird \"Straße\" grundsätzlich als "
+              "\"Str.\" ausgegeben.",
+              "Grün = neues, getrenntes oder geändertes Feld. Gelb = fachliche Vorgabe "
+              "fehlt noch.")
+    SP = ["Abschnitt", "Feld", "Beschreibung", "Mögliche Ausprägungen / Format",
+          "Beispiel", "Anpassung", "Status"]
+    BR = [26, 24, 46, 46, 30, 40, 9]
+    kopf = r + 1
+    r = kopfzeile(ws, SP, BR, kopf)
+    for abschnitt, felder in ABSCHNITTE:
         for feld, beschr, auspr, beisp, anp, mark in felder:
-            werte = [rein(titel), rein(feld), rein(beschr), rein(auspr), rein(beisp),
-                     rein(anp), STATUS_TEXT[mark]]
-            schreibe(ws, zeile, werte, fill=STATUS_FARBE[mark], bold_erste=False)
-            ws.cell(row=zeile, column=2).font = Font(name=FONT, sz=10, b=True)
-            hoehe(ws, zeile, werte, breiten)
-            zeile += 1
+            r = schreibe(ws, r, [rein(abschnitt), rein(feld), rein(beschr), rein(auspr),
+                                 rein(beisp), rein(anp), STATUS_TEXT[mark]],
+                         BR, fill=STATUS_FARBE[mark], fett_spalten=(2,))
+    abschluss(ws, kopf, r - 1, len(SP), fixieren="C%d" % (kopf + 1))
 
-    ws.freeze_panes = "C6"
-    ws.auto_filter.ref = "A5:%s%d" % (get_column_letter(len(spalten)), zeile - 1)
-    ws.sheet_view.showGridLines = False
-
-    # ---- Blatt 2: Sparte ------------------------------------------------
-    wsS = wb.create_sheet("Sparte")
-    wsS["A1"] = "Sparte als Kürzel - unsere Annahme"
-    wsS["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
-    wsS["A2"] = rein(SPARTEN_TEXT)
-    wsS["A2"].font = Font(name=FONT, sz=10, color="FF4B5563")
-    wsS["A2"].alignment = Alignment(wrap_text=True, vertical="top")
-    wsS.merge_cells("A2:E2")
-    wsS.row_dimensions[2].height = 60
-
-    spaltenS = ["Kürzel", "Sparte", "Präfix der Versicherungsnummer", "Vorgänge", "Anteil"]
-    breitenS = [10, 42, 52, 12, 10]
-    kopfzeile(wsS, spaltenS, breitenS, zeile=4)
-    zeile = 5
-    for kuerzel, sparte, prae, anz, ant, mark in SPARTEN:
-        werte = [kuerzel, rein(sparte), rein(prae), anz, ant]
-        schreibe(wsS, zeile, werte, fill=STATUS_FARBE[mark], bold_erste=True)
-        hoehe(wsS, zeile, werte, breitenS)
-        zeile += 1
-    zeile += 1
-    wsS.cell(row=zeile, column=1, value=rein(SPARTEN_HINWEIS)).font = Font(
-        name=FONT, sz=10, color="FF92400E")
-    wsS.cell(row=zeile, column=1).alignment = Alignment(wrap_text=True, vertical="top")
-    wsS.merge_cells(start_row=zeile, start_column=1, end_row=zeile, end_column=5)
-    wsS.row_dimensions[zeile].height = 46
-    wsS.sheet_view.showGridLines = False
-
-    # ---- Blatt 3: Prüfung Unterlagen ------------------------------------
-    ws2 = wb.create_sheet("Prüfung Unterlagen")
-    ws2["A1"] = "Ausprägungen des Feldes \"Prüfung Unterlagen\""
-    ws2["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
-    ws2["A2"] = ("Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder "
-                 "\"Makler-Vorgang\" ist UND die Klassifikation \"BÜ-Vorgang\" lautet. "
-                 "Mehrere Mängel werden kommagetrennt ausgegeben, z. B. "
-                 "\"BÜ-Wunsch fehlt, MV unvollständig\".")
-    ws2["A2"].font = Font(name=FONT, sz=10, color="FF4B5563")
-
-    spalten2 = ["Ausprägung", "Wann sie gesetzt wird", "Status"]
-    breiten2 = [34, 78, 9]
-    kopfzeile(ws2, spalten2, breiten2, zeile=4)
-    zeile = 5
-    for wert, wann, mark in PRUEFUNG:
-        werte = [rein(wert), rein(wann), STATUS_TEXT[mark]]
-        schreibe(ws2, zeile, werte, fill=STATUS_FARBE[mark], bold_erste=True)
-        hoehe(ws2, zeile, werte, breiten2)
-        zeile += 1
-    ws2.sheet_view.showGridLines = False
-
-    # ---- Blatt 4: Offene Punkte -----------------------------------------
-    ws3 = wb.create_sheet("Offene Punkte")
-    ws3["A1"] = "Offene Punkte"
-    ws3["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
-    ws3["A2"] = "Was noch fachlich zu klären ist, bevor Prompt und Deckblatt nachgezogen werden."
-    ws3["A2"].font = Font(name=FONT, sz=10, color="FF4B5563")
-
-    spalten3 = ["Nr.", "Thema", "Frage / Hintergrund"]
-    breiten3 = [6, 34, 86]
-    kopfzeile(ws3, spalten3, breiten3, zeile=4)
-    zeile = 5
+    # ---- Blatt 2: Offene Punkte -----------------------------------------
+    ws2 = wb.create_sheet("Offene Punkte")
+    r = titel(ws2, "Offene Punkte",
+              "Was noch fachlich zu klären ist, bevor Prompt und Deckblatt nachgezogen "
+              "werden.")
+    SP2 = ["Nr.", "Thema", "Frage / Hintergrund"]
+    BR2 = [6, 34, 86]
+    kopf2 = r + 1
+    r = kopfzeile(ws2, SP2, BR2, kopf2)
     for i, (thema, frage) in enumerate(OFFEN, 1):
-        werte = [i, rein(thema), rein(frage)]
-        schreibe(ws3, zeile, werte, fill=GELB, bold_erste=False)
-        ws3.cell(row=zeile, column=2).font = Font(name=FONT, sz=10, b=True)
-        hoehe(ws3, zeile, [rein(thema), rein(frage)], breiten3[1:])
-        zeile += 1
-
-    zeile += 1
-    ws3.cell(row=zeile, column=2, value="Bekannte Besonderheiten bei Agentur-Nr / "
-                                        "Personalnummer").font = Font(name=FONT, sz=11, b=True,
-                                                                      color=BLAU)
-    zeile += 1
+        r = schreibe(ws2, r, [i, rein(thema), rein(frage)], BR2, fill=GELB,
+                     fett_spalten=(2,))
+    letzte = r - 1
+    r += 1
+    ws2.cell(row=r, column=2,
+             value="Bekannte Besonderheiten bei Agentur-Nr / Personalnummer").font = Font(
+                 name=FONT, sz=11, b=True, color=BLAU)
+    r += 1
     for i, b in enumerate(BESONDERHEITEN, 1):
-        werte = [i, "", rein(b)]
-        schreibe(ws3, zeile, werte, fill=GRAU)
-        hoehe(ws3, zeile, [rein(b)], [breiten3[2]])
-        zeile += 1
-    ws3.sheet_view.showGridLines = False
+        r = schreibe(ws2, r, [i, "", rein(b)], BR2, fill=GRAU)
+    abschluss(ws2, kopf2, letzte, len(SP2))
 
-    # Offene Punkte direkt hinter die Feldliste ziehen - das ist der Teil,
-    # zu dem wir eine Rueckmeldung brauchen.
-    wb.move_sheet("Offene Punkte", offset=-(len(wb.sheetnames) - 2))
+    # ---- Blatt 3: Sparte ------------------------------------------------
+    ws3 = wb.create_sheet("Sparte")
+    r = titel(ws3, "Sparte als Kürzel - unsere Annahme", rein(SPARTEN_TEXT))
+    SP3 = ["Kürzel", "Sparte", "Präfix der Versicherungsnummer", "Vorgänge", "Anteil"]
+    BR3 = [10, 42, 52, 12, 10]
+    kopf3 = r + 1
+    r = kopfzeile(ws3, SP3, BR3, kopf3)
+    for kuerzel, sparte, prae, anz, ant, mark in SPARTEN:
+        r = schreibe(ws3, r, [kuerzel, rein(sparte), rein(prae), anz, ant], BR3,
+                     fill=STATUS_FARBE[mark], fett_spalten=(1,))
+    letzte3 = r - 1
+    r = hinweis(ws3, r + 1, rein(SPARTEN_HINWEIS), len(SP3))
+    abschluss(ws3, kopf3, letzte3, len(SP3))
+
+    # ---- Blatt 4: Prüfung Unterlagen ------------------------------------
+    ws4 = wb.create_sheet("Prüfung Unterlagen")
+    r = titel(ws4, "Ausprägungen des Feldes \"Prüfung Unterlagen\"",
+              "Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder "
+              "\"Makler-Vorgang\" ist UND die Klassifikation \"BÜ-Vorgang\" lautet.",
+              "Mehrere Mängel werden kommagetrennt ausgegeben, z. B. "
+              "\"BÜ-Wunsch fehlt, MV unvollständig\".")
+    SP4 = ["Ausprägung", "Wann sie gesetzt wird", "Status"]
+    BR4 = [34, 78, 9]
+    kopf4 = r + 1
+    r = kopfzeile(ws4, SP4, BR4, kopf4)
+    for wert, wann, mark in PRUEFUNG:
+        r = schreibe(ws4, r, [rein(wert), rein(wann), STATUS_TEXT[mark]], BR4,
+                     fill=STATUS_FARBE[mark], fett_spalten=(1,))
+    abschluss(ws4, kopf4, r - 1, len(SP4))
 
     wb.calculation.fullCalcOnLoad = True
     wb.save(ziel)
