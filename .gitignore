@@ -12,3 +12,4 @@ output/testfaelle_metadaten.csv
 
 # generierte Mail-Datei (wird per Skript aus scripts/mail-formatanalyse.txt gebaut)
 Formatanalyse-Agentur-Personalnummern.eml
+Datenfelder-KI-Deckblatt.eml

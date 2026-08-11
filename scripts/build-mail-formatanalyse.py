@@ -3,60 +3,22 @@
 """
 Baut die Mail zur Formatanalyse als .eml (Outlook-tauglich).
 
-- multipart/alternative: Klartext + HTML (Tabellen, Schrift Aptos)
-- analyse.xlsx als Anhang
-- Header "X-Unsent: 1", damit Outlook die Datei als unversendeten Entwurf
-  im Verfassen-Fenster oeffnet statt als empfangene Nachricht
+Inhalt: welche Schreibweisen bei Agentur-Nr und Vermittler-/Personalnummer in
+den BUe-Vorgaengen des April-Laufs extrahiert wurden. analyse.xlsx haengt an.
 
 Aufruf:  python3 scripts/build-mail-formatanalyse.py [ziel.eml]
 """
 
-import mimetypes
-import os
 import sys
-from email import policy
-from email.message import EmailMessage
+
+from mailbau import baue_eml, lies_text, tab
 
 ZIEL = sys.argv[1] if len(sys.argv) > 1 else "Formatanalyse-Agentur-Personalnummern.eml"
-ANHANG = "analyse.xlsx"
+ANHAENGE = ["analyse.xlsx"]
 # Betreff bewusst kurz gehalten (<= 64 Zeichen): laengere Betreffs werden beim
 # Schreiben der EML umgebrochen, was in manchen Clients doppelte Leerzeichen
 # erzeugt.
 BETREFF = "Formatanalyse Agentur- und Personalnummern - Bitte um Einordnung"
-
-TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         "mail-formatanalyse.txt"), encoding="utf-8").read()
-# Betreffzeile aus dem Klartext entfernen - sie steht im Header
-TEXT = TEXT.split("\n", 1)[1].lstrip("\n") if TEXT.startswith("Betreff:") else TEXT
-
-CSS = """
-  body { font-family: Aptos, 'Segoe UI', Calibri, sans-serif; font-size: 11pt;
-         color: #111827; line-height: 1.45; }
-  h3 { font-size: 11.5pt; margin: 18px 0 6px 0; color: #1E40AF; }
-  p { margin: 8px 0; }
-  table { border-collapse: collapse; margin: 8px 0 14px 0; }
-  th, td { border: 1px solid #D1D5DB; padding: 4px 9px; font-size: 10.5pt;
-           text-align: left; vertical-align: top; }
-  th { background: #1E40AF; color: #FFFFFF; font-weight: 600; }
-  td.n { text-align: right; white-space: nowrap; }
-  code { font-family: Consolas, 'Courier New', monospace; font-size: 10pt; }
-  ul { margin: 6px 0 12px 0; padding-left: 22px; }
-  li { margin: 4px 0; }
-  .hint { color: #4B5563; }
-"""
-
-
-def tab(kopf, zeilen, num_spalten=()):
-    h = "".join("<th>%s</th>" % k for k in kopf)
-    body = ""
-    for zl in zeilen:
-        tds = ""
-        for i, wert in enumerate(zl):
-            klasse = ' class="n"' if i in num_spalten else ""
-            tds += "<td%s>%s</td>" % (klasse, wert)
-        body += "<tr>%s</tr>" % tds
-    return "<table><tr>%s</tr>%s</table>" % (h, body)
-
 
 HTML = """<div>
 <p>Hallo zusammen,</p>
@@ -217,27 +179,4 @@ HTML = HTML.replace("{TAB_VERMITTLER}", tab(
       "<code>00 111 40 16</code>", "74"]],
     num_spalten=(0, 3)))
 
-msg = EmailMessage()
-msg["Subject"] = BETREFF
-msg["To"] = ""
-msg["X-Unsent"] = "1"          # Outlook oeffnet die Datei als Entwurf
-msg.set_content(TEXT)
-msg.add_alternative(
-    "<html><head><meta charset=\"utf-8\"><style>%s</style></head><body>%s</body></html>"
-    % (CSS, HTML), subtype="html")
-
-if os.path.exists(ANHANG):
-    typ, _ = mimetypes.guess_type(ANHANG)
-    haupt, unter = (typ or "application/octet-stream").split("/", 1)
-    with open(ANHANG, "rb") as f:
-        msg.add_attachment(f.read(), maintype=haupt, subtype=unter,
-                           filename=os.path.basename(ANHANG))
-else:
-    print("Hinweis: %s nicht gefunden - EML wird ohne Anhang gebaut." % ANHANG)
-
-# WICHTIG: mit policy.SMTP serialisieren -> CRLF-Zeilenenden. Mit blossen
-# LF-Zeilenenden verschluckt Outlook an den Quoted-Printable-Umbruechen
-# Zeichen ("vorhanden" wird zu "vor=anden", Tabellenzeilen verschmelzen).
-with open(ZIEL, "wb") as f:
-    f.write(msg.as_bytes(policy=policy.SMTP))
-print("OK - %s geschrieben (%.1f MB)" % (ZIEL, os.path.getsize(ZIEL) / 1048576.0))
+baue_eml(ZIEL, BETREFF, lies_text("mail-formatanalyse.txt"), HTML, ANHAENGE)
