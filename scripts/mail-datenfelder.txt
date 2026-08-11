@@ -1,0 +1,189 @@
+Betreff: Datenfelder KI-Deckblatt - Zielbild und offene Punkte
+
+Hallo zusammen,
+
+anbei die vollständige Liste aller Datenfelder des KI-Deckblatts - im Zielbild,
+also inklusive der Anpassungen aus eurem Review "260807 Anpassung
+Deckblatt_V1.pdf". Zu jedem Feld steht, welche Ausprägungen es annehmen kann.
+
+Damit haben wir eine gemeinsame Grundlage: Was wird erhoben, in welcher Form,
+und wo sind noch Entscheidungen offen.
+
+Kennzeichnung in den Tabellen:
+  NEU     Feld kommt neu dazu oder wird aus einem bestehenden Feld getrennt
+  OFFEN   fachliche Vorgabe fehlt noch - siehe "Offene Punkte" am Ende
+
+Grundsätzliche Änderung: alle Felder immer anzeigen
+---------------------------------------------------
+Bisher blendet das Deckblatt Felder aus, die leer sind - dadurch sieht jedes
+Deckblatt etwas anders aus. Nach eurem Kommentar "Immer ALLE Felder befüllt auf
+KI-Deckblatt aufführen" stellen wir das um: Jedes Feld erscheint immer, leere
+Felder mit einem Strich ("-"). Die Struktur ist damit bei jedem Vorgang
+identisch. Bitte kurz bestätigen, dass es so gemeint war.
+
+KOPFZEILE
+---------
+  Lfd-Nr                 BÜ-KI-001, BÜ-KI-002, ... (identisch zur Spalte
+                         Lfd_Nr in der Excel-Auswertung)
+  Status (Ampel)         Neue BÜ | BÜ-Reminder | Keine BÜ
+  Typ                    Makler | MFA
+  Klassifikation         siehe Abschnitt KLASSIFIKATION & VORGANG
+  Maklervollmacht        siehe Abschnitt MAKLERVOLLMACHT
+
+KUNDE & VERTRAG
+---------------
+  Kunde_Nachname         Text                                          NEU
+  Kunde_Vorname          Text                                          NEU
+     -> ersetzt das bisherige kombinierte Feld "Kunde (Name)"
+  Geburtsdatum VN        TT.MM.JJJJ
+  Kunde_Strasse          Text inkl. Hausnummer                         NEU
+  Kunde_PLZ              5 Ziffern                                     NEU
+  Kunde_Ort              Text                                          NEU
+     -> ersetzt das bisherige kombinierte Feld "Kunde-Adresse"
+  Versicherungsnummer    Originalform inkl. Buchstaben-Präfix, führenden
+                         Nullen und Suffixen (z. B. SV096877374.7,
+                         LF70902206). Mehrere Nummern kommagetrennt.
+  Spartenkürzel          2 Buchstaben, z. B. SV, LF, LV, KR, DA, KV     NEU/OFFEN
+  Sparte                 Komposit | Leben | KV | Mehrere | Unbekannt
+  Kunden-/Partnernummer  Ziffern (KDNR/Partnernummer, NICHT die
+                         Versicherungs- oder Maklernummer)
+  MV_VN_Nachname         Text                                          NEU
+  MV_VN_Vorname          Text                                          NEU
+     -> ersetzt das bisherige kombinierte Feld "VN laut MV"; dient dem
+        Abgleich zwischen Anschreiben und Maklervollmacht
+
+MAKLER
+------
+  Pool                   Konsolidierter Poolname (JDC / Jung, DMS & Cie.;
+                         Fonds Finanz Maklerservice GmbH; blau direkt GmbH;
+                         VEMA eG; ...) oder leer
+  Vermittler             Firma des angebundenen Maklerunternehmens, sonst
+                         Name der handelnden natürlichen Person
+  Agentur-Nr             ***PLATZHALTER - Ausprägungen von Marcus***   OFFEN
+  Personalnummer         ***PLATZHALTER - Ausprägungen von Marcus***   OFFEN
+     -> ersetzt das bisherige kombinierte Feld "Agentur-/Personalnummer".
+        Siehe eigener Abschnitt unten.
+  Makler_E-Mail          Mailadresse des Maklers                       NEU/OFFEN
+  Makler_Adresse         Text ohne Komma                               OFFEN
+  Auftrag-Datum          TT.MM.JJJJ (Datum des Pool-/Makler-Anschreibens,
+                         NICHT der Mail-Eingang)
+
+KLASSIFIKATION & VORGANG
+------------------------
+  Vorgangstyp            Makler-Vorgang | Zustellfehler | Ergo-Outbound |
+                         System-Mail | Werbung-Spam | Unklar
+  Klassifikation         BUe-Vorgang | Anfrage-Ruecksprache |
+                         Antrag-Aenderung | Schadenmeldung |
+                         Nicht-Standard | Kein-Makler-Vorgang
+  Geschäftstyp           BUe einfacher Vertrag | BUe Kundenverbindung |
+                         Keine BUe
+                         (bisher nur in der Excel, nicht auf dem Deckblatt -
+                         soll das mit aufs Deckblatt?)
+  BÜ-Wunsch vorhanden    ja | nein
+                         Gibt es einen ausformulierten Auftrag zur
+                         Bestandsübertragung? Eine leere Mail mit nur einer
+                         Maklervollmacht im Anhang ergibt "nein".
+  Prüfung Unterlagen     siehe eigener Abschnitt unten
+  Reminder/Wiedervorlage ja | nein
+  Reminder-Quelle        Anhang-PDF-Inhalt | Anhang-Dateiname |
+                         Mail-Betreff | Mail-Body (kommagetrennt; leer wenn
+                         kein Reminder)
+
+MAKLERVOLLMACHT & UNTERSCHRIFTEN
+--------------------------------
+  MV enthalten           ja | nein
+  MV-Status              OK | MV unvollständig | MV fehlt | kein Anhang |
+                         nicht prüfbar
+  MV auf Makler          ja | nein | nicht prüfbar
+    ausgestellt          (explizit auf den Makler ausgestellt statt blanko)
+  MV vollumfänglich      ja | teilweise | nein | nicht prüfbar
+  MV-Einschränkungen     Freitext (nur wenn nicht vollumfänglich)
+  Unterschrift Kunde     ja | nein | nicht prüfbar                     GEÄNDERT
+     -> Die Unterschrift des Maklers entfällt wie gewünscht; angezeigt wird
+        nur noch die Unterschrift des Kunden.
+  Untervollmacht erteilt ja | nein | nicht prüfbar
+  MV_Unterschriftsdatum  TT.MM.JJJJ                                    NEU
+     -> Das Feld wird bereits erhoben (Datum der Unterschrift durch den
+        Kunden), stand bisher nur nicht auf dem Deckblatt.
+  MV_Eingangsdatum       TT.MM.JJJJ                                    NEU/OFFEN
+
+ERGEBNIS
+--------
+  Zusammenfassung        Freitext, max. rund 280 Zeichen
+  Hinweis                Freitext, max. rund 220 Zeichen (nur bei
+                         Auffälligkeiten, z. B. wenn Maklervollmacht und
+                         Anschreiben auf unterschiedliche Firmen lauten)
+
+Ausprägungen von "Prüfung Unterlagen"
+--------------------------------------
+Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder
+"Makler-Vorgang" ist UND die Klassifikation "BUe-Vorgang" lautet. Sonst bleibt
+es leer.
+
+  Reminder - keine Vollst.-Prüfung    wenn Reminder/Wiedervorlage = ja
+                                      (bei einer Erinnerung wird nichts neu
+                                      eingereicht, deshalb keine Prüfung)
+  Vollständig                         kein Mangel gefunden
+  BÜ-Wunsch fehlt                     "BÜ-Wunsch vorhanden" ist nicht "ja"
+  MV fehlt                            MV-Status enthält "MV fehlt" oder
+                                      "kein Anhang"
+  MV unvollständig                    MV-Status enthält "unvollständig"
+
+Mehrere Mängel werden kommagetrennt ausgegeben, z. B.
+"BÜ-Wunsch fehlt, MV unvollständig".
+
+Agentur-Nr und Personalnummer - Platzhalter
+-------------------------------------------
+Diese beiden Felder lassen wir bewusst offen, bis das fachliche Regelwerk
+steht. Marcus, du gibst uns hier bitte die Ausprägungen mit:
+
+  Agentur-Nr        ***von Marcus zu befüllen***
+  Personalnummer    ***von Marcus zu befüllen***
+
+Hintergrund: Da die Absender die Begriffe nicht einheitlich verwenden, muss die
+Maschine die Unterscheidung über ein Regelwerk lernen. Aus den bisherigen
+Auswertungen kennen wir diese Besonderheiten:
+
+  1. Vermittler- und Agenturnummer sind bei der Einreichung teilweise
+     vertauscht.
+  2. Die Nummern kommen oft nur als 811774 oder 8903252 ohne A00 bzw. P0 -
+     Beispiel Finanzguru.
+  3. Manchmal wird nur eine der beiden Nummern mitgegeben - Beispiel
+     Fonds Finanz.
+  4. Schreibweisen mit Bindestrich wie 898-0003 müssten bereinigt werden.
+
+Konkret gebraucht wird: gültige Stellenzahlen, Bedeutung der Präfixe 6000 und
+890, Umgang mit führenden Nullen und führenden Buchstaben, zulässige
+Trennzeichen, eine eventuelle Prüfziffer und die Frage, wie das Tool mit einem
+Wert umgehen soll, der die Prüfung nicht besteht. Die Detailauswertung dazu
+habt ihr in der Mail zur Formatanalyse.
+
+Offene Punkte
+-------------
+  1. Agentur-Nr / Personalnummer: Regelwerk und Ausprägungen (Marcus).
+  2. Spartenkürzel: Eine Suche nach beliebigen Zwei-Buchstaben-Kombinationen
+     würde zu viele Fehler liefern. Vorschlag: Wir nehmen die ersten beiden
+     Buchstaben der erkannten Versicherungsnummer und prüfen sie gegen eine
+     Liste gültiger Spartenkürzel. Diese Liste bräuchten wir von euch.
+  3. Makler_E-Mail: Welche Adresse soll hier stehen - die Absenderadresse der
+     Mail oder eine andere?
+  4. MV_Eingangsdatum und MV_Unterschriftsdatum: Bitte definieren, woran wir
+     die beiden Daten jeweils ablesen sollen.
+  5. Makler_Adresse: Soll sie wie die Kundenadresse in Straße, PLZ und Ort
+     getrennt werden?
+  6. Reminder im Vorgangstyp: Ihr hattet angeregt, Reminder/Erinnerungen mit
+     in den Vorgangstyp aufzunehmen. Aus unserer Sicht ist das eine eigene
+     Dimension - eine Erinnerung an eine Bestandsübertragung bleibt fachlich
+     ein BÜ-Vorgang, sie ist nur nicht die erste Mail dazu. Deshalb steht sie
+     heute in einem eigenen Feld und zusätzlich in der Status-Ampel
+     ("BÜ-Reminder"). Wenn ihr sie trotzdem im Vorgangstyp braucht, setzen wir
+     das um - dann bitte kurz sagen, ob "Reminder" die anderen Werte ersetzt
+     oder zusätzlich erscheint.
+  7. Geschäftstyp: Soll das Feld mit aufs Deckblatt?
+
+Sobald die offenen Punkte geklärt sind, ziehen wir Prompt, Deckblatt und
+Excel-Spalten in einem Schritt nach.
+
+Rückfragen gerne jederzeit.
+
+Viele Grüße
