@@ -25,7 +25,7 @@ ANHAENGE = [EXCEL, "260807 Anpassung Deckblatt_V1.pdf"]
 from build_datenfelder_xlsx import baue_xlsx
 from datenfelder import (ABSCHNITTE, ALLE_FELDER, BESONDERHEITEN, EINLEITUNG, OFFEN,
                          PLATZHALTER_SCHLUSS, PLATZHALTER_TEXT, PRUEFUNG, SCHLUSS,
-                         rein, umbruch)
+                         SPARTEN, SPARTEN_HINWEIS, SPARTEN_TEXT, rein, umbruch)
 
 # ---------------------------------------------------------------------------
 # HTML bauen
@@ -46,6 +46,12 @@ teile.append("<p>%s</p>" % ALLE_FELDER)
 for titel, felder in ABSCHNITTE:
     teile.append("<h3>%s</h3>" % titel)
     teile.append(html_tab(felder))
+teile.append("<h3>Sparte als Kürzel - unsere Annahme</h3>")
+teile.append("<p>%s</p>" % SPARTEN_TEXT)
+teile.append(tab(("Kürzel", "Sparte", "Präfix der Versicherungsnummer", "Vorgänge", "Anteil"),
+                 [[s_[0], s_[1], s_[2], s_[3], s_[4]] for s_ in SPARTEN],
+                 num_spalten=(3, 4), klassen=[s_[5] for s_ in SPARTEN]))
+teile.append('<p class="hint">%s</p>' % SPARTEN_HINWEIS)
 teile.append("<h3>Ausprägungen von &bdquo;Prüfung Unterlagen&ldquo;</h3>")
 teile.append("<p>Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder "
              "&bdquo;Makler-Vorgang&ldquo; ist <b>und</b> die Klassifikation "
@@ -98,6 +104,14 @@ for titel, felder in ABSCHNITTE:
         if anp:
             zeilen.append("    Anpassung:     " + umbruch(rein(anp), 58, " " * 19))
         zeilen.append("")
+
+zeilen += ["SPARTE ALS KÜRZEL - UNSERE ANNAHME", "-" * 35, "",
+           umbruch(rein(SPARTEN_TEXT)), ""]
+zeilen.append("  %-8s %-34s %9s %8s" % ("Kürzel", "Sparte", "Vorgänge", "Anteil"))
+for kuerzel, sparte, prae, anz, ant, mark in SPARTEN:
+    zeilen.append("  %-8s %-34s %9s %8s" % (kuerzel, rein(sparte)[:34], anz, ant))
+    zeilen.append("           Präfixe: " + umbruch(rein(prae), 56, " " * 21))
+zeilen += ["", umbruch(rein(SPARTEN_HINWEIS)), ""]
 
 zeilen += ["AUSPRÄGUNGEN VON „PRÜFUNG UNTERLAGEN“", "-" * 38, "",
            umbruch("Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder "

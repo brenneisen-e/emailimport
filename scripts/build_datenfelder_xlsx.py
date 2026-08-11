@@ -19,7 +19,8 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from datenfelder import ABSCHNITTE, BESONDERHEITEN, OFFEN, PRUEFUNG, rein
+from datenfelder import (ABSCHNITTE, BESONDERHEITEN, OFFEN, PRUEFUNG, SPARTEN,
+                         SPARTEN_HINWEIS, SPARTEN_TEXT, rein)
 
 FONT = "Aptos"
 BLAU = "FF1E40AF"
@@ -100,7 +101,34 @@ def baue_xlsx(ziel):
     ws.auto_filter.ref = "A5:%s%d" % (get_column_letter(len(spalten)), zeile - 1)
     ws.sheet_view.showGridLines = False
 
-    # ---- Blatt 2: Prüfung Unterlagen ------------------------------------
+    # ---- Blatt 2: Sparte ------------------------------------------------
+    wsS = wb.create_sheet("Sparte")
+    wsS["A1"] = "Sparte als Kürzel - unsere Annahme"
+    wsS["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
+    wsS["A2"] = rein(SPARTEN_TEXT)
+    wsS["A2"].font = Font(name=FONT, sz=10, color="FF4B5563")
+    wsS["A2"].alignment = Alignment(wrap_text=True, vertical="top")
+    wsS.merge_cells("A2:E2")
+    wsS.row_dimensions[2].height = 60
+
+    spaltenS = ["Kürzel", "Sparte", "Präfix der Versicherungsnummer", "Vorgänge", "Anteil"]
+    breitenS = [10, 42, 52, 12, 10]
+    kopfzeile(wsS, spaltenS, breitenS, zeile=4)
+    zeile = 5
+    for kuerzel, sparte, prae, anz, ant, mark in SPARTEN:
+        werte = [kuerzel, rein(sparte), rein(prae), anz, ant]
+        schreibe(wsS, zeile, werte, fill=STATUS_FARBE[mark], bold_erste=True)
+        hoehe(wsS, zeile, werte, breitenS)
+        zeile += 1
+    zeile += 1
+    wsS.cell(row=zeile, column=1, value=rein(SPARTEN_HINWEIS)).font = Font(
+        name=FONT, sz=10, color="FF92400E")
+    wsS.cell(row=zeile, column=1).alignment = Alignment(wrap_text=True, vertical="top")
+    wsS.merge_cells(start_row=zeile, start_column=1, end_row=zeile, end_column=5)
+    wsS.row_dimensions[zeile].height = 46
+    wsS.sheet_view.showGridLines = False
+
+    # ---- Blatt 3: Prüfung Unterlagen ------------------------------------
     ws2 = wb.create_sheet("Prüfung Unterlagen")
     ws2["A1"] = "Ausprägungen des Feldes \"Prüfung Unterlagen\""
     ws2["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
@@ -121,7 +149,7 @@ def baue_xlsx(ziel):
         zeile += 1
     ws2.sheet_view.showGridLines = False
 
-    # ---- Blatt 3: Offene Punkte -----------------------------------------
+    # ---- Blatt 4: Offene Punkte -----------------------------------------
     ws3 = wb.create_sheet("Offene Punkte")
     ws3["A1"] = "Offene Punkte"
     ws3["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)

@@ -50,10 +50,10 @@ ABSCHNITTE = [
                           "aus dem Dokument - inklusive Buchstaben-Präfix, führender "
                           "Nullen und Suffixen. Mehrere Verträge kommagetrennt.",
    "Text", "LF70902206", "", None),
-  ("Sparte", "Sparte des Vertrags, als Kürzel - abgeleitet aus den ersten beiden "
-             "Buchstaben der Versicherungsnummer", "2 Buchstaben", "LF",
-   "GEÄNDERT - Kürzel statt der bisherigen Gruppen Komposit / Leben / KV; "
-   "Liste gültiger Kürzel wird benötigt", "offen"),
+  ("Sparte", "Sparte des Vertrags als Kürzel, abgeleitet aus dem Buchstaben-Präfix der "
+             "Versicherungsnummer", "KO | KV | LF | KR - siehe eigene Tabelle unten", "LF",
+   "GEÄNDERT - Kürzel statt der bisherigen Gruppen Komposit / Leben / KV; Zuordnung ist "
+   "eine Annahme und braucht eure Bestätigung", "offen"),
   ("Kunden-/Partnernummer", "Kunden- bzw. Partnernummer des VN in den ERGO-Systemen - "
                             "nicht die Versicherungs- oder Maklernummer",
    "Ziffern", "1234567890", "", None),
@@ -127,8 +127,9 @@ ABSCHNITTE = [
   ("MV_Unterschriftsdatum", "Datum, an dem der Kunde die Maklervollmacht bzw. den "
                             "Betreuungswunsch unterschrieben hat", "TT.MM.JJJJ",
    "02.04.2026", "NEU auf dem Deckblatt - Feld wird bereits erhoben", "neu"),
-  ("MV_Eingangsdatum", "Eingangsdatum der Maklervollmacht bzw. des Betreuungswunsches",
-   "TT.MM.JJJJ", "13.04.2026", "NEU - woran ablesen?", "offen"),
+  ("MV_Eingangsdatum", "Eingangsdatum der Maklervollmacht bzw. des Betreuungswunsches - "
+                       "das ist das Datum der Mail, mit der eingereicht wurde",
+   "TT.MM.JJJJ", "13.04.2026", "NEU", "neu"),
  ]),
  ("Ergebnis", [
   ("Zusammenfassung", "Worum es in dem Vorgang geht, in ein bis zwei Sätzen",
@@ -141,6 +142,38 @@ ABSCHNITTE = [
    "Übertragung in den Bestand der Fonds Finanz erfolgen soll.", "", None),
  ]),
 ]
+
+# ---------------------------------------------------------------------------
+# Sparte: vorgeschlagene Kürzel und ihre Herleitung aus der Versicherungsnummer
+# Mengen aus dem April-Lauf, 4.286 Versicherungsnummern in BÜ-Vorgängen.
+# ---------------------------------------------------------------------------
+SPARTEN = [
+ ("KO", "Komposit", "SV, DA, UP, RS, HP, HA, HR, AS, WG, SB, UV, ER, GU, HG, V",
+  "1.813", "42,3 %", None),
+ ("KV", "Krankenversicherung", "KV", "1.054", "24,6 %", None),
+ ("LF", "Leben", "LF, LV, R, T, FL", "656", "15,3 %", None),
+ ("KR", "Kraftfahrt", "KR", "307", "7,2 %", None),
+ ("?", "nicht ableitbar - Versicherungsnummer ohne Buchstaben-Präfix",
+  "z. B. 328124276, 7125170230214", "386", "9,0 %", "offen"),
+ ("?", "nicht ableitbar - Präfix in keiner der vier Gruppen",
+  "M, SA, HV, BG, TB, IT, RE, GL und weitere Einzelfälle", "70", "1,6 %", "offen"),
+]
+
+SPARTEN_TEXT = (
+ "Ihr habt KR = Kraftfahrt sowie KV, KO und LF als Kürzel genannt. Daraus leiten wir "
+ "folgende Annahme ab: Die Sparte hat vier Ausprägungen - KO (Komposit), KV "
+ "(Krankenversicherung), LF (Leben) und KR (Kraftfahrt). Ermittelt wird sie über das "
+ "Buchstaben-Präfix der Versicherungsnummer. Die Zuordnung unten ist aus dem April-Lauf "
+ "abgeleitet: Wir haben je Präfix nachgesehen, welcher Sparte die Vorgänge heute "
+ "zugeordnet sind. KR-Verträge laufen heute unter Komposit, was zur Lesart Kraftfahrt "
+ "passt.")
+
+SPARTEN_HINWEIS = (
+ "Wichtig: Bei 386 Vorgängen (9,0 %) hat die Versicherungsnummer gar kein "
+ "Buchstaben-Präfix, bei weiteren 70 (1,6 %) passt das Präfix in keine der vier Gruppen. "
+ "Für rund jeden zehnten Vorgang brauchen wir also eine Regel, was dann passieren soll - "
+ "Feld leer lassen oder die Sparte aus dem Mailtext ableiten.")
+
 
 # ---------------------------------------------------------------------------
 # Ausprägungen von "Prüfung Unterlagen"
@@ -164,16 +197,14 @@ PRUEFUNG = [
 
 OFFEN = [
  ("Agentur-Nr / Personalnummer", "Regelwerk und Ausprägungen (Marcus)."),
- ("Sparte als Kürzel", "Das Feld ersetzt die bisherigen Gruppen Komposit / Leben / "
-                       "KV / Mehrere / Unbekannt - bitte bestätigen, dass die grobe "
-                       "Einteilung nicht zusätzlich gebraucht wird. Zur Ermittlung: Eine "
-                       "Suche nach beliebigen Zwei-Buchstaben-Kombinationen würde zu "
-                       "viele Fehler liefern. Vorschlag: Wir nehmen die ersten beiden "
-                       "Buchstaben der erkannten Versicherungsnummer und prüfen sie gegen "
-                       "eine Liste gültiger Spartenkürzel. Diese Liste bräuchten wir von "
-                       "euch."),
- ("MV_Eingangsdatum und MV_Unterschriftsdatum", "Bitte definieren, woran wir die beiden "
-                                                "Daten jeweils ablesen sollen."),
+ ("Sparte als Kürzel", "Bitte die angenommene Zuordnung in der Spartentabelle "
+                       "bestätigen oder korrigieren - insbesondere, ob KO wirklich alles "
+                       "außer Kranken, Leben und Kraftfahrt umfasst und ob die "
+                       "Präfix-Listen vollständig sind."),
+ ("Sparte ohne Präfix", "Bei rund jedem zehnten Vorgang lässt sich die Sparte nicht aus "
+                        "der Versicherungsnummer ableiten (kein Buchstaben-Präfix oder "
+                        "unbekanntes Präfix). Feld leer lassen oder aus dem Mailtext "
+                        "ableiten?"),
  ("VN-Unterschrift fehlt", "Wir setzen den neuen Wert bei Unterschrift Kunde = "
                            "&bdquo;nein&ldquo;. Wie soll &bdquo;nicht prüfbar&ldquo; "
                            "behandelt werden - als Mangel oder als unauffällig?"),
