@@ -176,6 +176,7 @@ def kennzahlen(mit_trennung, acht_auffuellen, heutige_spalten=False):
                 vorgaenge["Vermittler"] += 1
             if not r[13] and not r[14]:
                 vorgaenge["keine"] += 1
+                vorgaenge["gar keine"] += 1
             continue
         klassen = []
         for roh, _ in kandidaten(r, mit_trennung):
@@ -190,6 +191,16 @@ def kennzahlen(mit_trennung, acht_auffuellen, heutige_spalten=False):
             vorgaenge["Vermittler"] += 1
         if "Agentur" not in klassen and "Vermittler" not in klassen:
             vorgaenge["keine"] += 1
+            # Aufteilen: gar keine Nummer extrahiert, oder nur eine, die die
+            # Regeln nicht zuordnen konnten.
+            offene = [roh for roh, _ in kandidaten(r, mit_trennung)
+                      if klasse(roh, acht_auffuellen) == "ohne Zuordnung"]
+            if not offene:
+                vorgaenge["gar keine"] += 1
+            elif all(len(ziffern(x).lstrip("0")) == 8 for x in offene):
+                vorgaenge["nur achtstellige"] += 1
+            else:
+                vorgaenge["nur lange"] += 1
     return nummern, laengen, vorgaenge
 
 
@@ -202,26 +213,32 @@ SPALTEN_KZ = ["Kennzahl", "vorher", "nachher: Regeln wie besprochen",
 
 
 def kz_zeilen():
-    """(Bezeichnung, vorher, nachher1, nachher2, Einrueckung, Farbe)"""
+    """(Bezeichnung, vorher, nachher1, nachher2, Einrueckungsstufe, Farbe)"""
     (nv, _, vv), (nr, lr, vr), (na, la, va) = K_VORHER, K_REGELN, K_ACHT
     return [
         ("Extrahierte Nummern insgesamt", nv["Agentur"] + nv["Vermittler"],
          nr["Agentur"] + nr["Vermittler"] + nr["ohne Zuordnung"],
-         na["Agentur"] + na["Vermittler"] + na["ohne Zuordnung"], False, GRAU),
-        ("als Agenturnummer", nv["Agentur"], nr["Agentur"], na["Agentur"], True, GRUEN),
+         na["Agentur"] + na["Vermittler"] + na["ohne Zuordnung"], 0, GRAU),
+        ("als Agenturnummer", nv["Agentur"], nr["Agentur"], na["Agentur"], 1, GRUEN),
         ("als Vermittlernummer", nv["Vermittler"], nr["Vermittler"], na["Vermittler"],
-         True, None),
-        ("ohne Zuordnung", "-", nr["ohne Zuordnung"], na["ohne Zuordnung"], True, GELB),
-        ("davon achtstellig", "-", lr[8], la[8], True, GELB),
+         1, None),
+        ("ohne Zuordnung", "-", nr["ohne Zuordnung"], na["ohne Zuordnung"], 1, GELB),
+        ("davon achtstellig", "-", lr[8], la[8], 2, GELB),
         ("davon 10 und mehr Stellen", "-",
          sum(v for k, v in lr.items() if k >= 10),
-         sum(v for k, v in la.items() if k >= 10), True, GELB),
-        ("", "", "", "", False, None),
-        ("BÜ-Vorgänge insgesamt", N, N, N, False, GRAU),
-        ("mit Agenturnummer", vv["Agentur"], vr["Agentur"], va["Agentur"], True, GRUEN),
+         sum(v for k, v in la.items() if k >= 10), 2, GELB),
+        ("", "", "", "", 0, None),
+        ("BÜ-Vorgänge insgesamt", N, N, N, 0, GRAU),
+        ("mit Agenturnummer", vv["Agentur"], vr["Agentur"], va["Agentur"], 1, GRUEN),
         ("mit Vermittlernummer", vv["Vermittler"], vr["Vermittler"], va["Vermittler"],
-         True, None),
-        ("ohne jede Nummer", vv["keine"], vr["keine"], va["keine"], True, GELB),
+         1, None),
+        ("ohne verwertbare Nummer", vv["keine"], vr["keine"], va["keine"], 1, GELB),
+        ("davon gar keine Nummer extrahiert", vv["gar keine"], vr["gar keine"],
+         va["gar keine"], 2, None),
+        ("davon nur achtstellige Nummern", 0, vr["nur achtstellige"],
+         va["nur achtstellige"], 2, GELB),
+        ("davon nur Nummern mit 10 und mehr Stellen", 0, vr["nur lange"],
+         va["nur lange"], 2, GELB),
     ]
 
 
@@ -242,13 +259,12 @@ r = titel(ws, "Nummern-Regeln am April-Extrakt: vorher und nachher",
 BR_KZ = [40, 14, 30, 34]
 kopf_kz = r + 1
 r = kopfzeile(ws, SPALTEN_KZ, BR_KZ, kopf_kz)
-for name, v1, v2, v3, eingerueckt, fill in kz_zeilen():
+for name, v1, v2, v3, stufe, fill in kz_zeilen():
     if not name:
         r += 1
         continue
-    beschriftung = ("    " + name) if eingerueckt else name
-    r = schreibe(ws, r, [beschriftung, v1, v2, v3], BR_KZ, fill=fill,
-                 fett_spalten=() if eingerueckt else (1,))
+    r = schreibe(ws, r, ["    " * stufe + name, v1, v2, v3], BR_KZ, fill=fill,
+                 fett_spalten=() if stufe else (1,))
 letzte_kz = r - 1
 r = hinweis(ws, r + 1,
             "Die Zahlen der Nummern und der Vorgänge unterscheiden sich leicht: Ein "
