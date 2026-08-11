@@ -197,6 +197,14 @@ PRUEFUNG = [
 
 OFFEN = [
  ("Agentur-Nr / Personalnummer", "Regelwerk und Ausprägungen (Marcus)."),
+ ("Abgleich mit dem EMMA-Abzug", "Wann soll die Personalnummer gegen den EMMA-Abzug "
+                                 "abgeglichen werden? Unser Vorschlag: nur dann, wenn die "
+                                 "Agentur- bzw. Personalnummer vom Standard abweicht - und "
+                                 "in diesem Fall über den Abgleich von Geburtsdatum und "
+                                 "Name. Ein Abgleich bei jedem Vorgang wäre deutlich "
+                                 "aufwendiger und aus unserer Sicht nur nötig, wenn ihr "
+                                 "die Nummern grundsätzlich verifiziert haben wollt. Passt "
+                                 "der Vorschlag, oder soll immer abgeglichen werden?"),
  ("Sparte als Kürzel", "Bitte die angenommene Zuordnung in der Spartentabelle "
                        "bestätigen oder korrigieren - insbesondere, ob KO wirklich alles "
                        "außer Kranken, Leben und Kraftfahrt umfasst und ob die "

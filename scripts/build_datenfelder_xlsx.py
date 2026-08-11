@@ -179,6 +179,10 @@ def baue_xlsx(ziel):
         zeile += 1
     ws3.sheet_view.showGridLines = False
 
+    # Offene Punkte direkt hinter die Feldliste ziehen - das ist der Teil,
+    # zu dem wir eine Rueckmeldung brauchen.
+    wb.move_sheet("Offene Punkte", offset=-(len(wb.sheetnames) - 2))
+
     wb.calculation.fullCalcOnLoad = True
     wb.save(ziel)
     return ziel
