@@ -69,19 +69,29 @@ ABSCHNITTE = [
   ("Vermittler", "Das angebundene Maklerunternehmen unter dem Pool; ist der Makler eine "
                  "Einzelperson, steht hier deren Name",
    "Firmenname oder Personenname", "Finanzservice Limnell", "", None),
-  ("Agentur-Nr", "Agenturnummer des Maklers beim Versicherer. Sie ist das führende "
-                 "Feld und der Einstieg in den EMMA-Abgleich.",
+  ("Agentur-Nr", "Agenturnummer des Maklers beim Versicherer. Sie ist das führende Feld "
+                 "und der Einstieg in den EMMA-Abgleich. Fehlt sie im Anschreiben, wird "
+                 "sie über die Personalnummer aus EMMA ergänzt.",
    "7 oder 9 Ziffern nach der Bereinigung. Achtstellige Nummern werden mit einer "
    "führenden Null auf neun Stellen ergänzt.", "600042497",
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
    "Stellenzahl", "neu"),
-  ("Personalnummer", "Personal- bzw. Vermittlernummer des Maklers beim Versicherer",
+  ("Personalnummer", "Personal- bzw. Vermittlernummer des Maklers beim Versicherer. "
+                     "<b>Der Wert kann aus EMMA stammen:</b> Er wird gegen den EMMA-Abzug "
+                     "plausibilisiert, bei Abweichung mit der dort hinterlegten Nummer "
+                     "überschrieben und bei fehlender Angabe ergänzt.",
    "Weniger als 7 Ziffern nach der Bereinigung, in der Regel 5 oder 6.", "811774",
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
    "Stellenzahl", "neu"),
+  ("Nummern-Herkunft", "Woher der angezeigte Wert stammt - damit auf dem Deckblatt "
+                       "sichtbar ist, ob eine Nummer aus dem Anschreiben kommt oder aus "
+                       "EMMA ergänzt bzw. überschrieben wurde.",
+   "aus dem Anschreiben | Agentur-Nr aus EMMA ergänzt | Personalnummer aus EMMA ergänzt | "
+   "Personalnummer aus EMMA überschrieben", "aus dem Anschreiben",
+   "NEU - Folge des EMMA-Abgleichs", "neu"),
   ("Nummern-Status", "Ergebnis des Abgleichs mit dem EMMA-Abzug: Existiert die "
-                     "Agenturnummer, gehört sie zum Vermittler, passt die "
-                     "Personalnummer dazu?",
+                     "Agenturnummer, gehört sie zum Vermittler, passt die Personalnummer "
+                     "dazu?",
    "OK | zu prüfen", "OK",
    "NEU - ergibt sich aus dem EMMA-Abgleich", "neu"),
   ("Makler_E-Mail", "Absenderadresse der Mail, mit der der Vorgang eingereicht wurde",
@@ -205,6 +215,12 @@ PRUEFUNG = [
 ]
 
 OFFEN = [
+ ("Ursprungswert bei Überschreibung", "Wenn EMMA die Personalnummer überschreibt, steht "
+                                     "die vom Makler genannte Nummer nicht mehr auf dem "
+                                     "Deckblatt. Reicht euch das Feld Nummern-Herkunft "
+                                     "als Hinweis, oder soll der ursprüngliche Wert "
+                                     "zusätzlich angezeigt werden - etwa für den Fall, "
+                                     "dass sich der Makler auf seine Angabe beruft?"),
  ("Sparte als Kürzel", "Bitte die angenommene Zuordnung in der Spartentabelle "
                        "bestätigen oder korrigieren - insbesondere, ob KO wirklich alles "
                        "außer Kranken, Leben und Kraftfahrt umfasst und ob die "
@@ -265,7 +281,7 @@ NUMMERN_TEXT = (
  "Weil die Absender die Begriffe nicht einheitlich verwenden, entscheidet nicht die "
  "Beschriftung im Anschreiben, sondern die Stellenzahl. So läuft es künftig ab:")
 
-NUMMERN_SCHRITTE = [
+NUMMERN_SCHRITTE = [  # noqa: E501
  "Die KI liest die Nummern aus dem Anschreiben aus, so wie sie dort stehen.",
  "Felder, die zwei Nummern enthalten, werden getrennt - aus „V 85357 A 777-0503“ werden "
  "85357 und 777-0503.",
@@ -279,6 +295,8 @@ NUMMERN_SCHRITTE = [
  "Agentur ergänzt, sofern die Beziehung eindeutig ist.",
  "Bleibt etwas unstimmig, wird der Vorgang im Feld Nummern-Status als „zu prüfen“ "
  "gekennzeichnet.",
+ "Weil dabei ein Wert aus EMMA den im Anschreiben genannten ersetzen kann, hält das Feld "
+ "Nummern-Herkunft fest, woher die angezeigte Nummer stammt.",
 ]
 
 NUMMERN_SCHLUSS = (
