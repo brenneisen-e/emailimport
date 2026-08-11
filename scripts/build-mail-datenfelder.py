@@ -39,8 +39,6 @@ def html_tab(felder):
 teile = ["<div>", "<p>Hallo zusammen,</p>"]
 for absatz in EINLEITUNG:
     teile.append("<p>%s</p>" % absatz)
-teile.append("<p>Grün hinterlegt sind neue, getrennte oder geänderte Felder, gelb die "
-             "Punkte, zu denen uns noch eine fachliche Vorgabe fehlt.</p>")
 teile.append("<h3>Bitte um Rückmeldung</h3>")
 teile.append("<p>%s</p>" % BITTE)
 teile.append("<p>Von unserer Seite sind noch diese Punkte offen:</p>")
@@ -65,7 +63,7 @@ teile.append(tab(("Ausprägung", "Wann sie gesetzt wird"),
 teile.append('<p class="hint">Mehrere Mängel werden kommagetrennt ausgegeben, z.&nbsp;B. '
              "&bdquo;BÜ-Wunsch fehlt, MV unvollständig&ldquo;. Die Ausprägung "
              "&bdquo;VN-Unterschrift fehlt&ldquo; ist neu - bisher floss die Unterschrift "
-             "des Kunden nicht in die Prüfung ein.</p>")
+             "des Kunden gar nicht in die Prüfung ein.</p>")
 teile.append("<h3>Agentur-Nr und Personalnummer - so werden sie ermittelt</h3>")
 teile.append("<p>%s</p>" % NUMMERN_TEXT)
 teile.append("<ol>%s</ol>" % "".join("<li>%s</li>" % b for b in NUMMERN_SCHRITTE))
@@ -81,8 +79,6 @@ HTML = "\n".join(teile)
 zeilen = ["Hallo zusammen,", ""]
 for absatz in EINLEITUNG:
     zeilen += [umbruch(rein(absatz)), ""]
-zeilen += ["Markierungen: NEU = neues, getrenntes oder geändertes Feld, "
-           "OFFEN = fachliche", "Vorgabe fehlt noch.", ""]
 zeilen += ["BITTE UM RÜCKMELDUNG", "-" * 20, "", umbruch(rein(BITTE)), "",
            "Von unserer Seite sind noch diese Punkte offen:", ""]
 for i, (a, b) in enumerate(OFFEN, 1):
@@ -124,7 +120,7 @@ for wert, wann, mark in PRUEFUNG:
 zeilen += [umbruch("Mehrere Mängel werden kommagetrennt ausgegeben, z. B. "
                    "„BÜ-Wunsch fehlt, MV unvollständig“. Die Ausprägung "
                    "„VN-Unterschrift fehlt“ ist neu - bisher floss die "
-                   "Unterschrift des Kunden nicht in die Prüfung ein."), ""]
+                   "Unterschrift des Kunden gar nicht in die Prüfung ein."), ""]
 
 zeilen += ["AGENTUR-NR UND PERSONALNUMMER - SO WERDEN SIE ERMITTELT", "-" * 55, "",
            umbruch(rein(NUMMERN_TEXT)), ""]
