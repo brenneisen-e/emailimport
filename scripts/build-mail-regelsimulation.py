@@ -246,139 +246,9 @@ xl.save(EXCEL)
 # ---------------------------------------------------------------------------
 # Mail
 # ---------------------------------------------------------------------------
-top_wechsler = ", ".join("<code>%s</code> (%dx)" % (roh, c)
-                         for (roh, _), c in wechsler_liste.most_common(6))
-
-HTML = """<div>
-<p>Hallo Marcus,</p>
-
-<p>danke für den Vorschlag - die ersten vier Regeln habe ich über den
-April-Extrakt laufen lassen. Basis sind die {N} BÜ-Vorgänge mit {WERTE}
-extrahierten Nummern. Die Auswertung hängt als Excel an.</p>
-
-<p><b>Kurzfassung:</b> Die Regeln greifen und decken die Agenturnummer deutlich
-besser ab als bisher. An zwei Stellen fallen Nummern durchs Raster - beides
-lässt sich mit einer kleinen technischen Ergänzung beheben, ohne an eurer
-Regellogik etwas zu ändern.</p>
-
-<h3>1. Befüllung je Vorgang</h3>
-{TAB_BEF}
-<p>Der Einstieg über die Agenturnummer - für euch der Weg in EMMA - deckt statt
-{AG_ALT} künftig {AG_NEU} Vorgänge ab, das sind {AG_PZ} statt {AG_PZ_ALT}. Der
-Rückfallweg über die Vermittlernummer schrumpft entsprechend von 624 auf
-104 Vorgänge.</p>
-
-<p><b>Warum &bdquo;keine&ldquo; zunächst um 117 steigt: Es sind achtstellige
-Nummern.</b> Die Regeln decken zwei Längen ab - unter 7 Stellen wird
-Vermittlernummer, 7 oder 9 Stellen wird Agenturnummer. <b>Für 8 Stellen gibt es
-keine Regel</b>, und genau diese Länge kommt {ACHT} mal vor. Dazu {LANG} Werte
-mit 10 und mehr Stellen. In all diesen {A_OFFEN} Vorgängen ist das jeweils die
-einzige Nummer - fällt sie weg, bleibt nichts übrig.</p>
-
-<h3>2. Zwei Ergänzungen, die das beheben</h3>
-<p><b>Ergänzung 1 - Felder mit zwei Nummern trennen.</b> Werte wie
-<code>V 85357 A 777-0503</code> enthalten in Wirklichkeit zwei Nummern:
-Vermittler 85357 und Agentur 777-0503. Die Bereinigung zieht sie heute zu
-<code>853577770503</code> zusammen - 12 Stellen, damit unbrauchbar. Trennt man
-vorher an den Buchstaben-Labels, ergibt derselbe Wert sauber
-<code>85357</code> (Vermittler) und <code>7770503</code> (Agentur), der Vorgang
-hat danach sogar beide Nummern. Die Trennung greift nur, wenn wirklich zwei
-gelabelte Nummern vorliegen - Einzelwerte wie <code>A600040124</code>,
-<code>60002/0753</code> oder <code>00 111 40 16</code> bleiben unangetastet.</p>
-
-<p><b>Ergänzung 2 - achtstellige Nummern mit einer führenden Null auf neun
-Stellen ergänzen.</b> Dein Vorschlag, und die Daten stützen ihn deutlich:
-{N_1000} der {ACHT} Achtsteller gehören zur selben Familie, die sonst
-neunstellig geschrieben wird - <code>01000-3083</code>,
-<code>01000/3451</code>, <code>A010006515</code>. Ohne die führende Null steht
-dort <code>10003083</code>, mit ihr <code>010003083</code>, und das passt genau
-ins Muster fünf Stellen Agentur plus vier Stellen Unternummer. Die Regel
-erledigt damit alle {ACHT} Achtsteller in einem Schritt.</p>
-
-{TAB_VARIANTEN}
-
-<p>Mit beiden Ergänzungen bleiben von den {A_OFFEN} offenen Nummern noch
-<b>{C_OFFEN}</b> übrig, und die Vorgänge ganz ohne Nummer liegen bei
-<b>{C_KEINE}</b> gegenüber {HEUTE_KEINE} heute - also praktisch auf dem
-heutigen Stand, bei gleichzeitig {AG_GEWINN} Vorgängen mehr mit
-Agenturnummer.</p>
-
-<p>Die {C_OFFEN} verbleibenden Werte sind Einzelfälle mit 10 und mehr Stellen:
-<code>6000020026</code>, <code>28964000000</code>,
-<code>86821000000/60001/0017</code> und drei ähnliche. Die würde ich direkt als
-&bdquo;zu prüfen&ldquo; kennzeichnen.</p>
-
-<p><b>Ein Detail zur Auffüllregel, das mir dabei aufgefallen ist:</b> Sie passt
-für die {N_1000} Werte der 01000-Familie sehr gut. Bei {N_6008} Werten beginnt
-die Nummer aber mit <code>6008</code> - etwa <code>60083652</code> oder
-<code>60080159</code>. Dort fehlt die Null vermutlich nicht vorn, sondern in
-der Mitte: <code>600083652</code> würde in die dichte Reihe der
-6000-Agenturnummern passen, <code>060083652</code> nicht. Die Auffüllregel
-liefert hier also möglicherweise die falsche Nummer. Weil dein EMMA-Abgleich
-ohnehin prüft, ob die Agenturnummer existiert, würden genau diese Fälle dort
-auffallen und als &bdquo;zu prüfen&ldquo; landen - insofern ist es kein
-Blocker, ich wollte es nur nicht unter den Tisch fallen lassen.</p>
-
-<h3>3. Was sich je Nummer ändert</h3>
-{TAB_WECHSEL}
-<p>Die Agenturnummern bleiben praktisch unangetastet: {A_STABIL} von
-{A_GESAMT} behalten ihre Zuordnung. Die Bewegung steckt bei den
-Vermittlernummern - <b>{N_WECHSLER} Werte ({N_WECHSLER_PZ} aller Nummern)
-werden neu zur Agenturnummer</b>. Häufigste Fälle: {TOP_WECHSLER}.</p>
-<p>Das ist der eigentliche Unterschied zur heutigen Logik: Die bisherige Regel
-&bdquo;beginnt mit 6000 oder 890&ldquo; und die neue Längenregel widersprechen
-sich bei genau diesen Werten. <code>8923555</code> beginnt mit 89, aber nicht
-mit 890; <code>601000040</code> mit 601, nicht mit 6000. Nach der Längenregel
-sind beide Agenturnummern. Ob das fachlich stimmt, kann ich aus den Daten nicht
-beurteilen - der EMMA-Abgleich würde es aber genau hier zeigen.</p>
-
-<h3>Was ich von dir bräuchte</h3>
-<ol>
-<li><b>Die Trennregel:</b> Passt sie so? Sie ist reine Technik und ändert
-nichts an eurer Regellogik.</li>
-<li><b>Die 6008-Fälle:</b> Sollen wir sie wie alle anderen vorn auffüllen und
-den EMMA-Abgleich entscheiden lassen, oder von vornherein als
-&bdquo;zu prüfen&ldquo; kennzeichnen?</li>
-<li><b>Die {N_WECHSLER} Wechsler:</b> Im Blatt &bdquo;Wechsler V nach A&ldquo;
-stehen sie einzeln mit Häufigkeit. Magst du stichprobenhaft draufschauen, ob
-die Einordnung als Agenturnummer passt? Falls ja, ist die Längenregel der
-heutigen Präfix-Regel klar überlegen.</li>
-<li><b>Werte mit Textrest:</b> Bei <code>600041966 1zu1 AG</code> zieht die
-Bereinigung auch die Ziffern aus dem Firmennamen mit - heraus kommt
-<code>60004196611</code>, 11 statt 9 Stellen. Wir würden den Textanteil vorher
-entfernen; nur zur Info, dass wir das so vorsehen.</li>
-</ol>
-
-<p>Den EMMA-Teil deines Vorschlags - Agenturnummer als führend,
-Vermittlernummer ergänzen oder überschreiben, bei Verstößen
-&bdquo;zu prüfen&ldquo; - können wir genau so umsetzen. Sobald die Punkte oben
-geklärt sind, ziehe ich die Regeln in die Nachverarbeitung ein und lasse den
-April-Extrakt komplett neu durchlaufen.</p>
-
-<p>Rückfragen gerne jederzeit.</p>
-
-<p>Viele Grüße</p>
-</div>"""
-
-HTML = HTML.replace("{TAB_BEF}", tab(
-    ["Befüllung je Vorgang", "heute", "nach Vorschlag", "Veränderung"],
-    [[k, tsd(heute[k]), tsd(A_bef[k]), diff(A_bef[k], heute[k])] for k in KATEGORIEN]
-    + [["<b>Summe</b>", "<b>%s</b>" % tsd(N), "<b>%s</b>" % tsd(N), "<b>0</b>"]],
-    num_spalten=(1, 2, 3)))
-
-HTML = HTML.replace("{TAB_VARIANTEN}", tab(
-    ["Variante", "beide", "nur Agentur", "nur Vermittler", "keine", "ohne Zuordnung"],
-    [[name] + [tsd(bef[k]) for k in KATEGORIEN] + ["-" if off is None else tsd(off)]
-     for name, bef, off, _ in VARIANTEN],
-    num_spalten=(1, 2, 3, 4, 5)))
-
-HTML = HTML.replace("{TAB_WECHSEL}", tab(
-    ["heute", "nach Vorschlag", "Nummern", "Anteil"],
-    [[h, n, tsd(c), pz(c, WERTE)]
-     for (h, n), c in sorted(A_wechsel.items(), key=lambda x: -x[1])],
-    num_spalten=(2, 3)))
-
-# Aufteilung der Achtsteller nach Nummernfamilie (fuer die Einordnung im Text)
+AG_HEUTE = heute["beide"] + heute["nur Agentur"]
+AG_B = B_bef["beide"] + B_bef["nur Agentur"]
+AG_C = C_bef["beide"] + C_bef["nur Agentur"]
 acht_familien = collections.Counter()
 for r in BUE:
     for roh, _ in kandidaten(r, True):
@@ -388,25 +258,82 @@ for r in BUE:
 N_1000 = acht_familien["100"]
 N_6008 = acht_familien["600"]
 
-A_STABIL = A_wechsel[("Agentur", "Agentur")]
-A_GESAMT = sum(c for (h, _), c in A_wechsel.items() if h == "Agentur")
+top_wechsler = ", ".join("<code>%s</code> (%dx)" % (roh, c)
+                         for (roh, _), c in wechsler_liste.most_common(6))
+
+HTML = """<div>
+<p>Hallo Marcus,</p>
+
+<p>danke für den Vorschlag - ich habe die vier Regeln über den April-Extrakt
+laufen lassen ({N} BÜ-Vorgänge, {WERTE} extrahierte Nummern). Kurz: Sie
+funktionieren, die Abdeckung bei der Agenturnummer steigt deutlich. Eine
+Entscheidung fehlt noch, dazu unten die Frage.</p>
+
+{TAB_KERN}
+
+<p>Der Einstieg über die Agenturnummer - für euch der Weg in EMMA - deckt
+also spürbar mehr Vorgänge ab als heute.</p>
+
+<h3>Meine Frage: Was soll mit achtstelligen Nummern passieren?</h3>
+<p>Die Regeln decken zwei Längen ab: unter 7 Stellen wird Vermittlernummer,
+7 oder 9 Stellen wird Agenturnummer. <b>Für 8 Stellen gibt es keine Regel</b> -
+und die kommt {ACHT} mal vor. Diese Vorgänge stehen danach ganz ohne Nummer da,
+weil es dort jeweils die einzige ist.</p>
+
+<p><b>Unser Vorschlag: eine führende Null ergänzen, damit sie neunstellig sind
+und als Agenturnummer gelten.</b> Die Daten stützen das - {N_1000} der {ACHT}
+Werte gehören zur selben Familie, die sonst neunstellig geschrieben wird:
+<code>01000-3083</code>, <code>01000/3451</code>, <code>A010006515</code>. Ohne
+Null steht dort <code>10003083</code>, mit Null <code>010003083</code>, und das
+passt ins Muster fünf Stellen Agentur plus vier Stellen Unternummer.</p>
+
+<p>Mit dieser Regel bleiben von ursprünglich {A_OFFEN} nicht zuordenbaren
+Nummern nur noch {C_OFFEN} übrig - Einzelfälle mit 10 und mehr Stellen, die wir
+direkt als &bdquo;zu prüfen&ldquo; kennzeichnen würden.</p>
+
+<p>Eine Einschränkung dazu: Bei {N_6008} Werten beginnt die Nummer mit
+<code>6008</code>, etwa <code>60083652</code>. Dort fehlt die Null vermutlich
+nicht vorn, sondern in der Mitte - <code>600083652</code> passt in die Reihe
+der 6000-Agenturnummern, <code>060083652</code> nicht. Euer EMMA-Abgleich würde
+diese Fälle abfangen, sie landen dann bei &bdquo;zu prüfen&ldquo;.</p>
+
+<h3>Zwei Punkte am Rande</h3>
+<ul>
+<li><b>Felder mit zwei Nummern:</b> Werte wie <code>V 85357 A 777-0503</code>
+enthalten zwei Nummern. Die Bereinigung zog sie zu einer zwölfstelligen
+zusammen; wir trennen sie jetzt vorher auf, dann ergibt sich sauber Vermittler
+85357 und Agentur 7770503. Reine Technik, an eurer Regellogik ändert sich
+nichts.</li>
+<li><b>{N_WECHSLER} Nummern wechseln die Spalte</b> - heute Vermittlernummer,
+nach der Längenregel Agenturnummer, etwa <code>8923555</code> oder
+<code>601000040</code>. Sie stehen im Excel-Blatt &bdquo;Wechsler V nach
+A&ldquo;. Magst du da stichprobenhaft draufschauen, ob die Einordnung
+passt?</li>
+</ul>
+
+<p>Der EMMA-Teil deines Vorschlags lässt sich genau so umsetzen. Sobald die
+Frage zu den Achtstellern geklärt ist, ziehe ich die Regeln ein und lasse den
+April-Extrakt neu durchlaufen.</p>
+
+<p>Viele Grüße</p>
+</div>"""
+
+HTML = HTML.replace("{TAB_KERN}", tab(
+    ["", "heute", "mit euren Regeln", "+ achtstellige als Agentur"],
+    [["Vorgänge mit Agenturnummer",
+      "%s (%s)" % (tsd(AG_HEUTE), pz(AG_HEUTE, N)),
+      "%s (%s)" % (tsd(AG_B), pz(AG_B, N)),
+      "%s (%s)" % (tsd(AG_C), pz(AG_C, N))],
+     ["Vorgänge ohne jede Nummer", tsd(heute["keine"]), tsd(B_bef["keine"]),
+      tsd(C_bef["keine"])],
+     ["Nummern ohne Zuordnung", "-", tsd(B_OFFEN), tsd(C_OFFEN)]],
+    num_spalten=(1, 2, 3)))
 
 for platz, wert in (
         ("{N}", tsd(N)), ("{WERTE}", tsd(WERTE)),
-        ("{AG_ALT}", tsd(heute["beide"] + heute["nur Agentur"])),
-        ("{AG_NEU}", tsd(A_bef["beide"] + A_bef["nur Agentur"])),
-        ("{AG_PZ_ALT}", pz(heute["beide"] + heute["nur Agentur"], N)),
-        ("{AG_PZ}", pz(A_bef["beide"] + A_bef["nur Agentur"], N)),
-        ("{ACHT}", tsd(ACHT)), ("{LANG}", tsd(LANG)),
+        ("{ACHT}", tsd(ACHT)), ("{N_1000}", tsd(N_1000)), ("{N_6008}", tsd(N_6008)),
         ("{A_OFFEN}", tsd(A_OFFEN)), ("{C_OFFEN}", tsd(C_OFFEN)),
-        ("{C_KEINE}", tsd(C_bef["keine"])), ("{HEUTE_KEINE}", tsd(heute["keine"])),
-        ("{C_DIFF}", tsd(C_bef["keine"] - heute["keine"])),
-        ("{N_1000}", tsd(N_1000)), ("{N_6008}", tsd(N_6008)),
-        ("{AG_GEWINN}", tsd((C_bef["beide"] + C_bef["nur Agentur"])
-                            - (heute["beide"] + heute["nur Agentur"]))),
-        ("{A_STABIL}", tsd(A_STABIL)), ("{A_GESAMT}", tsd(A_GESAMT)),
-        ("{N_WECHSLER_PZ}", pz(N_WECHSLER, WERTE)), ("{N_WECHSLER}", tsd(N_WECHSLER)),
-        ("{TOP_WECHSLER}", top_wechsler)):
+        ("{N_WECHSLER}", tsd(N_WECHSLER))):
     HTML = HTML.replace(platz, wert)
 
 offen_platz = re.findall(r"\{[A-Z_0-9]+\}", HTML)
@@ -438,23 +365,21 @@ def ascii_tab(kopfzeilen, zeilen, breiten):
 
 
 TAB_TEXT = [
-    ascii_tab(["Befüllung je Vorgang", "heute", "Vorschlag", "Änderung"],
-              [[k, tsd(heute[k]), tsd(A_bef[k]), diff(A_bef[k], heute[k])]
-               for k in KATEGORIEN] + [["Summe", tsd(N), tsd(N), "0"]],
-              [24, 10, 12, 10]),
-    ascii_tab(["Variante", "beide", "nur Ag.", "nur Verm.", "keine", "offen"],
-              [[name] + [tsd(bef[k]) for k in KATEGORIEN]
-               + ["-" if off is None else tsd(off)] for name, bef, off, _ in VARIANTEN],
-              [56, 8, 9, 11, 8, 8]),
-    ascii_tab(["heute", "nach Vorschlag", "Nummern", "Anteil"],
-              [[h, n, tsd(c), pz(c, WERTE)]
-               for (h, n), c in sorted(A_wechsel.items(), key=lambda x: -x[1])],
-              [14, 18, 10, 10]),
+    ascii_tab(["", "heute", "mit euren Regeln", "+ 8-stellige"],
+              [["Vorgänge mit Agenturnummer", "%s (%s)" % (tsd(AG_HEUTE), pz(AG_HEUTE, N)),
+                "%s (%s)" % (tsd(AG_B), pz(AG_B, N)),
+                "%s (%s)" % (tsd(AG_C), pz(AG_C, N))],
+               ["Vorgänge ohne jede Nummer", tsd(heute["keine"]), tsd(B_bef["keine"]),
+                tsd(C_bef["keine"])],
+               ["Nummern ohne Zuordnung", "-", tsd(B_OFFEN), tsd(C_OFFEN)]],
+              [28, 16, 18, 16]),
 ]
 
 t = HTML
 t = re.sub(r"<h3>(.*?)</h3>", lambda m: "\n@@H@@" + m.group(1) + "\n", t)
-t = re.sub(r"<li>(.*?)</li>", lambda m: "  - " + m.group(1) + "\n", t)
+t = re.sub(r"<li>(.*?)</li>",
+           lambda m: "@@LI@@" + re.sub(r"\s+", " ", m.group(1)).strip() + "\n",
+           t, flags=re.S)
 t = re.sub(r"<table>.*?</table>", "@@TAB@@", t, flags=re.S)
 t = re.sub(r"</p>", "\n\n", t)
 t = re.sub(r"<[^>]+>", "", t)
@@ -469,6 +394,8 @@ for zeile in t.split("\n"):
     if zeile.startswith("@@H@@"):
         titel = zeile[5:]
         zeilen_txt += ["", titel, "-" * len(titel)]
+    elif zeile.startswith("@@LI@@"):
+        zeilen_txt.append("  - " + umbruch(zeile[6:], 72).replace("\n", "\n    "))
     elif zeile.startswith("  ") or not zeile.strip():
         zeilen_txt.append(zeile)
     else:
