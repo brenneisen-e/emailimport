@@ -48,8 +48,10 @@ ABSCHNITTE = [
    "Benjamin", "NEU - Trennung von &bdquo;Kunde (Name)&ldquo;", "neu"),
   ("Geburtsdatum VN", "Geburtsdatum des Versicherungsnehmers", "TT.MM.JJJJ",
    "07.07.1988", "", None),
-  ("Kunde_Strasse", "Straße und Hausnummer des Versicherungsnehmers",
-   "Text inkl. Hausnummer", "Wiesenstr. 8",
+  ("Kunde_Strasse", "Straßenname und Hausnummer des Versicherungsnehmers",
+   "Text inkl. Hausnummer. &bdquo;Straße&ldquo; wird immer als "
+   "<b>Str.</b> abgekürzt, auch wenn im Dokument &bdquo;Strasse&ldquo; oder "
+   "&bdquo;Straße&ldquo; ausgeschrieben steht.", "Wiesenstr. 8",
    "NEU - Trennung von &bdquo;Kunde-Adresse&ldquo;", "neu"),
   ("Kunde_PLZ", "Postleitzahl des Versicherungsnehmers", "5 Ziffern", "64331",
    "NEU - Trennung von &bdquo;Kunde-Adresse&ldquo;", "neu"),
@@ -86,9 +88,10 @@ ABSCHNITTE = [
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;", "offen"),
   ("Makler_E-Mail", "Mailadresse des Maklers", "Mailadresse",
    "info@finanzservice-limnell.de", "NEU - welche Adresse soll das sein?", "offen"),
-  ("Makler_Adresse", "Anschrift des Maklers laut Anschreiben", "Text ohne Komma",
-   "Riesstrasse 25 80992 München",
-   "Trennung in Straße / PLZ / Ort wie beim Kunden?", "offen"),
+  ("Makler_Adresse", "Anschrift des Maklers laut Anschreiben",
+   "Text ohne Komma. &bdquo;Straße&ldquo; wird immer als <b>Str.</b> abgekürzt.",
+   "Riesstr. 25 80992 München",
+   "Trennung in Str. / PLZ / Ort wie beim Kunden?", "offen"),
   ("Auftrag-Datum", "Datum des Pool- bzw. Makler-Anschreibens - nicht der Mail-Eingang",
    "TT.MM.JJJJ", "06.04.2026", "", None),
  ]),
@@ -181,7 +184,7 @@ OFFEN = [
                    "eine andere?"),
  ("MV_Eingangsdatum und MV_Unterschriftsdatum", "Bitte definieren, woran wir die beiden "
                                                 "Daten jeweils ablesen sollen."),
- ("Makler_Adresse", "Soll sie wie die Kundenadresse in Straße, PLZ und Ort getrennt "
+ ("Makler_Adresse", "Soll sie wie die Kundenadresse in Str., PLZ und Ort getrennt "
                     "werden?"),
  ("VN-Unterschrift fehlt", "Wir setzen den neuen Wert bei Unterschrift Kunde = "
                            "&bdquo;nein&ldquo;. Wie soll &bdquo;nicht prüfbar&ldquo; "
@@ -209,6 +212,9 @@ EINLEITUNG = [
  "Ausprägungen es annehmen kann und ein Beispiel.",
  "Aufgeführt sind ausschließlich die Felder, die auf dem Deckblatt erscheinen. "
  "Zusatzspalten, die es nur in der Excel-Auswertung gibt, sind bewusst nicht dabei.",
+ "Eine Schreibweise vorab, weil sie mehrere Felder betrifft: In allen Adressfeldern "
+ "wird „Straße“ grundsätzlich als „Str.“ ausgegeben - unabhängig davon, ob im Dokument "
+ "„Straße“, „Strasse“ oder „Str.“ steht.",
  "Damit haben wir eine gemeinsame Grundlage: Was wird erhoben, in welcher Form, und wo "
  "sind noch Entscheidungen offen.",
 ]
