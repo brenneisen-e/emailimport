@@ -248,6 +248,19 @@ wir das produktiv setzen.</p>
 Rückfallweg über die Vermittlernummer schrumpft entsprechend von 624 auf 104
 Vorgänge.</p>
 
+<p><b>Warum &bdquo;keine&ldquo; um 117 steigt:</b> Das sind genau die
+{N_OHNE} Nummern, die weder unter 7 noch genau 7 oder 9 Stellen haben und
+deshalb in keiner der beiden Spalten landen (Details in Abschnitt 3). Der
+Punkt dabei: <b>In jedem dieser 117 Vorgänge ist das die einzige vorhandene
+Nummer</b> - keiner von ihnen hat noch eine zweite, verwertbare. Jeder Ausfall
+schlägt deshalb eins zu eins durch. Die häufigsten Fälle:</p>
+{TAB_AUSFALL}
+<p class="hint">Auffällig ist, dass diese Werte fast ausschließlich aus einer
+Nummernfamilie stammen: <code>10006515</code>, <code>10006776</code>,
+<code>10003083</code> und ähnliche - achtstellig, oft mit vorangestelltem
+<code>A0</code> oder <code>0</code>. Genau bei dieser Gruppe müssen wir uns
+also festlegen.</p>
+
 <h3>2. Was sich je Nummer ändert</h3>
 {TAB_WECHSEL}
 <p>Die Agenturnummern bleiben praktisch unangetastet: {A_STABIL} von
@@ -271,6 +284,12 @@ den {N8} achtstelligen Werten hatten <b>{N_MIT_NULL} im Original eine führende
 Null</b> und waren damit neunstellig - etwa <code>010003083</code> oder
 <code>01000/3451</code>. Regel 2 streicht die Null, danach greift Regel 4 nicht
 mehr.</p>
+<p>Ein Sonderfall noch: Bei Werten mit Textrest wie
+<code>600041966 1zu1 AG</code> zieht die Bereinigung auch die Ziffern aus dem
+Text mit - übrig bleibt <code>60004196611</code> mit 11 Stellen statt der
+richtigen 9. Hier müsste vor dem Zusammenziehen erst der Textanteil entfernt
+werden.</p>
+
 <p>Vorschlag: <b>Reihenfolge tauschen</b> - erst Präfixe und Trennzeichen
 entfernen, dann die Länge prüfen, und die führende Null erst danach streichen.
 Damit landen diese {N_MIT_NULL} Werte wieder korrekt bei der Agenturnummer.
@@ -315,6 +334,13 @@ HTML = HTML.replace("{TAB_BEF}", tab(
      for k in ("beide", "nur Agentur", "nur Vermittler", "keine")]
     + [["<b>Summe</b>", "<b>%s</b>" % tsd(N), "<b>%s</b>" % tsd(N), "<b>0</b>"]],
     num_spalten=(1, 2, 3)))
+
+HTML = HTML.replace("{TAB_AUSFALL}", tab(
+    ["Rohwert heute", "bereinigt", "Stellen", "Vorgänge"],
+    [[("<code>%s</code>" % roh), ("<code>%s</code>" % z), str(laenge), str(c)]
+     for (roh, z, laenge), c in sorted(ohne_zuordnung.items(),
+                                       key=lambda x: -x[1])[:6]],
+    num_spalten=(2, 3)))
 
 HTML = HTML.replace("{TAB_WECHSEL}", tab(
     ["heute", "nach Vorschlag", "Nummern", "Anteil"],
@@ -368,12 +394,17 @@ def ascii_tab(kopfzeilen, zeilen, breiten):
     return "\n".join(aus)
 
 
+AUSFALL_TOP = sorted(ohne_zuordnung.items(), key=lambda x: -x[1])[:6]
+
 TAB_TEXT = [
     ascii_tab(["Befüllung je Vorgang", "heute", "Vorschlag", "Änderung"],
               [[k, tsd(vorher[k]), tsd(nachher[k]),
                 ("%+d" % (nachher[k] - vorher[k])) if nachher[k] != vorher[k] else "0"]
                for k in ("beide", "nur Agentur", "nur Vermittler", "keine")]
               + [["Summe", tsd(N), tsd(N), "0"]], [24, 10, 12, 10]),
+    ascii_tab(["Rohwert heute", "bereinigt", "Stellen", "Vorgänge"],
+              [[roh, z, str(laenge), str(c)]
+               for (roh, z, laenge), c in AUSFALL_TOP], [24, 16, 10, 10]),
     ascii_tab(["heute", "nach Vorschlag", "Nummern", "Anteil"],
               [[h, n, tsd(c), pz(c, WERTE)]
                for (h, n), c in sorted(wechsel.items(), key=lambda x: -x[1])],
