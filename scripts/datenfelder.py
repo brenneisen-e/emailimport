@@ -69,12 +69,21 @@ ABSCHNITTE = [
   ("Vermittler", "Das angebundene Maklerunternehmen unter dem Pool; ist der Makler eine "
                  "Einzelperson, steht hier deren Name",
    "Firmenname oder Personenname", "Finanzservice Limnell", "", None),
-  ("Agentur-Nr", "Agenturnummer des Maklers beim Versicherer",
-   "*** Platzhalter - Ausprägungen von Marcus ***", "600042497",
-   "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;", "offen"),
+  ("Agentur-Nr", "Agenturnummer des Maklers beim Versicherer. Sie ist das führende "
+                 "Feld und der Einstieg in den EMMA-Abgleich.",
+   "7 oder 9 Ziffern nach der Bereinigung. Achtstellige Nummern werden mit einer "
+   "führenden Null auf neun Stellen ergänzt.", "600042497",
+   "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
+   "Stellenzahl", "neu"),
   ("Personalnummer", "Personal- bzw. Vermittlernummer des Maklers beim Versicherer",
-   "*** Platzhalter - Ausprägungen von Marcus ***", "811774",
-   "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;", "offen"),
+   "Weniger als 7 Ziffern nach der Bereinigung, in der Regel 5 oder 6.", "811774",
+   "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
+   "Stellenzahl", "neu"),
+  ("Nummern-Status", "Ergebnis des Abgleichs mit dem EMMA-Abzug: Existiert die "
+                     "Agenturnummer, gehört sie zum Vermittler, passt die "
+                     "Personalnummer dazu?",
+   "OK | zu prüfen", "OK",
+   "NEU - ergibt sich aus dem EMMA-Abgleich", "neu"),
   ("Makler_E-Mail", "Absenderadresse der Mail, mit der der Vorgang eingereicht wurde",
    "Mailadresse", "service@fondsfinanz.de", "NEU", "neu"),
   ("Makler_Strasse", "Straßenname und Hausnummer des Maklers laut Anschreiben",
@@ -196,15 +205,6 @@ PRUEFUNG = [
 ]
 
 OFFEN = [
- ("Agentur-Nr / Personalnummer", "Regelwerk und Ausprägungen (Marcus)."),
- ("Abgleich mit dem EMMA-Abzug", "Wann soll die Personalnummer gegen den EMMA-Abzug "
-                                 "abgeglichen werden? Unser Vorschlag: nur dann, wenn die "
-                                 "Agentur- bzw. Personalnummer vom Standard abweicht - und "
-                                 "in diesem Fall über den Abgleich von Geburtsdatum und "
-                                 "Name. Ein Abgleich bei jedem Vorgang wäre deutlich "
-                                 "aufwendiger und aus unserer Sicht nur nötig, wenn ihr "
-                                 "die Nummern grundsätzlich verifiziert haben wollt. Passt "
-                                 "der Vorschlag, oder soll immer abgeglichen werden?"),
  ("Sparte als Kürzel", "Bitte die angenommene Zuordnung in der Spartentabelle "
                        "bestätigen oder korrigieren - insbesondere, ob KO wirklich alles "
                        "außer Kranken, Leben und Kraftfahrt umfasst und ob die "
@@ -234,21 +234,25 @@ OFFEN = [
 # ---------------------------------------------------------------------------
 EINLEITUNG = [
  "anbei die vollständige Liste der Datenfelder des KI-Deckblatts - im Zielbild, also "
- "inklusive der Anpassungen aus eurem Review 260807 Anpassung Deckblatt_V1.pdf (der "
- "Vollständigkeit halber angehängt). Zu jedem Feld steht, was es beschreibt, welche "
- "Ausprägungen es annehmen kann und ein Beispiel.",
+ "inklusive der Anpassungen aus eurem Review 260807 Anpassung Deckblatt_V1.pdf und der "
+ "mit Marcus abgestimmten Regeln für Agentur- und Personalnummer. Zu jedem Feld steht, "
+ "was es beschreibt, welche Ausprägungen es annehmen kann und ein Beispiel.",
  "Aufgeführt sind ausschließlich die Felder, die auf dem Deckblatt erscheinen. "
  "Zusatzspalten, die es nur in der Excel-Auswertung gibt, sind bewusst nicht dabei.",
- "Eine Schreibweise vorab, weil sie mehrere Felder betrifft: In allen Adressfeldern "
- "wird „Straße“ grundsätzlich als „Str.“ ausgegeben - unabhängig davon, ob im Dokument "
+ "Eine Schreibweise vorab, weil sie mehrere Felder betrifft: In allen Adressfeldern wird "
+ "„Straße“ grundsätzlich als „Str.“ ausgegeben - unabhängig davon, ob im Dokument "
  "„Straße“, „Strasse“ oder „Str.“ steht. Kunden- und Makleradresse sind beide in Str., "
  "PLZ und Ort getrennt.",
  "Dieselbe Übersicht liegt zusätzlich als Excel bei (Datenfelder-KI-Deckblatt.xlsx) - "
- "dort lässt sie sich filtern, kommentieren und zurückspielen. Drei Blätter: Datenfelder, "
- "Prüfung Unterlagen, Offene Punkte.",
- "Damit haben wir eine gemeinsame Grundlage: Was wird erhoben, in welcher Form, und wo "
- "sind noch Entscheidungen offen.",
+ "dort lässt sie sich filtern und direkt kommentieren. Vier Blätter: Datenfelder, "
+ "Rückmeldung, Sparte, Prüfung Unterlagen.",
 ]
+
+BITTE = (
+ "Bitte schaut die Liste einmal durch und meldet zurück, wenn ein Feld fehlt, anders "
+ "aussehen soll oder für die manuelle bzw. automatische Prüfung gar nicht gebraucht "
+ "wird. In der Excel gibt es dafür eine leere Spalte „Rückmeldung“, die ihr direkt "
+ "ausfüllen könnt.")
 
 ALLE_FELDER = (
  "Bisher blendet das Deckblatt Felder aus, die leer sind - dadurch sieht jedes Deckblatt "
@@ -257,28 +261,32 @@ ALLE_FELDER = (
  "Strich. Die Struktur ist damit bei jedem Vorgang identisch. Bitte kurz bestätigen, dass "
  "es so gemeint war.")
 
-PLATZHALTER_TEXT = [
- "Hintergrund: Da die Absender die Begriffe nicht einheitlich verwenden, muss die Maschine "
- "die Unterscheidung über ein Regelwerk lernen. Aus den bisherigen Auswertungen kennen wir "
- "diese Besonderheiten:",
-]
-BESONDERHEITEN = [
- "Vermittler- und Agenturnummer sind bei der Einreichung teilweise vertauscht.",
- "Die Nummern kommen oft nur als 811774 oder 8903252 ohne A00 bzw. P0 - Beispiel "
- "Finanzguru.",
- "Manchmal wird nur eine der beiden Nummern mitgegeben - Beispiel Fonds Finanz.",
- "Schreibweisen mit Bindestrich wie 898-0003 müssten bereinigt werden.",
-]
-PLATZHALTER_SCHLUSS = (
- "Konkret gebraucht wird: gültige Stellenzahlen, Bedeutung der Präfixe 6000 und 890, "
- "Umgang mit führenden Nullen und führenden Buchstaben, zulässige Trennzeichen, eine "
- "eventuelle Prüfziffer und die Frage, wie das Tool mit einem Wert umgehen soll, der die "
- "Prüfung nicht besteht. Die Detailauswertung dazu habt ihr in der Mail zur "
- "Formatanalyse.")
+NUMMERN_TEXT = (
+ "Weil die Absender die Begriffe nicht einheitlich verwenden, entscheidet nicht die "
+ "Beschriftung im Anschreiben, sondern die Stellenzahl. So läuft es künftig ab:")
 
-SCHLUSS = "Sobald die offenen Punkte geklärt sind, ziehen wir Prompt, Deckblatt und " \
-          "Excel-Spalten in einem Schritt nach."
+NUMMERN_SCHRITTE = [
+ "Die KI liest die Nummern aus dem Anschreiben aus, so wie sie dort stehen.",
+ "Felder, die zwei Nummern enthalten, werden getrennt - aus „V 85357 A 777-0503“ werden "
+ "85357 und 777-0503.",
+ "Buchstaben-Präfixe, führende Nullen und Trennzeichen werden entfernt.",
+ "Achtstellige Nummern bekommen eine führende Null und sind damit neunstellig.",
+ "Weniger als 7 Stellen ergibt die Personalnummer, 7 oder 9 Stellen die Agenturnummer.",
+ "Die Agenturnummer ist führend und der Einstieg in den EMMA-Abgleich: Existiert sie und "
+ "gehört sie zum Vermittler? Die Personalnummer wird dabei ergänzt oder bei Abweichung "
+ "überschrieben.",
+ "Fehlt die Agenturnummer, wird über die Personalnummer eingestiegen und die zugehörige "
+ "Agentur ergänzt, sofern die Beziehung eindeutig ist.",
+ "Bleibt etwas unstimmig, wird der Vorgang im Feld Nummern-Status als „zu prüfen“ "
+ "gekennzeichnet.",
+]
 
+NUMMERN_SCHLUSS = (
+ "Am April-Extrakt gerechnet hätten damit rund 91 % der Vorgänge eine Agenturnummer, "
+ "gegenüber 79 % heute. Die Einzelheiten stehen in der Auswertung zur Formatanalyse.")
+
+SCHLUSS = ("Sobald eure Rückmeldung da ist, ziehen wir Prompt, Deckblatt und Excel-Spalten "
+           "in einem Schritt nach.")
 
 def rein(s):
     """HTML-Auszeichnung und Entities fuer den Klartextteil entfernen."""

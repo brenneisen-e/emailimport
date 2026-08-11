@@ -17,8 +17,8 @@ import sys
 
 import openpyxl
 
-from datenfelder import (ABSCHNITTE, BESONDERHEITEN, OFFEN, PRUEFUNG, SPARTEN,
-                         SPARTEN_HINWEIS, SPARTEN_TEXT, rein)
+from datenfelder import (ABSCHNITTE, BITTE, NUMMERN_SCHRITTE, NUMMERN_TEXT, OFFEN,
+                         PRUEFUNG, SPARTEN, SPARTEN_HINWEIS, SPARTEN_TEXT, rein)
 from xlsxbau import (BLAU, FONT, GELB, GRAU, GRUEN, abschluss, hinweis, kopfzeile,
                      schreibe, titel)
 from openpyxl.styles import Font
@@ -40,24 +40,24 @@ def baue_xlsx(ziel):
               "Schreibweise: In allen Adressfeldern wird \"Straße\" grundsätzlich als "
               "\"Str.\" ausgegeben.",
               "Grün = neues, getrenntes oder geändertes Feld. Gelb = fachliche Vorgabe "
-              "fehlt noch.")
+              "fehlt noch. Die letzte Spalte ist für eure Rückmeldung frei.")
     SP = ["Abschnitt", "Feld", "Beschreibung", "Mögliche Ausprägungen / Format",
-          "Beispiel", "Anpassung", "Status"]
-    BR = [26, 24, 46, 46, 30, 40, 9]
+          "Beispiel", "Anpassung", "Status", "Rückmeldung"]
+    BR = [26, 24, 46, 46, 30, 40, 9, 34]
     kopf = r + 1
     r = kopfzeile(ws, SP, BR, kopf)
     for abschnitt, felder in ABSCHNITTE:
         for feld, beschr, auspr, beisp, anp, mark in felder:
             r = schreibe(ws, r, [rein(abschnitt), rein(feld), rein(beschr), rein(auspr),
-                                 rein(beisp), rein(anp), STATUS_TEXT[mark]],
+                                 rein(beisp), rein(anp), STATUS_TEXT[mark], ""],
                          BR, fill=STATUS_FARBE[mark], fett_spalten=(2,))
     abschluss(ws, kopf, r - 1, len(SP), fixieren="C%d" % (kopf + 1))
 
     # ---- Blatt 2: Offene Punkte -----------------------------------------
-    ws2 = wb.create_sheet("Offene Punkte")
-    r = titel(ws2, "Offene Punkte",
-              "Was noch fachlich zu klären ist, bevor Prompt und Deckblatt nachgezogen "
-              "werden.")
+    ws2 = wb.create_sheet("Rückmeldung")
+    r = titel(ws2, "Rückmeldung und offene Punkte", rein(BITTE),
+              "Darunter die Punkte, zu denen von unserer Seite noch eine Entscheidung "
+              "fehlt.")
     SP2 = ["Nr.", "Thema", "Frage / Hintergrund"]
     BR2 = [6, 34, 86]
     kopf2 = r + 1
@@ -67,12 +67,14 @@ def baue_xlsx(ziel):
                      fett_spalten=(2,))
     letzte = r - 1
     r += 1
+    r += 1
     ws2.cell(row=r, column=2,
-             value="Bekannte Besonderheiten bei Agentur-Nr / Personalnummer").font = Font(
+             value="So werden Agentur-Nr und Personalnummer ermittelt").font = Font(
                  name=FONT, sz=11, b=True, color=BLAU)
     r += 1
-    for i, b in enumerate(BESONDERHEITEN, 1):
-        r = schreibe(ws2, r, [i, "", rein(b)], BR2, fill=GRAU)
+    r = schreibe(ws2, r, ["", "", rein(NUMMERN_TEXT)], BR2, fill=GRAU)
+    for i, schritt in enumerate(NUMMERN_SCHRITTE, 1):
+        r = schreibe(ws2, r, [i, "", rein(schritt)], BR2, fill=GRAU)
     abschluss(ws2, kopf2, letzte, len(SP2))
 
     # ---- Blatt 3: Sparte ------------------------------------------------
