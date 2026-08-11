@@ -9,8 +9,8 @@ Drei Varianten werden gerechnet:
      Trennzeichen), < 7 Stellen -> Vermittler, 7 oder 9 Stellen -> Agentur
   B  zusaetzlich: Felder, die zwei mit Label versehene Nummern enthalten
      ("V 85357 A 777-0503"), vorher auftrennen
-  C  zusaetzlich: die Stellenzahl pruefen, BEVOR fuehrende Nullen gestrichen
-     werden
+  C  zusaetzlich: achtstellige Nummern mit einer fuehrenden Null auf neun
+     Stellen ergaenzen und damit als Agenturnummer werten
 
 Aufruf:  python3 scripts/build-mail-regelsimulation.py
 """
@@ -79,15 +79,18 @@ def kandidaten(r, mit_trennung):
     return out
 
 
-def klasse(v, laenge_vor_null):
-    """< 7 Stellen -> Vermittler, 7 oder 9 Stellen -> Agentur, sonst offen."""
-    z = ziffern(v)
-    if laenge_vor_null and len(z) in (7, 9):
-        return "Agentur"
-    k = z.lstrip("0")
+def klasse(v, acht_auffuellen):
+    """< 7 Stellen -> Vermittler, 7 oder 9 Stellen -> Agentur, sonst offen.
+
+    acht_auffuellen: achtstellige Nummern bekommen eine fuehrende Null,
+    sind damit neunstellig und gelten als Agenturnummer.
+    """
+    k = ziffern(v).lstrip("0")
     n = len(k)
     if n == 0:
         return None
+    if acht_auffuellen and n == 8:
+        return "Agentur"
     if n < 7:
         return "Vermittler"
     if n in (7, 9):
@@ -95,14 +98,14 @@ def klasse(v, laenge_vor_null):
     return "ohne Zuordnung"
 
 
-def rechne(bue, mit_trennung, laenge_vor_null):
+def rechne(bue, mit_trennung, acht_auffuellen):
     befuellung = collections.Counter()
     offen = collections.Counter()
     wechsel = collections.Counter()
     for r in bue:
         klassen = []
         for roh, heute_spalte in kandidaten(r, mit_trennung):
-            k = klasse(roh, laenge_vor_null)
+            k = klasse(roh, acht_auffuellen)
             klassen.append(k)
             wechsel[(heute_spalte, k or "leer")] += 1
             if k == "ohne Zuordnung":
@@ -193,7 +196,7 @@ VARIANTEN = [
     ("heute (Präfix-Regel 6000/890)", heute, None, None),
     ("A - Regeln wie vorgeschlagen", A_bef, A_OFFEN, None),
     ("B - zusätzlich Felder mit zwei Nummern trennen", B_bef, B_OFFEN, GELB),
-    ("C - zusätzlich Länge vor dem Streichen der Null prüfen", C_bef, C_OFFEN, GRUEN),
+    ("C - zusätzlich achtstellige auf neun Stellen auffüllen", C_bef, C_OFFEN, GRUEN),
 ]
 
 xl = openpyxl.Workbook()
@@ -283,19 +286,38 @@ hat danach sogar beide Nummern. Die Trennung greift nur, wenn wirklich zwei
 gelabelte Nummern vorliegen - Einzelwerte wie <code>A600040124</code>,
 <code>60002/0753</code> oder <code>00 111 40 16</code> bleiben unangetastet.</p>
 
-<p><b>Ergänzung 2 - Länge prüfen, bevor die führende Null gestrichen wird.</b>
-Von den {ACHT} achtstelligen Werten hatten {N_NULL} im Original eine führende
-Null und waren damit neunstellig - etwa <code>A010006515</code> oder
-<code>01000/3451</code>. Regel 2 streicht die Null, danach greift Regel 4 nicht
-mehr. Prüft man die Stellenzahl vor dem Streichen, landen diese Werte korrekt
-bei der Agenturnummer.</p>
+<p><b>Ergänzung 2 - achtstellige Nummern mit einer führenden Null auf neun
+Stellen ergänzen.</b> Dein Vorschlag, und die Daten stützen ihn deutlich:
+{N_1000} der {ACHT} Achtsteller gehören zur selben Familie, die sonst
+neunstellig geschrieben wird - <code>01000-3083</code>,
+<code>01000/3451</code>, <code>A010006515</code>. Ohne die führende Null steht
+dort <code>10003083</code>, mit ihr <code>010003083</code>, und das passt genau
+ins Muster fünf Stellen Agentur plus vier Stellen Unternummer. Die Regel
+erledigt damit alle {ACHT} Achtsteller in einem Schritt.</p>
 
 {TAB_VARIANTEN}
 
 <p>Mit beiden Ergänzungen bleiben von den {A_OFFEN} offenen Nummern noch
-{C_OFFEN} übrig, und die Zahl der Vorgänge ohne jede Nummer liegt bei
-{C_KEINE} gegenüber {HEUTE_KEINE} heute. Der Aufschlag von {C_DIFF} sind genau
-die Fälle, für die uns noch eine Festlegung fehlt.</p>
+<b>{C_OFFEN}</b> übrig, und die Vorgänge ganz ohne Nummer liegen bei
+<b>{C_KEINE}</b> gegenüber {HEUTE_KEINE} heute - also praktisch auf dem
+heutigen Stand, bei gleichzeitig {AG_GEWINN} Vorgängen mehr mit
+Agenturnummer.</p>
+
+<p>Die {C_OFFEN} verbleibenden Werte sind Einzelfälle mit 10 und mehr Stellen:
+<code>6000020026</code>, <code>28964000000</code>,
+<code>86821000000/60001/0017</code> und drei ähnliche. Die würde ich direkt als
+&bdquo;zu prüfen&ldquo; kennzeichnen.</p>
+
+<p><b>Ein Detail zur Auffüllregel, das mir dabei aufgefallen ist:</b> Sie passt
+für die {N_1000} Werte der 01000-Familie sehr gut. Bei {N_6008} Werten beginnt
+die Nummer aber mit <code>6008</code> - etwa <code>60083652</code> oder
+<code>60080159</code>. Dort fehlt die Null vermutlich nicht vorn, sondern in
+der Mitte: <code>600083652</code> würde in die dichte Reihe der
+6000-Agenturnummern passen, <code>060083652</code> nicht. Die Auffüllregel
+liefert hier also möglicherweise die falsche Nummer. Weil dein EMMA-Abgleich
+ohnehin prüft, ob die Agenturnummer existiert, würden genau diese Fälle dort
+auffallen und als &bdquo;zu prüfen&ldquo; landen - insofern ist es kein
+Blocker, ich wollte es nur nicht unter den Tisch fallen lassen.</p>
 
 <h3>3. Was sich je Nummer ändert</h3>
 {TAB_WECHSEL}
@@ -312,12 +334,11 @@ beurteilen - der EMMA-Abgleich würde es aber genau hier zeigen.</p>
 
 <h3>Was ich von dir bräuchte</h3>
 <ol>
-<li><b>Die beiden Ergänzungen:</b> Passen sie so? Beide sind reine Technik und
-ändern nichts an eurer Regellogik.</li>
-<li><b>Echte Achtsteller:</b> Nach Ergänzung 2 bleiben {REST_ACHT} Werte übrig,
-die tatsächlich acht Stellen haben - etwa <code>10002866</code> oder
-<code>89420798</code>. Vermittlernummer, Agenturnummer oder direkt
-&bdquo;zu prüfen&ldquo;?</li>
+<li><b>Die Trennregel:</b> Passt sie so? Sie ist reine Technik und ändert
+nichts an eurer Regellogik.</li>
+<li><b>Die 6008-Fälle:</b> Sollen wir sie wie alle anderen vorn auffüllen und
+den EMMA-Abgleich entscheiden lassen, oder von vornherein als
+&bdquo;zu prüfen&ldquo; kennzeichnen?</li>
 <li><b>Die {N_WECHSLER} Wechsler:</b> Im Blatt &bdquo;Wechsler V nach A&ldquo;
 stehen sie einzeln mit Häufigkeit. Magst du stichprobenhaft draufschauen, ob
 die Einordnung als Agenturnummer passt? Falls ja, ist die Längenregel der
@@ -357,7 +378,16 @@ HTML = HTML.replace("{TAB_WECHSEL}", tab(
      for (h, n), c in sorted(A_wechsel.items(), key=lambda x: -x[1])],
     num_spalten=(2, 3)))
 
-N_NULL = ACHT - REST_ACHT
+# Aufteilung der Achtsteller nach Nummernfamilie (fuer die Einordnung im Text)
+acht_familien = collections.Counter()
+for r in BUE:
+    for roh, _ in kandidaten(r, True):
+        k = ziffern(roh).lstrip("0")
+        if len(k) == 8:
+            acht_familien[k[:3]] += 1
+N_1000 = acht_familien["100"]
+N_6008 = acht_familien["600"]
+
 A_STABIL = A_wechsel[("Agentur", "Agentur")]
 A_GESAMT = sum(c for (h, _), c in A_wechsel.items() if h == "Agentur")
 
@@ -371,7 +401,9 @@ for platz, wert in (
         ("{A_OFFEN}", tsd(A_OFFEN)), ("{C_OFFEN}", tsd(C_OFFEN)),
         ("{C_KEINE}", tsd(C_bef["keine"])), ("{HEUTE_KEINE}", tsd(heute["keine"])),
         ("{C_DIFF}", tsd(C_bef["keine"] - heute["keine"])),
-        ("{N_NULL}", tsd(N_NULL)), ("{REST_ACHT}", tsd(REST_ACHT)),
+        ("{N_1000}", tsd(N_1000)), ("{N_6008}", tsd(N_6008)),
+        ("{AG_GEWINN}", tsd((C_bef["beide"] + C_bef["nur Agentur"])
+                            - (heute["beide"] + heute["nur Agentur"]))),
         ("{A_STABIL}", tsd(A_STABIL)), ("{A_GESAMT}", tsd(A_GESAMT)),
         ("{N_WECHSLER_PZ}", pz(N_WECHSLER, WERTE)), ("{N_WECHSLER}", tsd(N_WECHSLER)),
         ("{TOP_WECHSLER}", top_wechsler)):
@@ -413,7 +445,7 @@ TAB_TEXT = [
     ascii_tab(["Variante", "beide", "nur Ag.", "nur Verm.", "keine", "offen"],
               [[name] + [tsd(bef[k]) for k in KATEGORIEN]
                + ["-" if off is None else tsd(off)] for name, bef, off, _ in VARIANTEN],
-              [50, 8, 9, 11, 8, 8]),
+              [56, 8, 9, 11, 8, 8]),
     ascii_tab(["heute", "nach Vorschlag", "Nummern", "Anteil"],
               [[h, n, tsd(c), pz(c, WERTE)]
                for (h, n), c in sorted(A_wechsel.items(), key=lambda x: -x[1])],
