@@ -154,6 +154,11 @@ def pz(z, n):
     return ("%.1f" % (100.0 * z / n)).replace(".", ",") + " %"
 
 
+def pz0(z, n):
+    """Auf ganze Prozent gerundet - fuer knappe Aussagen im Fliesstext."""
+    return "%d %%" % round(100.0 * z / n)
+
+
 def tsd(n):
     return "{:,}".format(int(n)).replace(",", ".")
 
@@ -264,76 +269,31 @@ top_wechsler = ", ".join("<code>%s</code> (%dx)" % (roh, c)
 HTML = """<div>
 <p>Hallo Marcus,</p>
 
-<p>danke für den Vorschlag - ich habe die vier Regeln über den April-Extrakt
-laufen lassen ({N} BÜ-Vorgänge, {WERTE} extrahierte Nummern). Kurz: Sie
-funktionieren, die Abdeckung bei der Agenturnummer steigt deutlich. Eine
-Entscheidung fehlt noch, dazu unten die Frage.</p>
+<p>ich habe mir die Regeln am April-Extrakt angeschaut. Ergebnis: Damit hätten
+<b>rund {AG_PZ_B} der Vorgänge eine Agenturnummer - heute sind es
+{AG_PZ_HEUTE}</b>.</p>
 
-{TAB_KERN}
+<p>Offen ist für mich nur eine Frage: <b>Was soll mit achtstelligen Nummern
+passieren?</b> Die Regeln decken unter 7 Stellen (Vermittlernummer) und 7 oder
+9 Stellen (Agenturnummer) ab - für 8 Stellen gibt es keine Vorgabe. Das
+betrifft <b>{ACHT_PZ} der Vorgänge</b> ({ACHT} von {N}), die dann ganz ohne
+Nummer dastehen.</p>
 
-<p>Der Einstieg über die Agenturnummer - für euch der Weg in EMMA - deckt
-also spürbar mehr Vorgänge ab als heute.</p>
+<p>Unser Vorschlag wäre, eine führende Null zu ergänzen, damit sie neunstellig
+sind und als Agenturnummer gelten. {N_1000} der {ACHT} gehören zu einer
+Familie, die sonst neunstellig geschrieben wird - <code>01000-3083</code>,
+<code>A010006515</code>. Damit kämen wir auf {AG_PZ_C}.</p>
 
-<h3>Meine Frage: Was soll mit achtstelligen Nummern passieren?</h3>
-<p>Die Regeln decken zwei Längen ab: unter 7 Stellen wird Vermittlernummer,
-7 oder 9 Stellen wird Agenturnummer. <b>Für 8 Stellen gibt es keine Regel</b> -
-und die kommt {ACHT} mal vor. Diese Vorgänge stehen danach ganz ohne Nummer da,
-weil es dort jeweils die einzige ist.</p>
-
-<p><b>Unser Vorschlag: eine führende Null ergänzen, damit sie neunstellig sind
-und als Agenturnummer gelten.</b> Die Daten stützen das - {N_1000} der {ACHT}
-Werte gehören zur selben Familie, die sonst neunstellig geschrieben wird:
-<code>01000-3083</code>, <code>01000/3451</code>, <code>A010006515</code>. Ohne
-Null steht dort <code>10003083</code>, mit Null <code>010003083</code>, und das
-passt ins Muster fünf Stellen Agentur plus vier Stellen Unternummer.</p>
-
-<p>Mit dieser Regel bleiben von ursprünglich {A_OFFEN} nicht zuordenbaren
-Nummern nur noch {C_OFFEN} übrig - Einzelfälle mit 10 und mehr Stellen, die wir
-direkt als &bdquo;zu prüfen&ldquo; kennzeichnen würden.</p>
-
-<p>Eine Einschränkung dazu: Bei {N_6008} Werten beginnt die Nummer mit
-<code>6008</code>, etwa <code>60083652</code>. Dort fehlt die Null vermutlich
-nicht vorn, sondern in der Mitte - <code>600083652</code> passt in die Reihe
-der 6000-Agenturnummern, <code>060083652</code> nicht. Euer EMMA-Abgleich würde
-diese Fälle abfangen, sie landen dann bei &bdquo;zu prüfen&ldquo;.</p>
-
-<h3>Zwei Punkte am Rande</h3>
-<ul>
-<li><b>Felder mit zwei Nummern:</b> Werte wie <code>V 85357 A 777-0503</code>
-enthalten zwei Nummern. Die Bereinigung zog sie zu einer zwölfstelligen
-zusammen; wir trennen sie jetzt vorher auf, dann ergibt sich sauber Vermittler
-85357 und Agentur 7770503. Reine Technik, an eurer Regellogik ändert sich
-nichts.</li>
-<li><b>{N_WECHSLER} Nummern wechseln die Spalte</b> - heute Vermittlernummer,
-nach der Längenregel Agenturnummer, etwa <code>8923555</code> oder
-<code>601000040</code>. Sie stehen im Excel-Blatt &bdquo;Wechsler V nach
-A&ldquo;. Magst du da stichprobenhaft draufschauen, ob die Einordnung
-passt?</li>
-</ul>
-
-<p>Der EMMA-Teil deines Vorschlags lässt sich genau so umsetzen. Sobald die
-Frage zu den Achtstellern geklärt ist, ziehe ich die Regeln ein und lasse den
-April-Extrakt neu durchlaufen.</p>
+<p>Details und die Einzelwerte hängen als Excel an.</p>
 
 <p>Viele Grüße</p>
 </div>"""
 
-HTML = HTML.replace("{TAB_KERN}", tab(
-    ["", "heute", "mit euren Regeln", "+ achtstellige als Agentur"],
-    [["Vorgänge mit Agenturnummer",
-      "%s (%s)" % (tsd(AG_HEUTE), pz(AG_HEUTE, N)),
-      "%s (%s)" % (tsd(AG_B), pz(AG_B, N)),
-      "%s (%s)" % (tsd(AG_C), pz(AG_C, N))],
-     ["Vorgänge ohne jede Nummer", tsd(heute["keine"]), tsd(B_bef["keine"]),
-      tsd(C_bef["keine"])],
-     ["Nummern ohne Zuordnung", "-", tsd(B_OFFEN), tsd(C_OFFEN)]],
-    num_spalten=(1, 2, 3)))
-
 for platz, wert in (
-        ("{N}", tsd(N)), ("{WERTE}", tsd(WERTE)),
-        ("{ACHT}", tsd(ACHT)), ("{N_1000}", tsd(N_1000)), ("{N_6008}", tsd(N_6008)),
-        ("{A_OFFEN}", tsd(A_OFFEN)), ("{C_OFFEN}", tsd(C_OFFEN)),
-        ("{N_WECHSLER}", tsd(N_WECHSLER))):
+        ("{N}", tsd(N)), ("{ACHT}", tsd(ACHT)), ("{N_1000}", tsd(N_1000)),
+        ("{ACHT_PZ}", pz(ACHT, N)),
+        ("{AG_PZ_HEUTE}", pz0(AG_HEUTE, N)), ("{AG_PZ_B}", pz0(AG_B, N)),
+        ("{AG_PZ_C}", pz0(AG_C, N))):
     HTML = HTML.replace(platz, wert)
 
 offen_platz = re.findall(r"\{[A-Z_0-9]+\}", HTML)
@@ -364,16 +324,7 @@ def ascii_tab(kopfzeilen, zeilen, breiten):
     return "\n".join(aus)
 
 
-TAB_TEXT = [
-    ascii_tab(["", "heute", "mit euren Regeln", "+ 8-stellige"],
-              [["Vorgänge mit Agenturnummer", "%s (%s)" % (tsd(AG_HEUTE), pz(AG_HEUTE, N)),
-                "%s (%s)" % (tsd(AG_B), pz(AG_B, N)),
-                "%s (%s)" % (tsd(AG_C), pz(AG_C, N))],
-               ["Vorgänge ohne jede Nummer", tsd(heute["keine"]), tsd(B_bef["keine"]),
-                tsd(C_bef["keine"])],
-               ["Nummern ohne Zuordnung", "-", tsd(B_OFFEN), tsd(C_OFFEN)]],
-              [28, 16, 18, 16]),
-]
+TAB_TEXT = []
 
 t = HTML
 t = re.sub(r"<h3>(.*?)</h3>", lambda m: "\n@@H@@" + m.group(1) + "\n", t)
