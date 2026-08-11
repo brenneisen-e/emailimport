@@ -9,8 +9,8 @@ Drei Varianten werden gerechnet:
      Trennzeichen), < 7 Stellen -> Vermittler, 7 oder 9 Stellen -> Agentur
   B  zusaetzlich: Felder, die zwei mit Label versehene Nummern enthalten
      ("V 85357 A 777-0503"), vorher auftrennen
-  C  zusaetzlich: achtstellige Nummern mit einer fuehrenden Null auf neun
-     Stellen ergaenzen und damit als Agenturnummer werten
+  C  zusaetzlich: 7 bis 9 Stellen = Agenturnummer. Achtstellige Werte sind die
+     neuen Agenturen nach ZAV und ohne fuehrende Null gueltig (Ruecklauf Marcus).
 
 Aufruf:  python3 scripts/build-mail-regelsimulation.py
 """
@@ -74,8 +74,8 @@ def kandidaten(r, mit_trennung):
 def klasse(v, acht_auffuellen):
     """< 7 Stellen -> Vermittler, 7 oder 9 Stellen -> Agentur, sonst offen.
 
-    acht_auffuellen: achtstellige Nummern bekommen eine fuehrende Null,
-    sind damit neunstellig und gelten als Agenturnummer.
+    acht_auffuellen: achtstellige Werte zaehlen ebenfalls als Agenturnummer -
+    das sind die neuen Agenturen nach ZAV, die ohne fuehrende Null gueltig sind.
     """
     k = ziffern(v).lstrip("0")
     n = len(k)
@@ -209,7 +209,7 @@ K_REGELN = kennzahlen(True, False)
 K_ACHT = kennzahlen(True, True)
 
 SPALTEN_KZ = ["Kennzahl", "vorher", "nachher: Regeln wie besprochen",
-              "nachher: wenn achtstellige = Agenturnummer"]
+              "nachher: mit achtstelligen als Agenturnummer"]
 
 
 def kz_zeilen():
@@ -254,8 +254,8 @@ r = titel(ws, "Nummern-Regeln am April-Extrakt: vorher und nachher",
           "Basis: %s BÜ-Vorgänge. Regeln: Präfixe, führende Nullen und Trennzeichen "
           "entfernen; unter 7 Stellen = Vermittlernummer, 7 oder 9 Stellen = "
           "Agenturnummer." % tsd(N),
-          "Die dritte Spalte zeigt, was passiert, wenn achtstellige Nummern mit einer "
-          "führenden Null auf neun Stellen ergänzt werden - das ist die offene Frage.")
+          "Die dritte Spalte zaehlt achtstellige Werte als Agenturnummer - das sind laut "
+          "Rückmeldung die neuen Agenturen nach ZAV.")
 BR_KZ = [40, 14, 30, 34]
 kopf_kz = r + 1
 r = kopfzeile(ws, SPALTEN_KZ, BR_KZ, kopf_kz)

@@ -69,8 +69,8 @@ ABSCHNITTE = [
   ("Agentur-Nr", "Agenturnummer des Maklers beim Versicherer. Sie ist das führende Feld "
                  "und der Einstieg in den EMMA-Abgleich. Fehlt sie im Anschreiben, wird "
                  "sie über die Personalnummer aus EMMA ergänzt.",
-   "7 oder 9 Ziffern nach der Bereinigung. Achtstellige Nummern werden mit einer "
-   "führenden Null auf neun Stellen ergänzt.", "600042497",
+   "7 bis 9 Ziffern nach der Bereinigung. Achtstellige Werte sind die neuen Agenturen "
+   "nach ZAV und ohne führende Null gültig.", "600042497",
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
    "Stellenzahl", "neu"),
   ("Personalnummer", "Personal- bzw. Vermittlernummer des Maklers beim Versicherer. "
@@ -277,8 +277,8 @@ NUMMERN_SCHRITTE = [  # noqa: E501
  "Felder, die zwei Nummern enthalten, werden getrennt - aus „V 85357 A 777-0503“ werden "
  "85357 und 777-0503.",
  "Buchstaben-Präfixe, führende Nullen und Trennzeichen werden entfernt.",
- "Achtstellige Nummern bekommen eine führende Null und sind damit neunstellig.",
- "Weniger als 7 Stellen ergibt die Personalnummer, 7 oder 9 Stellen die Agenturnummer.",
+ "Weniger als 7 Stellen ergibt die Personalnummer, 7 bis 9 Stellen die Agenturnummer. "
+ "Achtstellige Werte gehören dazu - das sind die neuen Agenturen nach ZAV.",
  "Die Agenturnummer ist führend und der Einstieg in den EMMA-Abgleich: Existiert sie und "
  "gehört sie zum Vermittler? Die Personalnummer wird dabei ergänzt oder bei Abweichung "
  "überschrieben.",
@@ -292,8 +292,9 @@ NUMMERN_SCHRITTE = [  # noqa: E501
 ]
 
 NUMMERN_SCHLUSS = (
- "Am April-Extrakt gerechnet hätten damit rund 91 % der Vorgänge eine Agenturnummer, "
- "gegenüber 79 % heute. Die Einzelheiten stehen in der Auswertung zur Formatanalyse.")
+ "Am April-Extrakt gerechnet haben damit 91,1 % der Vorgänge eine Agenturnummer, "
+ "gegenüber 79,3 % heute. Offen bleiben nur 7 Werte mit mehr als 9 Stellen, meist zwei "
+ "zusammengezogene Nummern - die bekommen den Status „zu prüfen“.")
 
 SCHLUSS = ("Sobald eure Rückmeldung da ist, ziehen wir Prompt, Deckblatt und Excel-Spalten "
            "in einem Schritt nach.")
