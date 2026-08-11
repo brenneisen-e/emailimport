@@ -83,16 +83,15 @@ ABSCHNITTE = [
    "Weniger als 7 Ziffern nach der Bereinigung, in der Regel 5 oder 6.", "811774",
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
    "Stellenzahl", "neu"),
-  ("Nummern-Herkunft", "Woher der angezeigte Wert stammt - damit auf dem Deckblatt "
-                       "sichtbar ist, ob eine Nummer aus dem Anschreiben kommt oder aus "
-                       "EMMA ergänzt bzw. überschrieben wurde.",
-   "aus dem Anschreiben | Agentur-Nr aus EMMA ergänzt | Personalnummer aus EMMA ergänzt | "
-   "Personalnummer aus EMMA überschrieben", "aus dem Anschreiben",
-   "NEU - Folge des EMMA-Abgleichs", "neu"),
-  ("Nummern-Status", "Ergebnis des Abgleichs mit dem EMMA-Abzug: Existiert die "
-                     "Agenturnummer, gehört sie zum Vermittler, passt die Personalnummer "
-                     "dazu?",
-   "OK | zu prüfen", "OK",
+  ("Nummern-Status", "Ergebnis des Abgleichs mit dem EMMA-Abzug. Zeigt zugleich an, ob "
+                     "eine Nummer aus EMMA übernommen wurde, weil die Angabe aus der Mail "
+                     "nicht passte oder fehlte - der Sachbearbeiter sieht damit sofort, "
+                     "wo er hinschauen muss.",
+   "OK - Makler mit EMMA validiert<br>"
+   "zu prüfen - Agenturnummer aus EMMA übernommen (falsche Nummer aus der Mail)<br>"
+   "zu prüfen - Vermittlernummer aus EMMA übernommen<br>"
+   "zu prüfen - keine Nummer gefunden",
+   "OK - Makler mit EMMA validiert",
    "NEU - ergibt sich aus dem EMMA-Abgleich", "neu"),
   ("Makler_E-Mail", "Absenderadresse der Mail, mit der der Vorgang eingereicht wurde",
    "Mailadresse", "service@fondsfinanz.de", "NEU", "neu"),
@@ -215,12 +214,12 @@ PRUEFUNG = [
 ]
 
 OFFEN = [
- ("Ursprungswert bei Überschreibung", "Wenn EMMA die Personalnummer überschreibt, steht "
-                                     "die vom Makler genannte Nummer nicht mehr auf dem "
-                                     "Deckblatt. Reicht euch das Feld Nummern-Herkunft "
-                                     "als Hinweis, oder soll der ursprüngliche Wert "
-                                     "zusätzlich angezeigt werden - etwa für den Fall, "
-                                     "dass sich der Makler auf seine Angabe beruft?"),
+ ("Ursprungswert bei Überschreibung", "Wenn eine Nummer aus EMMA übernommen wird, steht "
+                                     "die vom Makler genannte nicht mehr auf dem "
+                                     "Deckblatt. Reicht der Nummern-Status als Hinweis, "
+                                     "oder soll der ursprüngliche Wert zusätzlich "
+                                     "angezeigt werden - etwa für den Fall, dass sich der "
+                                     "Makler auf seine Angabe beruft?"),
  ("Sparte als Kürzel", "Bitte die angenommene Zuordnung in der Spartentabelle "
                        "bestätigen oder korrigieren - insbesondere, ob KO wirklich alles "
                        "außer Kranken, Leben und Kraftfahrt umfasst und ob die "
@@ -295,8 +294,9 @@ NUMMERN_SCHRITTE = [  # noqa: E501
  "Agentur ergänzt, sofern die Beziehung eindeutig ist.",
  "Bleibt etwas unstimmig, wird der Vorgang im Feld Nummern-Status als „zu prüfen“ "
  "gekennzeichnet.",
- "Weil dabei ein Wert aus EMMA den im Anschreiben genannten ersetzen kann, hält das Feld "
- "Nummern-Herkunft fest, woher die angezeigte Nummer stammt.",
+ "Das Feld Nummern-Status hält fest, was dabei herausgekommen ist: mit EMMA validiert, "
+ "oder eine der drei Prüf-Ausprägungen, wenn eine Nummer aus EMMA übernommen wurde oder "
+ "gar keine gefunden wurde.",
 ]
 
 NUMMERN_SCHLUSS = (
@@ -307,7 +307,12 @@ SCHLUSS = ("Sobald eure Rückmeldung da ist, ziehen wir Prompt, Deckblatt und Ex
            "in einem Schritt nach.")
 
 def rein(s):
-    """HTML-Auszeichnung und Entities fuer den Klartextteil entfernen."""
+    """HTML-Auszeichnung und Entities fuer Klartext und Excel entfernen.
+
+    <br> wird zum Zeilenumbruch - in der Excel bleibt die Aufzaehlung damit
+    lesbar, im Klartext setzt umbruch() sie zeilenweise.
+    """
+    s = re.sub(r"<br\s*/?>", "\n", s)
     s = re.sub(r"<[^>]+>", "", s)
     for a, b in (("&bdquo;", "„"), ("&ldquo;", "“"), ("&amp;", "&"),
                  ("&nbsp;", " "), ("&mdash;", "-")):
@@ -316,6 +321,9 @@ def rein(s):
 
 
 def umbruch(s, breite=74, einzug=""):
+    if "\n" in s:                       # vorhandene Umbrueche erhalten
+        return ("\n" + einzug).join(umbruch(teil, breite, einzug)
+                                    for teil in s.split("\n"))
     worte, zeilen, akt = s.split(), [], ""
     for w in worte:
         if akt and len(akt) + 1 + len(w) > breite:
