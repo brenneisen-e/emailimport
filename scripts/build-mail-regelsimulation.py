@@ -21,7 +21,8 @@ import re
 import openpyxl
 
 from mailbau import baue_eml, tab
-from xlsxbau import GELB, GRUEN, ROT, abschluss, kopfzeile, schreibe, titel
+from xlsxbau import (GELB, GRAU, GRUEN, ROT, TEXTGRAU, abschluss, hinweis,
+                     kopfzeile, schreibe, titel)
 
 QUELLE = "analyse.xlsx"
 EXCEL = "Regelsimulation-Nummern.xlsx"
@@ -159,35 +160,102 @@ def diff(neu, alt):
 
 
 # ---------------------------------------------------------------------------
+# Kennzahlen je Variante: einmal auf Ebene der Nummern, einmal je Vorgang
+# ---------------------------------------------------------------------------
+def kennzahlen(mit_trennung, acht_auffuellen, heutige_spalten=False):
+    nummern = collections.Counter()
+    laengen = collections.Counter()
+    vorgaenge = collections.Counter()
+    for r in BUE:
+        if heutige_spalten:
+            for _, spalte in kandidaten(r, False):
+                nummern[spalte] += 1
+            if r[13]:
+                vorgaenge["Agentur"] += 1
+            if r[14]:
+                vorgaenge["Vermittler"] += 1
+            if not r[13] and not r[14]:
+                vorgaenge["keine"] += 1
+            continue
+        klassen = []
+        for roh, _ in kandidaten(r, mit_trennung):
+            k = klasse(roh, acht_auffuellen)
+            klassen.append(k)
+            nummern[k] += 1
+            if k == "ohne Zuordnung":
+                laengen[len(ziffern(roh).lstrip("0"))] += 1
+        if "Agentur" in klassen:
+            vorgaenge["Agentur"] += 1
+        if "Vermittler" in klassen:
+            vorgaenge["Vermittler"] += 1
+        if "Agentur" not in klassen and "Vermittler" not in klassen:
+            vorgaenge["keine"] += 1
+    return nummern, laengen, vorgaenge
+
+
+K_VORHER = kennzahlen(False, False, heutige_spalten=True)
+K_REGELN = kennzahlen(True, False)
+K_ACHT = kennzahlen(True, True)
+
+SPALTEN_KZ = ["Kennzahl", "vorher", "nachher: Regeln wie besprochen",
+              "nachher: wenn achtstellige = Agenturnummer"]
+
+
+def kz_zeilen():
+    """(Bezeichnung, vorher, nachher1, nachher2, Einrueckung, Farbe)"""
+    (nv, _, vv), (nr, lr, vr), (na, la, va) = K_VORHER, K_REGELN, K_ACHT
+    return [
+        ("Extrahierte Nummern insgesamt", nv["Agentur"] + nv["Vermittler"],
+         nr["Agentur"] + nr["Vermittler"] + nr["ohne Zuordnung"],
+         na["Agentur"] + na["Vermittler"] + na["ohne Zuordnung"], False, GRAU),
+        ("als Agenturnummer", nv["Agentur"], nr["Agentur"], na["Agentur"], True, GRUEN),
+        ("als Vermittlernummer", nv["Vermittler"], nr["Vermittler"], na["Vermittler"],
+         True, None),
+        ("ohne Zuordnung", "-", nr["ohne Zuordnung"], na["ohne Zuordnung"], True, GELB),
+        ("davon achtstellig", "-", lr[8], la[8], True, GELB),
+        ("davon 10 und mehr Stellen", "-",
+         sum(v for k, v in lr.items() if k >= 10),
+         sum(v for k, v in la.items() if k >= 10), True, GELB),
+        ("", "", "", "", False, None),
+        ("BÜ-Vorgänge insgesamt", N, N, N, False, GRAU),
+        ("mit Agenturnummer", vv["Agentur"], vr["Agentur"], va["Agentur"], True, GRUEN),
+        ("mit Vermittlernummer", vv["Vermittler"], vr["Vermittler"], va["Vermittler"],
+         True, None),
+        ("ohne jede Nummer", vv["keine"], vr["keine"], va["keine"], True, GELB),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Excel - Aufbau wie bei den uebrigen Anlagen (siehe xlsxbau.py)
 # ---------------------------------------------------------------------------
-VARIANTEN = [
-    ("heute (Präfix-Regel 6000/890)", heute, None, None),
-    ("A - Regeln wie vorgeschlagen", A_bef, A_OFFEN, None),
-    ("B - zusätzlich Felder mit zwei Nummern trennen", B_bef, B_OFFEN, GELB),
-    ("C - zusätzlich achtstellige auf neun Stellen auffüllen", C_bef, C_OFFEN, GRUEN),
-]
-
 xl = openpyxl.Workbook()
 
-# ---- Blatt 1: Varianten -------------------------------------------------
+# ---- Blatt 1: Vorher / nachher -----------------------------------------
 ws = xl.active
-ws.title = "Varianten"
-r = titel(ws, "Nummern-Regeln am April-Extrakt",
-          "Basis: %s BÜ-Vorgänge mit %s extrahierten Nummern. Regeln: bereinigen, "
-          "unter 7 Stellen = Vermittlernummer, 7 oder 9 Stellen = Agenturnummer."
-          % (tsd(N), tsd(WERTE)),
-          "Gelb = technische Ergänzung, grün = offene Entscheidung zu den "
-          "achtstelligen Nummern.")
-SP_V = ["Variante", "beide", "nur Agentur", "nur Vermittler", "keine",
-        "Nummern ohne Zuordnung"]
-BR_V = [50, 12, 14, 16, 12, 22]
-kopf_v = r + 1
-r = kopfzeile(ws, SP_V, BR_V, kopf_v)
-for name, bef, off, fill in VARIANTEN:
-    r = schreibe(ws, r, [name] + [bef[k] for k in KATEGORIEN] +
-                 ["" if off is None else off], BR_V, fill=fill, fett_spalten=(1,))
-abschluss(ws, kopf_v, r - 1, len(SP_V), fixieren="B%d" % (kopf_v + 1))
+ws.title = "Vorher-Nachher"
+r = titel(ws, "Nummern-Regeln am April-Extrakt: vorher und nachher",
+          "Basis: %s BÜ-Vorgänge. Regeln: Präfixe, führende Nullen und Trennzeichen "
+          "entfernen; unter 7 Stellen = Vermittlernummer, 7 oder 9 Stellen = "
+          "Agenturnummer." % tsd(N),
+          "Die dritte Spalte zeigt, was passiert, wenn achtstellige Nummern mit einer "
+          "führenden Null auf neun Stellen ergänzt werden - das ist die offene Frage.")
+BR_KZ = [40, 14, 30, 34]
+kopf_kz = r + 1
+r = kopfzeile(ws, SPALTEN_KZ, BR_KZ, kopf_kz)
+for name, v1, v2, v3, eingerueckt, fill in kz_zeilen():
+    if not name:
+        r += 1
+        continue
+    beschriftung = ("    " + name) if eingerueckt else name
+    r = schreibe(ws, r, [beschriftung, v1, v2, v3], BR_KZ, fill=fill,
+                 fett_spalten=() if eingerueckt else (1,))
+letzte_kz = r - 1
+r = hinweis(ws, r + 1,
+            "Die Zahlen der Nummern und der Vorgänge unterscheiden sich leicht: Ein "
+            "Vorgang kann zwei Nummern enthalten, und beim Auftrennen von Feldern wie "
+            "\"V 85357 A 777-0503\" entstehen aus einem Wert zwei Nummern.",
+            len(SPALTEN_KZ), farbe=TEXTGRAU)
+abschluss(ws, kopf_kz, letzte_kz, len(SPALTEN_KZ), fixieren="B%d" % (kopf_kz + 1))
 
 # ---- Blatt 2: Wechsler --------------------------------------------------
 ws2 = xl.create_sheet("Wechsler V nach A")
@@ -209,13 +277,13 @@ abschluss(ws2, kopf_w, r - 1, len(SP_W), fixieren="B%d" % (kopf_w + 1))
 
 # ---- Blatt 3: Ohne Zuordnung -------------------------------------------
 ws3 = xl.create_sheet("Ohne Zuordnung")
-r = titel(ws3, "Nummern, die durch das Raster fallen",
-          "Weder unter 7 Stellen noch genau 7 oder 9 Stellen - %s Werte."
-          % tsd(A_OFFEN),
-          "Grün = mit den beiden Ergänzungen (Felder mit zwei Nummern trennen, "
-          "achtstellige auffüllen) gelöst. Rot = bleibt offen.")
-SP_O = ["Rohwert", "bereinigt", "Stellen", "Vorgänge", "mit den Ergänzungen gelöst?"]
-BR_O = [28, 20, 10, 12, 26]
+r = titel(ws3, "Nummern ohne Zuordnung",
+          "Weder unter 7 Stellen noch genau 7 oder 9 Stellen - deshalb landen sie in "
+          "keiner der beiden Spalten.",
+          "Grün = wird gelöst, wenn achtstellige Nummern auf neun Stellen aufgefüllt "
+          "werden. Rot = bleibt auch dann offen.")
+SP_O = ["Rohwert", "bereinigt", "Stellen", "Vorgänge", "durch Auffüllen gelöst?"]
+BR_O = [28, 20, 10, 12, 24]
 kopf_o = r + 1
 r = kopfzeile(ws3, SP_O, BR_O, kopf_o)
 c_offen_roh = {k[0] for k in C_offen}
