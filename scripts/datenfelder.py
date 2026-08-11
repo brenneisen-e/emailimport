@@ -66,30 +66,15 @@ ABSCHNITTE = [
   ("Vermittler", "Das angebundene Maklerunternehmen unter dem Pool; ist der Makler eine "
                  "Einzelperson, steht hier deren Name",
    "Firmenname oder Personenname", "Finanzservice Limnell", "", None),
-  ("Agentur-Nr", "Agenturnummer des Maklers beim Versicherer. Sie ist das führende Feld "
-                 "und der Einstieg in den EMMA-Abgleich. Fehlt sie im Anschreiben, wird "
-                 "sie über die Personalnummer aus EMMA ergänzt.",
+  ("Agentur-Nr", "Agenturnummer des Maklers beim Versicherer",
    "7 bis 9 Ziffern nach der Bereinigung. Achtstellige Werte sind die neuen Agenturen "
    "nach ZAV und ohne führende Null gültig.", "600042497",
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
    "Stellenzahl", "neu"),
-  ("Personalnummer", "Personal- bzw. Vermittlernummer des Maklers beim Versicherer. "
-                     "<b>Der Wert kann aus EMMA stammen:</b> Er wird gegen den EMMA-Abzug "
-                     "plausibilisiert, bei Abweichung mit der dort hinterlegten Nummer "
-                     "überschrieben und bei fehlender Angabe ergänzt.",
+  ("Personalnummer", "Personal- bzw. Vermittlernummer des Maklers beim Versicherer",
    "Weniger als 7 Ziffern nach der Bereinigung, in der Regel 5 oder 6.", "811774",
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;, Zuordnung über die "
    "Stellenzahl", "neu"),
-  ("Nummern-Status", "Ergebnis des Abgleichs mit dem EMMA-Abzug. Zeigt zugleich an, ob "
-                     "eine Nummer aus EMMA übernommen wurde, weil die Angabe aus der Mail "
-                     "nicht passte oder fehlte - der Sachbearbeiter sieht damit sofort, "
-                     "wo er hinschauen muss.",
-   "OK - Makler mit EMMA validiert<br>"
-   "zu prüfen - Agenturnummer aus EMMA übernommen<br>"
-   "zu prüfen - Vermittlernummer aus EMMA übernommen<br>"
-   "zu prüfen - keine Nummer gefunden",
-   "OK - Makler mit EMMA validiert",
-   "NEU - ergibt sich aus dem EMMA-Abgleich", "neu"),
   ("Makler_E-Mail", "Absenderadresse der Mail, mit der der Vorgang eingereicht wurde",
    "Mailadresse", "service@fondsfinanz.de", "NEU", "neu"),
   ("Makler_Strasse", "Straßenname und Hausnummer des Maklers laut Anschreiben",
@@ -204,12 +189,6 @@ PRUEFUNG = [
 ]
 
 OFFEN = [
- ("Ursprungswert bei Überschreibung", "Wenn eine Nummer aus EMMA übernommen wird, steht "
-                                     "die vom Makler genannte nicht mehr auf dem "
-                                     "Deckblatt. Reicht der Nummern-Status als Hinweis, "
-                                     "oder soll der ursprüngliche Wert zusätzlich "
-                                     "angezeigt werden - etwa für den Fall, dass sich der "
-                                     "Makler auf seine Angabe beruft?"),
  ("Sparte als Kürzel", "Bitte die angenommene Zuordnung in der Spartentabelle "
                        "bestätigen oder korrigieren - insbesondere, ob KO wirklich alles "
                        "außer Kranken, Leben und Kraftfahrt umfasst und ob die "
@@ -256,29 +235,19 @@ NUMMERN_TEXT = (
  "Weil die Absender die Begriffe nicht einheitlich verwenden, entscheidet nicht die "
  "Beschriftung im Anschreiben, sondern die Stellenzahl. So läuft es künftig ab:")
 
-NUMMERN_SCHRITTE = [  # noqa: E501
+NUMMERN_SCHRITTE = [
  "Die KI liest die Nummern aus dem Anschreiben aus, so wie sie dort stehen.",
  "Felder, die zwei Nummern enthalten, werden getrennt - aus „V 85357 A 777-0503“ werden "
  "85357 und 777-0503.",
  "Buchstaben-Präfixe, führende Nullen und Trennzeichen werden entfernt.",
  "Weniger als 7 Stellen ergibt die Personalnummer, 7 bis 9 Stellen die Agenturnummer. "
  "Achtstellige Werte gehören dazu - das sind die neuen Agenturen nach ZAV.",
- "Die Agenturnummer ist führend und der Einstieg in den EMMA-Abgleich: Existiert sie und "
- "gehört sie zum Vermittler? Die Personalnummer wird dabei ergänzt oder bei Abweichung "
- "überschrieben.",
- "Fehlt die Agenturnummer, wird über die Personalnummer eingestiegen und die zugehörige "
- "Agentur ergänzt, sofern die Beziehung eindeutig ist.",
- "Bleibt etwas unstimmig, wird der Vorgang im Feld Nummern-Status als „zu prüfen“ "
- "gekennzeichnet.",
- "Das Feld Nummern-Status hält fest, was dabei herausgekommen ist: mit EMMA validiert, "
- "oder eine der drei Prüf-Ausprägungen, wenn eine Nummer aus EMMA übernommen wurde oder "
- "gar keine gefunden wurde.",
 ]
 
 NUMMERN_SCHLUSS = (
  "Am April-Extrakt gerechnet haben damit 91,1 % der Vorgänge eine Agenturnummer, "
- "gegenüber 79,3 % heute. Offen bleiben nur 7 Werte mit mehr als 9 Stellen, meist zwei "
- "zusammengezogene Nummern - die bekommen den Status „zu prüfen“.")
+ "gegenüber 79,3 % heute. Der Abgleich mit der EMMA-Liste kommt als eigener Schritt "
+ "hinterher und ist in dieser Feldliste bewusst noch nicht abgebildet.")
 
 SCHLUSS = ("Sobald eure Rückmeldung da ist, ziehen wir Prompt, Deckblatt und Excel-Spalten "
            "in einem Schritt nach.")
