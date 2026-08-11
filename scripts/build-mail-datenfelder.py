@@ -49,7 +49,7 @@ for titel, felder in ABSCHNITTE:
 teile.append("<h3>Ausprägungen von &bdquo;Prüfung Unterlagen&ldquo;</h3>")
 teile.append("<p>Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder "
              "&bdquo;Makler-Vorgang&ldquo; ist <b>und</b> die Klassifikation "
-             "&bdquo;BUe-Vorgang&ldquo; lautet.</p>")
+             "&bdquo;BÜ-Vorgang&ldquo; lautet.</p>")
 teile.append(tab(("Ausprägung", "Wann sie gesetzt wird"),
                  [[p[0], p[1]] for p in PRUEFUNG], klassen=[p[2] for p in PRUEFUNG]))
 teile.append('<p class="hint">Mehrere Mängel werden kommagetrennt ausgegeben, z.&nbsp;B. '
@@ -102,7 +102,7 @@ for titel, felder in ABSCHNITTE:
 zeilen += ["AUSPRÄGUNGEN VON „PRÜFUNG UNTERLAGEN“", "-" * 38, "",
            umbruch("Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder "
                    "„Makler-Vorgang“ ist UND die Klassifikation "
-                   "„BUe-Vorgang“ lautet."), ""]
+                   "„BÜ-Vorgang“ lautet."), ""]
 for wert, wann, mark in PRUEFUNG:
     zeilen.append("  %s%s" % (rein(wert), "   [NEU]" if mark else ""))
     zeilen.append("    " + umbruch(rein(wann), 70, "    "))

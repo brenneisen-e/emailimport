@@ -105,7 +105,7 @@ def baue_xlsx(ziel):
     ws2["A1"] = "Ausprägungen des Feldes \"Prüfung Unterlagen\""
     ws2["A1"].font = Font(name=FONT, sz=14, b=True, color=BLAU)
     ws2["A2"] = ("Das Feld wird überhaupt nur befüllt, wenn der Vorgangstyp leer oder "
-                 "\"Makler-Vorgang\" ist UND die Klassifikation \"BUe-Vorgang\" lautet. "
+                 "\"Makler-Vorgang\" ist UND die Klassifikation \"BÜ-Vorgang\" lautet. "
                  "Mehrere Mängel werden kommagetrennt ausgegeben, z. B. "
                  "\"BÜ-Wunsch fehlt, MV unvollständig\".")
     ws2["A2"].font = Font(name=FONT, sz=10, color="FF4B5563")
