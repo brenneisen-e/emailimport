@@ -26,7 +26,7 @@ ABSCHNITTE = [
   ("Typ", "Klassischer Makler mit Maklervollmacht oder Mehrfachagent mit "
           "Betreuungswechsel", "Makler | MFA", "Makler", "", None),
   ("Klassifikation", "Fachliche Einordnung des Vorgangs, als Badge wiederholt",
-   "siehe Abschnitt Klassifikation &amp; Vorgang", "BUe-Vorgang", "", None),
+   "siehe Abschnitt Klassifikation &amp; Vorgang", "BÜ-Vorgang", "", None),
   ("Maklervollmacht", "Status der Maklervollmacht, als Badge wiederholt",
    "siehe Abschnitt Maklervollmacht &amp; Unterschriften", "OK", "", None),
  ]),
@@ -75,12 +75,15 @@ ABSCHNITTE = [
   ("Personalnummer", "Personal- bzw. Vermittlernummer des Maklers beim Versicherer",
    "*** Platzhalter - Ausprägungen von Marcus ***", "811774",
    "NEU - Trennung von &bdquo;Agentur-/Personalnummer&ldquo;", "offen"),
-  ("Makler_E-Mail", "Mailadresse des Maklers", "Mailadresse",
-   "info@finanzservice-limnell.de", "NEU - welche Adresse soll das sein?", "offen"),
-  ("Makler_Adresse", "Anschrift des Maklers laut Anschreiben",
-   "Text ohne Komma. &bdquo;Straße&ldquo; wird immer als <b>Str.</b> abgekürzt.",
-   "Riesstr. 25 80992 München",
-   "Trennung in Str. / PLZ / Ort wie beim Kunden?", "offen"),
+  ("Makler_E-Mail", "Absenderadresse der Mail, mit der der Vorgang eingereicht wurde",
+   "Mailadresse", "service@fondsfinanz.de", "NEU", "neu"),
+  ("Makler_Strasse", "Straßenname und Hausnummer des Maklers laut Anschreiben",
+   "Text inkl. Hausnummer. &bdquo;Straße&ldquo; wird immer als <b>Str.</b> abgekürzt.",
+   "Riesstr. 25", "NEU - Trennung von &bdquo;Makler-Adresse&ldquo;", "neu"),
+  ("Makler_PLZ", "Postleitzahl des Maklers", "5 Ziffern", "80992",
+   "NEU - Trennung von &bdquo;Makler-Adresse&ldquo;", "neu"),
+  ("Makler_Ort", "Ort des Maklers", "Text", "München",
+   "NEU - Trennung von &bdquo;Makler-Adresse&ldquo;", "neu"),
   ("Auftrag-Datum", "Datum des Pool- bzw. Makler-Anschreibens - nicht der Mail-Eingang",
    "TT.MM.JJJJ", "06.04.2026", "", None),
  ]),
@@ -89,8 +92,8 @@ ABSCHNITTE = [
    "Makler-Vorgang | Zustellfehler | Ergo-Outbound | System-Mail | Werbung-Spam | Unklar",
    "Makler-Vorgang", "Reminder ergänzen? siehe offene Punkte", "offen"),
   ("Klassifikation", "Fachliche Einordnung des Anliegens",
-   "BUe-Vorgang | Anfrage-Ruecksprache | Antrag-Aenderung | Schadenmeldung | "
-   "Nicht-Standard | Kein-Makler-Vorgang", "BUe-Vorgang", "", None),
+   "BÜ-Vorgang | Anfrage-Ruecksprache | Antrag-Aenderung | Schadenmeldung | "
+   "Nicht-Standard | Kein-Makler-Vorgang", "BÜ-Vorgang", "", None),
   ("BÜ-Wunsch vorhanden", "Enthält die Mail einen ausformulierten Auftrag zur "
                           "Bestandsübertragung? Eine leere Mail mit nur einer "
                           "Maklervollmacht im Anhang ergibt &bdquo;nein&ldquo;.",
@@ -144,7 +147,7 @@ ABSCHNITTE = [
 # ---------------------------------------------------------------------------
 PRUEFUNG = [
  ("<i>leer</i>", "wenn der Vorgangstyp nicht leer bzw. nicht &bdquo;Makler-Vorgang&ldquo; "
-                 "ist oder die Klassifikation nicht &bdquo;BUe-Vorgang&ldquo; lautet - "
+                 "ist oder die Klassifikation nicht &bdquo;BÜ-Vorgang&ldquo; lautet - "
                  "dann wird gar nicht geprüft", None),
  ("Reminder - keine Vollst.-Prüfung", "wenn Reminder/Wiedervorlage = ja. Bei einer "
                                       "Erinnerung wird nichts neu eingereicht, deshalb "
@@ -169,12 +172,8 @@ OFFEN = [
                        "Buchstaben der erkannten Versicherungsnummer und prüfen sie gegen "
                        "eine Liste gültiger Spartenkürzel. Diese Liste bräuchten wir von "
                        "euch."),
- ("Makler_E-Mail", "Welche Adresse soll hier stehen - die Absenderadresse der Mail oder "
-                   "eine andere?"),
  ("MV_Eingangsdatum und MV_Unterschriftsdatum", "Bitte definieren, woran wir die beiden "
                                                 "Daten jeweils ablesen sollen."),
- ("Makler_Adresse", "Soll sie wie die Kundenadresse in Str., PLZ und Ort getrennt "
-                    "werden?"),
  ("VN-Unterschrift fehlt", "Wir setzen den neuen Wert bei Unterschrift Kunde = "
                            "&bdquo;nein&ldquo;. Wie soll &bdquo;nicht prüfbar&ldquo; "
                            "behandelt werden - als Mangel oder als unauffällig?"),
@@ -203,7 +202,8 @@ EINLEITUNG = [
  "Zusatzspalten, die es nur in der Excel-Auswertung gibt, sind bewusst nicht dabei.",
  "Eine Schreibweise vorab, weil sie mehrere Felder betrifft: In allen Adressfeldern "
  "wird „Straße“ grundsätzlich als „Str.“ ausgegeben - unabhängig davon, ob im Dokument "
- "„Straße“, „Strasse“ oder „Str.“ steht.",
+ "„Straße“, „Strasse“ oder „Str.“ steht. Kunden- und Makleradresse sind beide in Str., "
+ "PLZ und Ort getrennt.",
  "Dieselbe Übersicht liegt zusätzlich als Excel bei (Datenfelder-KI-Deckblatt.xlsx) - "
  "dort lässt sie sich filtern, kommentieren und zurückspielen. Drei Blätter: Datenfelder, "
  "Prüfung Unterlagen, Offene Punkte.",
