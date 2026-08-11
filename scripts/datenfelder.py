@@ -54,9 +54,6 @@ ABSCHNITTE = [
              "Versicherungsnummer", "KO | KV | LF | KR - siehe eigene Tabelle unten", "LF",
    "GEÄNDERT - Kürzel statt der bisherigen Gruppen Komposit / Leben / KV; Zuordnung ist "
    "eine Annahme und braucht eure Bestätigung", "offen"),
-  ("Kunden-/Partnernummer", "Kunden- bzw. Partnernummer des VN in den ERGO-Systemen - "
-                            "nicht die Versicherungs- oder Maklernummer",
-   "Ziffern", "1234567890", "", None),
   ("MV_VN_Nachname", "Nachname des Vollmachtgebers laut Maklervollmacht - dient dem "
                      "Abgleich mit dem Anschreiben", "Text", "Haug",
    "NEU - Trennung von &bdquo;VN laut MV&ldquo;", "neu"),
@@ -102,8 +99,6 @@ ABSCHNITTE = [
    "NEU - Trennung von &bdquo;Makler-Adresse&ldquo;", "neu"),
   ("Makler_Ort", "Ort des Maklers", "Text", "München",
    "NEU - Trennung von &bdquo;Makler-Adresse&ldquo;", "neu"),
-  ("Auftrag-Datum", "Datum des Pool- bzw. Makler-Anschreibens - nicht der Mail-Eingang",
-   "TT.MM.JJJJ", "06.04.2026", "", None),
  ]),
  ("Klassifikation &amp; Vorgang", [
   ("Vorgangstyp", "Grobe Einordnung, worum es sich bei der Mail überhaupt handelt",
@@ -131,9 +126,6 @@ ABSCHNITTE = [
   ("MV vollumfänglich", "Deckt die Vollmacht den gesamten Bestand ab oder ist sie "
                         "eingeschränkt?", "ja | teilweise | nein | nicht prüfbar", "ja",
    "", None),
-  ("MV-Einschränkungen", "Worauf die Vollmacht eingeschränkt ist; nur befüllt, wenn nicht "
-                         "vollumfänglich", "Freitext",
-   "nur Komposit, ohne Leben", "", None),
   ("Unterschrift Kunde", "Hat der Versicherungsnehmer die Maklervollmacht unterschrieben?",
    "ja | nein | nicht prüfbar", "ja",
    "GEÄNDERT - Unterschrift des Maklers entfällt", "neu"),
@@ -249,10 +241,11 @@ EINLEITUNG = [
  "inklusive der Anpassungen aus eurem Review 260807 Anpassung Deckblatt_V1.pdf und der "
  "mit Marcus abgestimmten Regeln für Agentur- und Personalnummer. Zu jedem Feld steht, "
  "was es beschreibt, welche Ausprägungen es annehmen kann und ein Beispiel.",
- "Aufgeführt sind ausschließlich die Felder, die auf dem Deckblatt erscheinen. "
- "Zusatzspalten, die es nur in der Excel-Auswertung gibt, sind bewusst nicht dabei. "
- "Ebenfalls draußen: die Reminder-Quelle, die das Tool heute nur bei Wiedervorlagen "
- "einblendet - falls ihr sie für die Prüfung braucht, nehmen wir sie wieder auf.",
+ "Grundlage ist genau das Muster-Deckblatt aus eurem Review (BÜ-KI-084): aufgeführt sind "
+ "die Felder, die dort stehen, plus die neu hinzugekommenen. Felder, die das Tool nur in "
+ "Sonderfällen einblendet - Kunden-/Partnernummer, Auftrag-Datum, MV-Einschränkungen und "
+ "Reminder-Quelle - sind nicht dabei; falls ihr eines davon für die Prüfung braucht, "
+ "nehmen wir es auf.",
  "Eine Schreibweise vorab, weil sie mehrere Felder betrifft: In allen Adressfeldern wird "
  "„Straße“ grundsätzlich als „Str.“ ausgegeben - unabhängig davon, ob im Dokument "
  "„Straße“, „Strasse“ oder „Str.“ steht. Kunden- und Makleradresse sind beide in Str., "
