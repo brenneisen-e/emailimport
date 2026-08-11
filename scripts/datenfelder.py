@@ -85,7 +85,7 @@ ABSCHNITTE = [
                      "nicht passte oder fehlte - der Sachbearbeiter sieht damit sofort, "
                      "wo er hinschauen muss.",
    "OK - Makler mit EMMA validiert<br>"
-   "zu prüfen - Agenturnummer aus EMMA übernommen (falsche Nummer aus der Mail)<br>"
+   "zu prüfen - Agenturnummer aus EMMA übernommen<br>"
    "zu prüfen - Vermittlernummer aus EMMA übernommen<br>"
    "zu prüfen - keine Nummer gefunden",
    "OK - Makler mit EMMA validiert",
@@ -103,7 +103,7 @@ ABSCHNITTE = [
  ("Klassifikation &amp; Vorgang", [
   ("Vorgangstyp", "Grobe Einordnung, worum es sich bei der Mail überhaupt handelt",
    "Makler-Vorgang | Zustellfehler | Ergo-Outbound | System-Mail | Werbung-Spam | Unklar",
-   "Makler-Vorgang", "Reminder ergänzen? siehe offene Punkte", "offen"),
+   "Makler-Vorgang", "", None),
   ("Klassifikation", "Fachliche Einordnung des Anliegens",
    "BÜ-Vorgang | Anfrage-Ruecksprache | Antrag-Aenderung | Schadenmeldung | "
    "Nicht-Standard | Kein-Makler-Vorgang", "BÜ-Vorgang", "", None),
@@ -197,9 +197,10 @@ PRUEFUNG = [
  ("MV fehlt", "MV-Status ist &bdquo;MV fehlt&ldquo; oder &bdquo;kein Anhang&ldquo;", None),
  ("MV unvollständig", "MV vollumfänglich ist &bdquo;teilweise&ldquo; oder "
                       "&bdquo;nein&ldquo;", None),
- ("VN-Unterschrift fehlt", "Unterschrift Kunde ist &bdquo;nein&ldquo; - die Vollmacht "
-                           "liegt zwar vor, ist aber nicht vom Versicherungsnehmer "
-                           "unterschrieben", "neu"),
+ ("VN-Unterschrift fehlt", "Unterschrift Kunde ist &bdquo;nein&ldquo; oder &bdquo;nicht "
+                           "prüfbar&ldquo; - die Vollmacht liegt zwar vor, aber die "
+                           "Unterschrift des Versicherungsnehmers ist nicht belegt. Beide "
+                           "Fälle gelten als Mangel bei der Vollständigkeit.", "neu"),
 ]
 
 OFFEN = [
@@ -217,19 +218,6 @@ OFFEN = [
                         "der Versicherungsnummer ableiten (kein Buchstaben-Präfix oder "
                         "unbekanntes Präfix). Feld leer lassen oder aus dem Mailtext "
                         "ableiten?"),
- ("VN-Unterschrift fehlt", "Wir setzen den neuen Wert bei Unterschrift Kunde = "
-                           "&bdquo;nein&ldquo;. Wie soll &bdquo;nicht prüfbar&ldquo; "
-                           "behandelt werden - als Mangel oder als unauffällig?"),
- ("Reminder im Vorgangstyp", "Ihr hattet angeregt, Reminder/Erinnerungen mit in den "
-                             "Vorgangstyp aufzunehmen. Aus unserer Sicht ist das eine "
-                             "eigene Dimension - eine Erinnerung an eine "
-                             "Bestandsübertragung bleibt fachlich ein BÜ-Vorgang, sie ist "
-                             "nur nicht die erste Mail dazu. Deshalb steht sie heute in "
-                             "einem eigenen Feld und zusätzlich in der Status-Ampel "
-                             "(&bdquo;BÜ-Reminder&ldquo;). Wenn ihr sie trotzdem im "
-                             "Vorgangstyp braucht, setzen wir das um - dann bitte kurz "
-                             "sagen, ob &bdquo;Reminder&ldquo; die anderen Werte ersetzt "
-                             "oder zusätzlich erscheint."),
 ]
 
 
@@ -237,26 +225,22 @@ OFFEN = [
 # Textbausteine (einmal definiert, in beide Fassungen uebernommen)
 # ---------------------------------------------------------------------------
 EINLEITUNG = [
- "anbei die vollständige Liste der Datenfelder des KI-Deckblatts - im Zielbild, also "
- "inklusive der Anpassungen aus eurem Review 260807 Anpassung Deckblatt_V1.pdf und der "
- "mit Marcus abgestimmten Regeln für Agentur- und Personalnummer. Zu jedem Feld steht, "
- "was es beschreibt, welche Ausprägungen es annehmen kann und ein Beispiel.",
- "Grundlage ist genau das Muster-Deckblatt aus eurem Review (BÜ-KI-084): aufgeführt sind "
- "die Felder, die dort stehen, plus die neu hinzugekommenen. Felder, die das Tool nur in "
- "Sonderfällen einblendet - Kunden-/Partnernummer, Auftrag-Datum, MV-Einschränkungen und "
- "Reminder-Quelle - sind nicht dabei; falls ihr eines davon für die Prüfung braucht, "
- "nehmen wir es auf.",
- "Eine Schreibweise vorab, weil sie mehrere Felder betrifft: In allen Adressfeldern wird "
- "„Straße“ grundsätzlich als „Str.“ ausgegeben - unabhängig davon, ob im Dokument "
- "„Straße“, „Strasse“ oder „Str.“ steht. Kunden- und Makleradresse sind beide in Str., "
- "PLZ und Ort getrennt.",
+ "anbei findet ihr einen Vorschlag für die vollständige Liste der Datenfelder des "
+ "KI-Deckblatts - im Zielbild, also inklusive der Anpassungen aus eurem Review 260807 "
+ "Anpassung Deckblatt_V1.pdf und der von Marcus vorgeschlagenen Regeln für Agentur- und "
+ "Personalnummer. Zu jedem Feld steht, was es beschreibt, welche Ausprägungen es annehmen "
+ "kann und ein Beispiel. Grundlage ist genau das Muster-Deckblatt aus eurem Review "
+ "(BÜ-KI-084): aufgeführt sind die Felder, die dort stehen, plus die neu hinzugekommenen.",
  "Dieselbe Übersicht liegt zusätzlich als Excel bei (Datenfelder-KI-Deckblatt.xlsx) - "
  "dort lässt sie sich filtern und direkt kommentieren. Vier Blätter: Datenfelder, "
  "Rückmeldung, Sparte, Prüfung Unterlagen.",
+ "Grün hinterlegt sind neue, getrennte oder geänderte Felder, gelb die Punkte, zu denen "
+ "noch eine fachliche Vorgabe fehlt.",
 ]
 
 BITTE = (
- "Bitte schaut die Liste einmal durch und meldet zurück, wenn ein Feld fehlt, anders "
+ "Bitte schaut die Liste einmal durch und meldet bestmöglich bis morgen EOB zurück, "
+ "wenn ein Feld fehlt, anders "
  "aussehen soll oder für die manuelle bzw. automatische Prüfung gar nicht gebraucht "
  "wird. In der Excel gibt es dafür eine leere Spalte „Rückmeldung“, die ihr direkt "
  "ausfüllen könnt.")
