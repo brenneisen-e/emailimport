@@ -121,9 +121,6 @@ ABSCHNITTE = [
    "Ausprägung &bdquo;VN-Unterschrift fehlt&ldquo; kommt dazu", "neu"),
   ("Reminder/Wiedervorlage", "Handelt es sich um eine Erinnerung zu einem bereits "
                              "eingereichten Vorgang?", "ja | nein", "nein", "", None),
-  ("Reminder-Quelle", "Woran der Reminder erkannt wurde; leer, wenn kein Reminder",
-   "Anhang-PDF-Inhalt | Anhang-Dateiname | Mail-Betreff | Mail-Body (kommagetrennt)",
-   "Mail-Betreff", "", None),
  ]),
  ("Maklervollmacht &amp; Unterschriften", [
   ("MV enthalten", "Liegt der Mail eine Maklervollmacht bei?", "ja | nein", "ja", "", None),
@@ -253,7 +250,9 @@ EINLEITUNG = [
  "mit Marcus abgestimmten Regeln für Agentur- und Personalnummer. Zu jedem Feld steht, "
  "was es beschreibt, welche Ausprägungen es annehmen kann und ein Beispiel.",
  "Aufgeführt sind ausschließlich die Felder, die auf dem Deckblatt erscheinen. "
- "Zusatzspalten, die es nur in der Excel-Auswertung gibt, sind bewusst nicht dabei.",
+ "Zusatzspalten, die es nur in der Excel-Auswertung gibt, sind bewusst nicht dabei. "
+ "Ebenfalls draußen: die Reminder-Quelle, die das Tool heute nur bei Wiedervorlagen "
+ "einblendet - falls ihr sie für die Prüfung braucht, nehmen wir sie wieder auf.",
  "Eine Schreibweise vorab, weil sie mehrere Felder betrifft: In allen Adressfeldern wird "
  "„Straße“ grundsätzlich als „Str.“ ausgegeben - unabhängig davon, ob im Dokument "
  "„Straße“, „Strasse“ oder „Str.“ steht. Kunden- und Makleradresse sind beide in Str., "
