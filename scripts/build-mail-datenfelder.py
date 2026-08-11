@@ -41,6 +41,10 @@ for absatz in EINLEITUNG:
     teile.append("<p>%s</p>" % absatz)
 teile.append("<p>Grün hinterlegt sind neue, getrennte oder geänderte Felder, gelb die "
              "Punkte, zu denen uns noch eine fachliche Vorgabe fehlt.</p>")
+teile.append("<h3>Offene Punkte - hier brauchen wir eine Entscheidung</h3>")
+teile.append("<p>Vorweg die Punkte, bei denen uns eine fachliche Vorgabe fehlt. Die "
+             "vollständige Feldliste steht darunter.</p>")
+teile.append("<ol>%s</ol>" % "".join("<li><b>%s:</b> %s</li>" % (a, b) for a, b in OFFEN))
 teile.append("<h3>Grundsätzliche Änderung: alle Felder immer anzeigen</h3>")
 teile.append("<p>%s</p>" % ALLE_FELDER)
 for titel, felder in ABSCHNITTE:
@@ -74,8 +78,6 @@ for absatz in PLATZHALTER_TEXT:
     teile.append("<p>%s</p>" % absatz)
 teile.append("<ul>%s</ul>" % "".join("<li>%s</li>" % b for b in BESONDERHEITEN))
 teile.append("<p>%s</p>" % PLATZHALTER_SCHLUSS)
-teile.append("<h3>Offene Punkte</h3>")
-teile.append("<ol>%s</ol>" % "".join("<li><b>%s:</b> %s</li>" % (a, b) for a, b in OFFEN))
 teile.append("<p>%s</p>" % SCHLUSS)
 teile.append("<p>Rückfragen gerne jederzeit.</p><p>Viele Grüße</p></div>")
 HTML = "\n".join(teile)
@@ -89,6 +91,13 @@ for absatz in EINLEITUNG:
     zeilen += [umbruch(rein(absatz)), ""]
 zeilen += ["Markierungen: NEU = neues, getrenntes oder geändertes Feld, "
            "OFFEN = fachliche", "Vorgabe fehlt noch.", ""]
+zeilen += ["OFFENE PUNKTE - HIER BRAUCHEN WIR EINE ENTSCHEIDUNG", "-" * 51, "",
+           umbruch("Vorweg die Punkte, bei denen uns eine fachliche Vorgabe fehlt. Die "
+                   "vollständige Feldliste steht darunter."), ""]
+for i, (a, b) in enumerate(OFFEN, 1):
+    zeilen.append("  %d. %s: %s" % (i, rein(a), umbruch(rein(b), 68, "     ")))
+zeilen.append("")
+
 zeilen += ["Grundsätzliche Änderung: alle Felder immer anzeigen",
            "-" * 51, umbruch(rein(ALLE_FELDER)), ""]
 
@@ -138,9 +147,6 @@ for i, b in enumerate(BESONDERHEITEN, 1):
     zeilen.append("  %d. %s" % (i, umbruch(rein(b), 70, "     ")))
 zeilen += ["", umbruch(rein(PLATZHALTER_SCHLUSS)), ""]
 
-zeilen += ["OFFENE PUNKTE", "-" * 13, ""]
-for i, (a, b) in enumerate(OFFEN, 1):
-    zeilen.append("  %d. %s: %s" % (i, rein(a), umbruch(rein(b), 68, "     ")))
 zeilen += ["", umbruch(SCHLUSS), "", "Rückfragen gerne jederzeit.", "", "Viele Grüße", ""]
 
 TEXT = "\n".join(zeilen)
