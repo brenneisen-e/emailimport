@@ -5,29 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BGAV Hypercare - Email Review Tool</title>
 
-    <!-- ----------------------------------------------------------------
-         iframe-Einbettung
-         Das Einbetten erlaubt die Datei _headers (frame-ancestors *, kein
-         X-Frame-Options). Dieses Skript setzt <html data-embedded="1">,
-         wenn die Seite in einem iframe laeuft; die CSS-Regeln am Ende des
-         Stylesheets machen daraus ein kompaktes Layout.
-         URL-Schalter:  ?embed=1  erzwingt den Einbett-Modus
-                        ?embed=0  schaltet ihn ab
-                        ?chrome=0 blendet zusaetzlich die Kopfzeile aus
-         ---------------------------------------------------------------- -->
-    <script>
-    (function () {
-        var q = String(window.location.search || '');
-        var framed = true;
-        try { framed = (window.self !== window.top); } catch (e) { framed = true; }
-        var root = document.documentElement;
-        if (!/[?&]embed=0/.test(q) && (framed || /[?&]embed=1/.test(q))) {
-            root.setAttribute('data-embedded', '1');
-        }
-        if (/[?&]chrome=0/.test(q)) root.setAttribute('data-chrome', '0');
-    })();
-    </script>
-
     <style>
         /* ============================================================================
            MODERNES DESIGN - Weiss-dominiert, Clean, Minimalistisch
@@ -723,11 +700,6 @@
         .mb-md {
             margin-bottom: var(--spacing-md);
         }
-
-        /* ---------- iframe-Einbettung (siehe Skript im <head> + _headers) ---------- */
-        html[data-embedded="1"] body,
-        html[data-embedded="1"] .container { min-height: 0; }
-        html[data-chrome="0"] .header { display: none; }
     </style>
 </head>
 <body>

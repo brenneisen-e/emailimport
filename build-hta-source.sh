@@ -30,26 +30,6 @@ cat > "$OUT" << HEADER_END
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ERGO Vorgang-Analyse v${VER} - HTA Quellcode</title>
 
-<!-- ----------------------------------------------------------------
-     iframe-Einbettung
-     Das Einbetten erlaubt die Datei _headers (frame-ancestors *, kein
-     X-Frame-Options). Dieses Skript setzt <html data-embedded="1">,
-     wenn die Seite in einem iframe laeuft; die CSS-Regeln am Ende des
-     Stylesheets machen daraus ein kompaktes Layout.
-     URL-Schalter: ?embed=1 erzwingt den Modus, ?embed=0 schaltet ihn ab.
-     ---------------------------------------------------------------- -->
-<script>
-(function () {
-    var q = String(window.location.search || '');
-    var framed = true;
-    try { framed = (window.self !== window.top); } catch (e) { framed = true; }
-    var root = document.documentElement;
-    if (!/[?&]embed=0/.test(q) && (framed || /[?&]embed=1/.test(q))) {
-        root.setAttribute('data-embedded', '1');
-    }
-    if (/[?&]chrome=0/.test(q)) root.setAttribute('data-chrome', '0');
-})();
-</script>
 
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -144,10 +124,6 @@ textarea#code {
 }
 textarea#code:focus { outline: 2px solid #ef4444; }
 svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
-
-/* ---------- iframe-Einbettung (siehe Skript im <head> + _headers) ---------- */
-html[data-embedded="1"] body { min-height: 0; padding: 0.9rem; }
-html[data-embedded="1"] textarea#code { height: 60vh; }
 </style>
 </head>
 <body>

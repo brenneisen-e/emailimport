@@ -43,7 +43,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-email-batch.bas` + `ANLEITUNG-ERGO-EXCEL.txt` | `ERGO-Excel-Tool-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-vorgang-analyse.bas` + `ANLEITUNG-ERGO-VORGANG-ANALYSE.txt` | `ERGO-Vorgang-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-mail-statistik.hta` | `ERGO-Mail-Statistik-v<VER>.zip` | siehe unten (versionierte Inhalte) |
-| `outlook-regeln-visualisierung.hta` | `Outlook-Regeln-Visualisierung-v<VER>.zip` | siehe unten (versionierte Inhalte) |
+| `outlook-regeln-visualisierung.hta` | `Outlook-Regeln-Visualisierung-v<VER>.zip` + `outlook-regeln-source.html` | siehe unten (versionierte Inhalte) + `./build-regeln-source.sh` |
 
 > **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
 > „Quellcode kopieren"-Buttons kopieren den HTA-Code aus einer **Inline-Base64-Kopie**
@@ -52,8 +52,10 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 > und `outlook-regeln-visualisierung.hta`.
 > Nach **jeder** Aenderung an einer dieser Dateien deshalb zusaetzlich zum ZIP
 > die Einbettung neu bauen: `./scripts/build-embedded-sources.sh`
-> (ersetzt alle Base64-Strings in `downloads.html`; neue Dateien dort im
-> Skript-Array `FILES` + als Key in `EMBEDDED_SOURCES` ergaenzen).
+> (ersetzt alle Base64-Strings in **`downloads.html` UND `index.html`** &ndash; die
+> Startseite hat einen eigenen Kopieren-Button fuer
+> `outlook-regeln-visualisierung.hta`; neue Dateien im Skript-Array `FILES` +
+> als Key im jeweiligen `EMBEDDED_SOURCES`-Objekt ergaenzen).
 
 #### Versionierte ERGO-ZIPs bauen
 Das ERGO-Tool fuehrt die Versionsnummer **im ZIP-Dateinamen UND im Dateinamen der
@@ -206,35 +208,28 @@ Regeln:
   PDF / eine Mail), damit die HTA nicht „haengt" und Progress/Log sichtbar
   weiterlaufen.
 
-### 7. iframe-Einbettung der Website (HTTP-Header + Embed-Modus)
+### 7. Quellcode-Seiten statt Downloads (Copy & Paste)
 
-Die Seiten duerfen in fremde Websites als `<iframe>` eingebettet werden. Dafuer sorgen
-zwei Bausteine, die bei Aenderungen erhalten bleiben MUESSEN:
+Corporate-Proxys filtern `.zip`- und `.hta`-Requests weg, und die Seiten werden
+**nicht** per iframe in fremde Websites eingebettet. Der Verteilweg fuer HTA-Tools
+ist deshalb **Copy & Paste des Quellcodes**:
 
-**a) `_headers` (Cloudflare Pages)** im Repo-Root:
-- `! X-Frame-Options` entfernt den Framing-Blocker,
-- `Content-Security-Policy: frame-ancestors *` erlaubt Framing ausdruecklich.
-Soll nur eine bestimmte Host-Seite einbetten duerfen, dort das `*` durch die
-Origin(s) ersetzen. Die Datei ist rein deklarativ und wird von Cloudflare Pages
-beim Deploy ausgelesen &ndash; nicht umbenennen, nicht in einen Unterordner legen.
+| Tool | Quellcode-Seite | Build |
+|------|-----------------|-------|
+| `ergo-vorgang-analyse.hta` | `hta-source.html` | `./build-hta-source.sh` |
+| `outlook-regeln-visualisierung.hta` | `outlook-regeln-source.html` | `./build-regeln-source.sh` |
 
-**b) Embed-Modus im HTML** &ndash; jede Seite (`index.html`, `downloads.html`,
-`claude-analyse.html`, `bgav-hypercare-email-review.html` und der Header-Block in
-`build-hta-source.sh` fuer `hta-source.html`) enthaelt im `<head>` ein kleines
-Skript, das Framing erkennt und `<html data-embedded="1">` setzt. Am Ende des
-jeweiligen Stylesheets stehen die passenden Regeln:
-`html[data-embedded="1"] …` macht klebende Kopfzeilen statisch, nimmt
-`min-height: 100vh` raus und verkleinert die Aussenraender.
-`html[data-chrome="0"] …` blendet zusaetzlich die Kopfzeile aus.
+Beide Seiten sind **self-contained** (kein CDN, kein externes CSS/JS, Code inline
+in einer `<textarea>`) und laufen deshalb auch auf einem fremden Webserver, wenn
+man die Datei einfach dorthin kopiert (z. B. in den `public/`-Ordner einer
+Next.js-App &ndash; dann erreichbar unter `/outlook-regeln-source.html`).
 
-URL-Schalter: `?embed=1` erzwingt den Modus, `?embed=0` schaltet ihn ab,
-`?chrome=0` versteckt die Kopfzeile. Beispiel:
+Zusaetzlich hat die Startseite `index.html` eine Kachel mit Button
+**&bdquo;Quellcode kopieren&ldquo;**: Der HTA-Code steckt als Base64 inline in der Seite
+(`EMBEDDED_SOURCES`), das Kopieren laeuft synchron im Klick ohne Netzwerk-Fetch.
 
-```html
-<iframe src="https://emailimport.pages.dev/downloads.html?embed=1&chrome=0"
-        style="width:100%;height:900px;border:0" loading="lazy"></iframe>
-```
-
-Bei NEUEN HTML-Seiten den `<head>`-Block und die `data-embedded`-CSS-Regeln
-mit uebernehmen (aus `downloads.html` kopieren). `hta-source.html` NICHT direkt
-editieren &ndash; immer `./build-hta-source.sh` neu laufen lassen.
+**Bei jeder Aenderung an `outlook-regeln-visualisierung.hta` also:**
+1. `VERSION` im HTA-Tag hochzaehlen,
+2. `./build-regeln-source.sh` (baut `outlook-regeln-source.html` neu),
+3. `./scripts/build-embedded-sources.sh` (Base64 in `downloads.html` + `index.html`),
+4. ZIP neu bauen (siehe Abschnitt 2) und Page-Version im Footer von `index.html` hochzaehlen.

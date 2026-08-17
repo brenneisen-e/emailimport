@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outlook-Regeln visualisieren v1.0 &ndash; Quellcode</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f1f5f9;
+    min-height: 100vh;
+    padding: 1.5rem;
+}
+.container { max-width: 1400px; margin: 0 auto; }
+.card {
+    background: rgba(30, 41, 59, 0.85);
+    border-radius: 14px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    margin-bottom: 1rem;
+}
+h1 { font-size: 22px; margin-bottom: 0.5rem; }
+.subtitle { color: #94a3b8; font-size: 13px; }
+.info {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-size: 13px;
+    color: #cbd5e1;
+}
+.info strong { color: #93c5fd; }
+.info ol, .info ul { margin-left: 1.25rem; margin-top: 0.5rem; }
+.info li { margin-bottom: 3px; }
+.info code {
+    background: rgba(0,0,0,0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #fbbf24;
+    font-family: 'Consolas', monospace;
+}
+.host {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid #10b981;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-size: 13px;
+    color: #cbd5e1;
+}
+.host strong { color: #6ee7b7; }
+.actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 1rem 0;
+}
+button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.btn-copy { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+.btn-copy:hover { background: linear-gradient(135deg, #34d399, #10b981); transform: translateY(-1px); }
+.btn-copy.copied { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.btn-download { background: linear-gradient(135deg, #d97706, #b45309); color: white; }
+.btn-download:hover { background: linear-gradient(135deg, #f59e0b, #d97706); transform: translateY(-1px); }
+.btn-icon { background: #475569; color: #f1f5f9; padding: 12px 16px; }
+.btn-icon:hover { background: #64748b; }
+#status { font-size: 13px; color: #6ee7b7; font-weight: 500; margin-left: 0.5rem; }
+#status.err { color: #fca5a5; }
+.meta { font-size: 12px; color: #94a3b8; margin: 0.5rem 0 1rem; }
+.meta strong { color: #f1f5f9; }
+textarea#code {
+    width: 100%;
+    height: 70vh;
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    resize: vertical;
+    white-space: pre;
+}
+textarea#code:focus { outline: 2px solid #ef4444; }
+svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
+.back { color: #94a3b8; font-size: 12px; text-decoration: none; }
+.back:hover { color: #f1f5f9; }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="card">
+<a class="back" href="index.html">&larr; Zur Startseite</a>
+<h1 style="margin-top:8px;">Outlook-Regeln visualisieren <strong>v1.0</strong> &ndash; Quellcode</h1>
+<p class="subtitle">Regeln ausgew&auml;hlter (Gruppen-)Postf&auml;cher auslesen und die Logik als Excel-Mappe darstellen &middot; kein Download-ZIP n&ouml;tig</p>
+
+<div class="info">
+<strong>So startest du das Tool (ohne ZIP-Download):</strong>
+<ol>
+<li>Auf <strong>&bdquo;Code kopieren&ldquo;</strong> klicken (oder <strong>&bdquo;Alles markieren&ldquo;</strong> + <code>Strg+C</code>)</li>
+<li>Notepad / Notepad++ &ouml;ffnen und einf&uuml;gen (<code>Strg+V</code>)</li>
+<li>Speichern als <code>outlook-regeln-visualisierung.hta</code> &ndash; Dateityp <strong>Alle Dateien</strong>, Encoding <strong>UTF-8</strong> (nicht als .txt!)</li>
+<li>Outlook geoffnet lassen, Doppelklick auf die .hta &rarr; Postf&auml;cher ankreuzen &rarr; Excel</li>
+</ol>
+</div>
+
+<div class="host">
+<strong>Warum Copy &amp; Paste statt ZIP?</strong><br>
+Corporate-Proxys filtern ZIP- und .hta-Downloads weg. Der komplette HTA-Code
+steht deshalb unten im Textfeld &ndash; einmal kopieren, lokal als .hta speichern,
+fertig. Nichts wird nachgeladen, die .hta l&auml;uft danach komplett offline auf dem
+Arbeitsplatz (Outlook + Excel per COM).
+</div>
+
+<div class="meta">HTA-Version: <strong>v1.0</strong> &middot; Dateigr&ouml;&szlig;e: <strong id="meta-size">&hellip;</strong> &middot; Zeilen: <strong id="meta-lines">&hellip;</strong></div>
+
+<div class="actions">
+<button class="btn-copy" id="btnCopy" onclick="copyCode()">
+<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+Code kopieren
+</button>
+<button class="btn-download" onclick="downloadCode()">
+<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+Als .hta herunterladen
+</button>
+<button class="btn-icon" onclick="selectAll()" title="Gesamten Text markieren">
+<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 7v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7"/><path d="M22 7l-10 5L2 7"/></svg>
+Alles markieren
+</button>
+<span id="status"></span>
+</div>
+
+<textarea id="code" readonly spellcheck="false">
+&lt;!DOCTYPE html>
+&lt;html>
+&lt;head>
+    &lt;meta charset="utf-8">
+    &lt;meta http-equiv="X-UA-Compatible" content="IE=11">
+    &lt;title>Outlook-Regeln visualisieren&lt;/title>
+    &lt;HTA:APPLICATION
+        ID="Outlook_Regeln_Visualisierung"
+        APPLICATIONNAME="Outlook-Regeln visualisieren"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    &lt;style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .container { max-width: 880px; margin: 0 auto; }
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .header { text-align: center; margin-bottom: 1.25rem; }
+        .logo { font-size: 42px; margin-bottom: 0.25rem; }
+        h2 { color: #f1f5f9; margin-bottom: 0.25rem; }
+        .subtitle { color: #94a3b8; font-size: 13px; }
+        .ver { color: #64748b; font-size: 11px; margin-top: 4px; }
+
+        .section {
+            background: rgba(0,0,0,0.22);
+            border: 1px solid rgba(148,163,184,0.15);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1rem;
+        }
+        .section-title {
+            font-size: 13px; font-weight: 600; color: #e2e8f0;
+            margin-bottom: 0.75rem;
+        }
+        .section-title .tag {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            color: #94a3b8; border: 1px solid #475569; border-radius: 6px;
+            padding: 1px 7px; margin-left: 8px; vertical-align: 1px;
+        }
+
+        .hint { font-size: 11px; color: #94a3b8; margin-top: 0.5rem; line-height: 1.5; }
+
+        .quick { margin-bottom: 0.7rem; }
+        .quick button {
+            padding: 5px 11px; margin-right: 6px; margin-bottom: 4px;
+            border: 1px solid #475569; border-radius: 7px;
+            background: transparent; color: #cbd5e1;
+            font-size: 11.5px; cursor: pointer;
+        }
+        .quick button:hover { border-color: #ef4444; color: #fff; }
+
+        .store-list {
+            max-height: 220px; overflow-y: auto;
+            border: 1px solid #475569; border-radius: 8px;
+            background: #1e293b; padding: 0.5rem 0.6rem;
+        }
+        .store-row {
+            display: block; color: #e2e8f0; font-size: 12.5px;
+            padding: 4px 2px; cursor: pointer; line-height: 1.5;
+        }
+        .store-row:hover { color: #fff; }
+        .store-row input { margin-right: 8px; vertical-align: -1px; }
+        .badge {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            border-radius: 5px; padding: 1px 6px; margin-left: 7px;
+            vertical-align: 1px;
+        }
+        .badge-self { color: #93c5fd; border: 1px solid #3b82f6; }
+        .badge-extra { color: #6ee7b7; border: 1px solid #10b981; }
+        .badge-file { color: #fcd34d; border: 1px solid #f59e0b; }
+
+        .chk { display: block; color: #cbd5e1; font-size: 12.5px; margin-bottom: 0.35rem; cursor: pointer; }
+        .chk input { margin-right: 7px; }
+
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 14px; font-weight: 600;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+
+        .progress-container { display: none; margin: 1rem 0 0.25rem; }
+        .progress-bar { height: 8px; background: #374151; border-radius: 4px; overflow: hidden; }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, #ef4444, #f97316);
+            width: 0%; transition: width 0.3s;
+        }
+        .progress-text { font-size: 12px; color: #94a3b8; margin-top: 0.5rem; text-align: center; }
+
+        .log {
+            display: none; margin-top: 0.9rem; padding: 0.6rem 0.75rem;
+            max-height: 170px; overflow-y: auto;
+            background: rgba(0,0,0,0.35); border: 1px solid rgba(148,163,184,0.15);
+            border-radius: 8px; font-size: 11.5px; line-height: 1.6;
+            font-family: Consolas, 'Courier New', monospace;
+        }
+        .log div { white-space: pre-wrap; }
+        .log .t-info { color: #cbd5e1; }
+        .log .t-ok { color: #6ee7b7; }
+        .log .t-err { color: #fca5a5; }
+        .log .t-head { color: #f1f5f9; font-weight: 600; margin-top: 3px; }
+        .log .t-muted { color: #94a3b8; }
+
+        .status { display: none; padding: 0.85rem 1rem; border-radius: 8px; margin: 0.85rem 0 0; font-size: 13px; line-height: 1.5; }
+        .status.success { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; }
+        .status.error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+        .status.info { background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #93c5fd; }
+
+        .foot { text-align: center; color: #64748b; font-size: 11px; margin-top: 1rem; }
+    &lt;/style>
+&lt;/head>
+&lt;body>
+    &lt;div class="container">
+        &lt;div class="card">
+            &lt;div class="header">
+                &lt;div class="logo">&amp;#128203;&lt;/div>
+                &lt;h2>Outlook-Regeln visualisieren&lt;/h2>
+                &lt;div class="subtitle">Alle Regeln ausgew&amp;auml;hlter (Gruppen-)Postf&amp;auml;cher auslesen und die Logik als Excel-Mappe darstellen&lt;/div>
+                &lt;div class="ver">v1.0&lt;/div>
+            &lt;/div>
+
+            &lt;!-- Postfaecher -->
+            &lt;div class="section">
+                &lt;div class="section-title">Postf&amp;auml;cher ausw&amp;auml;hlen &lt;span class="tag">Mehrfachauswahl&lt;/span>&lt;/div>
+                &lt;div class="quick">
+                    &lt;button onclick="selectAllStores(true)">Alle&lt;/button>
+                    &lt;button onclick="selectAllStores(false)">Keine&lt;/button>
+                    &lt;button onclick="selectGroupStores()">Nur Gruppenpostf&amp;auml;cher&lt;/button>
+                    &lt;button onclick="takeFromOutlook()">Aus Outlook-Auswahl &amp;uuml;bernehmen&lt;/button>
+                    &lt;button onclick="reconnectOutlook()">Postf&amp;auml;cher neu laden&lt;/button>
+                &lt;/div>
+                &lt;div class="store-list" id="storeList">
+                    &lt;div class="store-row">Outlook wird verbunden &amp;hellip;&lt;/div>
+                &lt;/div>
+                &lt;div class="hint">
+                    &amp;bdquo;Gruppenpostf&amp;auml;cher&amp;ldquo; = alle Postf&amp;auml;cher im Outlook-Profil ausser dem eigenen.
+                    &amp;bdquo;Aus Outlook-Auswahl &amp;uuml;bernehmen&amp;ldquo; kreuzt das Postfach an, in dem gerade ein Ordner
+                    oder eine Mail markiert ist &amp;ndash; f&amp;uuml;r mehrere Postf&amp;auml;cher einfach mehrere H&amp;auml;kchen setzen.
+                    &lt;br>&lt;b>Wichtig:&lt;/b> Regeln eines Gruppenpostfachs sind nur lesbar, wenn das Postfach als
+                    vollwertiges Postfach im Profil h&amp;auml;ngt (Konto/weiteres Postfach), nicht bei
+                    &amp;bdquo;Ordner eines anderen Benutzers &amp;ouml;ffnen&amp;ldquo;.
+                &lt;/div>
+            &lt;/div>
+
+            &lt;!-- Optionen -->
+            &lt;div class="section">
+                &lt;div class="section-title">Optionen&lt;/div>
+                &lt;label class="chk">
+                    &lt;input type="checkbox" id="chkDisabled" checked>
+                    Deaktivierte Regeln mit ausgeben (im Excel als &amp;bdquo;inaktiv&amp;ldquo; markiert)
+                &lt;/label>
+                &lt;label class="chk">
+                    &lt;input type="checkbox" id="chkLocal" checked>
+                    Nur-lokale Regeln (Client-Regeln) mit ausgeben
+                &lt;/label>
+                &lt;label class="chk">
+                    &lt;input type="checkbox" id="chkSend">
+                    Auch Regeln f&amp;uuml;r ausgehende Mails (Senden-Regeln) einbeziehen
+                &lt;/label>
+                &lt;label class="chk">
+                    &lt;input type="checkbox" id="chkChecks" checked>
+                    Blatt &amp;bdquo;Pr&amp;uuml;fhinweise&amp;ldquo; erzeugen (Konflikte, toter Code, Datenabfluss)
+                &lt;/label>
+            &lt;/div>
+
+            &lt;button class="btn btn-primary" id="btnStart" onclick="startRead()" disabled>Regeln auslesen &amp;amp; Excel erstellen&lt;/button>
+
+            &lt;div class="progress-container" id="progressContainer">
+                &lt;div class="progress-bar">&lt;div class="progress-fill" id="progressFill">&lt;/div>&lt;/div>
+                &lt;div class="progress-text" id="progressText">&lt;/div>
+            &lt;/div>
+
+            &lt;div class="log" id="log">&lt;/div>
+            &lt;div class="status" id="status">&lt;/div>
+
+            &lt;div class="foot">Ben&amp;ouml;tigt Outlook (MAPI) und Excel &amp;middot; l&amp;auml;uft vollst&amp;auml;ndig lokal, keine Daten verlassen den Arbeitsplatz&lt;/div>
+        &lt;/div>
+    &lt;/div>
+
+&lt;script language="JScript">
+/* =====================================================================
+   Outlook-Regeln visualisieren  (HTA / JScript / COM-Automation)
+   ---------------------------------------------------------------------
+   1) Outlook wird per COM gestartet/verbunden, alle Stores des Profils
+      werden als Mehrfachauswahl angeboten (Gruppenpostfaecher inklusive).
+   2) Fuer jedes angekreuzte Postfach wird Store.GetRules() gelesen und
+      jede Regel in Bedingungen / Ausnahmen / Aktionen zerlegt.
+   3) Excel-Mappe mit 5 Blaettern:
+        Uebersicht     - eine Zeile pro Regel + Logik in Kurzform
+        Regel-Logik    - WENN / UND / AUSSER WENN / DANN je Regel, farbig
+        Elemente       - flache Liste aller Bedingungen/Ausnahmen/Aktionen
+        Zielordner     - wohin die Regeln Mails schreiben (Mengengeruest)
+        Pruefhinweise  - Konflikte, tote Regeln, Datenabfluss, Doppelungen
+
+   JScript + ActiveXObject wie in ergo-mail-statistik.hta. Das Auslesen
+   laeuft in kleinen Bloecken pro setTimeout-Tick, damit die HTA nicht
+   haengt und der Fortschritt sichtbar bleibt.
+   ===================================================================== */
+
+var outlookApp = null;
+var outlookNS = null;
+
+var STORES = [];              // { idx, name, storeId, isDefault, isFile }
+var readState = null;         // Zustand des laufenden Auslesens
+var CHUNK_RULES = 5;          // Regeln pro setTimeout-Tick
+
+/* Outlook-Konstanten */
+var OL_RULE_RECEIVE = 0;      // olRuleReceive
+var OL_RULE_SEND    = 1;      // olRuleSend
+
+/* ---------------- Bedingungen: benannte Eigenschaften der RuleConditions ----------------
+   Reihenfolge = Anzeigereihenfolge im Excel. Nicht vorhandene Eigenschaften
+   werfen beim Zugriff und werden uebersprungen (try/catch). */
+var COND_DEFS = [
+    { prop: 'From',                  label: 'Absender ist' },
+    { prop: 'SenderAddress',         label: 'Absenderadresse enthält' },
+    { prop: 'SenderInAddressList',   label: 'Absender steht in Adressbuch' },
+    { prop: 'SentTo',                label: 'Gesendet an' },
+    { prop: 'NotTo',                 label: 'NICHT gesendet an' },
+    { prop: 'ToMe',                  label: 'Direkt an mich adressiert' },
+    { prop: 'OnlyToMe',              label: 'Nur an mich adressiert' },
+    { prop: 'ToOrCc',                label: 'Ich stehe in An oder Cc' },
+    { prop: 'CC',                    label: 'Ich stehe in Cc' },
+    { prop: 'RecipientAddress',      label: 'Empfängeradresse enthält' },
+    { prop: 'Subject',               label: 'Betreff enthält' },
+    { prop: 'Body',                  label: 'Mailtext enthält' },
+    { prop: 'BodyOrSubject',         label: 'Betreff oder Mailtext enthält' },
+    { prop: 'MessageHeader',         label: 'Nachrichtenkopf enthält' },
+    { prop: 'Category',              label: 'Kategorie zugewiesen' },
+    { prop: 'AnyCategory',           label: 'Irgendeine Kategorie zugewiesen' },
+    { prop: 'HasAttachment',         label: 'Hat Anhang' },
+    { prop: 'Importance',            label: 'Priorität ist' },
+    { prop: 'Sensitivity',           label: 'Vertraulichkeit ist' },
+    { prop: 'FormName',              label: 'Formular / Nachrichtenklasse' },
+    { prop: 'Account',               label: 'Über Konto empfangen' },
+    { prop: 'MeetingInviteOrUpdate', label: 'Ist Besprechungsanfrage / -aktualisierung' },
+    { prop: 'FromRssFeed',           label: 'Aus RSS-Feed' },
+    { prop: 'FromAnyRSSFeed',        label: 'Aus irgendeinem RSS-Feed' },
+    { prop: 'OnLocalMachine',        label: 'Nur auf diesem Computer' },
+    { prop: 'OnOtherMachine',        label: 'Nur auf einem anderen Computer' }
+];
+
+/* ---------------- Aktionen: benannte Eigenschaften der RuleActions ---------------- */
+var ACTION_DEFS = [
+    { prop: 'MoveToFolder',        label: 'In Ordner verschieben',            move: true },
+    { prop: 'CopyToFolder',        label: 'In Ordner kopieren',               move: true },
+    { prop: 'Forward',             label: 'Weiterleiten an',                  out: true },
+    { prop: 'ForwardAsAttachment', label: 'Als Anhang weiterleiten an',       out: true },
+    { prop: 'Redirect',            label: 'Umleiten an',                      out: true },
+    { prop: 'CC',                  label: 'Kopie senden an (Cc)',             out: true },
+    { prop: 'Delete',              label: 'Löschen (Gelöschte Elemente)' },
+    { prop: 'DeletePermanently',   label: 'Endgültig löschen',      hard: true },
+    { prop: 'AssignToCategory',    label: 'Kategorie zuweisen' },
+    { prop: 'ClearCategories',     label: 'Kategorien entfernen' },
+    { prop: 'MarkAsTask',          label: 'Zur Nachverfolgung markieren' },
+    { prop: 'Importance',          label: 'Priorität setzen' },
+    { prop: 'Sensitivity',         label: 'Vertraulichkeit setzen' },
+    { prop: 'DesktopAlert',        label: 'Desktopbenachrichtigung anzeigen' },
+    { prop: 'NewItemAlert',        label: 'Hinweisfenster anzeigen' },
+    { prop: 'PlaySound',           label: 'Sound abspielen' },
+    { prop: 'NotifyDelivery',      label: 'Übermittlungsbestätigung anfordern' },
+    { prop: 'NotifyRead',          label: 'Lesebestätigung anfordern' },
+    { prop: 'Stop',                label: 'Keine weiteren Regeln anwenden',   stop: true }
+];
+
+var IMPORTANCE_TEXT  = ['Niedrig', 'Normal', 'Hoch'];
+var SENSITIVITY_TEXT = ['Normal', 'Persönlich', 'Privat', 'Vertraulich'];
+
+/* ---------------- Init ---------------- */
+window.onload = function () {
+    try { window.resizeTo(920, 980); } catch (e) {}
+    connectOutlook();
+};
+
+function connectOutlook() {
+    try {
+        outlookApp = new ActiveXObject("Outlook.Application");
+        outlookNS = outlookApp.GetNamespace("MAPI");
+        loadStores();
+    } catch (e) {
+        document.getElementById('storeList').innerHTML =
+            '&lt;div class="store-row">&amp;ndash; keine Verbindung &amp;ndash;&lt;/div>';
+        showError("Outlook konnte nicht verbunden werden. Bitte Outlook &amp;ouml;ffnen und &amp;bdquo;Postf&amp;auml;cher neu laden&amp;ldquo; klicken. (" + esc(e.message) + ")");
+    }
+}
+
+function reconnectOutlook() {
+    hideStatus();
+    connectOutlook();
+}
+
+/* ---------------- UI-Helfer ---------------- */
+function esc(s) {
+    return String(s === null || typeof s === 'undefined' ? '' : s)
+        .replace(/&amp;/g, '&amp;amp;').replace(/&lt;/g, '&amp;lt;').replace(/>/g, '&amp;gt;');
+}
+function trim(s) { return String(s === null || typeof s === 'undefined' ? '' : s).replace(/^\s+|\s+$/g, ''); }
+function pad(n) { return n &lt; 10 ? '0' + n : '' + n; }
+
+function showStatus(cls, html) {
+    var el = document.getElementById('status');
+    el.className = 'status ' + cls;
+    el.style.display = 'block';
+    el.innerHTML = html;
+}
+function showError(html)   { showStatus('error', html); }
+function showInfo(html)    { showStatus('info', html); }
+function showSuccess(html) { showStatus('success', html); }
+function hideStatus() { document.getElementById('status').style.display = 'none'; }
+
+function showProgress(text) {
+    document.getElementById('progressContainer').style.display = 'block';
+    setProgress(0, text);
+}
+function setProgress(pct, text) {
+    if (pct &lt; 0) pct = 0;
+    if (pct > 100) pct = 100;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').innerHTML = text;
+}
+function hideProgress() {
+    document.getElementById('progressContainer').style.display = 'none';
+}
+
+/* Log: echte Umlaute im String-Literal, Escaping macht log() selbst. */
+function log(msg, type) {
+    var box = document.getElementById('log');
+    box.style.display = 'block';
+    var d = new Date();
+    var line = document.createElement('div');
+    line.className = 't-' + (type || 'info');
+    line.innerHTML = '&lt;span class="t-muted">' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + '&lt;/span>  ' + esc(msg);
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+    var box = document.getElementById('log');
+    box.innerHTML = '';
+    box.style.display = 'none';
+}
+
+/* ---------------- Postfaecher laden ---------------- */
+function loadStores() {
+    STORES = [];
+    var listEl = document.getElementById('storeList');
+    listEl.innerHTML = '';
+
+    var defaultId = '';
+    try { defaultId = String(outlookNS.DefaultStore.StoreID); } catch (e) {}
+
+    try {
+        var stores = outlookNS.Stores;
+        for (var i = 1; i &lt;= stores.Count; i++) {
+            try {
+                var store = stores.Item(i);
+                var name = '';
+                try { name = String(store.DisplayName); } catch (eN) { name = 'Postfach ' + i; }
+                var sid = '';
+                try { sid = String(store.StoreID); } catch (eS) {}
+                var isFile = false;
+                try { isFile = !!store.IsDataFileStore; } catch (eF) {}
+                STORES.push({
+                    idx: i,
+                    name: name,
+                    storeId: sid,
+                    isDefault: (sid !== '' &amp;&amp; sid === defaultId),
+                    isFile: isFile
+                });
+            } catch (eItem) {}
+        }
+    } catch (e) {
+        listEl.innerHTML = '&lt;div class="store-row">&amp;ndash; Fehler &amp;ndash;&lt;/div>';
+        showError("Postf&amp;auml;cher konnten nicht geladen werden: " + esc(e.message));
+        return;
+    }
+
+    if (STORES.length === 0) {
+        listEl.innerHTML = '&lt;div class="store-row">&amp;ndash; keine Postf&amp;auml;cher im Profil &amp;ndash;&lt;/div>';
+        updateStartButton();
+        return;
+    }
+
+    for (var k = 0; k &lt; STORES.length; k++) {
+        var s = STORES[k];
+        var lbl = document.createElement('label');
+        lbl.className = 'store-row';
+        var badge = s.isFile
+            ? '&lt;span class="badge badge-file">Datendatei&lt;/span>'
+            : (s.isDefault
+                ? '&lt;span class="badge badge-self">eigenes Postfach&lt;/span>'
+                : '&lt;span class="badge badge-extra">weiteres Postfach&lt;/span>');
+        lbl.innerHTML = '&lt;input type="checkbox" id="st' + k + '" onclick="updateStartButton()"> ' +
+                        esc(s.name) + badge;
+        listEl.appendChild(lbl);
+    }
+
+    log('Outlook verbunden – ' + STORES.length + ' Postfach/Postfächer im Profil gefunden.', 'ok');
+    selectGroupStores();
+    updateStartButton();
+}
+
+function setChecked(k, val) {
+    var el = document.getElementById('st' + k);
+    if (el) el.checked = !!val;
+}
+function isChecked(k) {
+    var el = document.getElementById('st' + k);
+    return el ? !!el.checked : false;
+}
+
+function selectAllStores(val) {
+    for (var k = 0; k &lt; STORES.length; k++) setChecked(k, val);
+    updateStartButton();
+}
+
+/* Gruppenpostfach-Heuristik: alles ausser dem eigenen Standard-Postfach
+   und ausser lokalen Datendateien (PST). */
+function selectGroupStores() {
+    var any = false;
+    for (var k = 0; k &lt; STORES.length; k++) {
+        var take = (!STORES[k].isDefault &amp;&amp; !STORES[k].isFile);
+        setChecked(k, take);
+        if (take) any = true;
+    }
+    if (!any) {
+        /* Kein weiteres Postfach im Profil: eigenes vorauswaehlen. */
+        for (var j = 0; j &lt; STORES.length; j++) {
+            if (!STORES[j].isFile) { setChecked(j, true); break; }
+        }
+    }
+    updateStartButton();
+}
+
+/* Postfach der aktuellen Outlook-Auswahl (Ordner bzw. markierte Mails) ankreuzen. */
+function takeFromOutlook() {
+    hideStatus();
+    var found = {};
+    var count = 0;
+    try {
+        var exp = outlookApp.ActiveExplorer();
+        if (exp) {
+            try {
+                var sid = String(exp.CurrentFolder.Store.StoreID);
+                if (!found[sid]) { found[sid] = true; count++; }
+            } catch (e1) {}
+            try {
+                var sel = exp.Selection;
+                for (var i = 1; i &lt;= sel.Count; i++) {
+                    try {
+                        var parent = sel.Item(i).Parent;
+                        var sid2 = String(parent.Store.StoreID);
+                        if (!found[sid2]) { found[sid2] = true; count++; }
+                    } catch (e2) {}
+                }
+            } catch (e3) {}
+        }
+    } catch (e) {}
+
+    if (count === 0) {
+        showInfo("In Outlook ist gerade keine Auswahl erkennbar. Bitte in Outlook einen Ordner des Gruppenpostfachs anklicken (oder eine Mail markieren) und erneut &amp;bdquo;Aus Outlook-Auswahl &amp;uuml;bernehmen&amp;ldquo; dr&amp;uuml;cken &amp;ndash; oder die H&amp;auml;kchen direkt in der Liste setzen.");
+        return;
+    }
+
+    var hits = 0;
+    for (var k = 0; k &lt; STORES.length; k++) {
+        var take = !!found[STORES[k].storeId];
+        setChecked(k, take);
+        if (take) hits++;
+    }
+    updateStartButton();
+
+    if (hits === 0) {
+        showInfo("Das Postfach der Outlook-Auswahl ist in der Liste nicht wiederzufinden. Bitte die H&amp;auml;kchen direkt in der Liste setzen.");
+    } else {
+        log('Aus Outlook übernommen: ' + hits + ' Postfach/Postfächer angekreuzt.', 'ok');
+    }
+}
+
+function selectedStores() {
+    var out = [];
+    for (var k = 0; k &lt; STORES.length; k++) {
+        if (isChecked(k)) out.push(STORES[k]);
+    }
+    return out;
+}
+
+function updateStartButton() {
+    document.getElementById('btnStart').disabled = (selectedStores().length === 0);
+}
+
+/* ---------------- COM-Lesehilfen ---------------- */
+/* Eigenschaft lesen, ohne bei nicht vorhandenen Properties abzubrechen. */
+function tryGet(obj, prop) {
+    try {
+        var v = obj[prop];
+        return (typeof v === 'undefined') ? null : v;
+    } catch (e) { return null; }
+}
+
+/* SAFEARRAY (VBArray) oder Einzelwert in ein JS-Array aus Strings wandeln. */
+function toList(v) {
+    if (v === null || typeof v === 'undefined') return [];
+    var out = [];
+    try {
+        var arr = new VBArray(v).toArray();
+        for (var i = 0; i &lt; arr.length; i++) {
+            var s = trim(arr[i]);
+            if (s !== '') out.push(s);
+        }
+        return out;
+    } catch (e) {}
+    try {
+        if (typeof v === 'object' &amp;&amp; typeof v.length === 'number') {
+            for (var j = 0; j &lt; v.length; j++) {
+                var s2 = trim(v[j]);
+                if (s2 !== '') out.push(s2);
+            }
+            return out;
+        }
+    } catch (e2) {}
+    var s3 = trim(v);
+    if (s3 !== '') out.push(s3);
+    return out;
+}
+
+/* Recipients-Collection als Namensliste. */
+function recipientList(recs) {
+    var out = [];
+    if (!recs) return out;
+    try {
+        for (var i = 1; i &lt;= recs.Count; i++) {
+            try {
+                var r = recs.Item(i);
+                var name = '';
+                try { name = trim(r.Name); } catch (e1) {}
+                var addr = '';
+                try { addr = trim(r.Address); } catch (e2) {}
+                if (name === '' &amp;&amp; addr === '') continue;
+                if (name === '') { out.push(addr); }
+                else if (addr !== '' &amp;&amp; addr.indexOf('@') !== -1 &amp;&amp; addr.toLowerCase() !== name.toLowerCase()) {
+                    out.push(name + ' &lt;' + addr + '>');
+                } else {
+                    out.push(name);
+                }
+            } catch (eR) {}
+        }
+    } catch (e) {}
+    return out;
+}
+
+function quoteList(list) {
+    var out = [];
+    for (var i = 0; i &lt; list.length; i++) out.push('"' + list[i] + '"');
+    return out.join(', ');
+}
+
+/* Details einer Bedingung / Aktion lesen. Es wird generisch nach allen
+   Eigenschaften gefragt, die die Outlook-Subtypen anbieten koennen. */
+function describeRuleItem(obj) {
+    var parts = [];
+
+    var texts = toList(tryGet(obj, 'Text'));
+    if (texts.length > 0) parts.push(quoteList(texts));
+
+    var addr = toList(tryGet(obj, 'Address'));
+    if (addr.length > 0) parts.push(quoteList(addr));
+
+    var forms = toList(tryGet(obj, 'FormName'));
+    if (forms.length > 0) parts.push(quoteList(forms));
+
+    var cats = toList(tryGet(obj, 'Categories'));
+    if (cats.length > 0) parts.push(cats.join(', '));
+
+    var recs = recipientList(tryGet(obj, 'Recipients'));
+    if (recs.length > 0) parts.push(recs.join('; '));
+
+    var folder = tryGet(obj, 'Folder');
+    if (folder) {
+        var fp = folderPath(folder);
+        if (fp !== '') parts.push(fp);
+    }
+
+    var acc = tryGet(obj, 'Account');
+    if (acc) {
+        try { parts.push(trim(acc.DisplayName)); } catch (e) {}
+    }
+
+    var al = tryGet(obj, 'AddressList');
+    if (al) {
+        try { parts.push(trim(al.Name)); } catch (e) {}
+    }
+
+    var imp = tryGet(obj, 'Importance');
+    if (typeof imp === 'number' &amp;&amp; imp >= 0 &amp;&amp; imp &lt;= 2) parts.push(IMPORTANCE_TEXT[imp]);
+
+    var sens = tryGet(obj, 'Sensitivity');
+    if (typeof sens === 'number' &amp;&amp; sens >= 0 &amp;&amp; sens &lt;= 3) parts.push(SENSITIVITY_TEXT[sens]);
+
+    var flagTo = tryGet(obj, 'FlagTo');
+    if (flagTo !== null &amp;&amp; trim(flagTo) !== '') parts.push(trim(flagTo));
+
+    var interval = tryGet(obj, 'MarkInterval');
+    if (typeof interval === 'number') parts.push('Frist-Code ' + interval);
+
+    var file = tryGet(obj, 'FilePath');
+    if (file !== null &amp;&amp; trim(file) !== '') parts.push(trim(file));
+
+    return parts.join(' | ');
+}
+
+/* Ordnerpfad eines Ordner-Objekts, robust gegen geloeschte Ordner. */
+function folderPath(folder) {
+    try {
+        var p = trim(folder.FolderPath);
+        if (p !== '') return p;
+    } catch (e) {}
+    try {
+        var n = trim(folder.Name);
+        if (n !== '') return n;
+    } catch (e2) {}
+    return '(Ordner nicht verfügbar)';
+}
+
+/* Typ-Kennung einer Bedingung/Aktion (fuer die Vollstaendigkeits-Pruefung). */
+function itemType(obj) {
+    var t = tryGet(obj, 'ConditionType');
+    if (typeof t === 'number') return 'C' + t;
+    t = tryGet(obj, 'ActionType');
+    if (typeof t === 'number') return 'A' + t;
+    return '?';
+}
+
+/* Alle aktiven Eintraege eines RuleConditions-/RuleActions-Containers lesen.
+   Erst die benannten Eigenschaften (mit deutschem Label), danach ueber den
+   Index alles, was nicht ueber einen Namen erfasst wurde. */
+function collectRuleItems(container, defs) {
+    var out = [];
+    var seen = {};
+    if (!container) return out;
+
+    for (var i = 0; i &lt; defs.length; i++) {
+        var def = defs[i];
+        var obj = tryGet(container, def.prop);
+        if (!obj) continue;
+        var enabled = tryGet(obj, 'Enabled');
+        if (enabled !== true) continue;
+        seen[itemType(obj)] = true;
+        out.push({
+            label: def.label,
+            detail: describeRuleItem(obj),
+            def: def
+        });
+    }
+
+    /* Nachlese: Aktionen/Bedingungen ohne benannte Eigenschaft (z. B.
+       "Skript ausfuehren" oder neue Outlook-Versionen). */
+    try {
+        var cnt = container.Count;
+        for (var k = 1; k &lt;= cnt; k++) {
+            try {
+                var it = container.Item(k);
+                if (tryGet(it, 'Enabled') !== true) continue;
+                var key = itemType(it);
+                if (seen[key]) continue;
+                seen[key] = true;
+                out.push({
+                    label: 'Sonstiges (Typ ' + key + ')',
+                    detail: describeRuleItem(it),
+                    def: {}
+                });
+            } catch (eIt) {}
+        }
+    } catch (e) {}
+
+    return out;
+}
+
+/* ---------------- Regeln auslesen (in Bloecken) ---------------- */
+function startRead() {
+    hideStatus();
+    clearLog();
+
+    var stores = selectedStores();
+    if (stores.length === 0) {
+        showError("Bitte mindestens ein Postfach ankreuzen.");
+        return;
+    }
+
+    document.getElementById('btnStart').disabled = true;
+    showProgress("Regeln werden gelesen &amp;hellip;");
+
+    readState = {
+        stores: stores,
+        sIdx: 0,
+        rules: null,
+        rIdx: 1,
+        ruleCount: 0,
+        storeName: '',
+        rows: [],                 // ein Eintrag pro Regel
+        storeStats: [],           // { name, rules, read, error }
+        skipped: 0,
+        includeDisabled: document.getElementById('chkDisabled').checked,
+        includeLocal: document.getElementById('chkLocal').checked,
+        includeSend: document.getElementById('chkSend').checked,
+        withChecks: document.getElementById('chkChecks').checked
+    };
+
+    log('Auslesen gestartet für ' + stores.length + ' Postfach/Postfächer.', 'head');
+    window.setTimeout(readTick, 60);
+}
+
+function readTick() {
+    var st = readState;
+    if (!st) return;
+
+    try {
+        /* Naechstes Postfach oeffnen */
+        if (st.rules === null) {
+            if (st.sIdx >= st.stores.length) { finishRead(); return; }
+            var s = st.stores[st.sIdx];
+            st.storeName = s.name;
+            setProgress(storePct(st), "Postfach: " + esc(s.name));
+
+            var rules = null;
+            var errMsg = '';
+            try {
+                var store = outlookNS.Stores.Item(s.idx);
+                rules = store.GetRules();
+            } catch (eG) {
+                errMsg = eG.message ? String(eG.message) : 'unbekannter Fehler';
+            }
+
+            if (rules === null) {
+                st.storeStats.push({ name: s.name, rules: 0, read: 0, error: errMsg });
+                log('Postfach "' + s.name + '": Regeln nicht lesbar – ' + errMsg, 'err');
+                st.sIdx++;
+                window.setTimeout(readTick, 10);
+                return;
+            }
+
+            st.rules = rules;
+            try { st.ruleCount = rules.Count; } catch (eC) { st.ruleCount = 0; }
+            st.rIdx = 1;
+            st.storeStats.push({ name: s.name, rules: st.ruleCount, read: 0, error: '' });
+            log('Postfach "' + s.name + '": ' + st.ruleCount + ' Regel(n) gefunden.', 'ok');
+        }
+
+        var stat = st.storeStats[st.storeStats.length - 1];
+        var end = Math.min(st.rIdx + CHUNK_RULES - 1, st.ruleCount);
+
+        for (var r = st.rIdx; r &lt;= end; r++) {
+            try {
+                var rec = readRule(st.rules.Item(r), st.storeName, st);
+                if (rec) { st.rows.push(rec); stat.read++; }
+            } catch (eR) {
+                st.skipped++;
+            }
+        }
+
+        st.rIdx = end + 1;
+        setProgress(storePct(st),
+            "Postfach " + esc(st.storeName) + ": " +
+            Math.min(st.rIdx - 1, st.ruleCount) + " / " + st.ruleCount + " Regeln gelesen");
+
+        if (st.rIdx > st.ruleCount) {
+            st.sIdx++;
+            st.rules = null;
+        }
+
+        window.setTimeout(readTick, 10);
+    } catch (e) {
+        hideProgress();
+        document.getElementById('btnStart').disabled = false;
+        readState = null;
+        showError("Fehler beim Auslesen der Regeln: " + esc(e.message));
+    }
+}
+
+function storePct(st) {
+    var per = 100 / st.stores.length;
+    var inner = st.ruleCount > 0 ? Math.min(1, (st.rIdx - 1) / st.ruleCount) : 0;
+    return Math.round(st.sIdx * per + inner * per);
+}
+
+/* Eine Outlook-Regel in ein flaches Objekt uebersetzen. */
+function readRule(rule, mailbox, st) {
+    var name = '';
+    try { name = trim(rule.Name); } catch (e) {}
+    if (name === '') name = '(ohne Namen)';
+
+    var enabled = true;
+    try { enabled = !!rule.Enabled; } catch (e) {}
+    var order = 0;
+    try { order = rule.ExecutionOrder; } catch (e) {}
+    var isLocal = false;
+    try { isLocal = !!rule.IsLocalRule; } catch (e) {}
+    var ruleType = OL_RULE_RECEIVE;
+    try { ruleType = rule.RuleType; } catch (e) {}
+
+    /* Filter aus den Optionen */
+    if (!enabled &amp;&amp; !st.includeDisabled) return null;
+    if (isLocal &amp;&amp; !st.includeLocal) return null;
+    if (ruleType === OL_RULE_SEND &amp;&amp; !st.includeSend) return null;
+
+    var conditions = [], exceptions = [], actions = [];
+    try { conditions = collectRuleItems(rule.Conditions, COND_DEFS); } catch (e) {}
+    try { exceptions = collectRuleItems(rule.Exceptions, COND_DEFS); } catch (e) {}
+    try { actions    = collectRuleItems(rule.Actions, ACTION_DEFS); } catch (e) {}
+
+    /* Kennzahlen fuer Uebersicht und Pruefhinweise */
+    var stop = false, targets = [], outbound = [], hardDelete = false;
+    var realActions = 0;
+    for (var i = 0; i &lt; actions.length; i++) {
+        var a = actions[i];
+        var d = a.def || {};
+        if (d.stop) { stop = true; continue; }
+        realActions++;
+        if (d.move &amp;&amp; a.detail !== '') targets.push(a.detail);
+        if (d.out) outbound.push(a.label + (a.detail !== '' ? ' ' + a.detail : ''));
+        if (d.hard) hardDelete = true;
+    }
+
+    return {
+        mailbox: mailbox,
+        name: name,
+        enabled: enabled,
+        order: order,
+        isLocal: isLocal,
+        ruleType: ruleType,
+        conditions: conditions,
+        exceptions: exceptions,
+        actions: actions,
+        stop: stop,
+        realActions: realActions,
+        targets: targets,
+        outbound: outbound,
+        hardDelete: hardDelete
+    };
+}
+
+/* ---------------- Textbausteine ---------------- */
+function itemText(it) {
+    return it.detail !== '' ? (it.label + ' ' + it.detail) : it.label;
+}
+function itemTexts(list, sep) {
+    var out = [];
+    for (var i = 0; i &lt; list.length; i++) out.push(itemText(list[i]));
+    return out.join(sep);
+}
+
+/* Logik in einer Zeile: WENN ... DANN ... AUSSER WENN ... */
+function logicText(rec) {
+    var s = 'WENN ' + (rec.conditions.length > 0
+        ? itemTexts(rec.conditions, ' UND ')
+        : 'jede eingehende Mail (keine Bedingung)');
+    s += '  DANN ' + (rec.actions.length > 0 ? itemTexts(rec.actions, ' + ') : 'keine Aktion');
+    if (rec.exceptions.length > 0) {
+        s += '  AUSSER WENN ' + itemTexts(rec.exceptions, ' ODER ');
+    }
+    if (s.length > 900) s = s.substring(0, 897) + '...';
+    return s;
+}
+
+/* Signatur der Bedingungen - fuer Doppelungs- und Konfliktpruefung. */
+function condSignature(rec) {
+    var parts = [];
+    for (var i = 0; i &lt; rec.conditions.length; i++) parts.push(itemText(rec.conditions[i]));
+    parts.sort();
+    return parts.join(' &amp;&amp; ');
+}
+function condSet(rec) {
+    var set = {};
+    for (var i = 0; i &lt; rec.conditions.length; i++) set[itemText(rec.conditions[i])] = true;
+    return set;
+}
+function isSubset(small, big) {
+    var any = false;
+    for (var k in small) {
+        if (!small.hasOwnProperty(k)) continue;
+        any = true;
+        if (!big[k]) return false;
+    }
+    return any;
+}
+
+function ruleTypeText(t) { return t === OL_RULE_SEND ? 'Senden' : 'Empfangen'; }
+function jaNein(b) { return b ? 'Ja' : 'Nein'; }
+function fmtNow() {
+    var d = new Date();
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() +
+           ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/* ---------------- Abschluss ---------------- */
+function finishRead() {
+    var st = readState;
+    readState = null;
+
+    setProgress(100, "Regeln gelesen &amp;ndash; Excel wird erstellt &amp;hellip;");
+    log('Insgesamt ' + st.rows.length + ' Regel(n) übernommen. Excel-Mappe wird aufgebaut …', 'head');
+
+    /* Kurzer Tick, damit der Fortschritt gerendert wird, bevor Excel-COM blockiert */
+    window.setTimeout(function () {
+        try {
+            if (st.rows.length === 0) {
+                hideProgress();
+                showError("Es wurden keine Regeln gefunden, die zu den gew&amp;auml;hlten Optionen passen. " +
+                          "H&amp;auml;ufigster Grund: Das Gruppenpostfach h&amp;auml;ngt nicht als vollwertiges Postfach im Profil, " +
+                          "oder es gibt dort tats&amp;auml;chlich keine Regeln.");
+                document.getElementById('btnStart').disabled = false;
+                return;
+            }
+
+            buildExcel(st);
+            hideProgress();
+
+            var sheets = st.withChecks ? 5 : 4;
+            var msg = "&lt;b>Fertig!&lt;/b>&lt;br>" + st.rows.length + " Regel(n) aus " + st.storeStats.length +
+                      " Postfach/Postf&amp;auml;chern ausgelesen. Die Excel-Mappe ist ge&amp;ouml;ffnet (" + sheets +
+                      " Bl&amp;auml;tter). Bitte manuell speichern.";
+            var errs = 0;
+            for (var i = 0; i &lt; st.storeStats.length; i++) if (st.storeStats[i].error !== '') errs++;
+            if (errs > 0) {
+                msg += "&lt;br>&lt;i>" + errs + " Postfach/Postf&amp;auml;cher lieferten keine Regeln &amp;ndash; Details im Log und im Blatt &amp;bdquo;&amp;Uuml;bersicht&amp;ldquo;.&lt;/i>";
+            }
+            if (st.skipped > 0) {
+                msg += "&lt;br>&lt;i>" + st.skipped + " Regel(n) konnten nicht gelesen werden und wurden &amp;uuml;bersprungen.&lt;/i>";
+            }
+            showSuccess(msg);
+            log('Excel-Mappe erstellt.', 'ok');
+        } catch (e) {
+            hideProgress();
+            showError("Excel-Export fehlgeschlagen: " + esc(e.message));
+            log('Excel-Export fehlgeschlagen: ' + e.message, 'err');
+        }
+        document.getElementById('btnStart').disabled = false;
+    }, 60);
+}
+
+/* ---------------- Excel-Ausgabe ---------------- */
+/* Excel Interior.Color erwartet R + G*256 + B*65536 */
+function rgb(r, g, b) { return r + g * 256 + b * 65536; }
+
+var C_HEAD    = [185, 28, 28];    // Kopfzeile: Rot
+var C_RULE    = [30, 41, 59];     // Regelkopf: dunkelblau
+var C_COND    = [219, 234, 254];  // Bedingung: hellblau
+var C_EXCEPT  = [254, 243, 199];  // Ausnahme: amber
+var C_ACTION  = [209, 250, 229];  // Aktion: gruen
+var C_GREY    = [243, 244, 246];  // neutral grau
+var C_SUM     = [229, 231, 235];  // Summenzeile
+
+function fillRange(sheet, r1, c1, r2, c2, col) {
+    try {
+        sheet.Range(sheet.Cells(r1, c1), sheet.Cells(r2, c2)).Interior.Color = rgb(col[0], col[1], col[2]);
+    } catch (e) {}
+}
+function styleHeaderRow(sheet, rowNr, colCount) {
+    try {
+        var hr = sheet.Range(sheet.Cells(rowNr, 1), sheet.Cells(rowNr, colCount));
+        hr.Font.Bold = true;
+        hr.Interior.Color = rgb(C_HEAD[0], C_HEAD[1], C_HEAD[2]);
+        hr.Font.Color = rgb(255, 255, 255);
+    } catch (e) {}
+}
+function freezeBelow(sheet, excel, rowNr) {
+    try {
+        sheet.Activate();
+        sheet.Range("A1").Select();
+        excel.ActiveWindow.FreezePanes = false;
+        sheet.Cells(rowNr + 1, 1).Select();
+        excel.ActiveWindow.FreezePanes = true;
+    } catch (e) {}
+}
+function writeRow(sheet, rowNr, values) {
+    for (var i = 0; i &lt; values.length; i++) {
+        try { sheet.Cells(rowNr, i + 1).Value = values[i]; } catch (e) {}
+    }
+}
+
+function buildExcel(st) {
+    var rows = st.rows;
+
+    var excel = new ActiveXObject("Excel.Application");
+    excel.Visible = true;
+    excel.DisplayAlerts = false;
+    try { excel.ScreenUpdating = false; } catch (e) {}
+
+    var wb = excel.Workbooks.Add();
+
+    /* Worksheets.Add() legt VOR dem aktiven Blatt an -> in umgekehrter
+       Reihenfolge anlegen. Zielreihenfolge:
+       Übersicht | Regel-Logik | Elemente | Zielordner | Prüfhinweise */
+    var shChecks = null, shFolders = null, shFlat = null, shLogic = null, shOverview = null;
+
+    if (st.withChecks) {
+        shChecks = wb.ActiveSheet;
+        try { shChecks.Name = "Prüfhinweise"; } catch (e) {}
+        shFolders = wb.Worksheets.Add();
+    } else {
+        shFolders = wb.ActiveSheet;
+    }
+    try { shFolders.Name = "Zielordner"; } catch (e) {}
+    shFlat = wb.Worksheets.Add();
+    try { shFlat.Name = "Elemente"; } catch (e) {}
+    shLogic = wb.Worksheets.Add();
+    try { shLogic.Name = "Regel-Logik"; } catch (e) {}
+    shOverview = wb.Worksheets.Add();
+    try { shOverview.Name = "Übersicht"; } catch (e) {}
+
+    try {
+        buildOverview(shOverview, excel, st);
+        buildLogic(shLogic, excel, st);
+        buildFlat(shFlat, excel, st);
+        buildFolders(shFolders, excel, st);
+        if (shChecks) buildChecks(shChecks, excel, st);
+    } finally {
+        try { excel.ScreenUpdating = true; } catch (e) {}
+        excel.DisplayAlerts = true;
+    }
+
+    try { shOverview.Activate(); shOverview.Range("A1").Select(); } catch (e) {}
+}
+
+/* ---------- Blatt 1: Übersicht ---------- */
+function buildOverview(sh, excel, st) {
+    var rows = st.rows;
+
+    sh.Cells(1, 1).Value = "Outlook-Regeln – Übersicht";
+    try { sh.Cells(1, 1).Font.Bold = true; sh.Cells(1, 1).Font.Size = 14; } catch (e) {}
+    sh.Cells(2, 1).Value = "Erstellt am:";
+    sh.Cells(2, 2).Value = fmtNow();
+    sh.Cells(3, 1).Value = "Postfächer:";
+    var names = [], errLines = [];
+    for (var i = 0; i &lt; st.storeStats.length; i++) {
+        var s = st.storeStats[i];
+        names.push(s.name + " (" + s.rules + " Regeln)");
+        if (s.error !== '') errLines.push(s.name + ": " + s.error);
+    }
+    sh.Cells(3, 2).Value = names.join("  |  ");
+    sh.Cells(4, 1).Value = "Regeln ausgegeben:";
+    sh.Cells(4, 2).Value = rows.length;
+    sh.Cells(5, 1).Value = "Optionen:";
+    sh.Cells(5, 2).Value =
+        (st.includeDisabled ? "inkl. deaktivierte" : "nur aktive") + ", " +
+        (st.includeLocal ? "inkl. Nur-lokale" : "ohne Nur-lokale") + ", " +
+        (st.includeSend ? "inkl. Senden-Regeln" : "nur Empfangen-Regeln");
+    var metaRow = 6;
+    if (errLines.length > 0) {
+        sh.Cells(metaRow, 1).Value = "Nicht lesbar:";
+        sh.Cells(metaRow, 2).Value = errLines.join("  |  ");
+        metaRow++;
+    }
+    for (var m = 2; m &lt; metaRow; m++) { try { sh.Cells(m, 1).Font.Bold = true; } catch (e) {} }
+
+    var headRow = metaRow + 1;
+    var headers = ["Nr", "Postfach", "Reihenfolge", "Regelname", "Aktiv", "Regeltyp", "Gültigkeit",
+                   "Bedingungen", "Ausnahmen", "Aktionen", "Stopp danach", "Zielordner", "Logik (WENN / DANN / AUSSER WENN)"];
+    writeRow(sh, headRow, headers);
+    styleHeaderRow(sh, headRow, headers.length);
+
+    /* Sortierung: Postfach, dann Ausführungsreihenfolge */
+    var sorted = rows.slice(0);
+    sorted.sort(function (a, b) {
+        if (a.mailbox &lt; b.mailbox) return -1;
+        if (a.mailbox > b.mailbox) return 1;
+        return a.order - b.order;
+    });
+
+    var row = headRow + 1;
+    for (var r = 0; r &lt; sorted.length; r++) {
+        var rec = sorted[r];
+        writeRow(sh, row, [
+            r + 1,
+            rec.mailbox,
+            rec.order,
+            rec.name,
+            jaNein(rec.enabled),
+            ruleTypeText(rec.ruleType),
+            rec.isLocal ? "Nur auf diesem Client" : "Server (immer)",
+            rec.conditions.length,
+            rec.exceptions.length,
+            rec.realActions,
+            jaNein(rec.stop),
+            rec.targets.join(" | "),
+            logicText(rec)
+        ]);
+        if (!rec.enabled) {
+            fillRange(sh, row, 1, row, headers.length, C_GREY);
+            try { sh.Range(sh.Cells(row, 1), sh.Cells(row, headers.length)).Font.Italic = true; } catch (e) {}
+        }
+        row++;
+    }
+
+    try { sh.Range(sh.Cells(headRow, 1), sh.Cells(row - 1, headers.length)).AutoFilter(); } catch (e) {}
+    try {
+        sh.Columns("A:K").AutoFit();
+        sh.Columns("D:D").ColumnWidth = 34;
+        sh.Columns("L:L").ColumnWidth = 32;
+        sh.Columns("M:M").ColumnWidth = 90;
+        sh.Cells(3, 2).ColumnWidth = 30;
+    } catch (e) {}
+    freezeBelow(sh, excel, headRow);
+}
+
+/* ---------- Blatt 2: Regel-Logik (Blockdarstellung) ---------- */
+function buildLogic(sh, excel, st) {
+    var rows = st.rows.slice(0);
+    rows.sort(function (a, b) {
+        if (a.mailbox &lt; b.mailbox) return -1;
+        if (a.mailbox > b.mailbox) return 1;
+        return a.order - b.order;
+    });
+
+    sh.Cells(1, 1).Value = "Regel-Logik im Detail";
+    try { sh.Cells(1, 1).Font.Bold = true; sh.Cells(1, 1).Font.Size = 14; } catch (e) {}
+    sh.Cells(2, 1).Value = "Legende:";
+    sh.Cells(2, 2).Value = "Bedingungen sind UND-verknüpft (alle müssen zutreffen). " +
+                           "Jede einzelne Ausnahme verhindert die Regel. " +
+                           "Aktionen laufen von oben nach unten; \"Keine weiteren Regeln anwenden\" beendet die Kette.";
+    try { sh.Cells(2, 1).Font.Bold = true; } catch (e) {}
+
+    var headRow = 4;
+    writeRow(sh, headRow, ["Postfach", "Nr", "Block", "Bezeichnung", "Details"]);
+    styleHeaderRow(sh, headRow, 5);
+
+    var row = headRow + 1;
+    var lastMailbox = null;
+
+    for (var r = 0; r &lt; rows.length; r++) {
+        var rec = rows[r];
+
+        /* Trennzeile je Postfach */
+        if (rec.mailbox !== lastMailbox) {
+            if (lastMailbox !== null) row++;
+            sh.Cells(row, 1).Value = "POSTFACH: " + rec.mailbox;
+            try {
+                var mr = sh.Range(sh.Cells(row, 1), sh.Cells(row, 5));
+                mr.Font.Bold = true;
+                mr.Interior.Color = rgb(C_HEAD[0], C_HEAD[1], C_HEAD[2]);
+                mr.Font.Color = rgb(255, 255, 255);
+            } catch (e) {}
+            lastMailbox = rec.mailbox;
+            row++;
+        }
+
+        /* Regelkopf */
+        var head = "Regel #" + rec.order + ": " + rec.name;
+        if (!rec.enabled) head += "   [INAKTIV]";
+        if (rec.isLocal) head += "   [nur auf diesem Client]";
+        if (rec.ruleType === OL_RULE_SEND) head += "   [Senden-Regel]";
+        sh.Cells(row, 1).Value = rec.mailbox;
+        sh.Cells(row, 2).Value = rec.order;
+        sh.Cells(row, 3).Value = "REGEL";
+        sh.Cells(row, 4).Value = head;
+        sh.Cells(row, 5).Value = logicText(rec);
+        try {
+            var hr = sh.Range(sh.Cells(row, 1), sh.Cells(row, 5));
+            hr.Font.Bold = true;
+            hr.Interior.Color = rgb(C_RULE[0], C_RULE[1], C_RULE[2]);
+            hr.Font.Color = rgb(255, 255, 255);
+        } catch (e) {}
+        row++;
+
+        /* WENN / UND */
+        if (rec.conditions.length === 0) {
+            sh.Cells(row, 3).Value = "WENN";
+            sh.Cells(row, 4).Value = "jede eingehende Mail";
+            sh.Cells(row, 5).Value = "keine Bedingung gesetzt – die Regel greift bei ALLEN Mails";
+            fillRange(sh, row, 3, row, 5, C_COND);
+            row++;
+        } else {
+            for (var c = 0; c &lt; rec.conditions.length; c++) {
+                sh.Cells(row, 3).Value = (c === 0) ? "WENN" : "UND";
+                sh.Cells(row, 4).Value = rec.conditions[c].label;
+                sh.Cells(row, 5).Value = rec.conditions[c].detail;
+                fillRange(sh, row, 3, row, 5, C_COND);
+                row++;
+            }
+        }
+
+        /* AUSSER WENN */
+        for (var x = 0; x &lt; rec.exceptions.length; x++) {
+            sh.Cells(row, 3).Value = (x === 0) ? "AUSSER WENN" : "ODER";
+            sh.Cells(row, 4).Value = rec.exceptions[x].label;
+            sh.Cells(row, 5).Value = rec.exceptions[x].detail;
+            fillRange(sh, row, 3, row, 5, C_EXCEPT);
+            row++;
+        }
+
+        /* DANN */
+        if (rec.actions.length === 0) {
+            sh.Cells(row, 3).Value = "DANN";
+            sh.Cells(row, 4).Value = "keine Aktion";
+            sh.Cells(row, 5).Value = "Regel ohne Aktion – sie tut nichts";
+            fillRange(sh, row, 3, row, 5, C_ACTION);
+            row++;
+        } else {
+            for (var a = 0; a &lt; rec.actions.length; a++) {
+                sh.Cells(row, 3).Value = (a === 0) ? "DANN" : "UND DANN";
+                sh.Cells(row, 4).Value = rec.actions[a].label;
+                sh.Cells(row, 5).Value = rec.actions[a].detail;
+                fillRange(sh, row, 3, row, 5, C_ACTION);
+                row++;
+            }
+        }
+
+        row++;   /* Leerzeile zwischen Regeln */
+    }
+
+    try {
+        sh.Columns("A:A").ColumnWidth = 26;
+        sh.Columns("B:B").ColumnWidth = 6;
+        sh.Columns("C:C").ColumnWidth = 14;
+        sh.Columns("D:D").ColumnWidth = 42;
+        sh.Columns("E:E").ColumnWidth = 80;
+    } catch (e) {}
+    freezeBelow(sh, excel, headRow);
+}
+
+/* ---------- Blatt 3: Elemente (flach, filterbar) ---------- */
+function buildFlat(sh, excel, st) {
+    var headers = ["Postfach", "Reihenfolge", "Regelname", "Aktiv", "Art", "Bezeichnung", "Details"];
+    writeRow(sh, 1, headers);
+    styleHeaderRow(sh, 1, headers.length);
+
+    var rows = st.rows;
+    var row = 2;
+    for (var r = 0; r &lt; rows.length; r++) {
+        var rec = rows[r];
+        row = flatBlock(sh, row, rec, "Bedingung", rec.conditions, C_COND);
+        row = flatBlock(sh, row, rec, "Ausnahme", rec.exceptions, C_EXCEPT);
+        row = flatBlock(sh, row, rec, "Aktion", rec.actions, C_ACTION);
+    }
+    if (row === 2) {
+        sh.Cells(2, 1).Value = "Keine Bedingungen/Aktionen gefunden.";
+    }
+
+    try { sh.Range(sh.Cells(1, 1), sh.Cells(row - 1, headers.length)).AutoFilter(); } catch (e) {}
+    try {
+        sh.Columns("A:E").AutoFit();
+        sh.Columns("C:C").ColumnWidth = 34;
+        sh.Columns("F:F").ColumnWidth = 42;
+        sh.Columns("G:G").ColumnWidth = 70;
+    } catch (e) {}
+    freezeBelow(sh, excel, 1);
+}
+
+function flatBlock(sh, row, rec, art, list, col) {
+    for (var i = 0; i &lt; list.length; i++) {
+        writeRow(sh, row, [
+            rec.mailbox, rec.order, rec.name, jaNein(rec.enabled),
+            art, list[i].label, list[i].detail
+        ]);
+        fillRange(sh, row, 5, row, 5, col);
+        row++;
+    }
+    return row;
+}
+
+/* ---------- Blatt 4: Zielordner (Mengengerüst) ---------- */
+function buildFolders(sh, excel, st) {
+    sh.Cells(1, 1).Value = "Wohin schreiben die Regeln?";
+    try { sh.Cells(1, 1).Font.Bold = true; sh.Cells(1, 1).Font.Size = 14; } catch (e) {}
+    sh.Cells(2, 1).Value = "Grundlage: Aktionen \"In Ordner verschieben\" und \"In Ordner kopieren\".";
+
+    var headRow = 4;
+    var headers = ["Postfach", "Zielordner", "Anzahl Regeln", "davon aktiv", "Regeln"];
+    writeRow(sh, headRow, headers);
+    styleHeaderRow(sh, headRow, headers.length);
+
+    /* Aggregation Postfach + Zielordner */
+    var map = {}, order = [];
+    for (var r = 0; r &lt; st.rows.length; r++) {
+        var rec = st.rows[r];
+        for (var t = 0; t &lt; rec.targets.length; t++) {
+            var key = rec.mailbox + '' + rec.targets[t];
+            if (!map[key]) {
+                map[key] = { mailbox: rec.mailbox, folder: rec.targets[t], count: 0, active: 0, names: [] };
+                order.push(key);
+            }
+            map[key].count++;
+            if (rec.enabled) map[key].active++;
+            map[key].names.push(rec.name + (rec.enabled ? '' : ' [inaktiv]'));
+        }
+    }
+
+    order.sort(function (a, b) {
+        var x = map[a], y = map[b];
+        if (x.mailbox &lt; y.mailbox) return -1;
+        if (x.mailbox > y.mailbox) return 1;
+        if (y.count !== x.count) return y.count - x.count;
+        return x.folder &lt; y.folder ? -1 : 1;
+    });
+
+    var row = headRow + 1;
+    var total = 0;
+    for (var i = 0; i &lt; order.length; i++) {
+        var e = map[order[i]];
+        var names = e.names.join(', ');
+        if (names.length > 500) names = names.substring(0, 497) + '...';
+        writeRow(sh, row, [e.mailbox, e.folder, e.count, e.active, names]);
+        total += e.count;
+        row++;
+    }
+
+    if (order.length === 0) {
+        sh.Cells(row, 1).Value = "Keine Regel verschiebt oder kopiert Mails in einen Ordner.";
+        row++;
+    } else {
+        writeRow(sh, row, ["Summe", "", total, "", ""]);
+        try {
+            var sr = sh.Range(sh.Cells(row, 1), sh.Cells(row, headers.length));
+            sr.Font.Bold = true;
+            sr.Interior.Color = rgb(C_SUM[0], C_SUM[1], C_SUM[2]);
+        } catch (e) {}
+        row++;
+    }
+
+    try { sh.Range(sh.Cells(headRow, 1), sh.Cells(row - 2, headers.length)).AutoFilter(); } catch (e) {}
+    try {
+        sh.Columns("A:A").ColumnWidth = 26;
+        sh.Columns("B:B").ColumnWidth = 60;
+        sh.Columns("C:D").AutoFit();
+        sh.Columns("E:E").ColumnWidth = 70;
+    } catch (e) {}
+    freezeBelow(sh, excel, headRow);
+}
+
+/* ---------- Blatt 5: Prüfhinweise ---------- */
+function buildChecks(sh, excel, st) {
+    sh.Cells(1, 1).Value = "Prüfhinweise zur Regel-Logik";
+    try { sh.Cells(1, 1).Font.Bold = true; sh.Cells(1, 1).Font.Size = 14; } catch (e) {}
+    sh.Cells(2, 1).Value = "Automatisch erkannte Auffälligkeiten. Kein Ersatz für die fachliche Prüfung – bitte einzeln bewerten.";
+
+    var headRow = 4;
+    var headers = ["Kategorie", "Postfach", "Regel", "Hinweis"];
+    writeRow(sh, headRow, headers);
+    styleHeaderRow(sh, headRow, headers.length);
+
+    var notes = [];
+    function note(cat, mailbox, rule, text) {
+        notes.push({ cat: cat, mailbox: mailbox, rule: rule, text: text });
+    }
+
+    var rows = st.rows;
+
+    /* Einzelregel-Prüfungen */
+    for (var i = 0; i &lt; rows.length; i++) {
+        var rec = rows[i];
+        if (!rec.enabled) {
+            note("Inaktiv", rec.mailbox, rec.name,
+                 "Regel ist deaktiviert und greift derzeit nicht.");
+        }
+        if (rec.isLocal) {
+            note("Nur-lokale Regel", rec.mailbox, rec.name,
+                 "Client-Regel: läuft nur, wenn genau dieses Outlook geöffnet ist. Für ein Gruppenpostfach mit mehreren Bearbeitern meist unerwünscht – serverseitige Regel bevorzugen.");
+        }
+        if (rec.conditions.length === 0 &amp;&amp; rec.realActions > 0) {
+            note("Sehr breit", rec.mailbox, rec.name,
+                 "Keine Bedingung gesetzt: die Regel greift bei ALLEN eingehenden Mails.");
+        }
+        if (rec.realActions === 0) {
+            note("Ohne Wirkung", rec.mailbox, rec.name,
+                 "Regel hat keine Aktion" + (rec.stop ? " ausser \"keine weiteren Regeln anwenden\"" : "") + " – sie bewirkt nichts.");
+        }
+        if (rec.outbound.length > 0) {
+            note("Datenabfluss prüfen", rec.mailbox, rec.name,
+                 "Regel leitet Mails weiter oder um: " + rec.outbound.join(" | ") + ". Empfänger und Ziel-Domäne prüfen.");
+        }
+        if (rec.hardDelete) {
+            note("Endgültiges Löschen", rec.mailbox, rec.name,
+                 "Regel löscht Mails endgültig (nicht in \"Gelöschte Elemente\"). Nicht wiederherstellbar.");
+        }
+        if (rec.targets.length > 1) {
+            note("Mehrfachziel", rec.mailbox, rec.name,
+                 "Regel schreibt in mehrere Ordner: " + rec.targets.join(" | ") + ".");
+        }
+        for (var t = 0; t &lt; rec.targets.length; t++) {
+            if (rec.targets[t].indexOf("nicht verf") !== -1) {
+                note("Zielordner fehlt", rec.mailbox, rec.name,
+                     "Ein Zielordner der Regel ist nicht lesbar (umbenannt oder gelöscht?).");
+            }
+        }
+    }
+
+    /* Doppelungen: gleiche Bedingungs-Signatur im selben Postfach */
+    var sigMap = {};
+    for (var s = 0; s &lt; rows.length; s++) {
+        var r2 = rows[s];
+        if (r2.conditions.length === 0) continue;
+        var key = r2.mailbox + '' + condSignature(r2);
+        if (!sigMap[key]) sigMap[key] = [];
+        sigMap[key].push(r2);
+    }
+    for (var k in sigMap) {
+        if (!sigMap.hasOwnProperty(k)) continue;
+        var group = sigMap[k];
+        if (group.length &lt; 2) continue;
+        var namesArr = [];
+        for (var g = 0; g &lt; group.length; g++) namesArr.push("#" + group[g].order + " " + group[g].name);
+        note("Doppelte Bedingung", group[0].mailbox, namesArr.join(" / "),
+             group.length + " Regeln haben genau dieselben Bedingungen. Reihenfolge und Aktionen prüfen – vermutlich zusammenfassbar.");
+    }
+
+    /* Toter Code: fruehere Regel mit "Stopp" und Teilmenge der Bedingungen */
+    for (var a = 0; a &lt; rows.length; a++) {
+        var early = rows[a];
+        if (!early.enabled || !early.stop) continue;
+        var setEarly = condSet(early);
+        for (var b = 0; b &lt; rows.length; b++) {
+            var later = rows[b];
+            if (later === early) continue;
+            if (later.mailbox !== early.mailbox) continue;
+            if (!later.enabled) continue;
+            if (later.order &lt;= early.order) continue;
+            if (isSubset(setEarly, condSet(later))) {
+                note("Wird nie erreicht", later.mailbox, later.name,
+                     "Die früher laufende Regel #" + early.order + " (\"" + early.name + "\") hat dieselben oder weniger Bedingungen und beendet die Regelkette (\"keine weiteren Regeln anwenden\"). Sobald sie greift, läuft diese Regel nicht mehr.");
+            }
+        }
+    }
+
+    /* Postfaecher ohne lesbare Regeln */
+    for (var p = 0; p &lt; st.storeStats.length; p++) {
+        var stat = st.storeStats[p];
+        if (stat.error !== '') {
+            note("Nicht lesbar", stat.name, "-",
+                 "Regeln konnten nicht gelesen werden: " + stat.error +
+                 " Häufigster Grund: Das Postfach hängt nicht als vollwertiges Postfach im Profil.");
+        } else if (stat.rules === 0) {
+            note("Keine Regeln", stat.name, "-", "In diesem Postfach ist keine Regel definiert.");
+        }
+    }
+
+    var CAT_COLOR = {
+        "Nur-lokale Regel": C_EXCEPT,
+        "Datenabfluss prüfen": C_EXCEPT,
+        "Endgültiges Löschen": C_EXCEPT,
+        "Wird nie erreicht": C_EXCEPT,
+        "Nicht lesbar": C_EXCEPT
+    };
+
+    var row = headRow + 1;
+    for (var n = 0; n &lt; notes.length; n++) {
+        var nt = notes[n];
+        writeRow(sh, row, [nt.cat, nt.mailbox, nt.rule, nt.text]);
+        var col = CAT_COLOR[nt.cat];
+        if (col) fillRange(sh, row, 1, row, 1, col);
+        row++;
+    }
+    if (notes.length === 0) {
+        sh.Cells(row, 1).Value = "Keine Auffälligkeiten gefunden.";
+        row++;
+    }
+
+    try { sh.Range(sh.Cells(headRow, 1), sh.Cells(row - 1, headers.length)).AutoFilter(); } catch (e) {}
+    try {
+        sh.Columns("A:A").ColumnWidth = 22;
+        sh.Columns("B:B").ColumnWidth = 26;
+        sh.Columns("C:C").ColumnWidth = 40;
+        sh.Columns("D:D").ColumnWidth = 95;
+    } catch (e) {}
+    freezeBelow(sh, excel, headRow);
+}
+&lt;/script>
+&lt;/body>
+&lt;/html>
+</textarea>
+
+</div>
+</div>
+
+<script>
+/* Alles lokal, keine Netzwerkzugriffe. */
+function setStatus(text, isError) {
+    var el = document.getElementById('status');
+    el.className = isError ? 'err' : '';
+    el.innerText = text || '';
+}
+
+/* Kopieren synchron im Klick: execCommand zuerst (funktioniert auch ohne
+   HTTPS und ohne Clipboard-Berechtigung), Clipboard-API als Fallback. */
+function copyText(text, okMessage) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) { setStatus(okMessage); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+            setStatus(okMessage);
+        }).catch(function () {
+            setStatus('Kopieren blockiert - bitte "Alles markieren" und Strg+C benutzen.', true);
+        });
+        return;
+    }
+    setStatus('Kopieren blockiert - bitte "Alles markieren" und Strg+C benutzen.', true);
+}
+
+function copyCode() {
+    var ta = document.getElementById('code');
+    var btn = document.getElementById('btnCopy');
+    copyText(ta.value, ta.value.length + ' Zeichen HTA-Code in der Zwischenablage.');
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Kopiert!';
+    setTimeout(function () {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Code kopieren';
+        setStatus('');
+    }, 3000);
+}
+
+function downloadCode() {
+    var content = document.getElementById('code').value;
+    var blob = new Blob([content], { type: 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'outlook-regeln-visualisierung.hta';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    setStatus('Datei erzeugt. Falls der Browser .hta blockiert: "Code kopieren" benutzen.');
+}
+
+function selectAll() {
+    var ta = document.getElementById('code');
+    ta.focus();
+    ta.select();
+    setStatus('Alles markiert - jetzt Strg+C druecken.');
+}
+
+(function () {
+    var code = document.getElementById('code').value;
+    document.getElementById('meta-size').innerText = Math.round(code.length / 1024) + ' KB';
+    document.getElementById('meta-lines').innerText = code.split('\n').length;
+})();
+</script>
+</body>
+</html>

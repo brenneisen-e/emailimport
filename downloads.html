@@ -6,30 +6,6 @@
     <title>Tool-Bibliothek &middot; Downloads</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#11015;&#65039;</text></svg>">
 
-    <!-- ----------------------------------------------------------------
-         iframe-Einbettung
-         Das Einbetten erlaubt die Datei _headers (frame-ancestors *, kein
-         X-Frame-Options). Dieses Skript erkennt, ob die Seite in einem
-         iframe laeuft, und setzt dann <html data-embedded="1">. Die
-         CSS-Regeln am Ende des Stylesheets machen daraus ein kompaktes
-         Layout ohne klebende Kopfzeile, damit im iframe nicht zwei
-         Scrollbereiche uebereinander liegen.
-         URL-Schalter:  ?embed=1  erzwingt den Einbett-Modus
-                        ?embed=0  schaltet ihn ab
-                        ?chrome=0 blendet zusaetzlich die Kopfzeile aus
-         ---------------------------------------------------------------- -->
-    <script>
-    (function () {
-        var q = String(window.location.search || '');
-        var framed = true;
-        try { framed = (window.self !== window.top); } catch (e) { framed = true; }
-        var root = document.documentElement;
-        if (!/[?&]embed=0/.test(q) && (framed || /[?&]embed=1/.test(q))) {
-            root.setAttribute('data-embedded', '1');
-        }
-        if (/[?&]chrome=0/.test(q)) root.setAttribute('data-chrome', '0');
-    })();
-    </script>
 
     <style>
         :root {
@@ -237,18 +213,6 @@
             .topbar-inner, .wrap { padding-left: 16px; padding-right: 16px; }
         }
 
-        /* ---------- iframe-Einbettung (siehe Skript im <head> + _headers) ----------
-           Greift nur, wenn die Seite in einem iframe laeuft bzw. ?embed=1 gesetzt
-           ist: klebende Leisten werden statisch (im iframe wuerden sie sonst den
-           halben sichtbaren Bereich belegen), Hero und Fussbereich werden flacher.
-           ?chrome=0 blendet die obere Leiste samt Zurueck-Link aus, wenn die
-           einbettende Seite ihre eigene Navigation mitbringt. */
-        html[data-embedded="1"] .topbar { position: static; }
-        html[data-embedded="1"] .controls { position: static; top: auto; }
-        html[data-embedded="1"] .hero { padding: 24px 0 14px; }
-        html[data-embedded="1"] .footer { margin-top: 32px; padding: 20px 0 28px; }
-
-        html[data-chrome="0"] .topbar { display: none; }
     </style>
 </head>
 <body>
@@ -353,12 +317,12 @@
                 tags: ['HTA', 'JScript', 'Excel'],
                 whatsNew: 'neu v1.0',
                 summary: 'Gruppenpostfächer ankreuzen, alle Outlook-Regeln auslesen und die Logik (WENN / DANN / AUSSER WENN) als Excel-Mappe darstellen.',
-                action: { kind: 'download', href: 'Outlook-Regeln-Visualisierung-v1.0.zip', as: 'Outlook-Regeln-Visualisierung-v1.0.zip' },
+                action: { kind: 'open', href: 'outlook-regeln-source.html', label: 'Quellcode-Seite öffnen' },
                 copySrc: 'outlook-regeln-visualisierung.hta',
                 requires: 'Outlook (MAPI), Excel',
                 details: 'Startet Outlook per COM und listet alle Postfächer des Profils zur Mehrfachauswahl auf – ein Klick auf „Nur Gruppenpostfächer“ kreuzt alles ausser dem eigenen Postfach an, „Aus Outlook-Auswahl übernehmen“ nimmt das Postfach des gerade markierten Ordners bzw. der markierten Mail. Danach werden je Postfach alle Regeln zerlegt in Bedingungen, Ausnahmen und Aktionen. Die Excel-Mappe hat fünf Blätter: Übersicht (eine Zeile pro Regel inkl. Logik in Kurzform), Regel-Logik (farbige WENN/UND/AUSSER WENN/DANN-Blöcke), Elemente (flache, filterbare Liste aller Bedingungen und Aktionen), Zielordner (wohin die Regeln Mails schreiben) und Prüfhinweise (Nur-lokale Client-Regeln, Regeln ohne Bedingung, Weiterleitungen nach aussen, endgültiges Löschen, doppelte Bedingungen und Regeln, die wegen „keine weiteren Regeln anwenden“ nie erreicht werden).',
-                actionNote: '„Quellcode kopieren“ legt den kompletten HTA-Code in die Zwischenablage – in eine neue Textdatei einfügen und als outlook-regeln-visualisierung.hta speichern (Dateiendung .hta, nicht .txt), dann per Doppelklick starten. Wichtig: Regeln eines Gruppenpostfachs sind nur lesbar, wenn das Postfach als vollwertiges Postfach im Outlook-Profil hängt – bei „Ordner eines anderen Benutzers öffnen“ liefert Outlook keine Regeln.',
-                meta: 'Enthält: HTA',
+                actionNote: 'Kein ZIP nötig: „Quellcode kopieren“ legt den kompletten HTA-Code sofort in die Zwischenablage – in eine neue Textdatei einfügen und als outlook-regeln-visualisierung.hta speichern (Dateityp „Alle Dateien“, Encoding UTF-8, nicht .txt), dann per Doppelklick starten. Die Quellcode-Seite zeigt denselben Code im Textfeld und bietet zusätzlich einen Direkt-Download der .hta. Wichtig: Regeln eines Gruppenpostfachs sind nur lesbar, wenn das Postfach als vollwertiges Postfach im Outlook-Profil hängt – bei „Ordner eines anderen Benutzers öffnen“ liefert Outlook keine Regeln.',
+                meta: 'Quelle: HTA (auch als ZIP: Outlook-Regeln-Visualisierung-v1.0.zip)',
             },
             {
                 id: 'extraktion', group: 'process', icon: Icon.box,

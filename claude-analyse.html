@@ -5,29 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ERGO Vorgang-Analyse - Browser-KI (Claude API direkt)</title>
 
-<!-- ----------------------------------------------------------------
-     iframe-Einbettung
-     Das Einbetten erlaubt die Datei _headers (frame-ancestors *, kein
-     X-Frame-Options). Dieses Skript setzt <html data-embedded="1">,
-     wenn die Seite in einem iframe laeuft; die CSS-Regeln am Ende des
-     Stylesheets nehmen dann den aeusseren Rand raus.
-     URL-Schalter: ?embed=1 erzwingt den Modus, ?embed=0 schaltet ihn ab.
-     Achtung: Im iframe auf fremder Domain koennen Browser localStorage
-     blockieren - der API-Key laesst sich dann nicht dauerhaft merken.
-     ---------------------------------------------------------------- -->
-<script>
-(function () {
-    var q = String(window.location.search || '');
-    var framed = true;
-    try { framed = (window.self !== window.top); } catch (e) { framed = true; }
-    var root = document.documentElement;
-    if (!/[?&]embed=0/.test(q) && (framed || /[?&]embed=1/.test(q))) {
-        root.setAttribute('data-embedded', '1');
-    }
-    if (/[?&]chrome=0/.test(q)) root.setAttribute('data-chrome', '0');
-})();
-</script>
-
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -189,10 +166,6 @@ td.err { color: #fca5a5; }
     margin-bottom: 1rem;
 }
 .warn-banner strong { color: #fca5a5; }
-
-/* ---------- iframe-Einbettung (siehe Skript im <head> + _headers) ---------- */
-html[data-embedded="1"] body { min-height: 0; padding: 0.9rem; }
-html[data-embedded="1"] h1 { font-size: 20px; }
 </style>
 </head>
 <body>
