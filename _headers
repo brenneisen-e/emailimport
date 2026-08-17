@@ -1,0 +1,29 @@
+# ---------------------------------------------------------------------------
+# HTTP-Header fuer Cloudflare Pages (https://emailimport.pages.dev)
+#
+# Zweck: Die Seiten duerfen in eine andere Website als <iframe> eingebettet
+# werden. Dafuer muss der Browser zwei Dinge sehen:
+#   1. KEIN X-Frame-Options: DENY/SAMEORIGIN  -> wird hier explizit entfernt
+#   2. Content-Security-Policy: frame-ancestors *  -> Framing ausdruecklich erlaubt
+#
+# Einbetten dann z. B. so:
+#   <iframe src="https://emailimport.pages.dev/downloads.html?embed=1"
+#           style="width:100%;height:900px;border:0" loading="lazy"></iframe>
+#
+# Nur bestimmte Host-Seiten erlauben? Dann das Sternchen ersetzen, z. B.:
+#   Content-Security-Policy: frame-ancestors https://intranet.example.com
+# (mehrere Quellen mit Leerzeichen trennen). "*" heisst: jede Seite darf
+# einbetten - fuer diese oeffentlich erreichbaren Werkzeug-Seiten gewollt.
+#
+# Hinweis Datenschutz/Storage: In einem iframe auf fremder Domain gilt die
+# Seite als "third party". Browser koennen localStorage dort blockieren -
+# claude-analyse.html (API-Key) und die Cookie-Felder funktionieren dann
+# evtl. nur, wenn die Seite direkt (nicht eingebettet) geoeffnet wird.
+# ---------------------------------------------------------------------------
+
+/*
+  ! X-Frame-Options
+  Content-Security-Policy: frame-ancestors *
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=()

@@ -6,6 +6,31 @@
     <title>BGAV Hypercare - Email Review Tool</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
 
+    <!-- ----------------------------------------------------------------
+         iframe-Einbettung
+         Das Einbetten erlaubt die Datei _headers (frame-ancestors *, kein
+         X-Frame-Options). Dieses Skript erkennt, ob die Seite in einem
+         iframe laeuft, und setzt dann <html data-embedded="1">. Die
+         CSS-Regeln am Ende des Stylesheets machen daraus ein kompaktes
+         Layout ohne klebende Kopfzeile, damit im iframe nicht zwei
+         Scrollbereiche uebereinander liegen.
+         URL-Schalter:  ?embed=1  erzwingt den Einbett-Modus
+                        ?embed=0  schaltet ihn ab
+                        ?chrome=0 blendet zusaetzlich die Kopfzeile aus
+         ---------------------------------------------------------------- -->
+    <script>
+    (function () {
+        var q = String(window.location.search || '');
+        var framed = true;
+        try { framed = (window.self !== window.top); } catch (e) { framed = true; }
+        var root = document.documentElement;
+        if (!/[?&]embed=0/.test(q) && (framed || /[?&]embed=1/.test(q))) {
+            root.setAttribute('data-embedded', '1');
+        }
+        if (/[?&]chrome=0/.test(q)) root.setAttribute('data-chrome', '0');
+    })();
+    </script>
+
     <style>
         :root {
             --primary: #0078d4;
@@ -1137,6 +1162,19 @@
 
         .icon-lg { width: 1.5em; height: 1.5em; }
         .icon-xl { width: 2em; height: 2em; }
+
+        /* ---------- iframe-Einbettung (siehe Skript im <head> + _headers) ----------
+           Greift nur, wenn die Seite in einem iframe laeuft bzw. ?embed=1 gesetzt
+           ist. Ziel: kein doppeltes Scrollen, keine klebenden Kopfzeilen, weniger
+           Aussenrand. ?chrome=0 blendet die Kopfzeile ganz aus, wenn die
+           einbettende Seite schon eine eigene Navigation hat. */
+        html[data-embedded="1"] body { min-height: 0; }
+        html[data-embedded="1"] .header { position: static; }
+        html[data-embedded="1"] .upload-screen { min-height: 0; padding: 1.25rem; }
+        html[data-embedded="1"] .modal { padding: 1rem; }
+
+        html[data-chrome="0"] .header { display: none; }
+        html[data-chrome="0"] .main-content { height: 100vh; }
     </style>
 </head>
 <body>
@@ -1268,7 +1306,7 @@
             </div>
 
             <div class="version-info" style="margin-top: 20px; color: #a19f9d; font-size: 11px; text-align: center;">
-                Version 11.94
+                Version 11.95
             </div>
         </div><!-- /tools-wrapper -->
     </div><!-- /upload-screen -->

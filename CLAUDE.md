@@ -13,6 +13,7 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 - `ergo-email-batch.hta` → VERSION in Zeile ~19 (aktuell **1.1**)
 - `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.2**, JScript-COM wie die uebrigen Module)
 - `ergo-mail-statistik.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; KW-Statistik fuer bis zu 2 Postfaecher mit Stichwort-Flagging)
+- `outlook-regeln-visualisierung.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; liest Outlook-Regeln mehrerer (Gruppen-)Postfaecher und visualisiert die Logik in Excel)
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
@@ -42,11 +43,13 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-email-batch.bas` + `ANLEITUNG-ERGO-EXCEL.txt` | `ERGO-Excel-Tool-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-vorgang-analyse.bas` + `ANLEITUNG-ERGO-VORGANG-ANALYSE.txt` | `ERGO-Vorgang-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-mail-statistik.hta` | `ERGO-Mail-Statistik-v<VER>.zip` | siehe unten (versionierte Inhalte) |
+| `outlook-regeln-visualisierung.hta` | `Outlook-Regeln-Visualisierung-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 
 > **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
 > „Quellcode kopieren"-Buttons kopieren den HTA-Code aus einer **Inline-Base64-Kopie**
 > — ohne Netzwerk-Fetch, weil Corporate-Proxys `.hta`-Requests wegfiltern.
-> Eingebettet sind aktuell `un-laenderliste-excel.hta` und `ergo-mail-statistik.hta`.
+> Eingebettet sind aktuell `un-laenderliste-excel.hta`, `ergo-mail-statistik.hta`
+> und `outlook-regeln-visualisierung.hta`.
 > Nach **jeder** Aenderung an einer dieser Dateien deshalb zusaetzlich zum ZIP
 > die Einbettung neu bauen: `./scripts/build-embedded-sources.sh`
 > (ersetzt alle Base64-Strings in `downloads.html`; neue Dateien dort im
@@ -98,6 +101,20 @@ cp ergo-mail-statistik.hta /tmp/ergo-ms-build/ergo-mail-statistik-v$MS_VER.hta
 (cd /tmp/ergo-ms-build && \
    zip -j "$OLDPWD/ERGO-Mail-Statistik-v$MS_VER.zip" ergo-mail-statistik-v$MS_VER.hta)
 ```
+
+Fuer das Regel-Visualisierungs-Tool analog (eigene Versionsnummer, nur die HTA im ZIP):
+
+```bash
+RV_VER=1.0
+rm -f Outlook-Regeln-Visualisierung-v*.zip
+mkdir -p /tmp/ergo-rv-build
+cp outlook-regeln-visualisierung.hta /tmp/ergo-rv-build/outlook-regeln-visualisierung-v$RV_VER.hta
+(cd /tmp/ergo-rv-build && \
+   zip -j "$OLDPWD/Outlook-Regeln-Visualisierung-v$RV_VER.zip" outlook-regeln-visualisierung-v$RV_VER.hta)
+```
+
+Danach die Base64-Einbettung neu bauen (`./scripts/build-embedded-sources.sh`) und den
+`href` im `TOOLS`-Eintrag `regeln-visual` in `downloads.html` auf die neue ZIP-Version ziehen.
 
 **Anschliessend in `index.html` die Download-Links auf die neue Versionsnummer anpassen**
 (drei Stellen: `ERGO-Email-Batch-v<VER>.zip`, `ERGO-Excel-Tool-v<VER>.zip`,
@@ -188,3 +205,36 @@ Regeln:
   in **kleine Einheiten pro `setTimeout`-Tick** zerlegen (eine Einheit = ein
   PDF / eine Mail), damit die HTA nicht „haengt" und Progress/Log sichtbar
   weiterlaufen.
+
+### 7. iframe-Einbettung der Website (HTTP-Header + Embed-Modus)
+
+Die Seiten duerfen in fremde Websites als `<iframe>` eingebettet werden. Dafuer sorgen
+zwei Bausteine, die bei Aenderungen erhalten bleiben MUESSEN:
+
+**a) `_headers` (Cloudflare Pages)** im Repo-Root:
+- `! X-Frame-Options` entfernt den Framing-Blocker,
+- `Content-Security-Policy: frame-ancestors *` erlaubt Framing ausdruecklich.
+Soll nur eine bestimmte Host-Seite einbetten duerfen, dort das `*` durch die
+Origin(s) ersetzen. Die Datei ist rein deklarativ und wird von Cloudflare Pages
+beim Deploy ausgelesen &ndash; nicht umbenennen, nicht in einen Unterordner legen.
+
+**b) Embed-Modus im HTML** &ndash; jede Seite (`index.html`, `downloads.html`,
+`claude-analyse.html`, `bgav-hypercare-email-review.html` und der Header-Block in
+`build-hta-source.sh` fuer `hta-source.html`) enthaelt im `<head>` ein kleines
+Skript, das Framing erkennt und `<html data-embedded="1">` setzt. Am Ende des
+jeweiligen Stylesheets stehen die passenden Regeln:
+`html[data-embedded="1"] …` macht klebende Kopfzeilen statisch, nimmt
+`min-height: 100vh` raus und verkleinert die Aussenraender.
+`html[data-chrome="0"] …` blendet zusaetzlich die Kopfzeile aus.
+
+URL-Schalter: `?embed=1` erzwingt den Modus, `?embed=0` schaltet ihn ab,
+`?chrome=0` versteckt die Kopfzeile. Beispiel:
+
+```html
+<iframe src="https://emailimport.pages.dev/downloads.html?embed=1&chrome=0"
+        style="width:100%;height:900px;border:0" loading="lazy"></iframe>
+```
+
+Bei NEUEN HTML-Seiten den `<head>`-Block und die `data-embedded`-CSS-Regeln
+mit uebernehmen (aus `downloads.html` kopieren). `hta-source.html` NICHT direkt
+editieren &ndash; immer `./build-hta-source.sh` neu laufen lassen.

@@ -20,6 +20,7 @@ TARGET="downloads.html"
 FILES=(
     "un-laenderliste-excel.hta"
     "ergo-mail-statistik.hta"
+    "outlook-regeln-visualisierung.hta"
 )
 
 [ -f "$TARGET" ] || { echo "FEHLER: $TARGET nicht gefunden" >&2; exit 1; }

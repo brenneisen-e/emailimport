@@ -158,6 +158,32 @@ Die **Web-App** (`index.html`) ist ein Browser-Tool zum Anzeigen, Kategorisieren
 
 - **Online**: https://emailimport.pages.dev (oder eigene Cloudflare Pages URL)
 - **Lokal**: `index.html` direkt im Browser öffnen
+- **Als iframe in einer anderen Website**: erlaubt (siehe unten)
+
+### Einbetten als iframe
+
+Die Seiten senden kein `X-Frame-Options` und erlauben Framing per
+`Content-Security-Policy: frame-ancestors *` — konfiguriert in der Datei
+`_headers` im Repo-Root (Cloudflare Pages liest sie beim Deploy).
+
+```html
+<iframe src="https://emailimport.pages.dev/downloads.html?embed=1"
+        style="width:100%;height:900px;border:0" loading="lazy"></iframe>
+```
+
+URL-Schalter für das eingebettete Layout:
+
+| Parameter | Wirkung |
+|-----------|---------|
+| *(keiner)* | Framing wird automatisch erkannt: klebende Kopfzeilen werden statisch, Aussenränder kleiner |
+| `?embed=1` | erzwingt das kompakte Einbett-Layout (auch ohne iframe, zum Testen) |
+| `?embed=0` | schaltet das Einbett-Layout ab |
+| `?chrome=0` | blendet zusätzlich die Kopfzeile der Seite aus (wenn die einbettende Seite eigene Navigation hat) |
+
+Nur bestimmte Host-Seiten zulassen? In `_headers` das `*` bei `frame-ancestors`
+durch die erlaubten Origins ersetzen. Hinweis: In einem iframe auf fremder Domain
+können Browser `localStorage` blockieren — die API-Key-Speicherung in
+`claude-analyse.html` funktioniert dann nur beim direkten Aufruf.
 
 ### Funktionen
 
