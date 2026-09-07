@@ -24,6 +24,7 @@ TARGETS=(
 FILES=(
     "un-laenderliste-excel.hta"
     "ergo-mail-statistik.hta"
+    "ergo-reminder-analyse.hta"
     "outlook-regeln-visualisierung.hta"
 )
 
