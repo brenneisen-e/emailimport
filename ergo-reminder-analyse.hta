@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.1"
+        VERSION="1.2"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.1</div>
+                <div class="ver">v1.2</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -214,7 +214,7 @@
                 </div>
 
                 <label for="senders">Reminder-Absender (Domains oder Namen, kommagetrennt)</label>
-                <input type="text" id="senders" value="jungdms.de, jung-dms.de, jdc.de, jdcgroup.de, Jung DMS, JDC">
+                <input type="text" id="senders" value="bestandsuebertragung@jungdms.de, jungdms.de, jung-dms.de, jdc.de, jdcgroup.de, Jung DMS, JDC">
                 <div class="hint">Erinnerungen dieser Absender werden separat als &bdquo;JDC-Reminder&ldquo; gez&auml;hlt. Andere Absender laufen als &bdquo;sonstige Reminder&ldquo; mit.</div>
 
                 <label for="keywords">Reminder-Stichw&ouml;rter im Betreff (kommagetrennt)</label>
@@ -295,6 +295,7 @@ var KANAL_SONSTIGE = 'Sonstige / unbekannt';
 
 var PR_SMTP_ADDRESS = "http://schemas.microsoft.com/mapi/proptag/0x39FE001F";
 var PR_SENDER_SMTP  = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";
+var PR_TRANSPORT_HEADERS = "http://schemas.microsoft.com/mapi/proptag/0x007D001F";
 
 /* Klartext je Praefix (nur fuer die Spalte "Sparte-Detail") */
 var PREFIX_TEXT = {
@@ -732,6 +733,26 @@ function senderSmtpCached(st, item, senderName) {
     return addr;
 }
 
+/* Woran die JDC-Zuordnung haengt. Bei weitergeleiteten Mails (z. B. Archiv
+   "Weiterleitung an KWAD") ist der Absender aus Outlook-Sicht der interne
+   Weiterleiter; die JDC-Adresse steht dann nur noch in den Kopfzeilen oder
+   im Textanfang ("Von: bestandsuebertragung@jungdms.de"). Diese Pruefung
+   ist teuer und laeuft deshalb nur fuer Erinnerungen ohne JDC-Absender. */
+function jdcEvidence(st, item, senderMatched, subjClean) {
+    if (senderMatched) return 'Absender';
+    var hay = '';
+    try { hay += String(item.PropertyAccessor.GetProperty(PR_TRANSPORT_HEADERS) || ''); } catch (e0) {}
+    try { hay += ' ' + String(item.Body || '').substring(0, 6000); } catch (e1) {}
+    var lower = hay.toLowerCase();
+    for (var i = 0; i < st.senders.length; i++) {
+        var t = st.senders[i].toLowerCase();
+        if (t && lower.indexOf(t) !== -1) return 'Weiterleitung/Text';
+    }
+    /* JDC-Betreffmuster: "Erinnerung BUE Kunde: ... VertragsNr.: ... Rangstufe: ..." */
+    if (/vertragsnr/i.test(subjClean) && /rangstufe/i.test(subjClean)) return 'Betreffmuster';
+    return '';
+}
+
 /* SMTP-Adresse des Absenders (Exchange-Adressen aufloesen) */
 function senderSmtp(item) {
     var addr = '', type = '';
@@ -1007,12 +1028,18 @@ function processMail(st, job, item, rt) {
     var kw = kwKey(rt);
     var keep = st.allMails || istReminder || art === 'Bestandsübertragung (Erstvorgang)';
 
-    var senderName = '', senderAddr = '', senderDomain = '', vonJDC = false;
+    var senderName = '', senderAddr = '', senderDomain = '', vonJDC = false, jdcVia = '';
     if (istReminder || keep) {
         try { senderName = String(item.SenderName || ''); } catch (eSn) {}
         senderAddr = senderSmtpCached(st, item, senderName);
         senderDomain = domainOf(senderAddr);
-        vonJDC = matchesSenderList(senderName.toLowerCase(), senderAddr.toLowerCase(), senderDomain, st.senders);
+        var senderMatched = matchesSenderList(senderName.toLowerCase(), senderAddr.toLowerCase(), senderDomain, st.senders);
+        if (istReminder) {
+            jdcVia = jdcEvidence(st, item, senderMatched, subjClean);
+            vonJDC = jdcVia !== '';
+        } else if (senderMatched) {
+            vonJDC = true; jdcVia = 'Absender';
+        }
     }
 
     var attCount = '';
@@ -1052,7 +1079,7 @@ function processMail(st, job, item, rt) {
         mailbox: job.mailbox, folder: job.folder, kanal: kanal,
         senderName: senderName, senderAddr: senderAddr, senderDomain: senderDomain,
         to: to, subject: subject, art: art,
-        istReminder: istReminder, istErinnerungBUe: istErinnerungBUe, vonJDC: vonJDC,
+        istReminder: istReminder, istErinnerungBUe: istErinnerungBUe, vonJDC: vonJDC, jdcVia: jdcVia,
         kunde: p.kunde, vnr: p.vnr, vk: vk, sparte: sp.sparte, sparteDetail: sp.detail,
         rangstufe: p.rangstufe, agentur: p.agentur, vermittler: p.vermittler,
         att: attCount
@@ -1211,7 +1238,7 @@ function buildExcel(st) {
                  "Absender Name", "Absender E-Mail", "Absender Domain", "Empfänger (An)", "Betreff",
                  "Vorgangsart", "Erinnerung", "Erinnerung BÜ", "Von JDC", "Kunde", "Vertragsnummer",
                  "Sparte", "Sparte-Detail", "Rangstufe", "Agentur-Nr", "Vermittler-Nr", "Anhänge",
-                 "Erstvorgang im Scan", "Erstvorgang Datum", "Tage seit Erstvorgang", "Erinnerung Nr. je Vertrag"];
+                 "Erstvorgang im Scan", "Erstvorgang Datum", "Tage seit Erstvorgang", "Erinnerung Nr. je Vertrag", "JDC erkannt über"];
     try { shMails.Columns("S:S").NumberFormat = "@"; shMails.Columns("W:X").NumberFormat = "@"; } catch (eNF) {}
     putRow(shMails, 1, mHead);
     verifyArrayRows(shMails, 1, mHead);
@@ -1238,7 +1265,7 @@ function buildExcel(st) {
             m.senderName, m.senderAddr, m.senderDomain, m.to, m.subject,
             m.art, m.istReminder, m.istErinnerungBUe, m.vonJDC, m.kunde, m.vnr,
             m.sparte, m.sparteDetail, m.rangstufe, m.agentur, m.vermittler, m.att,
-            erst, erstDatum, tage, remNr
+            erst, erstDatum, tage, remNr, m.jdcVia || ''
         ]);
         r++;
     }
