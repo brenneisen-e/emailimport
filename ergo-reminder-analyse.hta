@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.0"
+        VERSION="1.1"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.0</div>
+                <div class="ver">v1.1</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -282,6 +282,14 @@ var outlookNS = null;
 
 var scanState = null;
 var CHUNK_SIZE = 40;            // Mails pro setTimeout-Tick
+
+/* Datumsfilter fuer Items.Restrict (deutsches Format, wie im Export-Tool) */
+function padTwo(n) { return (n < 10 ? '0' : '') + n; }
+function formatDateForRestrict(date) {
+    var d = new Date(date);
+    return padTwo(d.getDate()) + '.' + padTwo(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' +
+           padTwo(d.getHours()) + ':' + padTwo(d.getMinutes());
+}
 var MAILS_MAX = 30000;          // max. Zeilen im Blatt "Mails" (Schutz)
 var KANAL_SONSTIGE = 'Sonstige / unbekannt';
 
@@ -711,6 +719,19 @@ function vorgangsart(subjClean, istErinnerungBUe, istReminder) {
     return 'Sonstiges';
 }
 
+/* Absender-Aufloesung ist teuer (Adressbuch-Abfrage je Mail). Dieselben
+   Absender (JDC, Jung DMS, interne Systeme) kommen hundertfach vor —
+   deshalb je Scan nur einmal aufloesen, Schluessel ist die Rohadresse. */
+function senderSmtpCached(st, item, senderName) {
+    var raw = '';
+    try { raw = String(item.SenderEmailAddress || ''); } catch (e0) {}
+    var key = raw || senderName || '';
+    if (key && st.senderCache.hasOwnProperty(key)) return st.senderCache[key];
+    var addr = senderSmtp(item);
+    if (key) st.senderCache[key] = addr;
+    return addr;
+}
+
 /* SMTP-Adresse des Absenders (Exchange-Adressen aufloesen) */
 function senderSmtp(item) {
     var addr = '', type = '';
@@ -744,15 +765,26 @@ function matchesSenderList(nameLower, addrLower, domainLower, list) {
     return false;
 }
 
-/* Eingangskanal einer Mail bestimmen */
-function detectChannel(item, job, channels) {
+/* Eingangskanal einer Mail bestimmen. Die Empfaenger-Objekte sind mit
+   Abstand der teuerste Schritt (bis zu zwoelf Abfragen je Mail); gleiche
+   An/CC-Zeile heisst gleiche Empfaenger, deshalb je Kombination nur einmal. */
+function detectChannel(st, item, job, to, cc) {
     if (job.kanalFix) return job.kanalFix;
+    var channels = st.channels;
 
-    var hay = '';
-    try { hay += String(item.To || ''); } catch (e0) {}
-    try { hay += ' ' + String(item.CC || ''); } catch (e1) {}
+    var hay = String(to || '') + ' ' + String(cc || '');
     var ch = matchChannel(hay.toLowerCase(), channels);
     if (ch) return ch.label;
+
+    var cacheKey = hay;
+    if (st.channelCache.hasOwnProperty(cacheKey)) return st.channelCache[cacheKey];
+    var result = detectChannelSlow(item, job, channels);
+    st.channelCache[cacheKey] = result;
+    return result;
+}
+
+function detectChannelSlow(item, job, channels) {
+    var ch;
 
     /* Empfaenger-Objekte (SMTP-Adressen) - begrenzt, da COM-teuer */
     try {
@@ -840,7 +872,9 @@ function startAnalysis() {
         mailsDropped: 0,
         reminders: [],      // nur Erinnerungen (fuer Vertrag/Erstvorgang-Abgleich)
         erstByVnr: {},      // VNR -> { first: Date, count: n, kanal }
-        totalAll: 0
+        totalAll: 0,
+        senderCache: {},    // Rohadresse -> SMTP (Adressbuch nur einmal je Absender)
+        channelCache: {}    // An/CC-Zeile -> Kanal (Empfaenger-Objekte nur einmal je Kombination)
     };
 
     window.setTimeout(scanTick, 60);
@@ -872,7 +906,21 @@ function scanTick() {
             if (st.jobIdx >= st.jobs.length) { finishScan(); return; }
             var job = st.jobs[st.jobIdx];
             var folder = outlookNS.GetFolderFromID(job.entryId);
-            st.items = folder.Items;
+            /* Zeitraum serverseitig einschraenken: Outlook liefert nur die
+               Mails im Zeitraum, statt dass alle Mails des Ordners einzeln
+               angefasst werden. Faellt der Filter aus, bleibt der alte Weg
+               (absteigend sortiert, Abbruch am "Von"-Datum). Die Obergrenze
+               liegt eine Minute hinter "Bis", weil Restrict nur minutengenau
+               vergleicht; die Schleife prueft das Datum ohnehin noch einmal. */
+            var allItems = folder.Items;
+            st.items = null;
+            try {
+                var toPlus = new Date(st.toDate.getTime() + 60000);
+                st.items = allItems.Restrict(
+                    "[ReceivedTime] >= '" + formatDateForRestrict(st.fromDate) + "' AND " +
+                    "[ReceivedTime] <= '" + formatDateForRestrict(toPlus) + "'");
+            } catch (eRestrict) { st.items = null; }
+            if (!st.items) st.items = allItems;
             st.items.Sort("[ReceivedTime]", true);   // neueste zuerst
             st.itemCount = st.items.Count;
             st.itemIdx = 1;
@@ -929,7 +977,10 @@ function jobPct(st) {
     return Math.round(st.jobIdx * perJob + inner * perJob);
 }
 
-/* Eine Mail auswerten und in die Zaehler eintragen */
+/* Eine Mail auswerten und in die Zaehler eintragen.
+   Reihenfolge ist Absicht: Betreff und An/CC sind billig (Tabellenspalten),
+   Absender-Aufloesung und Anhaenge sind teuer und werden nur fuer Mails
+   geholt, die als Erinnerung zaehlen oder als Detailzeile behalten werden. */
 function processMail(st, job, item, rt) {
     var subject = '';
     try { subject = String(item.Subject || ''); } catch (eS) {}
@@ -944,24 +995,28 @@ function processMail(st, job, item, rt) {
         }
     }
 
-    var senderName = '';
-    try { senderName = String(item.SenderName || ''); } catch (eSn) {}
-    var senderAddr = senderSmtp(item);
-    var senderDomain = domainOf(senderAddr);
-    var vonJDC = matchesSenderList(senderName.toLowerCase(), senderAddr.toLowerCase(), senderDomain, st.senders);
-
-    var kanal = detectChannel(item, job, st.channels);
-    var K = getKanal(st, kanal);
-
-    var to = '';
+    var to = '', cc = '';
     try { to = String(item.To || ''); } catch (eTo) {}
-    var attCount = '';
-    if (st.countAtt) { try { attCount = item.Attachments.Count; } catch (eA) { attCount = ''; } }
+    try { cc = String(item.CC || ''); } catch (eCc) {}
+    var kanal = detectChannel(st, item, job, to, cc);
+    var K = getKanal(st, kanal);
 
     var p = parseSubject(subjClean);
     var sp = sparteOf(p.vnr, st.spartenMap);
     var art = vorgangsart(subjClean, istErinnerungBUe, istReminder);
     var kw = kwKey(rt);
+    var keep = st.allMails || istReminder || art === 'Bestandsübertragung (Erstvorgang)';
+
+    var senderName = '', senderAddr = '', senderDomain = '', vonJDC = false;
+    if (istReminder || keep) {
+        try { senderName = String(item.SenderName || ''); } catch (eSn) {}
+        senderAddr = senderSmtpCached(st, item, senderName);
+        senderDomain = domainOf(senderAddr);
+        vonJDC = matchesSenderList(senderName.toLowerCase(), senderAddr.toLowerCase(), senderDomain, st.senders);
+    }
+
+    var attCount = '';
+    if (keep && st.countAtt) { try { attCount = item.Attachments.Count; } catch (eA) { attCount = ''; } }
 
     /* Zaehler */
     job.total++;
@@ -990,6 +1045,8 @@ function processMail(st, job, item, rt) {
         else { e.count++; if (rt < e.first) e.first = rt; }
     }
 
+    if (!keep) return;
+
     var row = {
         datum: rt, kw: kw, wd: WEEKDAYS[(rt.getDay() + 6) % 7],
         mailbox: job.mailbox, folder: job.folder, kanal: kanal,
@@ -1001,12 +1058,8 @@ function processMail(st, job, item, rt) {
         att: attCount
     };
     if (istReminder) st.reminders.push(row);
-
-    var keep = st.allMails || istReminder || art === 'Bestandsübertragung (Erstvorgang)';
-    if (keep) {
-        if (st.mails.length < MAILS_MAX) st.mails.push(row);
-        else st.mailsDropped++;
-    }
+    if (st.mails.length < MAILS_MAX) st.mails.push(row);
+    else st.mailsDropped++;
 }
 
 function finishScan() {
