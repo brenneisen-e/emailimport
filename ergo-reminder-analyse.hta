@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.2"
+        VERSION="1.3"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.2</div>
+                <div class="ver">v1.3</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -281,7 +281,7 @@ var outlookApp = null;
 var outlookNS = null;
 
 var scanState = null;
-var CHUNK_SIZE = 40;            // Mails pro setTimeout-Tick
+var CHUNK_SIZE = 150;           // Mails pro setTimeout-Tick (Tabellenmodus ist billig je Mail)
 
 /* Datumsfilter fuer Items.Restrict (deutsches Format, wie im Export-Tool) */
 function padTwo(n) { return (n < 10 ? '0' : '') + n; }
@@ -296,6 +296,16 @@ var KANAL_SONSTIGE = 'Sonstige / unbekannt';
 var PR_SMTP_ADDRESS = "http://schemas.microsoft.com/mapi/proptag/0x39FE001F";
 var PR_SENDER_SMTP  = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";
 var PR_TRANSPORT_HEADERS = "http://schemas.microsoft.com/mapi/proptag/0x007D001F";
+/* Spalten fuer den Tabellenmodus (Folder.GetTable): DASL-Namen, damit Outlook
+   die Werte in Paketen vom Server holt, ohne jede Mail zu oeffnen */
+var COL_RECEIVED = "urn:schemas:httpmail:datereceived";
+var COL_SUBJECT  = "urn:schemas:httpmail:subject";
+var COL_TO       = "urn:schemas:httpmail:displayto";
+var COL_CC       = "urn:schemas:httpmail:displaycc";
+var COL_SENDER   = "urn:schemas:httpmail:sendername";
+var COL_SENDER_ADDR = "http://schemas.microsoft.com/mapi/proptag/0x0C1F001F";   // PR_SENDER_EMAIL_ADDRESS
+var COL_SENDER_TYPE = "http://schemas.microsoft.com/mapi/proptag/0x0C1E001F";   // PR_SENDER_ADDRTYPE (EX/SMTP)
+var COL_SENDER_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";   // PR_SENDER_SMTP_ADDRESS
 
 /* Klartext je Praefix (nur fuer die Spalte "Sparte-Detail") */
 var PREFIX_TEXT = {
@@ -723,12 +733,12 @@ function vorgangsart(subjClean, istErinnerungBUe, istReminder) {
 /* Absender-Aufloesung ist teuer (Adressbuch-Abfrage je Mail). Dieselben
    Absender (JDC, Jung DMS, interne Systeme) kommen hundertfach vor —
    deshalb je Scan nur einmal aufloesen, Schluessel ist die Rohadresse. */
-function senderSmtpCached(st, item, senderName) {
+function senderSmtpCached(st, item, senderName, full) {
     var raw = '';
     try { raw = String(item.SenderEmailAddress || ''); } catch (e0) {}
     var key = raw || senderName || '';
     if (key && st.senderCache.hasOwnProperty(key)) return st.senderCache[key];
-    var addr = senderSmtp(item);
+    var addr = senderSmtp(item, full);
     if (key) st.senderCache[key] = addr;
     return addr;
 }
@@ -753,19 +763,24 @@ function jdcEvidence(st, item, senderMatched, subjClean) {
     return '';
 }
 
-/* SMTP-Adresse des Absenders (Exchange-Adressen aufloesen) */
-function senderSmtp(item) {
+/* SMTP-Adresse des Absenders. Im Tabellenmodus liefert Outlook sie meist
+   direkt (PR_SENDER_SMTP_ADDRESS); sonst muss das Element geoeffnet und die
+   Exchange-Adresse aufgeloest werden — das ist der teure Weg. */
+function senderSmtp(item, full) {
     var addr = '', type = '';
+    try { if (item.SmtpAddress) addr = String(item.SmtpAddress); } catch (eS0) {}
+    if (addr) return trim(addr);
     try { type = String(item.SenderEmailType || ''); } catch (e0) {}
     if (type === 'EX') {
+        var f = full ? full() : item;
         try {
-            var s = item.Sender;
+            var s = f.Sender;
             if (s) {
                 var eu = s.GetExchangeUser();
                 if (eu && eu.PrimarySmtpAddress) addr = String(eu.PrimarySmtpAddress);
             }
         } catch (e1) {}
-        if (!addr) { try { addr = String(item.PropertyAccessor.GetProperty(PR_SENDER_SMTP) || ''); } catch (e2) {} }
+        if (!addr) { try { addr = String(f.PropertyAccessor.GetProperty(PR_SENDER_SMTP) || ''); } catch (e2) {} }
     }
     if (!addr) { try { addr = String(item.SenderEmailAddress || ''); } catch (e3) {} }
     return trim(addr);
@@ -789,7 +804,7 @@ function matchesSenderList(nameLower, addrLower, domainLower, list) {
 /* Eingangskanal einer Mail bestimmen. Die Empfaenger-Objekte sind mit
    Abstand der teuerste Schritt (bis zu zwoelf Abfragen je Mail); gleiche
    An/CC-Zeile heisst gleiche Empfaenger, deshalb je Kombination nur einmal. */
-function detectChannel(st, item, job, to, cc) {
+function detectChannel(st, item, job, to, cc, full) {
     if (job.kanalFix) return job.kanalFix;
     var channels = st.channels;
 
@@ -799,7 +814,7 @@ function detectChannel(st, item, job, to, cc) {
 
     var cacheKey = hay;
     if (st.channelCache.hasOwnProperty(cacheKey)) return st.channelCache[cacheKey];
-    var result = detectChannelSlow(item, job, channels);
+    var result = detectChannelSlow(full ? full() : item, job, channels);
     st.channelCache[cacheKey] = result;
     return result;
 }
@@ -894,6 +909,10 @@ function startAnalysis() {
         reminders: [],      // nur Erinnerungen (fuer Vertrag/Erstvorgang-Abgleich)
         erstByVnr: {},      // VNR -> { first: Date, count: n, kanal }
         totalAll: 0,
+        table: null,        // Outlook-Tabelle des aktuellen Ordners (Tabellenmodus)
+        mode: '',           // 'tabelle' oder 'einzeln'
+        allCount: 0,        // Mails im Ordner insgesamt (zur Anzeige der Filterwirkung)
+        dateCalib: null,    // Korrektur der Tabellen-Zeitstempel (UTC -> lokal), einmal ermittelt
         senderCache: {},    // Rohadresse -> SMTP (Adressbuch nur einmal je Absender)
         channelCache: {}    // An/CC-Zeile -> Kanal (Empfaenger-Objekte nur einmal je Kombination)
     };
@@ -923,65 +942,103 @@ function scanTick() {
     if (!st) return;
 
     try {
-        if (st.items === null) {
+        if (st.items === null && st.table === null) {
             if (st.jobIdx >= st.jobs.length) { finishScan(); return; }
             var job = st.jobs[st.jobIdx];
             var folder = outlookNS.GetFolderFromID(job.entryId);
-            /* Zeitraum serverseitig einschraenken: Outlook liefert nur die
-               Mails im Zeitraum, statt dass alle Mails des Ordners einzeln
-               angefasst werden. Faellt der Filter aus, bleibt der alte Weg
-               (absteigend sortiert, Abbruch am "Von"-Datum). Die Obergrenze
-               liegt eine Minute hinter "Bis", weil Restrict nur minutengenau
-               vergleicht; die Schleife prueft das Datum ohnehin noch einmal. */
-            var allItems = folder.Items;
-            st.items = null;
+            var toPlus = new Date(st.toDate.getTime() + 60000);
+            var dateFilter = "[ReceivedTime] >= '" + formatDateForRestrict(st.fromDate) + "' AND " +
+                             "[ReceivedTime] <= '" + formatDateForRestrict(toPlus) + "'";
+            try { st.allCount = folder.Items.Count; } catch (eCnt) { st.allCount = 0; }
+
+            /* Tabellenmodus: Outlook liefert nur die benoetigten Felder, in
+               Paketen vom Server, gefiltert auf den Zeitraum. Jede Mail
+               einzeln zu oeffnen (Einzelmodus) kostet bei Online-Archiven
+               je Mail einen Server-Roundtrip. */
+            st.table = null; st.items = null;
             try {
-                var toPlus = new Date(st.toDate.getTime() + 60000);
-                st.items = allItems.Restrict(
-                    "[ReceivedTime] >= '" + formatDateForRestrict(st.fromDate) + "' AND " +
-                    "[ReceivedTime] <= '" + formatDateForRestrict(toPlus) + "'");
-            } catch (eRestrict) { st.items = null; }
-            if (!st.items) st.items = allItems;
-            st.items.Sort("[ReceivedTime]", true);   // neueste zuerst
-            st.itemCount = st.items.Count;
-            st.itemIdx = 1;
-            setProgress(jobPct(st), "Ordner " + job.nr + " (" + esc(job.folder) + "): 0 / " + st.itemCount + " Mails");
+                var tbl = folder.GetTable(dateFilter);
+                tbl.Columns.RemoveAll();
+                tbl.Columns.Add("EntryID");
+                tbl.Columns.Add("MessageClass");
+                tbl.Columns.Add(COL_RECEIVED);
+                tbl.Columns.Add(COL_SUBJECT);
+                tbl.Columns.Add(COL_TO);
+                tbl.Columns.Add(COL_CC);
+                tbl.Columns.Add(COL_SENDER);
+                tbl.Columns.Add(COL_SENDER_ADDR);
+                tbl.Columns.Add(COL_SENDER_TYPE);
+                try { tbl.Columns.Add(COL_SENDER_SMTP); st.hasSmtpCol = true; } catch (eSm) { st.hasSmtpCol = false; }
+                try { tbl.Sort(COL_RECEIVED, true); } catch (eSort) {}
+                st.itemCount = tbl.GetRowCount();
+                st.table = tbl;
+                st.mode = 'tabelle';
+            } catch (eTable) { st.table = null; }
+
+            if (!st.table) {
+                /* Einzelmodus wie bisher: Zeitraum per Restrict, sonst ganzer Ordner */
+                var allItems = folder.Items;
+                try { st.items = allItems.Restrict(dateFilter); } catch (eRestrict) { st.items = null; }
+                if (!st.items) st.items = allItems;
+                st.items.Sort("[ReceivedTime]", true);   // neueste zuerst
+                st.itemCount = st.items.Count;
+                st.mode = 'einzeln';
+            }
+            st.itemIdx = 0;
+            setProgress(jobPct(st), progressText(st, job));
         }
 
         var job2 = st.jobs[st.jobIdx];
-        var end = Math.min(st.itemIdx + CHUNK_SIZE - 1, st.itemCount);
-        var jobDone = (st.itemIdx > st.itemCount);
+        var jobDone = false;
+        var processed = 0;
 
-        for (var i = st.itemIdx; i <= end; i++) {
-            try {
-                var item = st.items.Item(i);
-                if (item.Class !== 43) continue;      // nur Mails (olMail)
-
-                var rt;
-                try { rt = new Date(item.ReceivedTime); } catch (eRt) { continue; }
-                if (isNaN(rt.getTime())) continue;
-                if (rt < st.fromDate) { jobDone = true; break; }   // absteigend sortiert
-                if (rt > st.toDate) continue;
-
-                job2.scanned++;
-                processMail(st, job2, item, rt);
-            } catch (eItem) {
-                st.jobs[st.jobIdx].skippedErrors++;
+        if (st.table) {
+            while (processed < CHUNK_SIZE) {
+                if (st.table.EndOfTable) { jobDone = true; break; }
+                var row = st.table.GetNextRow();
+                st.itemIdx++; processed++;
+                try {
+                    var mc = String(row.Item("MessageClass") || '');
+                    if (mc && mc.indexOf('IPM.Note') !== 0) continue;   // nur Mails
+                    var rt = tableDate(st, row);
+                    if (!rt) continue;
+                    if (rt < st.fromDate) { jobDone = true; break; }   // absteigend sortiert
+                    if (rt > st.toDate) continue;
+                    job2.scanned++;
+                    processMail(st, job2, rowAsItem(st, row), rt);
+                } catch (eRow) {
+                    st.jobs[st.jobIdx].skippedErrors++;
+                }
             }
+            if (st.table.EndOfTable) jobDone = true;
+        } else {
+            var end = Math.min(st.itemIdx + CHUNK_SIZE, st.itemCount);
+            for (var i = st.itemIdx + 1; i <= end; i++) {
+                st.itemIdx = i;
+                try {
+                    var item = st.items.Item(i);
+                    if (item.Class !== 43) continue;      // nur Mails (olMail)
+                    var rt2;
+                    try { rt2 = new Date(item.ReceivedTime); } catch (eRt) { continue; }
+                    if (isNaN(rt2.getTime())) continue;
+                    if (rt2 < st.fromDate) { jobDone = true; break; }
+                    if (rt2 > st.toDate) continue;
+                    job2.scanned++;
+                    processMail(st, job2, item, rt2);
+                } catch (eItem) {
+                    st.jobs[st.jobIdx].skippedErrors++;
+                }
+            }
+            if (st.itemIdx >= st.itemCount) jobDone = true;
         }
 
-        st.itemIdx = end + 1;
-        if (st.itemIdx > st.itemCount) jobDone = true;
-
-        setProgress(jobPct(st),
-            "Ordner " + job2.nr + " (" + esc(job2.folder) + "): " +
-            Math.min(st.itemIdx - 1, st.itemCount) + " / " + st.itemCount +
-            " Mails gepr&uuml;ft &ndash; im Zeitraum: " + job2.total + ", Erinnerungen: " + job2.reminder + ", davon JDC: " + job2.jdc);
+        setProgress(jobPct(st), progressText(st, job2));
         renderKpis(st);
 
         if (jobDone) {
             st.jobIdx++;
             st.items = null;
+            st.table = null;
         }
         window.setTimeout(scanTick, 10);
     } catch (e) {
@@ -992,9 +1049,59 @@ function scanTick() {
     }
 }
 
+/* Fortschrittszeile: Version und Modus sichtbar, damit ein Screenshot
+   verraet, welche Fassung laeuft und ob der Zeitraumfilter gegriffen hat */
+function progressText(st, job) {
+    var filt = (st.allCount > 0 && st.itemCount < st.allCount)
+        ? " (gefiltert aus " + st.allCount + ")"
+        : (st.allCount > 0 ? " (Filter ohne Wirkung)" : "");
+    return "v1.3 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+        " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
+        Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt +
+        " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc;
+}
+
+/* Zeitstempel aus der Tabelle: laut Dokumentation in UTC. Beim ersten
+   Treffer wird einmal die echte Mail geoeffnet und der Unterschied zur
+   lokalen ReceivedTime bestimmt — so stimmt es auch, wenn ein Outlook die
+   Werte doch schon lokal liefert. */
+function tableDate(st, row) {
+    var d;
+    try { d = new Date(row.Item(COL_RECEIVED)); } catch (e0) { return null; }
+    if (isNaN(d.getTime())) return null;
+    if (st.dateCalib === null) {
+        st.dateCalib = 0;
+        try {
+            var probe = outlookNS.GetItemFromID(String(row.Item("EntryID")));
+            var local = new Date(probe.ReceivedTime);
+            var diffMin = Math.round((local.getTime() - d.getTime()) / 60000);
+            if (Math.abs(diffMin) >= 5 && Math.abs(diffMin) <= 15 * 60) st.dateCalib = diffMin * 60000;
+        } catch (e1) {}
+    }
+    return new Date(d.getTime() + st.dateCalib);
+}
+
+/* Tabellenzeile wie ein Mail-Objekt lesen: dieselben Feldnamen, die
+   processMail benutzt. Alles Teure holt processMail bei Bedarf ueber die
+   EntryID als komplettes Element. */
+function rowAsItem(st, row) {
+    var get = function (col) { try { var v = row.Item(col); return (v === null || v === undefined) ? '' : String(v); } catch (e) { return ''; } };
+    return {
+        fromTable: true,
+        EntryID: get("EntryID"),
+        Subject: get(COL_SUBJECT),
+        To: get(COL_TO),
+        CC: get(COL_CC),
+        SenderName: get(COL_SENDER),
+        SenderEmailAddress: get(COL_SENDER_ADDR),
+        SenderEmailType: get(COL_SENDER_TYPE),
+        SmtpAddress: st.hasSmtpCol ? get(COL_SENDER_SMTP) : ''
+    };
+}
+
 function jobPct(st) {
     var perJob = 100 / st.jobs.length;
-    var inner = st.itemCount > 0 ? Math.min(1, (st.itemIdx - 1) / st.itemCount) : 0;
+    var inner = st.itemCount > 0 ? Math.min(1, st.itemIdx / st.itemCount) : 0;
     return Math.round(st.jobIdx * perJob + inner * perJob);
 }
 
@@ -1003,6 +1110,16 @@ function jobPct(st) {
    Absender-Aufloesung und Anhaenge sind teuer und werden nur fuer Mails
    geholt, die als Erinnerung zaehlen oder als Detailzeile behalten werden. */
 function processMail(st, job, item, rt) {
+    /* Teure Zugriffe (Sender, Empfaenger, Kopfzeilen, Text, Anhaenge)
+       brauchen das komplett geoeffnete Element — im Tabellenmodus wird es
+       erst hier und nur bei Bedarf ueber die EntryID geholt. */
+    var fullCache = null;
+    var full = function () {
+        if (fullCache === null) {
+            try { fullCache = outlookNS.GetItemFromID(String(item.EntryID)); } catch (eF) { fullCache = item; }
+        }
+        return fullCache;
+    };
     var subject = '';
     try { subject = String(item.Subject || ''); } catch (eS) {}
     var subjClean = cleanSubject(subject);
@@ -1019,7 +1136,7 @@ function processMail(st, job, item, rt) {
     var to = '', cc = '';
     try { to = String(item.To || ''); } catch (eTo) {}
     try { cc = String(item.CC || ''); } catch (eCc) {}
-    var kanal = detectChannel(st, item, job, to, cc);
+    var kanal = detectChannel(st, item, job, to, cc, full);
     var K = getKanal(st, kanal);
 
     var p = parseSubject(subjClean);
@@ -1031,11 +1148,11 @@ function processMail(st, job, item, rt) {
     var senderName = '', senderAddr = '', senderDomain = '', vonJDC = false, jdcVia = '';
     if (istReminder || keep) {
         try { senderName = String(item.SenderName || ''); } catch (eSn) {}
-        senderAddr = senderSmtpCached(st, item, senderName);
+        senderAddr = senderSmtpCached(st, item, senderName, full);
         senderDomain = domainOf(senderAddr);
         var senderMatched = matchesSenderList(senderName.toLowerCase(), senderAddr.toLowerCase(), senderDomain, st.senders);
         if (istReminder) {
-            jdcVia = jdcEvidence(st, item, senderMatched, subjClean);
+            jdcVia = jdcEvidence(st, senderMatched ? item : full(), senderMatched, subjClean);
             vonJDC = jdcVia !== '';
         } else if (senderMatched) {
             vonJDC = true; jdcVia = 'Absender';
@@ -1043,7 +1160,7 @@ function processMail(st, job, item, rt) {
     }
 
     var attCount = '';
-    if (keep && st.countAtt) { try { attCount = item.Attachments.Count; } catch (eA) { attCount = ''; } }
+    if (keep && st.countAtt) { try { attCount = full().Attachments.Count; } catch (eA) { attCount = ''; } }
 
     /* Zaehler */
     job.total++;
