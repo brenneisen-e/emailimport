@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.3"
+        VERSION="1.4"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.3</div>
+                <div class="ver">v1.4</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -231,7 +231,7 @@
                 </label>
                 <label class="chk">
                     <input type="checkbox" id="chkAtt" checked>
-                    Anh&auml;nge z&auml;hlen (etwas langsamer)
+                    Anh&auml;nge z&auml;hlen (Tabellenmodus: ja/nein aus der Tabelle, genaue Zahl nur bei ohnehin ge&ouml;ffneten Mails)
                 </label>
             </div>
 
@@ -281,7 +281,7 @@ var outlookApp = null;
 var outlookNS = null;
 
 var scanState = null;
-var CHUNK_SIZE = 150;           // Mails pro setTimeout-Tick (Tabellenmodus ist billig je Mail)
+var CHUNK_SIZE = 300;           // Mails pro setTimeout-Tick (Tabellenmodus ist billig je Mail)
 
 /* Datumsfilter fuer Items.Restrict (deutsches Format, wie im Export-Tool) */
 function padTwo(n) { return (n < 10 ? '0' : '') + n; }
@@ -306,6 +306,7 @@ var COL_SENDER   = "urn:schemas:httpmail:sendername";
 var COL_SENDER_ADDR = "http://schemas.microsoft.com/mapi/proptag/0x0C1F001F";   // PR_SENDER_EMAIL_ADDRESS
 var COL_SENDER_TYPE = "http://schemas.microsoft.com/mapi/proptag/0x0C1E001F";   // PR_SENDER_ADDRTYPE (EX/SMTP)
 var COL_SENDER_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";   // PR_SENDER_SMTP_ADDRESS
+var COL_HAS_ATTACH  = "http://schemas.microsoft.com/mapi/proptag/0x0E1B000B";   // PR_HASATTACH (ja/nein)
 
 /* Klartext je Praefix (nur fuer die Spalte "Sparte-Detail") */
 var PREFIX_TEXT = {
@@ -748,18 +749,21 @@ function senderSmtpCached(st, item, senderName, full) {
    Weiterleiter; die JDC-Adresse steht dann nur noch in den Kopfzeilen oder
    im Textanfang ("Von: bestandsuebertragung@jungdms.de"). Diese Pruefung
    ist teuer und laeuft deshalb nur fuer Erinnerungen ohne JDC-Absender. */
-function jdcEvidence(st, item, senderMatched, subjClean) {
+function jdcEvidence(st, item, senderMatched, subjClean, full) {
     if (senderMatched) return 'Absender';
+    /* JDC-Betreffmuster zuerst — kostet nichts und trifft die meisten Faelle:
+       "Erinnerung BUE Kunde: ... VertragsNr.: ... Rangstufe: ..." */
+    if (/vertragsnr/i.test(subjClean) && /rangstufe/i.test(subjClean)) return 'Betreffmuster';
+    /* Erst jetzt die Mail oeffnen: Kopfzeilen und Textanfang durchsuchen */
+    var f = full ? full() : item;
     var hay = '';
-    try { hay += String(item.PropertyAccessor.GetProperty(PR_TRANSPORT_HEADERS) || ''); } catch (e0) {}
-    try { hay += ' ' + String(item.Body || '').substring(0, 6000); } catch (e1) {}
+    try { hay += String(f.PropertyAccessor.GetProperty(PR_TRANSPORT_HEADERS) || ''); } catch (e0) {}
+    try { hay += ' ' + String(f.Body || '').substring(0, 6000); } catch (e1) {}
     var lower = hay.toLowerCase();
     for (var i = 0; i < st.senders.length; i++) {
         var t = st.senders[i].toLowerCase();
         if (t && lower.indexOf(t) !== -1) return 'Weiterleitung/Text';
     }
-    /* JDC-Betreffmuster: "Erinnerung BUE Kunde: ... VertragsNr.: ... Rangstufe: ..." */
-    if (/vertragsnr/i.test(subjClean) && /rangstufe/i.test(subjClean)) return 'Betreffmuster';
     return '';
 }
 
@@ -909,6 +913,8 @@ function startAnalysis() {
         reminders: [],      // nur Erinnerungen (fuer Vertrag/Erstvorgang-Abgleich)
         erstByVnr: {},      // VNR -> { first: Date, count: n, kanal }
         totalAll: 0,
+        startedAt: new Date().getTime(),   // fuer die Restzeitschaetzung
+        doneBefore: 0,      // Mails der bereits abgeschlossenen Ordner
         table: null,        // Outlook-Tabelle des aktuellen Ordners (Tabellenmodus)
         mode: '',           // 'tabelle' oder 'einzeln'
         allCount: 0,        // Mails im Ordner insgesamt (zur Anzeige der Filterwirkung)
@@ -969,6 +975,7 @@ function scanTick() {
                 tbl.Columns.Add(COL_SENDER_ADDR);
                 tbl.Columns.Add(COL_SENDER_TYPE);
                 try { tbl.Columns.Add(COL_SENDER_SMTP); st.hasSmtpCol = true; } catch (eSm) { st.hasSmtpCol = false; }
+                try { tbl.Columns.Add(COL_HAS_ATTACH); st.hasAttachCol = true; } catch (eHa) { st.hasAttachCol = false; }
                 try { tbl.Sort(COL_RECEIVED, true); } catch (eSort) {}
                 st.itemCount = tbl.GetRowCount();
                 st.table = tbl;
@@ -1036,6 +1043,7 @@ function scanTick() {
         renderKpis(st);
 
         if (jobDone) {
+            st.doneBefore += st.itemIdx;
             st.jobIdx++;
             st.items = null;
             st.table = null;
@@ -1055,9 +1063,19 @@ function progressText(st, job) {
     var filt = (st.allCount > 0 && st.itemCount < st.allCount)
         ? " (gefiltert aus " + st.allCount + ")"
         : (st.allCount > 0 ? " (Filter ohne Wirkung)" : "");
-    return "v1.3 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+    /* Restzeit aus dem bisherigen Tempo (alle Ordner zusammen) */
+    var eta = '';
+    var elapsed = (new Date().getTime() - st.startedAt) / 1000;
+    var done = st.doneBefore + st.itemIdx;
+    if (elapsed > 5 && done > 50) {
+        var remaining = Math.max(0, st.itemCount - st.itemIdx);
+        for (var j = st.jobIdx + 1; j < st.jobs.length; j++) remaining += st.itemCount; // grobe Annahme: gleich gross
+        var secs = remaining / (done / elapsed);
+        eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
+    }
+    return "v1.4 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
         " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
-        Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt +
+        Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt + eta +
         " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc;
 }
 
@@ -1095,7 +1113,8 @@ function rowAsItem(st, row) {
         SenderName: get(COL_SENDER),
         SenderEmailAddress: get(COL_SENDER_ADDR),
         SenderEmailType: get(COL_SENDER_TYPE),
-        SmtpAddress: st.hasSmtpCol ? get(COL_SENDER_SMTP) : ''
+        SmtpAddress: st.hasSmtpCol ? get(COL_SENDER_SMTP) : '',
+        HasAttachments: st.hasAttachCol ? get(COL_HAS_ATTACH) : ''
     };
 }
 
@@ -1152,7 +1171,7 @@ function processMail(st, job, item, rt) {
         senderDomain = domainOf(senderAddr);
         var senderMatched = matchesSenderList(senderName.toLowerCase(), senderAddr.toLowerCase(), senderDomain, st.senders);
         if (istReminder) {
-            jdcVia = jdcEvidence(st, senderMatched ? item : full(), senderMatched, subjClean);
+            jdcVia = jdcEvidence(st, item, senderMatched, subjClean, full);
             vonJDC = jdcVia !== '';
         } else if (senderMatched) {
             vonJDC = true; jdcVia = 'Absender';
@@ -1160,7 +1179,17 @@ function processMail(st, job, item, rt) {
     }
 
     var attCount = '';
-    if (keep && st.countAtt) { try { attCount = full().Attachments.Count; } catch (eA) { attCount = ''; } }
+    if (keep && st.countAtt) {
+        if (fullCache !== null || !item.fromTable) {
+            /* Element ist ohnehin offen (Einzelmodus oder schon geladen): genaue Zahl */
+            try { attCount = full().Attachments.Count; } catch (eA) { attCount = ''; }
+        } else {
+            /* Tabellenmodus: Kennzeichen aus der Tabelle, sonst muesste jede Mail
+               einzeln vom Server geholt werden — das war die Stunde Laufzeit. */
+            var ha = String(item.HasAttachments || '').toLowerCase();
+            attCount = ha === 'true' || ha === '1' || ha === '-1' ? 'ja' : (ha === '' ? '' : 'nein');
+        }
+    }
 
     /* Zaehler */
     job.total++;
