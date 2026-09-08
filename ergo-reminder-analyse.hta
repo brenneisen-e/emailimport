@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.4"
+        VERSION="1.5"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.4</div>
+                <div class="ver">v1.5</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -220,6 +220,14 @@
                 <label for="keywords">Reminder-Stichw&ouml;rter im Betreff (kommagetrennt)</label>
                 <input type="text" id="keywords" value="Erinnerung, Reminder, Mahnung, Wiedervorlage, WV, Nachfass, Sachstandsanfrage">
                 <div class="hint">&bdquo;Erinnerung B&Uuml; Kunde: &hellip;&ldquo; wird immer als Erinnerung erkannt. Kurze W&ouml;rter (bis 3 Zeichen) z&auml;hlen nur als ganzes Wort.</div>
+
+                <label for="sharedText">Zweite Auswertung &ndash; Textmuster (leer = aus)</label>
+                <input type="text" id="sharedText" value="attached message was sent by a member of this shared mailbox">
+                <div class="hint">Z&auml;hlt zus&auml;tzlich Mails, deren <b>Text</b> dieses Muster enth&auml;lt (Hinweis aus Gruppenpostf&auml;chern, der neue Vorg&auml;nge ausl&ouml;st) &ndash; je Kalenderwoche und Kanal, mit eigenem Excel-Blatt.</div>
+
+                <label for="sharedSubject">&hellip; nur bei diesem Betreff-Muster pr&uuml;fen (leer = alle Mails, langsam)</label>
+                <input type="text" id="sharedSubject" value="DokArtHH=">
+                <div class="hint">Vorauswahl &uuml;ber den Betreff &ndash; kostet nichts. Nur diese Mails werden ge&ouml;ffnet und im Text gepr&uuml;ft. Mehrere Muster kommagetrennt.</div>
 
                 <label for="sparten">Sparten-Zuordnung nach Vertragsnummer-Pr&auml;fix</label>
                 <input type="text" id="sparten" value="SV:Komposit, KR:Komposit, RS:Komposit, HR:Komposit, UP:Komposit, HP:Komposit, DA:Komposit, AS:Komposit, KV:Kranken, LV:Leben, LF:Leben, FL:Leben, RV:Leben, GL:Leben">
@@ -366,14 +374,18 @@ function renderKpis(st) {
     var el = document.getElementById('kpis');
     if (!st) { el.style.display = 'none'; return; }
     var names = kanalNamesInOrder(st);
-    var h = '<table><tr><th>Eingangskanal</th><th>Mails</th><th>Erinnerungen</th><th>davon JDC</th><th>Quote JDC</th></tr>';
-    var sumT = 0, sumR = 0, sumJ = 0;
+    var zeigeShared = !!st.sharedText;
+    var h = '<table><tr><th>Eingangskanal</th><th>Mails</th><th>Erinnerungen</th><th>davon JDC</th><th>Quote JDC</th>' +
+            (zeigeShared ? '<th>Hinweis-Mails</th>' : '') + '</tr>';
+    var sumT = 0, sumR = 0, sumJ = 0, sumS = 0;
     for (var i = 0; i < names.length; i++) {
         var k = st.kanaele[names[i]];
-        sumT += k.t; sumR += k.r; sumJ += k.j;
-        h += '<tr><td>' + esc(names[i]) + '</td><td>' + k.t + '</td><td>' + k.r + '</td><td class="hl">' + k.j + '</td><td>' + pct(k.j, k.t) + '</td></tr>';
+        sumT += k.t; sumR += k.r; sumJ += k.j; sumS += k.sm;
+        h += '<tr><td>' + esc(names[i]) + '</td><td>' + k.t + '</td><td>' + k.r + '</td><td class="hl">' + k.j + '</td><td>' + pct(k.j, k.t) + '</td>' +
+             (zeigeShared ? '<td>' + k.sm + '</td>' : '') + '</tr>';
     }
-    h += '<tr><td><b>Gesamt</b></td><td><b>' + sumT + '</b></td><td><b>' + sumR + '</b></td><td class="hl"><b>' + sumJ + '</b></td><td><b>' + pct(sumJ, sumT) + '</b></td></tr>';
+    h += '<tr><td><b>Gesamt</b></td><td><b>' + sumT + '</b></td><td><b>' + sumR + '</b></td><td class="hl"><b>' + sumJ + '</b></td><td><b>' + pct(sumJ, sumT) + '</b></td>' +
+         (zeigeShared ? '<td><b>' + sumS + '</b></td>' : '') + '</tr>';
     h += '</table>';
     el.innerHTML = h;
     el.style.display = 'block';
@@ -868,6 +880,8 @@ function startAnalysis() {
     var senders = splitList(document.getElementById('senders').value);
     var keywords = parseKeywords(document.getElementById('keywords').value);
     var spartenMap = parseSparten(document.getElementById('sparten').value);
+    var sharedText = trim(document.getElementById('sharedText').value).toLowerCase();
+    var sharedSubject = splitList(document.getElementById('sharedSubject').value);
     var allMails = document.getElementById('chkAll').checked;
     var countAtt = document.getElementById('chkAtt').checked;
 
@@ -883,7 +897,7 @@ function startAnalysis() {
             mailbox: mbSel.options[mbSel.selectedIndex].text,
             folder: trim(fSel.options[fSel.selectedIndex].text),
             kanalFix: kSel.value || '',
-            total: 0, reminder: 0, jdc: 0, scanned: 0, skippedErrors: 0
+            total: 0, reminder: 0, jdc: 0, shared: 0, scanned: 0, skippedErrors: 0
         });
     }
     if (jobs.length === 0) { showError("Bitte mindestens Ordner 1 ausw&auml;hlen."); return; }
@@ -907,6 +921,9 @@ function startAnalysis() {
         fromDate: fromDate, toDate: toEnd,
         channels: channels, senders: senders, keywords: keywords, spartenMap: spartenMap,
         allMails: allMails, countAtt: countAtt,
+        sharedText: sharedText, sharedSubject: sharedSubject,
+        shared: [],         // Detailzeilen der zweiten Auswertung
+        sharedTotal: 0,
         kanaele: kanaele, kanalOrder: kanalOrder,
         mails: [],          // Detailzeilen
         mailsDropped: 0,
@@ -927,7 +944,7 @@ function startAnalysis() {
 }
 
 function newKanal() {
-    return { t: 0, r: 0, j: 0, rs: 0, bue: 0, kw: {}, sparten: {}, absender: {} };
+    return { t: 0, r: 0, j: 0, rs: 0, bue: 0, sm: 0, kw: {}, sparten: {}, absender: {} };
 }
 function kanalNamesInOrder(st) {
     var names = st.kanalOrder.slice(0);
@@ -1073,10 +1090,11 @@ function progressText(st, job) {
         var secs = remaining / (done / elapsed);
         eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
     }
-    return "v1.4 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+    return "v1.5 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
         " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
         Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt + eta +
-        " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc;
+        " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc +
+        (st.sharedText ? ", Hinweis-Mails: " + job.shared : "");
 }
 
 /* Zeitstempel aus der Tabelle: laut Dokumentation in UTC. Beim ersten
@@ -1165,7 +1183,7 @@ function processMail(st, job, item, rt) {
     var keep = st.allMails || istReminder || art === 'Bestandsübertragung (Erstvorgang)';
 
     var senderName = '', senderAddr = '', senderDomain = '', vonJDC = false, jdcVia = '';
-    if (istReminder || keep) {
+    if (istReminder || keep || istShared) {
         try { senderName = String(item.SenderName || ''); } catch (eSn) {}
         senderAddr = senderSmtpCached(st, item, senderName, full);
         senderDomain = domainOf(senderAddr);
@@ -1175,6 +1193,22 @@ function processMail(st, job, item, rt) {
             vonJDC = jdcVia !== '';
         } else if (senderMatched) {
             vonJDC = true; jdcVia = 'Absender';
+        }
+    }
+
+    /* Zweite Auswertung: Hinweistext aus Gruppenpostfaechern. Der Text steht
+       nur im Mailtext, deshalb entscheidet zuerst das Betreff-Muster (aus der
+       Tabelle, kostenlos), ob die Mail dafuer ueberhaupt geoeffnet wird. */
+    var istShared = false;
+    if (st.sharedText) {
+        var pruefen = st.sharedSubject.length === 0;
+        for (var sp2 = 0; sp2 < st.sharedSubject.length && !pruefen; sp2++) {
+            if (subject.toLowerCase().indexOf(st.sharedSubject[sp2].toLowerCase()) !== -1) pruefen = true;
+        }
+        if (pruefen) {
+            var body = '';
+            try { body = String(full().Body || '').substring(0, 8000).toLowerCase(); } catch (eB) {}
+            istShared = body.indexOf(st.sharedText) !== -1;
         }
     }
 
@@ -1195,9 +1229,19 @@ function processMail(st, job, item, rt) {
     job.total++;
     st.totalAll++;
     K.t++;
-    if (!K.kw[kw]) K.kw[kw] = { t: 0, r: 0, j: 0 };
+    if (!K.kw[kw]) K.kw[kw] = { t: 0, r: 0, j: 0, s: 0 };
     K.kw[kw].t++;
     if (art === 'Bestandsübertragung (Erstvorgang)') K.bue++;
+    if (istShared) {
+        job.shared++; st.sharedTotal++;
+        K.sm++; K.kw[kw].s++;
+        st.shared.push({
+            datum: rt, kw: kw, kanal: kanal, mailbox: job.mailbox, folder: job.folder,
+            senderName: senderName, senderAddr: senderAddr, subject: subject,
+            lnr: (/\bLNR\s*([0-9]+)/i.exec(subject) || ['', ''])[1],
+            dokart: (/DokArt[A-Za-z]*\s*=\s*([0-9]+)/i.exec(subject) || ['', ''])[1]
+        });
+    }
     if (istReminder) {
         job.reminder++;
         K.r++; K.kw[kw].r++;
@@ -1244,11 +1288,16 @@ function finishScan() {
 
     window.setTimeout(function () {
         try {
-            var sums = buildExcel(st);
+            buildExcel(st, function (sums) {
             hideProgress();
             var msg = "<b>Fertig!</b><br>" + st.totalAll + " Mails im Zeitraum, davon " + sums.r +
                       " Erinnerungen &ndash; <b>" + sums.j + " davon von JDC / Jung DMS</b> (" + esc(pct(sums.j, st.totalAll)) + " aller Mails).";
-            msg += "<br>Die Excel-Mappe ist ge&ouml;ffnet (4 Bl&auml;tter: &Uuml;bersicht, KW-Verlauf, Reminder je Vertrag, Mails). Bitte manuell speichern.";
+            msg += st.sharedText
+                ? "<br>Die Excel-Mappe ist ge&ouml;ffnet (5 Bl&auml;tter: &Uuml;bersicht, KW-Verlauf, Reminder je Vertrag, Hinweis-Mails, Mails). Bitte manuell speichern."
+                : "<br>Die Excel-Mappe ist ge&ouml;ffnet (4 Bl&auml;tter: &Uuml;bersicht, KW-Verlauf, Reminder je Vertrag, Mails). Bitte manuell speichern.";
+            if (st.sharedText) {
+                msg += "<br>Zweite Auswertung: <b>" + st.sharedTotal + " Hinweis-Mails</b> aus Gruppenpostf&auml;chern (Blatt &bdquo;Hinweis-Mails&ldquo;, dort auch je Kalenderwoche).";
+            }
             if (st.mailsDropped > 0) {
                 msg += "<br><i>Hinweis: Blatt &bdquo;Mails&ldquo; auf " + MAILS_MAX + " Zeilen begrenzt, " + st.mailsDropped + " weitere Mails nur in den Z&auml;hlungen enthalten.</i>";
             }
@@ -1256,12 +1305,14 @@ function finishScan() {
             for (var j = 0; j < st.jobs.length; j++) skipped += st.jobs[j].skippedErrors;
             if (skipped > 0) msg += "<br><i>" + skipped + " Element(e) konnten nicht gelesen werden und wurden &uuml;bersprungen.</i>";
             showSuccess(msg);
+            document.getElementById('btnStart').disabled = false;
+            });
         } catch (e) {
             hideProgress();
             try { if (xlApp) { xlApp.ScreenUpdating = true; xlApp.DisplayAlerts = true; } } catch (eX) {}
             showError("Excel-Export fehlgeschlagen: " + esc(e.message));
+            document.getElementById('btnStart').disabled = false;
         }
-        document.getElementById('btnStart').disabled = false;
     }, 60);
 }
 
@@ -1331,6 +1382,25 @@ function freezeBelow(sheet, excel, rowNr) {
         excel.ActiveWindow.FreezePanes = true;
     } catch (e) {}
 }
+/* Viele Zeilen in Bloecken schreiben. Zehntausende Zeilen am Stueck lassen
+   Windows das Skript fuer haengengeblieben halten ("Skript beenden? Ja/Nein");
+   zwischen den Bloecken gibt setTimeout die Kontrolle kurz zurueck. */
+var EXCEL_CHUNK = 400;
+function writeRowsChunked(sheet, startRow, rows, label, done) {
+    var idx = 0;
+    function step() {
+        var end = Math.min(idx + EXCEL_CHUNK, rows.length);
+        for (; idx < end; idx++) putRow(sheet, startRow + idx, rows[idx]);
+        if (idx < rows.length) {
+            setProgress(100, "Excel wird erstellt &hellip; " + label + ": " + idx + " / " + rows.length + " Zeilen");
+            window.setTimeout(step, 1);
+        } else {
+            done();
+        }
+    }
+    step();
+}
+
 function autoFilter(sheet, headRow, lastRow, colCount) {
     try { if (lastRow > headRow) sheet.Range(sheet.Cells(headRow, 1), sheet.Cells(lastRow, colCount)).AutoFilter(); } catch (e) {}
 }
@@ -1350,7 +1420,7 @@ function daysBetween(a, b) {
     return Math.round((b.getTime() - a.getTime()) / (24 * 3600 * 1000));
 }
 
-function buildExcel(st) {
+function buildExcel(st, done) {
     var excel = new ActiveXObject("Excel.Application");
     xlApp = excel;
     excel.Visible = true;
@@ -1363,6 +1433,11 @@ function buildExcel(st) {
     try { shMails.Name = "Mails"; } catch (e) {}
     var shVertrag = wb.Worksheets.Add();
     try { shVertrag.Name = "Reminder je Vertrag"; } catch (e) {}
+    var shShared = null;
+    if (st.sharedText) {
+        shShared = wb.Worksheets.Add();
+        try { shShared.Name = "Hinweis-Mails"; } catch (e) {}
+    }
     var shKW = wb.Worksheets.Add();
     try { shKW.Name = "KW-Verlauf"; } catch (e) {}
     var shUeb = wb.Worksheets.Add();
@@ -1391,7 +1466,8 @@ function buildExcel(st) {
     styleHeaderRow(shMails, 1, mHead.length);
 
     st.mails.sort(function (a, b) { return a.datum.getTime() - b.datum.getTime(); });
-    var r = 2;
+    /* Zeilen erst sammeln, geschrieben wird am Ende in Bloecken */
+    var mailRows = [];
     for (var i = 0; i < st.mails.length; i++) {
         var m = st.mails[i];
         var erst = '', erstDatum = '', tage = '', remNr = '';
@@ -1405,7 +1481,7 @@ function buildExcel(st) {
             }
             remNr = m.remNr || '';
         }
-        putRow(shMails, r, [
+        mailRows.push([
             i + 1, fmtDE(m.datum), pad(m.datum.getHours()) + ':' + pad(m.datum.getMinutes()), m.wd, m.kw,
             m.mailbox, m.folder, m.kanal,
             m.senderName, m.senderAddr, m.senderDomain, m.to, m.subject,
@@ -1413,17 +1489,8 @@ function buildExcel(st) {
             m.sparte, m.sparteDetail, m.rangstufe, m.agentur, m.vermittler, m.att,
             erst, erstDatum, tage, remNr, m.jdcVia || ''
         ]);
-        r++;
     }
     if (st.mails.length === 0) shMails.Cells(2, 2).Value = "Keine Mails im Zeitraum.";
-    try {
-        shMails.Columns("A:L").AutoFit();
-        shMails.Columns("M:M").ColumnWidth = 70;
-        shMails.Columns("N:AC").AutoFit();
-        shMails.Columns("L:L").ColumnWidth = 30;
-    } catch (e) {}
-    autoFilter(shMails, 1, r - 1, mHead.length);
-    freezeBelow(shMails, excel, 1);
 
     /* ========== Blatt 3: Reminder je Vertrag ========== */
     var vHead = ["Nr", "Vertragsnummer", "Kunde", "Sparte", "Eingangskanal", "Erinnerungen gesamt", "davon JDC",
@@ -1457,8 +1524,10 @@ function buildExcel(st) {
         kHead.push("Mails " + names[kn]);
         kHead.push("Erinnerungen " + names[kn]);
         kHead.push("JDC-Erinnerungen " + names[kn]);
+        if (st.sharedText) kHead.push("Hinweis-Mails " + names[kn]);
     }
     kHead.push("Mails gesamt", "Erinnerungen gesamt", "JDC-Erinnerungen gesamt", "Quote JDC an allen Mails");
+    if (st.sharedText) kHead.push("Hinweis-Mails gesamt");
     putRow(shKW, 1, kHead);
     styleHeaderRow(shKW, 1, kHead.length);
 
@@ -1473,13 +1542,15 @@ function buildExcel(st) {
     var kr = 2;
     for (var w = 0; w < weeks.length; w++) {
         var vals = [weeks[w].key, fmtDE(weeks[w].monday) + " – " + fmtDE(weeks[w].sunday)];
-        var wt = 0, wr = 0, wj = 0;
+        var wt = 0, wr = 0, wj = 0, ws = 0;
         for (var kn2 = 0; kn2 < names.length; kn2++) {
-            var kwv = st.kanaele[names[kn2]].kw[weeks[w].key] || { t: 0, r: 0, j: 0 };
+            var kwv = st.kanaele[names[kn2]].kw[weeks[w].key] || { t: 0, r: 0, j: 0, s: 0 };
             vals.push(kwv.t, kwv.r, kwv.j);
-            wt += kwv.t; wr += kwv.r; wj += kwv.j;
+            if (st.sharedText) vals.push(kwv.s || 0);
+            wt += kwv.t; wr += kwv.r; wj += kwv.j; ws += (kwv.s || 0);
         }
         vals.push(wt, wr, wj, ratio(wj, wt));
+        if (st.sharedText) vals.push(ws);
         putRow(shKW, kr, vals);
         kr++;
     }
@@ -1525,6 +1596,11 @@ function buildExcel(st) {
     kv("davon von JDC / Jung DMS:", sums.j);
     kv("davon von sonstigen Absendern:", sums.rs);
     kv("Anteil JDC-Erinnerungen an allen Mails:", pct(sums.j, sums.t));
+    if (st.sharedText) {
+        kv("Hinweis-Mails (zweite Auswertung):", st.sharedTotal);
+        kv("Textmuster:", "\u201E" + st.sharedText + "\u201C" +
+            (st.sharedSubject.length ? "  (nur bei Betreff: " + st.sharedSubject.join(', ') + ")" : "  (alle Mails geprueft)"));
+    }
     kv("Anteil JDC-Erinnerungen an allen Erinnerungen:", pct(sums.j, sums.r));
     kv("BÜ-Erstvorgänge (Betreff „Bestandsübertragung“):", sums.bue);
     kv("Verträge mit Erinnerung:", vertraege.length);
@@ -1667,10 +1743,58 @@ function buildExcel(st) {
         sh.Columns("A:A").WrapText = false;
     } catch (e) {}
 
-    try { shUeb.Activate(); shUeb.Range("A1").Select(); } catch (e) {}
-    try { excel.ScreenUpdating = true; } catch (eSU2) {}
-    excel.DisplayAlerts = true;
-    return sums;
+    /* ========== Blatt: Hinweis-Mails (zweite Auswertung) ========== */
+    if (shShared) {
+        var sHead = ["Nr", "Datum", "Uhrzeit", "KW", "Wochentag", "Eingangskanal", "Postfach", "Ordner",
+                     "Absender Name", "Absender E-Mail", "Betreff", "LNR", "DokArt"];
+        try { shShared.Columns("L:M").NumberFormat = "@"; } catch (eNF3) {}
+        putRow(shShared, 1, sHead);
+        styleHeaderRow(shShared, 1, sHead.length);
+        st.shared.sort(function (a, b) { return a.datum.getTime() - b.datum.getTime(); });
+        for (var sIdx = 0; sIdx < st.shared.length; sIdx++) {
+            var S = st.shared[sIdx];
+            putRow(shShared, sIdx + 2, [
+                sIdx + 1, fmtDE(S.datum), pad(S.datum.getHours()) + ':' + pad(S.datum.getMinutes()),
+                S.kw, WEEKDAYS[(S.datum.getDay() + 6) % 7], S.kanal, S.mailbox, S.folder,
+                S.senderName, S.senderAddr, S.subject, S.lnr, S.dokart
+            ]);
+        }
+        if (st.shared.length === 0) shShared.Cells(2, 2).Value = "Keine Mails mit diesem Textmuster im Zeitraum.";
+        /* Zusammenfassung je KW unter der Liste */
+        var sr = st.shared.length + 3;
+        shShared.Cells(sr, 1).Value = "Hinweis-Mails je Kalenderwoche"; styleTitle(shShared, sr, 12); sr++;
+        putRow(shShared, sr, ["KW", "Zeitraum (Mo–So)", "Anzahl"]);
+        styleHeaderRow(shShared, sr, 3); sr++;
+        for (var sw = 0; sw < weeks.length; sw++) {
+            var cnt = 0;
+            for (var sn = 0; sn < names.length; sn++) {
+                var kv2 = st.kanaele[names[sn]].kw[weeks[sw].key];
+                if (kv2) cnt += (kv2.s || 0);
+            }
+            putRow(shShared, sr, [weeks[sw].key, fmtDE(weeks[sw].monday) + " – " + fmtDE(weeks[sw].sunday), cnt]);
+            sr++;
+        }
+        try { shShared.Columns("A:M").AutoFit(); shShared.Columns("K:K").ColumnWidth = 70; } catch (e) {}
+        autoFilter(shShared, 1, st.shared.length + 1, sHead.length);
+        freezeBelow(shShared, excel, 1);
+    }
+
+    /* Zuletzt die Mail-Zeilen: das ist mit Abstand der groesste Block */
+    writeRowsChunked(shMails, 2, mailRows, "Mails", function () {
+        try {
+            shMails.Columns("A:L").AutoFit();
+            shMails.Columns("M:M").ColumnWidth = 70;
+            shMails.Columns("N:AC").AutoFit();
+            shMails.Columns("L:L").ColumnWidth = 30;
+        } catch (e) {}
+        autoFilter(shMails, 1, mailRows.length + 1, mHead.length);
+        freezeBelow(shMails, excel, 1);
+
+        try { shUeb.Activate(); shUeb.Range("A1").Select(); } catch (e) {}
+        try { excel.ScreenUpdating = true; } catch (eSU2) {}
+        excel.DisplayAlerts = true;
+        done(sums);
+    });
 }
 
 /* Erinnerungen je Vertrag gruppieren; setzt zusaetzlich remNr (1., 2., 3. Erinnerung) je Detailzeile */
