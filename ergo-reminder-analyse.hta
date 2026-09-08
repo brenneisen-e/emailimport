@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.5"
+        VERSION="1.6"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.5</div>
+                <div class="ver">v1.6</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -225,9 +225,9 @@
                 <input type="text" id="sharedText" value="attached message was sent by a member of this shared mailbox">
                 <div class="hint">Z&auml;hlt zus&auml;tzlich Mails, deren <b>Text</b> dieses Muster enth&auml;lt (Hinweis aus Gruppenpostf&auml;chern, der neue Vorg&auml;nge ausl&ouml;st) &ndash; je Kalenderwoche und Kanal, mit eigenem Excel-Blatt.</div>
 
-                <label for="sharedSubject">&hellip; nur bei diesem Betreff-Muster pr&uuml;fen (leer = alle Mails, langsam)</label>
-                <input type="text" id="sharedSubject" value="DokArtHH=">
-                <div class="hint">Vorauswahl &uuml;ber den Betreff &ndash; kostet nichts. Nur diese Mails werden ge&ouml;ffnet und im Text gepr&uuml;ft. Mehrere Muster kommagetrennt.</div>
+                <label for="sharedSubject">&hellip; nur bei diesem Betreff <b>oder Absender</b> pr&uuml;fen (leer = alle Mails, langsam)</label>
+                <input type="text" id="sharedSubject" value="DokArtHH=, Bestandsuebertragungen@ergo.de, Fw:, WG:">
+                <div class="hint">Vorauswahl aus der Tabelle &ndash; kostet nichts. Nur passende Mails werden ge&ouml;ffnet und im Text gepr&uuml;ft; das Ergebnis nennt, wie viele gepr&uuml;ft und wie viele hier aussortiert wurden. Findet die Auswertung nichts, dieses Feld leeren (pr&uuml;ft dann alle Mails, dauert deutlich l&auml;nger).</div>
 
                 <label for="sparten">Sparten-Zuordnung nach Vertragsnummer-Pr&auml;fix</label>
                 <input type="text" id="sparten" value="SV:Komposit, KR:Komposit, RS:Komposit, HR:Komposit, UP:Komposit, HP:Komposit, DA:Komposit, AS:Komposit, KV:Kranken, LV:Leben, LF:Leben, FL:Leben, RV:Leben, GL:Leben">
@@ -375,16 +375,16 @@ function renderKpis(st) {
     if (!st) { el.style.display = 'none'; return; }
     var names = kanalNamesInOrder(st);
     var zeigeShared = !!st.sharedText;
-    var h = '<table><tr><th>Eingangskanal</th><th>Mails</th><th>Erinnerungen</th><th>davon JDC</th><th>Quote JDC</th>' +
+    var h = '<table><tr><th>Eingangskanal</th><th>Mails</th><th>Erinnerungen</th><th>mit Anhang</th><th>ohne Anhang</th><th>davon JDC</th><th>Quote JDC</th>' +
             (zeigeShared ? '<th>Hinweis-Mails</th>' : '') + '</tr>';
-    var sumT = 0, sumR = 0, sumJ = 0, sumS = 0;
+    var sumT = 0, sumR = 0, sumJ = 0, sumS = 0, sumRA = 0, sumRO = 0;
     for (var i = 0; i < names.length; i++) {
         var k = st.kanaele[names[i]];
-        sumT += k.t; sumR += k.r; sumJ += k.j; sumS += k.sm;
-        h += '<tr><td>' + esc(names[i]) + '</td><td>' + k.t + '</td><td>' + k.r + '</td><td class="hl">' + k.j + '</td><td>' + pct(k.j, k.t) + '</td>' +
+        sumT += k.t; sumR += k.r; sumJ += k.j; sumS += k.sm; sumRA += k.rA; sumRO += k.rO;
+        h += '<tr><td>' + esc(names[i]) + '</td><td>' + k.t + '</td><td>' + k.r + '</td><td>' + k.rA + '</td><td>' + k.rO + '</td><td class="hl">' + k.j + '</td><td>' + pct(k.j, k.t) + '</td>' +
              (zeigeShared ? '<td>' + k.sm + '</td>' : '') + '</tr>';
     }
-    h += '<tr><td><b>Gesamt</b></td><td><b>' + sumT + '</b></td><td><b>' + sumR + '</b></td><td class="hl"><b>' + sumJ + '</b></td><td><b>' + pct(sumJ, sumT) + '</b></td>' +
+    h += '<tr><td><b>Gesamt</b></td><td><b>' + sumT + '</b></td><td><b>' + sumR + '</b></td><td><b>' + sumRA + '</b></td><td><b>' + sumRO + '</b></td><td class="hl"><b>' + sumJ + '</b></td><td><b>' + pct(sumJ, sumT) + '</b></td>' +
          (zeigeShared ? '<td><b>' + sumS + '</b></td>' : '') + '</tr>';
     h += '</table>';
     el.innerHTML = h;
@@ -880,8 +880,8 @@ function startAnalysis() {
     var senders = splitList(document.getElementById('senders').value);
     var keywords = parseKeywords(document.getElementById('keywords').value);
     var spartenMap = parseSparten(document.getElementById('sparten').value);
-    var sharedText = trim(document.getElementById('sharedText').value).toLowerCase();
-    var sharedSubject = splitList(document.getElementById('sharedSubject').value);
+    var sharedText = normText(document.getElementById('sharedText').value);
+    var sharedVorauswahl = splitList(document.getElementById('sharedSubject').value);
     var allMails = document.getElementById('chkAll').checked;
     var countAtt = document.getElementById('chkAtt').checked;
 
@@ -921,9 +921,9 @@ function startAnalysis() {
         fromDate: fromDate, toDate: toEnd,
         channels: channels, senders: senders, keywords: keywords, spartenMap: spartenMap,
         allMails: allMails, countAtt: countAtt,
-        sharedText: sharedText, sharedSubject: sharedSubject,
+        sharedText: sharedText, sharedVorauswahl: sharedVorauswahl,
         shared: [],         // Detailzeilen der zweiten Auswertung
-        sharedTotal: 0,
+        sharedTotal: 0, sharedChecked: 0, sharedSkipped: 0,
         kanaele: kanaele, kanalOrder: kanalOrder,
         mails: [],          // Detailzeilen
         mailsDropped: 0,
@@ -944,7 +944,7 @@ function startAnalysis() {
 }
 
 function newKanal() {
-    return { t: 0, r: 0, j: 0, rs: 0, bue: 0, sm: 0, kw: {}, sparten: {}, absender: {} };
+    return { t: 0, r: 0, j: 0, rs: 0, bue: 0, sm: 0, rA: 0, rO: 0, jA: 0, jO: 0, kw: {}, sparten: {}, absender: {} };
 }
 function kanalNamesInOrder(st) {
     var names = st.kanalOrder.slice(0);
@@ -959,6 +959,14 @@ function getKanal(st, name) {
     return st.kanaele[name];
 }
 function inc(obj, key, n) { obj[key] = (obj[key] || 0) + (n || 1); }
+
+/* Text fuer den Mustervergleich vereinheitlichen: Kleinschreibung, Zitat-
+   zeichen weg, jede Folge von Leerraum (auch Zeilenumbrueche) zu einem
+   Leerzeichen. Damit findet ein Muster den Text auch dann, wenn Outlook
+   ihn umgebrochen oder eingerueckt hat. */
+function normText(s) {
+    return String(s || '').substring(0, 20000).toLowerCase().replace(/[>|]/g, ' ').replace(/\s+/g, ' ');
+}
 
 function scanTick() {
     var st = scanState;
@@ -1090,7 +1098,7 @@ function progressText(st, job) {
         var secs = remaining / (done / elapsed);
         eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
     }
-    return "v1.5 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+    return "v1.6 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
         " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
         Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt + eta +
         " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc +
@@ -1182,6 +1190,36 @@ function processMail(st, job, item, rt) {
     var kw = kwKey(rt);
     var keep = st.allMails || istReminder || art === 'Bestandsübertragung (Erstvorgang)';
 
+    /* Zweite Auswertung: Hinweistext aus Gruppenpostfaechern. Der Text steht
+       nur im Mailtext; die Vorauswahl (Betreff oder Absender, beides aus der
+       Tabelle) entscheidet, ob die Mail dafuer ueberhaupt geoeffnet wird. */
+    var istShared = false;
+    if (st.sharedText) {
+        var pruefen = st.sharedVorauswahl.length === 0;
+        var heu = (subject + ' ' + (item.SenderEmailAddress || '') + ' ' + (item.SenderName || '')).toLowerCase();
+        for (var sp2 = 0; sp2 < st.sharedVorauswahl.length && !pruefen; sp2++) {
+            if (heu.indexOf(st.sharedVorauswahl[sp2].toLowerCase()) !== -1) pruefen = true;
+        }
+        if (!pruefen) {
+            st.sharedSkipped++;
+        } else {
+            st.sharedChecked++;
+            /* Klartext und, falls der leer bleibt, den HTML-Text durchsuchen.
+               Outlook bricht Klartext-Zeilen um und ruecken weitergeleitete
+               Mails ein, deshalb werden Leerraum und Zitatzeichen vor dem
+               Vergleich vereinheitlicht — sonst zerreisst ein Zeilenumbruch
+               mitten im Satz das gesuchte Muster. */
+            var body = '';
+            try { body = String(full().Body || ''); } catch (eB) {}
+            if (normText(body).indexOf(st.sharedText) === -1) {
+                var html = '';
+                try { html = String(full().HTMLBody || ''); } catch (eH) {}
+                if (html) body = html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+            }
+            istShared = normText(body).indexOf(st.sharedText) !== -1;
+        }
+    }
+
     var senderName = '', senderAddr = '', senderDomain = '', vonJDC = false, jdcVia = '';
     if (istReminder || keep || istShared) {
         try { senderName = String(item.SenderName || ''); } catch (eSn) {}
@@ -1199,24 +1237,24 @@ function processMail(st, job, item, rt) {
     /* Zweite Auswertung: Hinweistext aus Gruppenpostfaechern. Der Text steht
        nur im Mailtext, deshalb entscheidet zuerst das Betreff-Muster (aus der
        Tabelle, kostenlos), ob die Mail dafuer ueberhaupt geoeffnet wird. */
-    var istShared = false;
-    if (st.sharedText) {
-        var pruefen = st.sharedSubject.length === 0;
-        for (var sp2 = 0; sp2 < st.sharedSubject.length && !pruefen; sp2++) {
-            if (subject.toLowerCase().indexOf(st.sharedSubject[sp2].toLowerCase()) !== -1) pruefen = true;
-        }
-        if (pruefen) {
-            var body = '';
-            try { body = String(full().Body || '').substring(0, 8000).toLowerCase(); } catch (eB) {}
-            istShared = body.indexOf(st.sharedText) !== -1;
-        }
+
+    /* Hat die Mail einen Anhang? Kennzeichen aus der Tabelle (kostenlos) —
+       im Einzelmodus aus der Anzahl. Achtung: Outlook zaehlt eingebettete
+       Bilder aus Signaturen mit; fuer die Unterscheidung "Erinnerung mit /
+       ohne Anhang" ist das die verfuegbare Naeherung. */
+    var hatAnhang = null;
+    if (item.fromTable) {
+        var haFlag = String(item.HasAttachments || '').toLowerCase();
+        if (haFlag !== '') hatAnhang = (haFlag === 'true' || haFlag === '1' || haFlag === '-1');
+    } else {
+        try { hatAnhang = item.Attachments.Count > 0; } catch (eHA) { hatAnhang = null; }
     }
 
     var attCount = '';
     if (keep && st.countAtt) {
         if (fullCache !== null || !item.fromTable) {
             /* Element ist ohnehin offen (Einzelmodus oder schon geladen): genaue Zahl */
-            try { attCount = full().Attachments.Count; } catch (eA) { attCount = ''; }
+            try { attCount = full().Attachments.Count; hatAnhang = attCount > 0; } catch (eA) { attCount = ''; }
         } else {
             /* Tabellenmodus: Kennzeichen aus der Tabelle, sonst muesste jede Mail
                einzeln vom Server geholt werden — das war die Stunde Laufzeit. */
@@ -1229,7 +1267,7 @@ function processMail(st, job, item, rt) {
     job.total++;
     st.totalAll++;
     K.t++;
-    if (!K.kw[kw]) K.kw[kw] = { t: 0, r: 0, j: 0, s: 0 };
+    if (!K.kw[kw]) K.kw[kw] = { t: 0, r: 0, j: 0, s: 0, rA: 0, rO: 0 };
     K.kw[kw].t++;
     if (art === 'Bestandsübertragung (Erstvorgang)') K.bue++;
     if (istShared) {
@@ -1245,6 +1283,8 @@ function processMail(st, job, item, rt) {
     if (istReminder) {
         job.reminder++;
         K.r++; K.kw[kw].r++;
+        if (hatAnhang === true) { K.rA++; K.kw[kw].rA++; if (vonJDC) K.jA++; }
+        else if (hatAnhang === false) { K.rO++; K.kw[kw].rO++; if (vonJDC) K.jO++; }
         inc(K.absender, senderAddr || senderName || '(unbekannt)');
         if (vonJDC) {
             job.jdc++;
@@ -1270,6 +1310,7 @@ function processMail(st, job, item, rt) {
         senderName: senderName, senderAddr: senderAddr, senderDomain: senderDomain,
         to: to, subject: subject, art: art,
         istReminder: istReminder, istErinnerungBUe: istErinnerungBUe, vonJDC: vonJDC, jdcVia: jdcVia,
+        hatAnhang: hatAnhang === null ? '' : (hatAnhang ? 'ja' : 'nein'),
         kunde: p.kunde, vnr: p.vnr, vk: vk, sparte: sp.sparte, sparteDetail: sp.detail,
         rangstufe: p.rangstufe, agentur: p.agentur, vermittler: p.vermittler,
         att: attCount
@@ -1445,10 +1486,11 @@ function buildExcel(st, done) {
     try { wb.Styles("Normal").Font.Name = "Open Sans"; } catch (eF) {}
 
     var names = kanalNamesInOrder(st);
-    var sums = { t: 0, r: 0, j: 0, rs: 0, bue: 0 };
+    var sums = { t: 0, r: 0, j: 0, rs: 0, bue: 0, rA: 0, rO: 0, jA: 0, jO: 0 };
     for (var n0 = 0; n0 < names.length; n0++) {
         var K0 = st.kanaele[names[n0]];
         sums.t += K0.t; sums.r += K0.r; sums.j += K0.j; sums.rs += K0.rs; sums.bue += K0.bue;
+        sums.rA += K0.rA; sums.rO += K0.rO; sums.jA += K0.jA; sums.jO += K0.jO;
     }
 
     /* Verträge: Erinnerungen je VNR sammeln (auch fuer Uebersicht) */
@@ -1459,7 +1501,7 @@ function buildExcel(st, done) {
                  "Absender Name", "Absender E-Mail", "Absender Domain", "Empfänger (An)", "Betreff",
                  "Vorgangsart", "Erinnerung", "Erinnerung BÜ", "Von JDC", "Kunde", "Vertragsnummer",
                  "Sparte", "Sparte-Detail", "Rangstufe", "Agentur-Nr", "Vermittler-Nr", "Anhänge",
-                 "Erstvorgang im Scan", "Erstvorgang Datum", "Tage seit Erstvorgang", "Erinnerung Nr. je Vertrag", "JDC erkannt über"];
+                 "Erstvorgang im Scan", "Erstvorgang Datum", "Tage seit Erstvorgang", "Erinnerung Nr. je Vertrag", "JDC erkannt über", "Anhang vorhanden"];
     try { shMails.Columns("S:S").NumberFormat = "@"; shMails.Columns("W:X").NumberFormat = "@"; } catch (eNF) {}
     putRow(shMails, 1, mHead);
     verifyArrayRows(shMails, 1, mHead);
@@ -1487,7 +1529,7 @@ function buildExcel(st, done) {
             m.senderName, m.senderAddr, m.senderDomain, m.to, m.subject,
             m.art, m.istReminder, m.istErinnerungBUe, m.vonJDC, m.kunde, m.vnr,
             m.sparte, m.sparteDetail, m.rangstufe, m.agentur, m.vermittler, m.att,
-            erst, erstDatum, tage, remNr, m.jdcVia || ''
+            erst, erstDatum, tage, remNr, m.jdcVia || '', m.hatAnhang || ''
         ]);
     }
     if (st.mails.length === 0) shMails.Cells(2, 2).Value = "Keine Mails im Zeitraum.";
@@ -1523,10 +1565,13 @@ function buildExcel(st, done) {
     for (var kn = 0; kn < names.length; kn++) {
         kHead.push("Mails " + names[kn]);
         kHead.push("Erinnerungen " + names[kn]);
+        kHead.push("Erinnerungen mit Anhang " + names[kn]);
+        kHead.push("Erinnerungen ohne Anhang " + names[kn]);
         kHead.push("JDC-Erinnerungen " + names[kn]);
         if (st.sharedText) kHead.push("Hinweis-Mails " + names[kn]);
     }
-    kHead.push("Mails gesamt", "Erinnerungen gesamt", "JDC-Erinnerungen gesamt", "Quote JDC an allen Mails");
+    kHead.push("Mails gesamt", "Erinnerungen gesamt", "davon mit Anhang", "davon ohne Anhang",
+               "JDC-Erinnerungen gesamt", "Quote JDC an allen Mails");
     if (st.sharedText) kHead.push("Hinweis-Mails gesamt");
     putRow(shKW, 1, kHead);
     styleHeaderRow(shKW, 1, kHead.length);
@@ -1542,14 +1587,15 @@ function buildExcel(st, done) {
     var kr = 2;
     for (var w = 0; w < weeks.length; w++) {
         var vals = [weeks[w].key, fmtDE(weeks[w].monday) + " – " + fmtDE(weeks[w].sunday)];
-        var wt = 0, wr = 0, wj = 0, ws = 0;
+        var wt = 0, wr = 0, wj = 0, ws = 0, wra = 0, wro = 0;
         for (var kn2 = 0; kn2 < names.length; kn2++) {
-            var kwv = st.kanaele[names[kn2]].kw[weeks[w].key] || { t: 0, r: 0, j: 0, s: 0 };
-            vals.push(kwv.t, kwv.r, kwv.j);
+            var kwv = st.kanaele[names[kn2]].kw[weeks[w].key] || { t: 0, r: 0, j: 0, s: 0, rA: 0, rO: 0 };
+            vals.push(kwv.t, kwv.r, kwv.rA || 0, kwv.rO || 0, kwv.j);
             if (st.sharedText) vals.push(kwv.s || 0);
             wt += kwv.t; wr += kwv.r; wj += kwv.j; ws += (kwv.s || 0);
+            wra += (kwv.rA || 0); wro += (kwv.rO || 0);
         }
-        vals.push(wt, wr, wj, ratio(wj, wt));
+        vals.push(wt, wr, wra, wro, wj, ratio(wj, wt));
         if (st.sharedText) vals.push(ws);
         putRow(shKW, kr, vals);
         kr++;
@@ -1593,13 +1639,17 @@ function buildExcel(st, done) {
     sh.Cells(row, 1).Value = "Kernzahlen"; styleTitle(sh, row, 12); row++;
     kv("Mails gesamt im Zeitraum:", sums.t);
     kv("Erinnerungen gesamt:", sums.r);
+    kv("davon mit Anhang:", sums.rA);
+    kv("davon ohne Anhang:", sums.rO);
     kv("davon von JDC / Jung DMS:", sums.j);
     kv("davon von sonstigen Absendern:", sums.rs);
+    kv("JDC-Erinnerungen mit / ohne Anhang:", sums.jA + " / " + sums.jO);
     kv("Anteil JDC-Erinnerungen an allen Mails:", pct(sums.j, sums.t));
     if (st.sharedText) {
         kv("Hinweis-Mails (zweite Auswertung):", st.sharedTotal);
         kv("Textmuster:", "\u201E" + st.sharedText + "\u201C" +
-            (st.sharedSubject.length ? "  (nur bei Betreff: " + st.sharedSubject.join(', ') + ")" : "  (alle Mails geprueft)"));
+            (st.sharedVorauswahl.length ? "  (Vorauswahl: " + st.sharedVorauswahl.join(', ') + ")" : "  (alle Mails geprueft)"));
+        kv("davon im Text geprueft / uebersprungen:", st.sharedChecked + " / " + st.sharedSkipped);
     }
     kv("Anteil JDC-Erinnerungen an allen Erinnerungen:", pct(sums.j, sums.r));
     kv("BÜ-Erstvorgänge (Betreff „Bestandsübertragung“):", sums.bue);
