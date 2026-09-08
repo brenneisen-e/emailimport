@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.7"
+        VERSION="1.8"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.7</div>
+                <div class="ver">v1.8</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -1116,7 +1116,7 @@ function progressText(st, job) {
         var secs = remaining / (done / elapsed);
         eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
     }
-    return "v1.7 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+    return "v1.8 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
         " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
         Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt + eta +
         " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc +
@@ -1380,8 +1380,8 @@ function finishScan() {
             var msg = "<b>Fertig!</b><br>" + st.totalAll + " Mails im Zeitraum, davon " + sums.r +
                       " Erinnerungen &ndash; <b>" + sums.j + " davon von JDC / Jung DMS</b> (" + esc(pct(sums.j, st.totalAll)) + " aller Mails).";
             msg += st.sharedText
-                ? "<br>Die Excel-Mappe ist ge&ouml;ffnet (5 Bl&auml;tter: &Uuml;bersicht, KW-Verlauf, Reminder je Vertrag, Hinweis-Mails, Mails). Bitte manuell speichern."
-                : "<br>Die Excel-Mappe ist ge&ouml;ffnet (4 Bl&auml;tter: &Uuml;bersicht, KW-Verlauf, Reminder je Vertrag, Mails). Bitte manuell speichern.";
+                ? "<br>Die Excel-Mappe ist ge&ouml;ffnet (6 Bl&auml;tter: &Uuml;bersicht, KW-Verlauf, Sparten &amp; Duplikate, Reminder je Vertrag, Hinweis-Mails, Mails). Bitte manuell speichern."
+                : "<br>Die Excel-Mappe ist ge&ouml;ffnet (5 Bl&auml;tter: &Uuml;bersicht, KW-Verlauf, Sparten &amp; Duplikate, Reminder je Vertrag, Mails). Bitte manuell speichern.";
             if (st.sharedText) {
                 msg += "<br>Zweite Auswertung: <b>" + st.sharedTotal + " Hinweis-Mails</b> aus Gruppenpostf&auml;chern (Blatt &bdquo;Hinweis-Mails&ldquo;, dort auch je Kalenderwoche).";
             }
@@ -1525,6 +1525,8 @@ function buildExcel(st, done) {
         shShared = wb.Worksheets.Add();
         try { shShared.Name = "Hinweis-Mails"; } catch (e) {}
     }
+    var shSparte = wb.Worksheets.Add();
+    try { shSparte.Name = "Sparten & Duplikate"; } catch (e) {}
     var shKW = wb.Worksheets.Add();
     try { shKW.Name = "KW-Verlauf"; } catch (e) {}
     var shUeb = wb.Worksheets.Add();
@@ -1585,6 +1587,7 @@ function buildExcel(st, done) {
     var vHead = ["Nr", "Vertragsnummer", "Kunde", "Sparte", "Eingangskanal", "Erinnerungen gesamt", "davon JDC",
                  "davon mit Anhang", "davon ohne Anhang",
                  "an KWAD weitergeleitet", "davon mit Anhang", "noch offen", "Status",
+                 "Duplikat (mehrfach weitergeleitet)", "überzählige Weiterleitungen",
                  "zuletzt weitergeleitet am",
                  "Erste Erinnerung", "Letzte Erinnerung", "Erstvorgang im Scan", "Erstvorgang Datum",
                  "Tage Erstvorgang bis letzte Erinnerung", "Rangstufe", "Absender (letzte)"];
@@ -1605,6 +1608,8 @@ function buildExcel(st, done) {
             V.mitAnhang, V.ohneAnhang,
             st.fwdCategory ? V.fwd : '', st.fwdCategory ? V.fwdMitAnhang : '',
             st.fwdCategory ? offen : '', status,
+            st.fwdCategory ? (V.fwd > 1 ? 'ja' : 'nein') : '',
+            st.fwdCategory ? Math.max(0, V.fwd - 1) : '',
             V.fwdStamp || '',
             fmtDE(V.first), fmtDE(V.last),
             V.vk ? (ve ? 'ja' : 'nein') : 'keine VNR',
@@ -1618,6 +1623,101 @@ function buildExcel(st, done) {
     try { shVertrag.Columns("A:U").AutoFit(); } catch (e) {}
     autoFilter(shVertrag, 1, vr - 1, vHead.length);
     freezeBelow(shVertrag, excel, 1);
+
+    /* ========== Blatt: Sparten & Duplikate ==========
+       Ausgewertet wird je Vertrag, nicht je Mail: ein Duplikat ist ein
+       Vorgang, zu dem mehr als eine Mail an KWAD gegangen ist. Die Zahl der
+       ueberzaehligen Weiterleitungen (je Vertrag alles ab der zweiten) sagt,
+       wie viele Mails KWAD doppelt erreicht haben. */
+    var spStat = {}, spOrder = [];
+    for (var vs = 0; vs < vertraege.length; vs++) {
+        var Vs = vertraege[vs];
+        var spName = Vs.sparte || 'Unbekannt';
+        if (!spStat[spName]) {
+            spStat[spName] = { vertraege: 0, mails: 0, jdc: 0, mitAnhang: 0, fwd: 0,
+                               dupVertraege: 0, dupMails: 0, offen: 0, maxFwd: 0 };
+            spOrder.push(spName);
+        }
+        var P = spStat[spName];
+        P.vertraege++;
+        P.mails += Vs.count;
+        P.jdc += Vs.jdc;
+        P.mitAnhang += Vs.mitAnhang;
+        P.fwd += Vs.fwd;
+        P.offen += Math.max(0, Vs.count - Vs.fwd);
+        if (Vs.fwd > 1) { P.dupVertraege++; P.dupMails += (Vs.fwd - 1); }
+        if (Vs.fwd > P.maxFwd) P.maxFwd = Vs.fwd;
+    }
+    spOrder.sort(function (a, b) {
+        return (spStat[b].dupMails - spStat[a].dupMails) || (spStat[b].mails - spStat[a].mails) || (a < b ? -1 : 1);
+    });
+
+    var shSp = shSparte;
+    var spRow = 1;
+    shSp.Cells(spRow, 1).Value = "Erinnerungen und Duplikate je Sparte"; styleTitle(shSp, spRow, 14); spRow += 2;
+    shSp.Cells(spRow, 1).Value =
+        "Ein Duplikat ist ein Vorgang (Vertragsnummer), zu dem mehr als eine Mail an KWAD weitergeleitet wurde. " +
+        "\u201Eueberzaehlige Weiterleitungen\u201C zaehlt je Vertrag alles ab der zweiten Mail \u2013 so viele Mails haben KWAD doppelt erreicht.";
+    try { shSp.Cells(spRow, 1).Font.Italic = true; shSp.Cells(spRow, 1).Font.Color = rgb(100, 100, 100); } catch (e) {}
+    spRow += 2;
+
+    var spdHead = ["Sparte", "Vorgänge (Vertragsnummern)", "Erinnerungen gesamt", "davon von JDC",
+                   "Erinnerungen mit Anhang"];
+    if (st.fwdCategory) {
+        spdHead.push("an KWAD weitergeleitet", "noch offen",
+                     "Vorgänge mit mehrfacher Weiterleitung", "überzählige Weiterleitungen",
+                     "Anteil Duplikate an den Vorgängen", "höchste Zahl je Vorgang");
+    }
+    putRow(shSp, spRow, spdHead); styleHeaderRow(shSp, spRow, spdHead.length);
+    var spdFirst = spRow + 1;
+    spRow++;
+
+    var spTot = { vertraege: 0, mails: 0, jdc: 0, mitAnhang: 0, fwd: 0, offen: 0, dupVertraege: 0, dupMails: 0, maxFwd: 0 };
+    for (var so = 0; so < spOrder.length; so++) {
+        var P2 = spStat[spOrder[so]];
+        var zeile = [spOrder[so], P2.vertraege, P2.mails, P2.jdc, P2.mitAnhang];
+        if (st.fwdCategory) {
+            zeile.push(P2.fwd, P2.offen, P2.dupVertraege, P2.dupMails,
+                       ratio(P2.dupVertraege, P2.vertraege), P2.maxFwd);
+        }
+        putRow(shSp, spRow, zeile);
+        spTot.vertraege += P2.vertraege; spTot.mails += P2.mails; spTot.jdc += P2.jdc;
+        spTot.mitAnhang += P2.mitAnhang; spTot.fwd += P2.fwd; spTot.offen += P2.offen;
+        spTot.dupVertraege += P2.dupVertraege; spTot.dupMails += P2.dupMails;
+        if (P2.maxFwd > spTot.maxFwd) spTot.maxFwd = P2.maxFwd;
+        spRow++;
+    }
+    var spdSum = ["Gesamt", spTot.vertraege, spTot.mails, spTot.jdc, spTot.mitAnhang];
+    if (st.fwdCategory) {
+        spdSum.push(spTot.fwd, spTot.offen, spTot.dupVertraege, spTot.dupMails,
+                    ratio(spTot.dupVertraege, spTot.vertraege), spTot.maxFwd);
+    }
+    putRow(shSp, spRow, spdSum); styleSubHeader(shSp, spRow, spdHead.length);
+    if (st.fwdCategory) fmtPercent(shSp, spdFirst, 10, spRow, 10);
+    spRow += 2;
+
+    /* Betroffene Vorgaenge einzeln, damit man sie nachverfolgen kann */
+    if (st.fwdCategory) {
+        var dups = [];
+        for (var vd = 0; vd < vertraege.length; vd++) if (vertraege[vd].fwd > 1) dups.push(vertraege[vd]);
+        dups.sort(function (a, b) { return (b.fwd - a.fwd) || (a.sparte < b.sparte ? -1 : 1); });
+
+        shSp.Cells(spRow, 1).Value = "Vorgänge mit mehrfacher Weiterleitung (" + dups.length + ")";
+        styleTitle(shSp, spRow, 12); spRow++;
+        var dHead = ["Sparte", "Vertragsnummer", "Kunde", "Erinnerungen", "an KWAD weitergeleitet",
+                     "überzählig", "Erste Erinnerung", "Letzte Erinnerung", "zuletzt weitergeleitet am"];
+        try { shSp.Columns("B:B").NumberFormat = "@"; } catch (eNF4) {}
+        putRow(shSp, spRow, dHead); styleHeaderRow(shSp, spRow, dHead.length); spRow++;
+        for (var dd = 0; dd < dups.length; dd++) {
+            var D = dups[dd];
+            putRow(shSp, spRow, [D.sparte || 'Unbekannt', D.vnr || '(ohne VNR)', D.kunde, D.count, D.fwd,
+                                 D.fwd - 1, fmtDE(D.first), fmtDE(D.last), D.fwdStamp || '']);
+            spRow++;
+        }
+        if (dups.length === 0) shSp.Cells(spRow, 1).Value = "Keine Vorgänge mit mehrfacher Weiterleitung.";
+    }
+    try { shSp.Columns("A:K").AutoFit(); } catch (e) {}
+    freezeBelow(shSp, excel, spdFirst - 1);
 
     /* ========== Blatt 2: KW-Verlauf ========== */
     var kHead = ["KW", "Zeitraum (Mo–So)"];
@@ -1717,6 +1817,12 @@ function buildExcel(st, done) {
         kv("Erinnerungen bereits an KWAD weitergeleitet:", sums.rF);
         kv("Erinnerungen noch offen:", sums.rN);
         kv("Anteil weitergeleitet:", pct(sums.rF, sums.rF + sums.rN));
+        var dupV = 0, dupM = 0;
+        for (var vq = 0; vq < vertraege.length; vq++) {
+            if (vertraege[vq].fwd > 1) { dupV++; dupM += (vertraege[vq].fwd - 1); }
+        }
+        kv("Vorgaenge mit mehrfacher Weiterleitung:", dupV);
+        kv("davon ueberzaehlige Mails an KWAD:", dupM);
         kv("Erkannt an der Kategorie:", "\u201E" + trim(document.getElementById('fwdCategory').value) + "\u201C");
     }
     kv("Anteil JDC-Erinnerungen an allen Mails:", pct(sums.j, sums.t));
