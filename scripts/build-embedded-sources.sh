@@ -26,7 +26,8 @@ FILES=(
     "ergo-mail-statistik.hta"
     "ergo-reminder-analyse.hta"
     "outlook-regeln-visualisierung.hta"
-)
+
+    ergo-jdc-weiterleitung.hta)
 
 for TARGET in "${TARGETS[@]}"; do
     [ -f "$TARGET" ] || { echo "FEHLER: $TARGET nicht gefunden" >&2; exit 1; }

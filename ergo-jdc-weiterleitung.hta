@@ -1,0 +1,801 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>JDC-Mails an KWAD weiterleiten</title>
+    <HTA:APPLICATION
+        ID="ERGO_JDC_Weiterleitung"
+        APPLICATIONNAME="JDC-Mails an KWAD weiterleiten"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .header { text-align: center; margin-bottom: 1.25rem; }
+        .logo { width: 40px; height: 40px; margin: 0 auto 6px; display: block; }
+        h2 { color: #f1f5f9; margin-bottom: 0.25rem; }
+        .subtitle { color: #94a3b8; font-size: 13px; }
+        .ver { color: #64748b; font-size: 11px; margin-top: 4px; }
+
+        .section {
+            background: rgba(0,0,0,0.22);
+            border: 1px solid rgba(148,163,184,0.15);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1rem;
+        }
+        .section-title {
+            font-size: 13px; font-weight: 600; color: #e2e8f0;
+            margin-bottom: 0.75rem;
+        }
+        .section-title .tag {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            color: #94a3b8; border: 1px solid #475569; border-radius: 6px;
+            padding: 1px 7px; margin-left: 8px; vertical-align: 1px;
+        }
+
+        label {
+            display: block; margin-bottom: 0.35rem;
+            color: #cbd5e1; font-size: 12px; font-weight: 500;
+        }
+        select, input[type="text"] {
+            width: 100%; padding: 9px 12px;
+            border: 1px solid #475569; border-radius: 8px;
+            background: #1e293b; color: #f1f5f9; font-size: 13px;
+            margin-bottom: 0.8rem;
+        }
+        select:focus, input:focus { outline: none; border-color: #ef4444; }
+        select:disabled { opacity: 0.5; }
+        .row { display: flex; gap: 0.75rem; }
+        .row > * { flex: 1; }
+        .row > .narrow { flex: 0.8; }
+        .hint { font-size: 11px; color: #94a3b8; margin-top: -0.4rem; margin-bottom: 0.6rem; line-height: 1.45; }
+
+        .quick { margin-bottom: 0.6rem; }
+        .quick button {
+            padding: 5px 11px; margin-right: 6px; border: 1px solid #475569;
+            border-radius: 7px; background: transparent; color: #cbd5e1;
+            font-size: 11.5px; cursor: pointer;
+        }
+        .quick button:hover { border-color: #ef4444; color: #fff; }
+
+        .chk { display: block; color: #cbd5e1; font-size: 12.5px; margin-bottom: 0.3rem; cursor: pointer; }
+        .chk input { margin-right: 7px; }
+
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 14px; font-weight: 600;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+
+        .progress-container { display: none; margin: 1rem 0 0.25rem; }
+        .progress-bar { height: 8px; background: #374151; border-radius: 4px; overflow: hidden; }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, #ef4444, #f97316);
+            width: 0%; transition: width 0.3s;
+        }
+        .progress-text { font-size: 12px; color: #94a3b8; margin-top: 0.5rem; text-align: center; }
+
+        .kpis { display: none; margin-top: 0.75rem; }
+        .kpis table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .kpis th, .kpis td { padding: 5px 8px; border-bottom: 1px solid rgba(148,163,184,0.15); text-align: right; }
+        .kpis th { color: #94a3b8; font-weight: 600; }
+        .kpis td:first-child, .kpis th:first-child { text-align: left; color: #e2e8f0; }
+        .kpis td.hl { color: #fca5a5; font-weight: 600; }
+
+        .status { display: none; padding: 0.85rem 1rem; border-radius: 8px; margin: 0.85rem 0 0; font-size: 13px; line-height: 1.5; }
+        .status.success { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; }
+        .status.error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+        .status.info { background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #93c5fd; }
+
+        .foot { text-align: center; color: #64748b; font-size: 11px; margin-top: 1rem; }
+    </style>
+    <style>
+        .grid2 { display: flex; gap: 12px; }
+        .grid2 > div { flex: 1; }
+        .warn {
+            background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.4);
+            border-radius: 10px; padding: 0.75rem 0.9rem; margin-bottom: 1rem;
+            color: #fcd34d; font-size: 12px; line-height: 1.5;
+        }
+        .log {
+            max-height: 240px; overflow-y: auto; background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(148,163,184,0.15); border-radius: 10px;
+            padding: 0.6rem 0.8rem; font-size: 11px; line-height: 1.6; margin-top: 0.75rem;
+        }
+        .log div { border-bottom: 1px solid rgba(148,163,184,0.08); padding: 2px 0; }
+        .log .ok { color: #86efac; }
+        .log .skip { color: #94a3b8; }
+        .log .err { color: #fca5a5; }
+        .btnrow { display: flex; gap: 10px; margin-top: 0.75rem; }
+        .btnrow button { flex: 1; }
+        button.secondary {
+            background: rgba(148,163,184,0.18); color: #e2e8f0;
+        }
+        button.secondary:hover:enabled { background: rgba(148,163,184,0.3); }
+        .big { font-size: 22px; font-weight: 700; color: #f1f5f9; }
+        .statline { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="header">
+            <h2>JDC-Mails an KWAD weiterleiten</h2>
+            <div class="subtitle">Mails von Jung, DMS &amp; Cie. mit Anhang aus einem Postfach im Takt weiterleiten</div>
+            <div class="ver">v1.0</div>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="section">
+            <div class="section-title">Postfach und Ordner</div>
+            <div class="grid2">
+                <div>
+                    <label for="mailbox1">Postfach</label>
+                    <select id="mailbox1" onchange="loadFoldersFor(1)"></select>
+                </div>
+                <div>
+                    <label for="folder1">Ordner</label>
+                    <select id="folder1" disabled onchange="updateButtons()"></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Zeitraum</div>
+            <div style="margin-bottom:0.6rem;">
+                <button type="button" class="secondary" style="width:auto;padding:5px 12px;font-size:12px;" onclick="setQuickWeeks(4)">4 Wochen</button>
+                <button type="button" class="secondary" style="width:auto;padding:5px 12px;font-size:12px;" onclick="setQuickWeeks(8)">8 Wochen</button>
+                <button type="button" class="secondary" style="width:auto;padding:5px 12px;font-size:12px;" onclick="setQuickWeeks(12)">12 Wochen</button>
+            </div>
+            <div class="grid2">
+                <div>
+                    <label for="dateFrom">Von (JJJJ-MM-TT)</label>
+                    <input type="text" id="dateFrom">
+                </div>
+                <div>
+                    <label for="dateTo">Bis (JJJJ-MM-TT)</label>
+                    <input type="text" id="dateTo">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Auswahl der Mails</div>
+            <label for="senders">Absender (Domains oder Namen, kommagetrennt)</label>
+            <input type="text" id="senders" value="bestandsuebertragung@jungdms.de, jungdms.de, jung-dms.de, jdc.de, jdcgroup.de, Jung DMS, JDC">
+            <div class="hint">Gepr&uuml;ft werden Absender-Adresse, -Domain und Anzeigename.</div>
+
+            <label style="margin-top:0.75rem;"><input type="checkbox" id="chkAtt" checked onclick="updateButtons()"> Nur Mails <b>mit Anhang</b></label>
+            <label><input type="checkbox" id="chkSkipDone" checked> Bereits weitergeleitete Mails &uuml;berspringen (Kategorie &bdquo;<span id="markerLabel"></span>&ldquo;)</label>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Weiterleitung</div>
+            <div class="grid2">
+                <div>
+                    <label for="target">Empf&auml;nger</label>
+                    <input type="text" id="target" value="kwad@ergo.de">
+                </div>
+                <div>
+                    <label for="delay">Abstand zwischen den Mails (Sekunden)</label>
+                    <input type="text" id="delay" value="3">
+                </div>
+            </div>
+            <div class="hint">
+                Exchange Online l&auml;sst pro Postfach <b>30 Nachrichten je Minute</b> zu; dar&uuml;ber hinaus gesendete Mails
+                bleiben im Postausgang liegen. 3 Sekunden entsprechen 20 Mails je Minute und halten sicheren Abstand.
+                Unter 2 Sekunden wird das Limit erreicht. Bei sehr vielen Mails zus&auml;tzlich das Tageslimit des
+                Hauses beachten.
+            </div>
+            <label style="margin-top:0.75rem;"><input type="checkbox" id="chkPrefix"> Betreff mit Vermerk versehen (&bdquo;WG: &hellip;&ldquo; bleibt sonst wie von Outlook erzeugt)</label>
+            <label for="note">Text am Anfang der weitergeleiteten Mail (optional)</label>
+            <input type="text" id="note" value="">
+        </div>
+
+        <div class="warn">
+            <b>Bitte beachten:</b> Beim Suchen wird nichts versendet. Erst der zweite Knopf leitet weiter, nach einer
+            R&uuml;ckfrage mit Anzahl und Empf&auml;nger. Jede weitergeleitete Mail wird in Outlook mit einer Kategorie
+            markiert, damit ein zweiter Lauf sie nicht erneut verschickt. Der Vorgang l&auml;sst sich jederzeit anhalten.
+        </div>
+
+        <div class="btnrow">
+            <button type="button" id="btnSearch" onclick="startSearch()" disabled>1. Mails suchen</button>
+            <button type="button" id="btnSend" class="secondary" onclick="startForward()" disabled>2. Weiterleiten</button>
+        </div>
+        <div class="btnrow" id="ctrlRow" style="display:none;">
+            <button type="button" class="secondary" id="btnPause" onclick="togglePause()">Anhalten</button>
+            <button type="button" class="secondary" id="btnStop" onclick="stopForward()">Abbrechen</button>
+        </div>
+
+        <div id="progressWrap" style="display:none;margin-top:1rem;">
+            <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+            <div class="progress-text" id="progressText"></div>
+        </div>
+
+        <div id="result" style="display:none;margin-top:1rem;"></div>
+        <div class="log" id="log" style="display:none;"></div>
+
+        <div class="foot">Ben&ouml;tigt Outlook (MAPI) &middot; l&auml;uft vollst&auml;ndig lokal, keine Daten verlassen den Arbeitsplatz</div>
+    </div>
+</div>
+
+<script type="text/javascript">
+/* =====================================================================
+   JDC-Mails an KWAD weiterleiten  v1.0
+   ---------------------------------------------------------------------
+   Sucht in einem Ordner alle Mails eines Absenderkreises (JDC / Jung DMS)
+   mit Anhang im gewaehlten Zeitraum und leitet sie einzeln im Takt an eine
+   Zieladresse weiter.
+
+   Warum getaktet: Exchange Online begrenzt den Versand je Postfach auf
+   30 Nachrichten pro Minute. Wird schneller gesendet, bleiben die Mails
+   im Postausgang liegen und werden verzoegert zugestellt. Der Standard
+   von 3 Sekunden (20/min) haelt Abstand zu dieser Grenze.
+
+   Dublettenschutz: Jede erfolgreich weitergeleitete Mail bekommt die
+   Outlook-Kategorie MARKER. Ein spaeterer Lauf ueberspringt sie, solange
+   der Haken gesetzt ist — wichtig, weil ein Abbruch mitten im Lauf sonst
+   zu doppelten Weiterleitungen fuehrt.
+
+   JScript + ActiveXObject wie die uebrigen Module.
+   ===================================================================== */
+
+var outlookApp = null;
+var outlookNS = null;
+
+var MARKER = 'An KWAD weitergeleitet';
+var SEARCH_CHUNK = 300;          // Tabellenzeilen je Tick beim Suchen
+
+var searchState = null;
+var fwdState = null;
+
+/* Spalten fuer den Tabellenmodus (Folder.GetTable) */
+var COL_RECEIVED = "urn:schemas:httpmail:datereceived";
+var COL_SUBJECT  = "urn:schemas:httpmail:subject";
+var COL_SENDER   = "urn:schemas:httpmail:sendername";
+var COL_SENDER_ADDR = "http://schemas.microsoft.com/mapi/proptag/0x0C1F001F";
+var COL_SENDER_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";
+var COL_HAS_ATTACH  = "http://schemas.microsoft.com/mapi/proptag/0x0E1B000B";
+var COL_CATEGORIES  = "urn:schemas-microsoft-com:office:office#Keywords";
+
+/* ---------------- Init ---------------- */
+window.onload = function () {
+    try { window.resizeTo(940, 980); } catch (e) {}
+    document.getElementById('markerLabel').innerHTML = MARKER;
+    setQuickWeeks(8);
+    try {
+        outlookApp = new ActiveXObject("Outlook.Application");
+        outlookNS = outlookApp.GetNamespace("MAPI");
+        loadMailboxes();
+    } catch (e) {
+        showError("Outlook konnte nicht gestartet werden: " + esc(e.message) +
+                  "<br>Bitte Outlook oeffnen und das Werkzeug erneut starten.");
+    }
+};
+
+/* ---------------- Postfaecher und Ordner ---------------- */
+function loadMailboxes() {
+    try {
+        var stores = outlookNS.Stores;
+        var sel = document.getElementById('mailbox1');
+        sel.innerHTML = '<option value="">-- Postfach w&auml;hlen --</option>';
+        for (var i = 1; i <= stores.Count; i++) {
+            try {
+                var store = stores.Item(i);
+                var o = document.createElement('option');
+                o.value = i; o.text = store.DisplayName;
+                sel.appendChild(o);
+            } catch (e) {}
+        }
+    } catch (e) {
+        showError("Postf&auml;cher konnten nicht geladen werden: " + esc(e.message));
+    }
+}
+
+function loadFoldersFor(nr) {
+    var mailboxSel = document.getElementById('mailbox' + nr);
+    var folderSel = document.getElementById('folder' + nr);
+    folderSel.innerHTML = '<option value="">-- Ordner w&auml;hlen --</option>';
+    folderSel.disabled = true;
+    updateButtons();
+    if (!mailboxSel.value) return;
+    try {
+        var store = outlookNS.Stores.Item(parseInt(mailboxSel.value, 10));
+        var folders = store.GetRootFolder().Folders;
+        for (var i = 1; i <= folders.Count; i++) {
+            try {
+                var folder = folders.Item(i);
+                var opt = document.createElement('option');
+                opt.value = folder.EntryID;
+                opt.text = folder.Name;
+                folderSel.appendChild(opt);
+                addSubfolders(folder, folderSel, '\u00a0\u00a0\u00a0');
+            } catch (e) {}
+        }
+        folderSel.disabled = false;
+    } catch (e) {
+        showError("Ordner konnten nicht geladen werden: " + esc(e.message));
+    }
+}
+
+function addSubfolders(parentFolder, select, indent) {
+    try {
+        var subFolders = parentFolder.Folders;
+        for (var i = 1; i <= subFolders.Count; i++) {
+            try {
+                var sub = subFolders.Item(i);
+                var opt = document.createElement('option');
+                opt.value = sub.EntryID;
+                opt.text = indent + sub.Name;
+                select.appendChild(opt);
+                if (indent.length < 12) addSubfolders(sub, select, indent + '\u00a0\u00a0\u00a0');
+            } catch (e) {}
+        }
+    } catch (e) {}
+}
+
+function updateButtons() {
+    var ok = !!document.getElementById('folder1').value;
+    document.getElementById('btnSearch').disabled = !ok;
+}
+
+/* ---------------- Suchen ---------------- */
+function startSearch() {
+    hideStatus();
+    document.getElementById('log').style.display = 'none';
+    document.getElementById('log').innerHTML = '';
+    document.getElementById('result').style.display = 'none';
+    document.getElementById('btnSend').disabled = true;
+
+    var fromDate = parseIsoDate(document.getElementById('dateFrom').value);
+    var toDate = parseIsoDate(document.getElementById('dateTo').value);
+    if (!fromDate || !toDate) { showError("Bitte g&uuml;ltige Daten eingeben (Format JJJJ-MM-TT)."); return; }
+    if (fromDate > toDate) { showError("Datum &bdquo;Von&ldquo; muss vor &bdquo;Bis&ldquo; liegen."); return; }
+    var toEnd = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59);
+
+    var senders = splitList(document.getElementById('senders').value);
+    if (senders.length === 0) { showError("Bitte mindestens einen Absender angeben."); return; }
+
+    var folderSel = document.getElementById('folder1');
+    var mbSel = document.getElementById('mailbox1');
+
+    document.getElementById('btnSearch').disabled = true;
+    showProgress("Ordner wird ge&ouml;ffnet &hellip;");
+
+    searchState = {
+        entryId: folderSel.value,
+        mailbox: mbSel.options[mbSel.selectedIndex].text,
+        folder: trim(folderSel.options[folderSel.selectedIndex].text),
+        fromDate: fromDate, toDate: toEnd,
+        senders: senders,
+        onlyAtt: document.getElementById('chkAtt').checked,
+        skipDone: document.getElementById('chkSkipDone').checked,
+        table: null, mode: '', items: null, idx: 0, count: 0, allCount: 0,
+        found: [], skippedDone: 0, noAtt: 0, otherSender: 0, errors: 0,
+        startedAt: new Date().getTime()
+    };
+    window.setTimeout(searchTick, 40);
+}
+
+function searchTick() {
+    var st = searchState;
+    if (!st) return;
+    try {
+        if (st.table === null && st.items === null) {
+            var folder = outlookNS.GetFolderFromID(st.entryId);
+            try { st.allCount = folder.Items.Count; } catch (eC) { st.allCount = 0; }
+            var toPlus = new Date(st.toDate.getTime() + 60000);
+            var dateFilter = "[ReceivedTime] >= '" + formatDateForRestrict(st.fromDate) + "' AND " +
+                             "[ReceivedTime] <= '" + formatDateForRestrict(toPlus) + "'";
+            try {
+                var tbl = folder.GetTable(dateFilter);
+                tbl.Columns.RemoveAll();
+                tbl.Columns.Add("EntryID");
+                tbl.Columns.Add("MessageClass");
+                tbl.Columns.Add(COL_RECEIVED);
+                tbl.Columns.Add(COL_SUBJECT);
+                tbl.Columns.Add(COL_SENDER);
+                tbl.Columns.Add(COL_SENDER_ADDR);
+                try { tbl.Columns.Add(COL_SENDER_SMTP); st.hasSmtp = true; } catch (e1) { st.hasSmtp = false; }
+                try { tbl.Columns.Add(COL_HAS_ATTACH); st.hasAtt = true; } catch (e2) { st.hasAtt = false; }
+                try { tbl.Columns.Add(COL_CATEGORIES); st.hasCat = true; } catch (e3) { st.hasCat = false; }
+                try { tbl.Sort(COL_RECEIVED, false); } catch (e4) {}   // aelteste zuerst
+                st.count = tbl.GetRowCount();
+                st.table = tbl; st.mode = 'tabelle';
+            } catch (eT) { st.table = null; }
+
+            if (!st.table) {
+                var it = null;
+                try { it = folder.Items.Restrict(dateFilter); } catch (eR) { it = null; }
+                st.items = it || folder.Items;
+                try { st.items.Sort("[ReceivedTime]", false); } catch (eS) {}
+                st.count = st.items.Count;
+                st.mode = 'einzeln';
+            }
+            st.idx = 0;
+        }
+
+        var processed = 0;
+        if (st.table) {
+            while (processed < SEARCH_CHUNK && !st.table.EndOfTable) {
+                var row = st.table.GetNextRow();
+                st.idx++; processed++;
+                try { pruefeZeile(st, row); } catch (eRow) { st.errors++; }
+            }
+            if (st.table.EndOfTable) { finishSearch(); return; }
+        } else {
+            var end = Math.min(st.idx + SEARCH_CHUNK, st.count);
+            for (var i = st.idx + 1; i <= end; i++) {
+                st.idx = i;
+                try { pruefeItem(st, st.items.Item(i)); } catch (eIt) { st.errors++; }
+            }
+            if (st.idx >= st.count) { finishSearch(); return; }
+        }
+
+        setProgress(st.count > 0 ? Math.round(st.idx * 100 / st.count) : 0,
+            "v1.0 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") + " &middot; " +
+            st.idx + " / " + st.count + " Mails gepr&uuml;ft" +
+            (st.allCount > st.count ? " (gefiltert aus " + st.allCount + ")" : "") +
+            " &ndash; passend: " + st.found.length);
+        window.setTimeout(searchTick, 5);
+    } catch (e) {
+        hideProgress();
+        document.getElementById('btnSearch').disabled = false;
+        searchState = null;
+        showError("Fehler beim Suchen: " + esc(e.message));
+    }
+}
+
+/* Eine Tabellenzeile pruefen (schnell: nichts wird geoeffnet) */
+function pruefeZeile(st, row) {
+    var get = function (c) { try { var v = row.Item(c); return (v === null || v === undefined) ? '' : String(v); } catch (e) { return ''; } };
+    var mc = get("MessageClass");
+    if (mc && mc.indexOf('IPM.Note') !== 0) return;
+
+    var rt = new Date(get(COL_RECEIVED));
+    if (isNaN(rt.getTime())) return;
+    rt = new Date(rt.getTime() + dateOffset(st, get("EntryID"), rt));
+    if (rt < st.fromDate || rt > st.toDate) return;
+
+    if (st.onlyAtt && st.hasAtt) {
+        var ha = get(COL_HAS_ATTACH).toLowerCase();
+        if (!(ha === 'true' || ha === '1' || ha === '-1')) { st.noAtt++; return; }
+    }
+    if (st.skipDone && st.hasCat && get(COL_CATEGORIES).indexOf(MARKER) !== -1) { st.skippedDone++; return; }
+
+    var name = get(COL_SENDER);
+    var addr = st.hasSmtp ? get(COL_SENDER_SMTP) : '';
+    if (!addr) addr = get(COL_SENDER_ADDR);
+    if (!matchesSenderList(name.toLowerCase(), addr.toLowerCase(), domainOf(addr), st.senders)) { st.otherSender++; return; }
+
+    st.found.push({ entryId: get("EntryID"), datum: rt, subject: get(COL_SUBJECT), sender: addr || name });
+}
+
+/* Rueckfallweg ohne Tabelle: Element direkt lesen */
+function pruefeItem(st, item) {
+    if (item.Class !== 43) return;
+    var rt;
+    try { rt = new Date(item.ReceivedTime); } catch (e) { return; }
+    if (isNaN(rt.getTime()) || rt < st.fromDate || rt > st.toDate) return;
+
+    if (st.onlyAtt) {
+        var n = 0;
+        try { n = item.Attachments.Count; } catch (eA) { n = 0; }
+        if (n === 0) { st.noAtt++; return; }
+    }
+    var cats = '';
+    try { cats = String(item.Categories || ''); } catch (eC) {}
+    if (st.skipDone && cats.indexOf(MARKER) !== -1) { st.skippedDone++; return; }
+
+    var name = '', addr = '';
+    try { name = String(item.SenderName || ''); } catch (eN) {}
+    try { addr = String(item.SenderEmailAddress || ''); } catch (eE) {}
+    if (!matchesSenderList(name.toLowerCase(), addr.toLowerCase(), domainOf(addr), st.senders)) { st.otherSender++; return; }
+
+    var eid = '';
+    try { eid = String(item.EntryID); } catch (eI) {}
+    st.found.push({ entryId: eid, datum: rt, subject: (function () { try { return String(item.Subject || ''); } catch (eS) { return ''; } })(), sender: addr || name });
+}
+
+/* Tabellen-Zeitstempel sind UTC; Abweichung einmal an einer echten Mail messen */
+function dateOffset(st, entryId, tableDate) {
+    if (st.calib !== undefined) return st.calib;
+    st.calib = 0;
+    try {
+        var probe = outlookNS.GetItemFromID(entryId);
+        var diffMin = Math.round((new Date(probe.ReceivedTime).getTime() - tableDate.getTime()) / 60000);
+        if (Math.abs(diffMin) >= 5 && Math.abs(diffMin) <= 15 * 60) st.calib = diffMin * 60000;
+    } catch (e) {}
+    return st.calib;
+}
+
+function finishSearch() {
+    var st = searchState;
+    hideProgress();
+    document.getElementById('btnSearch').disabled = false;
+
+    var secs = Math.round((new Date().getTime() - st.startedAt) / 1000);
+    var n = st.found.length;
+    var delay = parseDelay();
+    var dauer = n > 1 ? Math.round((n - 1) * delay / 60) : 0;
+
+    var h = '<div class="big">' + n + (n === 1 ? ' Mail' : ' Mails') + ' zum Weiterleiten</div>';
+    h += '<div class="statline">Ordner: ' + esc(st.mailbox) + ' / ' + esc(st.folder) +
+         ' &middot; Zeitraum ' + fmtDE(st.fromDate) + ' bis ' + fmtDE(st.toDate) +
+         ' &middot; ' + st.count + ' Mails gepr&uuml;ft in ' + secs + ' s</div>';
+    h += '<div class="statline">Aussortiert: ' + st.otherSender + ' anderer Absender' +
+         (st.onlyAtt ? ', ' + st.noAtt + ' ohne Anhang' : '') +
+         (st.skipDone ? ', ' + st.skippedDone + ' bereits weitergeleitet' : '') +
+         (st.errors ? ', ' + st.errors + ' nicht lesbar' : '') + '</div>';
+    if (n > 0) {
+        h += '<div class="statline">Versand mit ' + delay + ' s Abstand: rund ' +
+             (dauer < 1 ? 'unter einer Minute' : dauer + ' Minuten') + ' (' + Math.round(60 / delay) + ' Mails je Minute).</div>';
+    }
+    var res = document.getElementById('result');
+    res.innerHTML = h;
+    res.style.display = 'block';
+
+    /* Vorschau der ersten Treffer */
+    if (n > 0) {
+        var log = document.getElementById('log');
+        var max = Math.min(n, 20);
+        var l = '<div class="skip">Vorschau der ersten ' + max + ' von ' + n + ' Mails:</div>';
+        for (var i = 0; i < max; i++) {
+            l += '<div class="skip">' + fmtDE(st.found[i].datum) + ' &middot; ' + esc(st.found[i].sender) + ' &middot; ' + esc(st.found[i].subject) + '</div>';
+        }
+        log.innerHTML = l;
+        log.style.display = 'block';
+    }
+
+    document.getElementById('btnSend').disabled = (n === 0);
+    if (n === 0) showInfo("Keine passenden Mails gefunden. Bitte Zeitraum, Absender oder den Haken &bdquo;nur mit Anhang&ldquo; pr&uuml;fen.");
+}
+
+/* ---------------- Weiterleiten ---------------- */
+function parseDelay() {
+    var v = parseFloat(String(document.getElementById('delay').value).replace(',', '.'));
+    if (isNaN(v) || v < 1) v = 3;
+    if (v > 120) v = 120;
+    return v;
+}
+
+function startForward() {
+    if (!searchState || searchState.found.length === 0) return;
+    var target = trim(document.getElementById('target').value);
+    if (!target) { showError("Bitte einen Empf&auml;nger angeben."); return; }
+
+    var n = searchState.found.length;
+    var delay = parseDelay();
+    var mins = Math.round((n - 1) * delay / 60);
+    if (!confirm(n + " Mail(s) werden einzeln an " + target + " weitergeleitet.\n" +
+                 "Abstand: " + delay + " Sekunden, Dauer rund " + (mins < 1 ? "unter einer Minute" : mins + " Minuten") + ".\n\n" +
+                 "Jetzt starten?")) return;
+
+    hideStatus();
+    document.getElementById('btnSearch').disabled = true;
+    document.getElementById('btnSend').disabled = true;
+    document.getElementById('ctrlRow').style.display = 'flex';
+    document.getElementById('log').innerHTML = '';
+    document.getElementById('log').style.display = 'block';
+    document.getElementById('result').style.display = 'none';
+
+    fwdState = {
+        list: searchState.found,
+        target: target,
+        delayMs: Math.round(delay * 1000),
+        note: trim(document.getElementById('note').value),
+        prefix: document.getElementById('chkPrefix').checked,
+        idx: 0, sent: 0, failed: 0,
+        paused: false, stopped: false,
+        startedAt: new Date().getTime()
+    };
+    showProgress("Weiterleitung wird gestartet &hellip;");
+    window.setTimeout(forwardTick, 200);
+}
+
+function forwardTick() {
+    var fs = fwdState;
+    if (!fs || fs.stopped) return;
+    if (fs.paused) { window.setTimeout(forwardTick, 300); return; }
+
+    if (fs.idx >= fs.list.length) { finishForward(); return; }
+
+    var entry = fs.list[fs.idx];
+    fs.idx++;
+
+    try {
+        var item = outlookNS.GetItemFromID(entry.entryId);
+        var fwd = item.Forward();
+        fwd.Recipients.Add(fs.target);
+        try { fwd.Recipients.ResolveAll(); } catch (eR) {}
+        if (fs.prefix) {
+            try { fwd.Subject = "[JDC] " + String(fwd.Subject || ''); } catch (eS) {}
+        }
+        if (fs.note) {
+            try { fwd.Body = fs.note + "\r\n\r\n" + String(fwd.Body || ''); } catch (eB) {}
+        }
+        fwd.Send();
+        fs.sent++;
+        /* Erst nach erfolgreichem Senden markieren */
+        try {
+            var cats = String(item.Categories || '');
+            if (cats.indexOf(MARKER) === -1) {
+                item.Categories = cats ? cats + ", " + MARKER : MARKER;
+                item.Save();
+            }
+        } catch (eCat) {}
+        logLine('ok', fs.idx + '. ' + fmtDE(entry.datum) + ' &middot; ' + esc(entry.subject));
+    } catch (e) {
+        fs.failed++;
+        logLine('err', fs.idx + '. Fehler bei &bdquo;' + esc(entry.subject) + '&ldquo;: ' + esc(e.message));
+    }
+
+    var pct2 = Math.round(fs.idx * 100 / fs.list.length);
+    var rest = fs.list.length - fs.idx;
+    var restSecs = rest * (fs.delayMs / 1000);
+    setProgress(pct2, fs.sent + " von " + fs.list.length + " gesendet" +
+        (fs.failed ? ", " + fs.failed + " fehlgeschlagen" : "") +
+        (rest > 0 ? " &ndash; noch " + rest + " Mails, ca. " +
+            (restSecs < 90 ? Math.round(restSecs) + " s" : Math.round(restSecs / 60) + " min") : ""));
+
+    if (fs.idx >= fs.list.length) { window.setTimeout(finishForward, 400); return; }
+    window.setTimeout(forwardTick, fs.delayMs);
+}
+
+function togglePause() {
+    if (!fwdState) return;
+    fwdState.paused = !fwdState.paused;
+    document.getElementById('btnPause').innerHTML = fwdState.paused ? 'Fortsetzen' : 'Anhalten';
+    if (fwdState.paused) logLine('skip', '&mdash; angehalten &mdash;');
+    else logLine('skip', '&mdash; fortgesetzt &mdash;');
+}
+
+function stopForward() {
+    if (!fwdState) return;
+    if (!confirm("Weiterleitung abbrechen?\n\nBereits gesendete Mails bleiben gesendet und sind markiert; " +
+                 "ein neuer Lauf setzt dort fort, wo abgebrochen wurde.")) return;
+    fwdState.stopped = true;
+    logLine('err', '&mdash; abgebrochen &mdash;');
+    finishForward();
+}
+
+function finishForward() {
+    var fs = fwdState;
+    if (!fs) return;
+    fwdState = null;
+    hideProgress();
+    document.getElementById('ctrlRow').style.display = 'none';
+    document.getElementById('btnPause').innerHTML = 'Anhalten';
+    document.getElementById('btnSearch').disabled = false;
+
+    var secs = Math.round((new Date().getTime() - fs.startedAt) / 1000);
+    var msg = "<b>" + fs.sent + " von " + fs.list.length + " Mails</b> an " + esc(fs.target) + " weitergeleitet";
+    msg += " (" + (secs < 90 ? secs + " Sekunden" : Math.round(secs / 60) + " Minuten") + ").";
+    if (fs.failed > 0) msg += "<br>" + fs.failed + " Mail(s) konnten nicht gesendet werden &ndash; siehe Protokoll.";
+    if (fs.stopped && fs.idx < fs.list.length) {
+        msg += "<br>Abgebrochen nach " + fs.idx + " von " + fs.list.length + ". Die noch offenen Mails bleiben unmarkiert; " +
+               "ein neuer Suchlauf findet nur diese wieder.";
+    }
+    msg += "<br>Gesendete Mails sind mit der Kategorie &bdquo;" + MARKER + "&ldquo; markiert.";
+    if (fs.failed > 0 || (fs.stopped && fs.idx < fs.list.length)) showInfo(msg); else showSuccess(msg);
+
+    /* Ergebnis ist verbraucht: neuer Suchlauf noetig */
+    document.getElementById('btnSend').disabled = true;
+    searchState = null;
+}
+
+function logLine(cls, html) {
+    var log = document.getElementById('log');
+    var d = document.createElement('div');
+    d.className = cls;
+    d.innerHTML = html;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+}
+
+/* ---------------- Hilfsfunktionen ---------------- */
+function trim(s) { return String(s === null || s === undefined ? '' : s).replace(/^\s+|\s+$/g, ''); }
+function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function isoDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function fmtDE(d) { return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear(); }
+function formatDateForRestrict(date) {
+    var d = new Date(date);
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function parseIsoDate(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trim(s));
+    if (!m) return null;
+    var d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    return isNaN(d.getTime()) ? null : d;
+}
+function setQuickWeeks(weeks) {
+    var to = new Date();
+    var from = new Date();
+    from.setDate(from.getDate() - weeks * 7);
+    document.getElementById('dateFrom').value = isoDate(from);
+    document.getElementById('dateTo').value = isoDate(to);
+}
+function splitList(str) {
+    var parts = String(str || '').split(',');
+    var out = [], seen = {};
+    for (var i = 0; i < parts.length; i++) {
+        var p = trim(parts[i]);
+        if (!p) continue;
+        var lower = p.toLowerCase();
+        if (seen[lower]) continue;
+        seen[lower] = true;
+        out.push(p);
+    }
+    return out;
+}
+function domainOf(addr) {
+    var m = /@([^>\s;,]+)/.exec(String(addr || ''));
+    return m ? m[1].toLowerCase() : '';
+}
+function matchesSenderList(nameLower, addrLower, domainLower, list) {
+    for (var i = 0; i < list.length; i++) {
+        var t = list[i].toLowerCase();
+        if (!t) continue;
+        if (domainLower && (domainLower === t || domainLower.indexOf('.' + t) !== -1 ||
+            (t.indexOf('.') !== -1 && domainLower.indexOf(t) !== -1))) return true;
+        if (addrLower && addrLower.indexOf(t) !== -1) return true;
+        if (nameLower && nameLower.indexOf(t) !== -1) return true;
+    }
+    return false;
+}
+
+/* ---------------- Anzeige ---------------- */
+function showProgress(text) {
+    document.getElementById('progressWrap').style.display = 'block';
+    setProgress(0, text);
+}
+function setProgress(pct, text) {
+    document.getElementById('progressBar').style.width = Math.max(0, Math.min(100, pct)) + '%';
+    document.getElementById('progressText').innerHTML = text;
+}
+function hideProgress() { document.getElementById('progressWrap').style.display = 'none'; }
+function showError(html) { setStatus('error', html); }
+function showSuccess(html) { setStatus('success', html); }
+function showInfo(html) { setStatus('info', html); }
+function setStatus(kind, html) {
+    var el = document.getElementById('status');
+    el.className = 'status ' + kind;
+    el.innerHTML = html;
+    el.style.display = 'block';
+}
+function hideStatus() { document.getElementById('status').style.display = 'none'; }
+</script>
+</body>
+</html>

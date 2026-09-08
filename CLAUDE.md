@@ -14,11 +14,12 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 - `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.2**, JScript-COM wie die uebrigen Module)
 - `ergo-mail-statistik.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; KW-Statistik fuer bis zu 2 Postfaecher mit Stichwort-Flagging)
 - `outlook-regeln-visualisierung.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; liest Outlook-Regeln mehrerer (Gruppen-)Postfaecher und visualisiert die Logik in Excel)
+- `ergo-jdc-weiterleitung.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; sucht JDC-Mails mit Anhang und leitet sie getaktet an eine Zieladresse weiter, mit Kategorie-Marker gegen Doppelversand)
 - `ergo-reminder-analyse.hta` → VERSION in Zeile ~18 (aktuell **1.5**, JScript-COM; zaehlt Erinnerungs-Mails von JDC/Jung DMS aus bis zu 2 Ordnern je Eingangskanal, mit Sparte aus VNR-Praefix)
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
-(aktuell **12.03**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
+(aktuell **12.04**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
 damit auf der Homepage sofort sichtbar ist, dass es eine neue Version gibt.
 Schema: Major.Minor — bei kleinen Aenderungen Minor +1, bei groesseren Major +1.
 
@@ -46,6 +47,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-mail-statistik.hta` | `ERGO-Mail-Statistik-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `outlook-regeln-visualisierung.hta` | `Outlook-Regeln-Visualisierung-v<VER>.zip` + `outlook-regeln-source.html` | siehe unten (versionierte Inhalte) + `./build-regeln-source.sh` |
 | `ergo-reminder-analyse.hta` | `ERGO-Reminder-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
+| `ergo-jdc-weiterleitung.hta` | `ERGO-JDC-Weiterleitung-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 
 > **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
 > „Quellcode kopieren"-Buttons kopieren den HTA-Code aus einer **Inline-Base64-Kopie**
@@ -116,6 +118,17 @@ mkdir -p /tmp/ergo-ra-build
 cp ergo-reminder-analyse.hta /tmp/ergo-ra-build/ergo-reminder-analyse-v$RA_VER.hta
 (cd /tmp/ergo-ra-build && \
    zip -j "$OLDPWD/ERGO-Reminder-Analyse-v$RA_VER.zip" ergo-reminder-analyse-v$RA_VER.hta)
+```
+
+Fuer das JDC-Weiterleitungs-Tool analog (eigene Versionsnummer, nur die HTA im ZIP):
+
+```bash
+FW_VER=1.0
+rm -f ERGO-JDC-Weiterleitung-v*.zip
+mkdir -p /tmp/ergo-fw-build
+cp ergo-jdc-weiterleitung.hta /tmp/ergo-fw-build/ergo-jdc-weiterleitung-v$FW_VER.hta
+(cd /tmp/ergo-fw-build && \
+   zip -j "$OLDPWD/ERGO-JDC-Weiterleitung-v$FW_VER.zip" ergo-jdc-weiterleitung-v$FW_VER.hta)
 ```
 
 Fuer das Regel-Visualisierungs-Tool analog (eigene Versionsnummer, nur die HTA im ZIP):
