@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.8"
+        VERSION="1.9"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.8</div>
+                <div class="ver">v1.9</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -220,6 +220,10 @@
                 <label for="keywords">Reminder-Stichw&ouml;rter im Betreff (kommagetrennt)</label>
                 <input type="text" id="keywords" value="Erinnerung, Reminder, Mahnung, Wiedervorlage, WV, Nachfass, Sachstandsanfrage">
                 <div class="hint">&bdquo;Erinnerung B&Uuml; Kunde: &hellip;&ldquo; wird immer als Erinnerung erkannt. Kurze W&ouml;rter (bis 3 Zeichen) z&auml;hlen nur als ganzes Wort.</div>
+
+                <label for="focusSparte">Sparte im Fokus (Duplikate)</label>
+                <input type="text" id="focusSparte" value="Kranken">
+                <div class="hint">Bei dieser Sparte l&ouml;st jede weitergeleitete Mail einen neuen Vorgang aus, Duplikate wirken sich hier also unmittelbar aus. Sie wird im Blatt &bdquo;Sparten &amp; Duplikate&ldquo; hervorgehoben und in der &Uuml;bersicht zuerst genannt.</div>
 
                 <label for="fwdCategory">Kategorie der bereits weitergeleiteten Mails (leer = aus)</label>
                 <input type="text" id="fwdCategory" value="An KWAD weitergeleitet">
@@ -894,6 +898,7 @@ function startAnalysis() {
     var senders = splitList(document.getElementById('senders').value);
     var keywords = parseKeywords(document.getElementById('keywords').value);
     var spartenMap = parseSparten(document.getElementById('sparten').value);
+    var focusSparte = trim(document.getElementById('focusSparte').value);
     var fwdCategory = trim(document.getElementById('fwdCategory').value).toLowerCase();
     var sharedText = normText(document.getElementById('sharedText').value);
     var sharedVorauswahl = splitList(document.getElementById('sharedSubject').value);
@@ -936,7 +941,7 @@ function startAnalysis() {
         fromDate: fromDate, toDate: toEnd,
         channels: channels, senders: senders, keywords: keywords, spartenMap: spartenMap,
         allMails: allMails, countAtt: countAtt,
-        fwdCategory: fwdCategory,
+        focusSparte: focusSparte, fwdCategory: fwdCategory,
         sharedText: sharedText, sharedVorauswahl: sharedVorauswahl,
         shared: [],         // Detailzeilen der zweiten Auswertung
         sharedTotal: 0, sharedChecked: 0, sharedSkipped: 0,
@@ -1116,7 +1121,7 @@ function progressText(st, job) {
         var secs = remaining / (done / elapsed);
         eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
     }
-    return "v1.8 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+    return "v1.9 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
         " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
         Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt + eta +
         " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc +
@@ -1630,6 +1635,29 @@ function buildExcel(st, done) {
        ueberzaehligen Weiterleitungen (je Vertrag alles ab der zweiten) sagt,
        wie viele Mails KWAD doppelt erreicht haben. */
     var spStat = {}, spOrder = [];
+    /* Zweite Sicht je Verbund: Bei Komposit und Leben werden mehrere Vertraege
+       eines Kunden im Verbund als ein Rueckstand gefuehrt — dort ist erst die
+       zweite Mail zum selben Kunden ein spuerbares Duplikat. Bei Kranken
+       zaehlt dagegen jeder Vertrag einzeln, weil jede Mail dort einen eigenen
+       Vorgang ausloest. Deshalb beide Zaehlweisen nebeneinander. */
+    var verbund = {};
+    for (var vb = 0; vb < vertraege.length; vb++) {
+        var Vb = vertraege[vb];
+        var spB = Vb.sparte || 'Unbekannt';
+        var kdKey = spB + '|' + ((Vb.kunde || '').toLowerCase() || 'vnr:' + (Vb.vk || vb));
+        if (!verbund[kdKey]) verbund[kdKey] = { sparte: spB, fwd: 0, vertraege: 0 };
+        verbund[kdKey].fwd += Vb.fwd;
+        verbund[kdKey].vertraege++;
+    }
+    var vbStat = {};
+    for (var vk2 in verbund) {
+        if (!verbund.hasOwnProperty(vk2)) continue;
+        var VB = verbund[vk2];
+        if (!vbStat[VB.sparte]) vbStat[VB.sparte] = { anzahl: 0, dup: 0, dupMails: 0 };
+        vbStat[VB.sparte].anzahl++;
+        if (VB.fwd > 1) { vbStat[VB.sparte].dup++; vbStat[VB.sparte].dupMails += (VB.fwd - 1); }
+    }
+
     for (var vs = 0; vs < vertraege.length; vs++) {
         var Vs = vertraege[vs];
         var spName = Vs.sparte || 'Unbekannt';
@@ -1656,8 +1684,11 @@ function buildExcel(st, done) {
     var spRow = 1;
     shSp.Cells(spRow, 1).Value = "Erinnerungen und Duplikate je Sparte"; styleTitle(shSp, spRow, 14); spRow += 2;
     shSp.Cells(spRow, 1).Value =
-        "Ein Duplikat ist ein Vorgang (Vertragsnummer), zu dem mehr als eine Mail an KWAD weitergeleitet wurde. " +
-        "\u201Eueberzaehlige Weiterleitungen\u201C zaehlt je Vertrag alles ab der zweiten Mail \u2013 so viele Mails haben KWAD doppelt erreicht.";
+        "Duplikat = mehr als eine an KWAD weitergeleitete Mail zur selben Einheit; \u201Eueberzaehlig\u201C zaehlt alles ab der zweiten Mail. " +
+        "Zwei Zaehlweisen nebeneinander, weil sie sich fachlich unterscheiden: Bei " + (st.focusSparte || "Kranken") +
+        " loest jede Mail einen eigenen Vorgang aus, dort sind die Spalten je Vertragsnummer massgeblich. " +
+        "Bei Komposit und Leben werden mehrere Vertraege eines Kunden im Verbund als ein Rueckstand gefuehrt \u2013 " +
+        "dort zaehlen die Verbund-Spalten, und Mehrfach-Weiterleitungen innerhalb eines Verbundes fallen nicht ins Gewicht.";
     try { shSp.Cells(spRow, 1).Font.Italic = true; shSp.Cells(spRow, 1).Font.Color = rgb(100, 100, 100); } catch (e) {}
     spRow += 2;
 
@@ -1665,22 +1696,35 @@ function buildExcel(st, done) {
                    "Erinnerungen mit Anhang"];
     if (st.fwdCategory) {
         spdHead.push("an KWAD weitergeleitet", "noch offen",
-                     "Vorgänge mit mehrfacher Weiterleitung", "überzählige Weiterleitungen",
-                     "Anteil Duplikate an den Vorgängen", "höchste Zahl je Vorgang");
+                     "je Vertrag: Vorgänge mit mehrfacher Weiterleitung", "je Vertrag: überzählige Weiterleitungen",
+                     "Anteil Duplikate an den Vorgängen", "höchste Zahl je Vorgang",
+                     "Verbünde (Kunden)", "je Verbund: mit mehrfacher Weiterleitung", "je Verbund: überzählige");
     }
     putRow(shSp, spRow, spdHead); styleHeaderRow(shSp, spRow, spdHead.length);
     var spdFirst = spRow + 1;
     spRow++;
 
     var spTot = { vertraege: 0, mails: 0, jdc: 0, mitAnhang: 0, fwd: 0, offen: 0, dupVertraege: 0, dupMails: 0, maxFwd: 0 };
+    var focusLower = (st.focusSparte || '').toLowerCase();
     for (var so = 0; so < spOrder.length; so++) {
         var P2 = spStat[spOrder[so]];
         var zeile = [spOrder[so], P2.vertraege, P2.mails, P2.jdc, P2.mitAnhang];
         if (st.fwdCategory) {
+            var VS = vbStat[spOrder[so]] || { anzahl: 0, dup: 0, dupMails: 0 };
             zeile.push(P2.fwd, P2.offen, P2.dupVertraege, P2.dupMails,
-                       ratio(P2.dupVertraege, P2.vertraege), P2.maxFwd);
+                       ratio(P2.dupVertraege, P2.vertraege), P2.maxFwd,
+                       VS.anzahl, VS.dup, VS.dupMails);
         }
         putRow(shSp, spRow, zeile);
+        /* Sparte im Fokus farbig hinterlegen — dort zaehlt jede ueberzaehlige
+           Mail als neuer Vorgang, deshalb steht sie im Vordergrund. */
+        if (focusLower && spOrder[so].toLowerCase().indexOf(focusLower) !== -1) {
+            try {
+                var fr = shSp.Range(shSp.Cells(spRow, 1), shSp.Cells(spRow, spdHead.length));
+                fr.Interior.Color = rgb(254, 226, 226);
+                fr.Font.Bold = true;
+            } catch (eFo) {}
+        }
         spTot.vertraege += P2.vertraege; spTot.mails += P2.mails; spTot.jdc += P2.jdc;
         spTot.mitAnhang += P2.mitAnhang; spTot.fwd += P2.fwd; spTot.offen += P2.offen;
         spTot.dupVertraege += P2.dupVertraege; spTot.dupMails += P2.dupMails;
@@ -1689,8 +1733,13 @@ function buildExcel(st, done) {
     }
     var spdSum = ["Gesamt", spTot.vertraege, spTot.mails, spTot.jdc, spTot.mitAnhang];
     if (st.fwdCategory) {
+        var vbT = { anzahl: 0, dup: 0, dupMails: 0 };
+        for (var vt in vbStat) if (vbStat.hasOwnProperty(vt)) {
+            vbT.anzahl += vbStat[vt].anzahl; vbT.dup += vbStat[vt].dup; vbT.dupMails += vbStat[vt].dupMails;
+        }
         spdSum.push(spTot.fwd, spTot.offen, spTot.dupVertraege, spTot.dupMails,
-                    ratio(spTot.dupVertraege, spTot.vertraege), spTot.maxFwd);
+                    ratio(spTot.dupVertraege, spTot.vertraege), spTot.maxFwd,
+                    vbT.anzahl, vbT.dup, vbT.dupMails);
     }
     putRow(shSp, spRow, spdSum); styleSubHeader(shSp, spRow, spdHead.length);
     if (st.fwdCategory) fmtPercent(shSp, spdFirst, 10, spRow, 10);
@@ -1716,7 +1765,7 @@ function buildExcel(st, done) {
         }
         if (dups.length === 0) shSp.Cells(spRow, 1).Value = "Keine Vorgänge mit mehrfacher Weiterleitung.";
     }
-    try { shSp.Columns("A:K").AutoFit(); } catch (e) {}
+    try { shSp.Columns("A:N").AutoFit(); } catch (e) {}
     freezeBelow(shSp, excel, spdFirst - 1);
 
     /* ========== Blatt 2: KW-Verlauf ========== */
@@ -1823,6 +1872,26 @@ function buildExcel(st, done) {
         }
         kv("Vorgaenge mit mehrfacher Weiterleitung:", dupV);
         kv("davon ueberzaehlige Mails an KWAD:", dupM);
+        /* Die Sparte im Fokus gesondert ausweisen: dort wird aus jeder
+           ueberzaehligen Mail ein neuer Vorgang. */
+        if (st.focusSparte) {
+            var fLower = st.focusSparte.toLowerCase(), fV = 0, fM = 0, fVorg = 0, fFwd = 0;
+            for (var vf = 0; vf < vertraege.length; vf++) {
+                var VF = vertraege[vf];
+                if ((VF.sparte || '').toLowerCase().indexOf(fLower) === -1) continue;
+                fVorg++; fFwd += VF.fwd;
+                if (VF.fwd > 1) { fV++; fM += (VF.fwd - 1); }
+            }
+            row++;
+            sh.Cells(row, 1).Value = "Sparte im Fokus: " + st.focusSparte; styleTitle(sh, row, 12); row++;
+            kv("Vorgaenge:", fVorg);
+            kv("an KWAD weitergeleitete Mails:", fFwd);
+            kv("Vorgaenge mit mehrfacher Weiterleitung:", fV);
+            kv("ueberzaehlige Mails (= zusaetzlich ausgeloeste Vorgaenge):", fM);
+            kv("Anteil an allen Duplikaten:", pct(fM, dupM));
+            kv("Hinweis:", "Bei Komposit und Leben zaehlt ein Verbund als ein Rueckstand \u2013 dort sind die " +
+                "Verbund-Spalten im Blatt \u201ESparten & Duplikate\u201C massgeblich, nicht die je Vertragsnummer.");
+        }
         kv("Erkannt an der Kategorie:", "\u201E" + trim(document.getElementById('fwdCategory').value) + "\u201C");
     }
     kv("Anteil JDC-Erinnerungen an allen Mails:", pct(sums.j, sums.t));
