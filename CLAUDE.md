@@ -14,11 +14,11 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 - `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.2**, JScript-COM wie die uebrigen Module)
 - `ergo-mail-statistik.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; KW-Statistik fuer bis zu 2 Postfaecher mit Stichwort-Flagging)
 - `outlook-regeln-visualisierung.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; liest Outlook-Regeln mehrerer (Gruppen-)Postfaecher und visualisiert die Logik in Excel)
-- `ergo-reminder-analyse.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; zaehlt Erinnerungs-Mails von JDC/Jung DMS aus bis zu 2 Ordnern je Eingangskanal, mit Sparte aus VNR-Praefix)
+- `ergo-reminder-analyse.hta` → VERSION in Zeile ~18 (aktuell **1.1**, JScript-COM; zaehlt je Eingangskanal (a) Erinnerungs-Mails von JDC/Jung DMS mit Sparte aus VNR-Praefix und (b) Shared-Mailbox-Sendekopien (Body-Text „…sent by a member of this shared mailbox…“), die im Postkorb kuenstlich neue Vorgaenge erzeugen)
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
-(aktuell **11.97**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
+(aktuell **11.98**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
 damit auf der Homepage sofort sichtbar ist, dass es eine neue Version gibt.
 Schema: Major.Minor — bei kleinen Aenderungen Minor +1, bei groesseren Major +1.
 
@@ -110,7 +110,7 @@ Fuer das Reminder-Analyse-Tool analog (eigene Versionsnummer, nur die HTA im ZIP
 `reminder-analyse` in `downloads.html` auf die neue ZIP-Version ziehen):
 
 ```bash
-RA_VER=1.0
+RA_VER=1.1
 rm -f ERGO-Reminder-Analyse-v*.zip
 mkdir -p /tmp/ergo-ra-build
 cp ergo-reminder-analyse.hta /tmp/ergo-ra-build/ergo-reminder-analyse-v$RA_VER.hta
