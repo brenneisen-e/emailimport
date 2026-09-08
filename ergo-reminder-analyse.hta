@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.6"
+        VERSION="1.7"
         WINDOWSTATE="normal"
     />
     <style>
@@ -127,7 +127,7 @@
                 </svg>
                 <h2>ERGO Reminder-Analyse</h2>
                 <div class="subtitle">Erinnerungen (z.&nbsp;B. von Jung, DMS &amp; Cie.) z&auml;hlen und je Eingangskanal auswerten</div>
-                <div class="ver">v1.6</div>
+                <div class="ver">v1.7</div>
             </div>
 
             <!-- Ordner 1 -->
@@ -220,6 +220,10 @@
                 <label for="keywords">Reminder-Stichw&ouml;rter im Betreff (kommagetrennt)</label>
                 <input type="text" id="keywords" value="Erinnerung, Reminder, Mahnung, Wiedervorlage, WV, Nachfass, Sachstandsanfrage">
                 <div class="hint">&bdquo;Erinnerung B&Uuml; Kunde: &hellip;&ldquo; wird immer als Erinnerung erkannt. Kurze W&ouml;rter (bis 3 Zeichen) z&auml;hlen nur als ganzes Wort.</div>
+
+                <label for="fwdCategory">Kategorie der bereits weitergeleiteten Mails (leer = aus)</label>
+                <input type="text" id="fwdCategory" value="An KWAD weitergeleitet">
+                <div class="hint">Das Weiterleitungs-Werkzeug setzt diese Outlook-Kategorie auf jede an KWAD gesendete Mail. Erinnerungen mit dieser Kategorie werden getrennt ausgewiesen &ndash; so ist je Kalenderwoche sichtbar, was schon weitergeleitet wurde und was noch offen ist.</div>
 
                 <label for="sharedText">Zweite Auswertung &ndash; Textmuster (leer = aus)</label>
                 <input type="text" id="sharedText" value="attached message was sent by a member of this shared mailbox">
@@ -315,6 +319,9 @@ var COL_SENDER_ADDR = "http://schemas.microsoft.com/mapi/proptag/0x0C1F001F";   
 var COL_SENDER_TYPE = "http://schemas.microsoft.com/mapi/proptag/0x0C1E001F";   // PR_SENDER_ADDRTYPE (EX/SMTP)
 var COL_SENDER_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";   // PR_SENDER_SMTP_ADDRESS
 var COL_HAS_ATTACH  = "http://schemas.microsoft.com/mapi/proptag/0x0E1B000B";   // PR_HASATTACH (ja/nein)
+var COL_CATEGORIES  = "urn:schemas-microsoft-com:office:office#Keywords";       // Outlook-Kategorien
+/* Benutzerfeld, das das Weiterleitungs-Werkzeug mit dem Zeitpunkt fuellt */
+var COL_FWD_STAMP   = "http://schemas.microsoft.com/mapi/string/{00020329-0000-0000-C000-000000000046}/KWAD_Weiterleitung";
 
 /* Klartext je Praefix (nur fuer die Spalte "Sparte-Detail") */
 var PREFIX_TEXT = {
@@ -375,16 +382,23 @@ function renderKpis(st) {
     if (!st) { el.style.display = 'none'; return; }
     var names = kanalNamesInOrder(st);
     var zeigeShared = !!st.sharedText;
-    var h = '<table><tr><th>Eingangskanal</th><th>Mails</th><th>Erinnerungen</th><th>mit Anhang</th><th>ohne Anhang</th><th>davon JDC</th><th>Quote JDC</th>' +
+    var zeigeFwd = !!st.fwdCategory;
+    var h = '<table><tr><th>Eingangskanal</th><th>Mails</th><th>Erinnerungen</th><th>mit Anhang</th><th>ohne Anhang</th>' +
+            (zeigeFwd ? '<th>weitergeleitet</th><th>offen</th>' : '') +
+            '<th>davon JDC</th><th>Quote JDC</th>' +
             (zeigeShared ? '<th>Hinweis-Mails</th>' : '') + '</tr>';
-    var sumT = 0, sumR = 0, sumJ = 0, sumS = 0, sumRA = 0, sumRO = 0;
+    var sumT = 0, sumR = 0, sumJ = 0, sumS = 0, sumRA = 0, sumRO = 0, sumRF = 0, sumRN = 0;
     for (var i = 0; i < names.length; i++) {
         var k = st.kanaele[names[i]];
-        sumT += k.t; sumR += k.r; sumJ += k.j; sumS += k.sm; sumRA += k.rA; sumRO += k.rO;
-        h += '<tr><td>' + esc(names[i]) + '</td><td>' + k.t + '</td><td>' + k.r + '</td><td>' + k.rA + '</td><td>' + k.rO + '</td><td class="hl">' + k.j + '</td><td>' + pct(k.j, k.t) + '</td>' +
+        sumT += k.t; sumR += k.r; sumJ += k.j; sumS += k.sm; sumRA += k.rA; sumRO += k.rO; sumRF += k.rF; sumRN += k.rN;
+        h += '<tr><td>' + esc(names[i]) + '</td><td>' + k.t + '</td><td>' + k.r + '</td><td>' + k.rA + '</td><td>' + k.rO + '</td>' +
+             (zeigeFwd ? '<td>' + k.rF + '</td><td class="hl">' + k.rN + '</td>' : '') +
+             '<td class="hl">' + k.j + '</td><td>' + pct(k.j, k.t) + '</td>' +
              (zeigeShared ? '<td>' + k.sm + '</td>' : '') + '</tr>';
     }
-    h += '<tr><td><b>Gesamt</b></td><td><b>' + sumT + '</b></td><td><b>' + sumR + '</b></td><td><b>' + sumRA + '</b></td><td><b>' + sumRO + '</b></td><td class="hl"><b>' + sumJ + '</b></td><td><b>' + pct(sumJ, sumT) + '</b></td>' +
+    h += '<tr><td><b>Gesamt</b></td><td><b>' + sumT + '</b></td><td><b>' + sumR + '</b></td><td><b>' + sumRA + '</b></td><td><b>' + sumRO + '</b></td>' +
+         (zeigeFwd ? '<td><b>' + sumRF + '</b></td><td class="hl"><b>' + sumRN + '</b></td>' : '') +
+         '<td class="hl"><b>' + sumJ + '</b></td><td><b>' + pct(sumJ, sumT) + '</b></td>' +
          (zeigeShared ? '<td><b>' + sumS + '</b></td>' : '') + '</tr>';
     h += '</table>';
     el.innerHTML = h;
@@ -880,6 +894,7 @@ function startAnalysis() {
     var senders = splitList(document.getElementById('senders').value);
     var keywords = parseKeywords(document.getElementById('keywords').value);
     var spartenMap = parseSparten(document.getElementById('sparten').value);
+    var fwdCategory = trim(document.getElementById('fwdCategory').value).toLowerCase();
     var sharedText = normText(document.getElementById('sharedText').value);
     var sharedVorauswahl = splitList(document.getElementById('sharedSubject').value);
     var allMails = document.getElementById('chkAll').checked;
@@ -897,7 +912,7 @@ function startAnalysis() {
             mailbox: mbSel.options[mbSel.selectedIndex].text,
             folder: trim(fSel.options[fSel.selectedIndex].text),
             kanalFix: kSel.value || '',
-            total: 0, reminder: 0, jdc: 0, shared: 0, scanned: 0, skippedErrors: 0
+            total: 0, reminder: 0, jdc: 0, shared: 0, weitergeleitet: 0, scanned: 0, skippedErrors: 0
         });
     }
     if (jobs.length === 0) { showError("Bitte mindestens Ordner 1 ausw&auml;hlen."); return; }
@@ -921,6 +936,7 @@ function startAnalysis() {
         fromDate: fromDate, toDate: toEnd,
         channels: channels, senders: senders, keywords: keywords, spartenMap: spartenMap,
         allMails: allMails, countAtt: countAtt,
+        fwdCategory: fwdCategory,
         sharedText: sharedText, sharedVorauswahl: sharedVorauswahl,
         shared: [],         // Detailzeilen der zweiten Auswertung
         sharedTotal: 0, sharedChecked: 0, sharedSkipped: 0,
@@ -944,7 +960,7 @@ function startAnalysis() {
 }
 
 function newKanal() {
-    return { t: 0, r: 0, j: 0, rs: 0, bue: 0, sm: 0, rA: 0, rO: 0, jA: 0, jO: 0, kw: {}, sparten: {}, absender: {} };
+    return { t: 0, r: 0, j: 0, rs: 0, bue: 0, sm: 0, rA: 0, rO: 0, jA: 0, jO: 0, rF: 0, rN: 0, kw: {}, sparten: {}, absender: {} };
 }
 function kanalNamesInOrder(st) {
     var names = st.kanalOrder.slice(0);
@@ -1001,6 +1017,8 @@ function scanTick() {
                 tbl.Columns.Add(COL_SENDER_TYPE);
                 try { tbl.Columns.Add(COL_SENDER_SMTP); st.hasSmtpCol = true; } catch (eSm) { st.hasSmtpCol = false; }
                 try { tbl.Columns.Add(COL_HAS_ATTACH); st.hasAttachCol = true; } catch (eHa) { st.hasAttachCol = false; }
+                try { tbl.Columns.Add(COL_CATEGORIES); st.hasCatCol = true; } catch (eCa) { st.hasCatCol = false; }
+                try { tbl.Columns.Add(COL_FWD_STAMP); st.hasFwdCol = true; } catch (eFw) { st.hasFwdCol = false; }
                 try { tbl.Sort(COL_RECEIVED, true); } catch (eSort) {}
                 st.itemCount = tbl.GetRowCount();
                 st.table = tbl;
@@ -1098,10 +1116,11 @@ function progressText(st, job) {
         var secs = remaining / (done / elapsed);
         eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
     }
-    return "v1.6 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+    return "v1.7 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
         " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
         Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt + eta +
         " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc +
+        (st.fwdCategory ? ", davon weitergeleitet: " + job.weitergeleitet : "") +
         (st.sharedText ? ", Hinweis-Mails: " + job.shared : "");
 }
 
@@ -1140,7 +1159,9 @@ function rowAsItem(st, row) {
         SenderEmailAddress: get(COL_SENDER_ADDR),
         SenderEmailType: get(COL_SENDER_TYPE),
         SmtpAddress: st.hasSmtpCol ? get(COL_SENDER_SMTP) : '',
-        HasAttachments: st.hasAttachCol ? get(COL_HAS_ATTACH) : ''
+        HasAttachments: st.hasAttachCol ? get(COL_HAS_ATTACH) : '',
+        Categories: st.hasCatCol ? get(COL_CATEGORIES) : '',
+        FwdStamp: st.hasFwdCol ? get(COL_FWD_STAMP) : ''
     };
 }
 
@@ -1238,6 +1259,27 @@ function processMail(st, job, item, rt) {
        nur im Mailtext, deshalb entscheidet zuerst das Betreff-Muster (aus der
        Tabelle, kostenlos), ob die Mail dafuer ueberhaupt geoeffnet wird. */
 
+    /* Wurde die Mail bereits an KWAD weitergeleitet? Das Weiterleitungs-
+       Werkzeug setzt dafuer eine Outlook-Kategorie; sie steht als
+       Tabellenspalte bereit und kostet nichts. */
+    var weitergeleitet = null, fwdStamp = '';
+    if (st.fwdCategory) {
+        var cats = '';
+        if (item.fromTable) cats = String(item.Categories || '');
+        else { try { cats = String(item.Categories || ''); } catch (eCat0) {} }
+        if (item.fromTable && !st.hasCatCol) weitergeleitet = null;
+        else weitergeleitet = cats.toLowerCase().indexOf(st.fwdCategory) !== -1;
+        if (weitergeleitet) {
+            if (item.fromTable) fwdStamp = String(item.FwdStamp || '');
+            else {
+                try {
+                    var up = item.UserProperties.Find('KWAD_Weiterleitung');
+                    if (up) fwdStamp = String(up.Value || '');
+                } catch (eUp) {}
+            }
+        }
+    }
+
     /* Hat die Mail einen Anhang? Kennzeichen aus der Tabelle (kostenlos) —
        im Einzelmodus aus der Anzahl. Achtung: Outlook zaehlt eingebettete
        Bilder aus Signaturen mit; fuer die Unterscheidung "Erinnerung mit /
@@ -1267,7 +1309,7 @@ function processMail(st, job, item, rt) {
     job.total++;
     st.totalAll++;
     K.t++;
-    if (!K.kw[kw]) K.kw[kw] = { t: 0, r: 0, j: 0, s: 0, rA: 0, rO: 0 };
+    if (!K.kw[kw]) K.kw[kw] = { t: 0, r: 0, j: 0, s: 0, rA: 0, rO: 0, rF: 0, rN: 0 };
     K.kw[kw].t++;
     if (art === 'Bestandsübertragung (Erstvorgang)') K.bue++;
     if (istShared) {
@@ -1285,6 +1327,8 @@ function processMail(st, job, item, rt) {
         K.r++; K.kw[kw].r++;
         if (hatAnhang === true) { K.rA++; K.kw[kw].rA++; if (vonJDC) K.jA++; }
         else if (hatAnhang === false) { K.rO++; K.kw[kw].rO++; if (vonJDC) K.jO++; }
+        if (weitergeleitet === true) { K.rF++; K.kw[kw].rF++; job.weitergeleitet++; }
+        else if (weitergeleitet === false) { K.rN++; K.kw[kw].rN++; }
         inc(K.absender, senderAddr || senderName || '(unbekannt)');
         if (vonJDC) {
             job.jdc++;
@@ -1311,6 +1355,8 @@ function processMail(st, job, item, rt) {
         to: to, subject: subject, art: art,
         istReminder: istReminder, istErinnerungBUe: istErinnerungBUe, vonJDC: vonJDC, jdcVia: jdcVia,
         hatAnhang: hatAnhang === null ? '' : (hatAnhang ? 'ja' : 'nein'),
+        weitergeleitet: weitergeleitet === null ? '' : (weitergeleitet ? 'ja' : 'nein'),
+        fwdStamp: fwdStamp,
         kunde: p.kunde, vnr: p.vnr, vk: vk, sparte: sp.sparte, sparteDetail: sp.detail,
         rangstufe: p.rangstufe, agentur: p.agentur, vermittler: p.vermittler,
         att: attCount
@@ -1486,11 +1532,12 @@ function buildExcel(st, done) {
     try { wb.Styles("Normal").Font.Name = "Open Sans"; } catch (eF) {}
 
     var names = kanalNamesInOrder(st);
-    var sums = { t: 0, r: 0, j: 0, rs: 0, bue: 0, rA: 0, rO: 0, jA: 0, jO: 0 };
+    var sums = { t: 0, r: 0, j: 0, rs: 0, bue: 0, rA: 0, rO: 0, jA: 0, jO: 0, rF: 0, rN: 0 };
     for (var n0 = 0; n0 < names.length; n0++) {
         var K0 = st.kanaele[names[n0]];
         sums.t += K0.t; sums.r += K0.r; sums.j += K0.j; sums.rs += K0.rs; sums.bue += K0.bue;
         sums.rA += K0.rA; sums.rO += K0.rO; sums.jA += K0.jA; sums.jO += K0.jO;
+        sums.rF += K0.rF; sums.rN += K0.rN;
     }
 
     /* Verträge: Erinnerungen je VNR sammeln (auch fuer Uebersicht) */
@@ -1501,7 +1548,7 @@ function buildExcel(st, done) {
                  "Absender Name", "Absender E-Mail", "Absender Domain", "Empfänger (An)", "Betreff",
                  "Vorgangsart", "Erinnerung", "Erinnerung BÜ", "Von JDC", "Kunde", "Vertragsnummer",
                  "Sparte", "Sparte-Detail", "Rangstufe", "Agentur-Nr", "Vermittler-Nr", "Anhänge",
-                 "Erstvorgang im Scan", "Erstvorgang Datum", "Tage seit Erstvorgang", "Erinnerung Nr. je Vertrag", "JDC erkannt über", "Anhang vorhanden"];
+                 "Erstvorgang im Scan", "Erstvorgang Datum", "Tage seit Erstvorgang", "Erinnerung Nr. je Vertrag", "JDC erkannt über", "Anhang vorhanden", "An KWAD weitergeleitet"];
     try { shMails.Columns("S:S").NumberFormat = "@"; shMails.Columns("W:X").NumberFormat = "@"; } catch (eNF) {}
     putRow(shMails, 1, mHead);
     verifyArrayRows(shMails, 1, mHead);
@@ -1529,13 +1576,16 @@ function buildExcel(st, done) {
             m.senderName, m.senderAddr, m.senderDomain, m.to, m.subject,
             m.art, m.istReminder, m.istErinnerungBUe, m.vonJDC, m.kunde, m.vnr,
             m.sparte, m.sparteDetail, m.rangstufe, m.agentur, m.vermittler, m.att,
-            erst, erstDatum, tage, remNr, m.jdcVia || '', m.hatAnhang || ''
+            erst, erstDatum, tage, remNr, m.jdcVia || '', m.hatAnhang || '', m.weitergeleitet || ''
         ]);
     }
     if (st.mails.length === 0) shMails.Cells(2, 2).Value = "Keine Mails im Zeitraum.";
 
     /* ========== Blatt 3: Reminder je Vertrag ========== */
     var vHead = ["Nr", "Vertragsnummer", "Kunde", "Sparte", "Eingangskanal", "Erinnerungen gesamt", "davon JDC",
+                 "davon mit Anhang", "davon ohne Anhang",
+                 "an KWAD weitergeleitet", "davon mit Anhang", "noch offen", "Status",
+                 "zuletzt weitergeleitet am",
                  "Erste Erinnerung", "Letzte Erinnerung", "Erstvorgang im Scan", "Erstvorgang Datum",
                  "Tage Erstvorgang bis letzte Erinnerung", "Rangstufe", "Absender (letzte)"];
     try { shVertrag.Columns("B:B").NumberFormat = "@"; } catch (eNF2) {}
@@ -1545,8 +1595,17 @@ function buildExcel(st, done) {
     for (var v = 0; v < vertraege.length; v++) {
         var V = vertraege[v];
         var ve = V.vk ? st.erstByVnr[V.vk] : null;
+        /* Status je Vertrag: was ist mit den Erinnerungen dieses Vertrags
+           schon an KWAD gegangen, was steht noch aus */
+        var offen = V.count - V.fwd;
+        var status = !st.fwdCategory ? ''
+            : (V.fwd === 0 ? 'offen' : (offen === 0 ? 'vollstaendig weitergeleitet' : 'teilweise (' + offen + ' offen)'));
         putRow(shVertrag, vr, [
             v + 1, V.vnr || '(ohne VNR)', V.kunde, V.sparte, V.kanaele.join(', '), V.count, V.jdc,
+            V.mitAnhang, V.ohneAnhang,
+            st.fwdCategory ? V.fwd : '', st.fwdCategory ? V.fwdMitAnhang : '',
+            st.fwdCategory ? offen : '', status,
+            V.fwdStamp || '',
             fmtDE(V.first), fmtDE(V.last),
             V.vk ? (ve ? 'ja' : 'nein') : 'keine VNR',
             ve ? fmtDE(ve.first) : '',
@@ -1556,7 +1615,7 @@ function buildExcel(st, done) {
         vr++;
     }
     if (vertraege.length === 0) shVertrag.Cells(2, 2).Value = "Keine Erinnerungen im Zeitraum.";
-    try { shVertrag.Columns("A:N").AutoFit(); } catch (e) {}
+    try { shVertrag.Columns("A:U").AutoFit(); } catch (e) {}
     autoFilter(shVertrag, 1, vr - 1, vHead.length);
     freezeBelow(shVertrag, excel, 1);
 
@@ -1567,11 +1626,16 @@ function buildExcel(st, done) {
         kHead.push("Erinnerungen " + names[kn]);
         kHead.push("Erinnerungen mit Anhang " + names[kn]);
         kHead.push("Erinnerungen ohne Anhang " + names[kn]);
+        if (st.fwdCategory) {
+            kHead.push("weitergeleitet " + names[kn]);
+            kHead.push("noch offen " + names[kn]);
+        }
         kHead.push("JDC-Erinnerungen " + names[kn]);
         if (st.sharedText) kHead.push("Hinweis-Mails " + names[kn]);
     }
-    kHead.push("Mails gesamt", "Erinnerungen gesamt", "davon mit Anhang", "davon ohne Anhang",
-               "JDC-Erinnerungen gesamt", "Quote JDC an allen Mails");
+    kHead.push("Mails gesamt", "Erinnerungen gesamt", "davon mit Anhang", "davon ohne Anhang");
+    if (st.fwdCategory) kHead.push("davon weitergeleitet", "davon noch offen");
+    kHead.push("JDC-Erinnerungen gesamt", "Quote JDC an allen Mails");
     if (st.sharedText) kHead.push("Hinweis-Mails gesamt");
     putRow(shKW, 1, kHead);
     styleHeaderRow(shKW, 1, kHead.length);
@@ -1587,15 +1651,20 @@ function buildExcel(st, done) {
     var kr = 2;
     for (var w = 0; w < weeks.length; w++) {
         var vals = [weeks[w].key, fmtDE(weeks[w].monday) + " – " + fmtDE(weeks[w].sunday)];
-        var wt = 0, wr = 0, wj = 0, ws = 0, wra = 0, wro = 0;
+        var wt = 0, wr = 0, wj = 0, ws = 0, wra = 0, wro = 0, wrf = 0, wrn = 0;
         for (var kn2 = 0; kn2 < names.length; kn2++) {
-            var kwv = st.kanaele[names[kn2]].kw[weeks[w].key] || { t: 0, r: 0, j: 0, s: 0, rA: 0, rO: 0 };
-            vals.push(kwv.t, kwv.r, kwv.rA || 0, kwv.rO || 0, kwv.j);
+            var kwv = st.kanaele[names[kn2]].kw[weeks[w].key] || { t: 0, r: 0, j: 0, s: 0, rA: 0, rO: 0, rF: 0, rN: 0 };
+            vals.push(kwv.t, kwv.r, kwv.rA || 0, kwv.rO || 0);
+            if (st.fwdCategory) vals.push(kwv.rF || 0, kwv.rN || 0);
+            vals.push(kwv.j);
             if (st.sharedText) vals.push(kwv.s || 0);
             wt += kwv.t; wr += kwv.r; wj += kwv.j; ws += (kwv.s || 0);
             wra += (kwv.rA || 0); wro += (kwv.rO || 0);
+            wrf += (kwv.rF || 0); wrn += (kwv.rN || 0);
         }
-        vals.push(wt, wr, wra, wro, wj, ratio(wj, wt));
+        vals.push(wt, wr, wra, wro);
+        if (st.fwdCategory) vals.push(wrf, wrn);
+        vals.push(wj, ratio(wj, wt));
         if (st.sharedText) vals.push(ws);
         putRow(shKW, kr, vals);
         kr++;
@@ -1644,6 +1713,12 @@ function buildExcel(st, done) {
     kv("davon von JDC / Jung DMS:", sums.j);
     kv("davon von sonstigen Absendern:", sums.rs);
     kv("JDC-Erinnerungen mit / ohne Anhang:", sums.jA + " / " + sums.jO);
+    if (st.fwdCategory) {
+        kv("Erinnerungen bereits an KWAD weitergeleitet:", sums.rF);
+        kv("Erinnerungen noch offen:", sums.rN);
+        kv("Anteil weitergeleitet:", pct(sums.rF, sums.rF + sums.rN));
+        kv("Erkannt an der Kategorie:", "\u201E" + trim(document.getElementById('fwdCategory').value) + "\u201C");
+    }
     kv("Anteil JDC-Erinnerungen an allen Mails:", pct(sums.j, sums.t));
     if (st.sharedText) {
         kv("Hinweis-Mails (zweite Auswertung):", st.sharedTotal);
@@ -1857,11 +1932,20 @@ function buildVertraege(st) {
         var V = map[key];
         if (!V) {
             V = { vk: R.vk, vnr: R.vnr, kunde: R.kunde, sparte: R.sparte, kanaele: [], count: 0, jdc: 0,
-                  first: R.datum, last: R.datum, rangstufe: R.rangstufe, lastSender: '' };
+                  first: R.datum, last: R.datum, rangstufe: R.rangstufe, lastSender: '',
+                  mitAnhang: 0, ohneAnhang: 0, fwd: 0, fwdMitAnhang: 0, fwdStamp: '' };
             map[key] = V; order.push(V);
         }
         V.count++;
         if (R.vonJDC) V.jdc++;
+        if (R.hatAnhang === 'ja') V.mitAnhang++;
+        else if (R.hatAnhang === 'nein') V.ohneAnhang++;
+        if (R.weitergeleitet === 'ja') {
+            V.fwd++;
+            if (R.hatAnhang === 'ja') V.fwdMitAnhang++;
+            /* Zeitstempel sind sortierbar (JJJJ-MM-TT hh:mm), der groesste ist der juengste */
+            if (R.fwdStamp && R.fwdStamp > V.fwdStamp) V.fwdStamp = R.fwdStamp;
+        }
         if (R.datum < V.first) V.first = R.datum;
         if (R.datum >= V.last) { V.last = R.datum; V.lastSender = R.senderAddr || R.senderName; }
         if (!V.kunde && R.kunde) V.kunde = R.kunde;
