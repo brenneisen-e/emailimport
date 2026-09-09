@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.9"
+        VERSION="2.0"
         WINDOWSTATE="normal"
     />
     <style>
@@ -93,6 +93,14 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
         .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+        .btn-ghost {
+            width: auto; padding: 7px 14px; font-size: 12.5px; margin: 0 6px 4px 0;
+            background: rgba(148, 163, 184, 0.16); color: #e2e8f0;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .btn-ghost:hover:not(:disabled) { background: rgba(148, 163, 184, 0.3); }
+        .hint-stand { color: #cbd5e1; }
+        .hint-stand code { color: #94a3b8; }
 
         .progress-container { display: none; margin: 1rem 0 0.25rem; }
         .progress-bar { height: 8px; background: #374151; border-radius: 4px; overflow: hidden; }
@@ -251,6 +259,31 @@
                 </label>
             </div>
 
+            <!-- Zwischenstand -->
+            <div class="section">
+                <div class="section-title">Zwischenstand</div>
+
+                <label class="chk">
+                    <input type="checkbox" id="chkResume" checked>
+                    Zwischenstand mitschreiben &ndash; nach einem Abbruch wird dort weitergemacht
+                </label>
+
+                <label for="resumeEvery">Sichern nach je &hellip; gepr&uuml;ften Mails</label>
+                <input type="text" id="resumeEvery" value="1000">
+                <div class="hint">
+                    Neben dieser HTA entsteht <b>Reminder-Zwischenstand.csv</b> mit allen bisher erfassten Zeilen
+                    (Doppelklick &ouml;ffnet sie in Excel) und <b>Reminder-Zwischenstand.json</b> mit den Z&auml;hlerst&auml;nden
+                    und der Stelle im Ordner. Bricht der Lauf ab &ndash; Outlook zu, Rechner aus, Absturz &ndash;, f&auml;ngt der
+                    n&auml;chste Lauf nicht wieder von vorn an, sondern liest den Zwischenstand ein und macht dort weiter.
+                    Nach einer fertig erstellten Excel-Mappe werden beide Dateien gel&ouml;scht. Ohne Haken wird nichts
+                    geschrieben und nichts gelesen; f&uuml;r einen bewusst neuen Lauf den Zwischenstand verwerfen.
+                </div>
+                <div class="hint hint-stand" id="resumeInfo">Zwischenstand wird gepr&uuml;ft &hellip;</div>
+                <div id="resumeActions" style="display:none">
+                    <button class="btn btn-ghost" type="button" onclick="cpVerwerfen()">Zwischenstand verwerfen</button>
+                </div>
+            </div>
+
             <button class="btn btn-primary" id="btnStart" onclick="startAnalysis()" disabled>Analyse starten &amp; Excel erstellen</button>
 
             <div class="progress-container" id="progressContainer">
@@ -347,6 +380,9 @@ window.onload = function () {
     } catch (e) {
         showError("Outlook konnte nicht verbunden werden. Bitte stelle sicher, dass Outlook ge&ouml;ffnet ist. (" + esc(e.message) + ")");
     }
+    /* Liegt neben der HTA ein Zwischenstand? Dann seine Einstellungen
+       uebernehmen, damit der Lauf ohne Nachtippen fortgesetzt werden kann. */
+    cpPruefen();
 };
 
 /* ---------------- UI-Helfer ---------------- */
@@ -905,6 +941,10 @@ function startAnalysis() {
     var allMails = document.getElementById('chkAll').checked;
     var countAtt = document.getElementById('chkAtt').checked;
 
+    var cpAktiv = document.getElementById('chkResume').checked;
+    var cpEvery = Math.round(Number(trim(document.getElementById('resumeEvery').value)) || 0);
+    if (cpEvery < 100) cpEvery = 100;
+
     var jobs = [];
     for (var nr = 1; nr <= 2; nr++) {
         var mbSel = document.getElementById('mailbox' + nr);
@@ -926,8 +966,29 @@ function startAnalysis() {
         return;
     }
 
+    /* Zwischenstand: fortsetzen nur, wenn die Einstellungen von damals
+       zu denen von jetzt passen - sonst passten alte und neue Zeilen nicht
+       zusammen und das Ergebnis waere still falsch. */
+    var cpOrdner = [];
+    for (var o = 0; o < jobs.length; o++) cpOrdner.push({ id: jobs[o].entryId, name: jobs[o].mailbox + ' / ' + jobs[o].folder });
+    var cpEinst = cpEinstellungen();
+    var cpIds = [];
+    for (var q = 0; q < cpOrdner.length; q++) cpIds.push(cpOrdner[q].id);
+    var cpSig = cpSignatur(cpEinst, cpIds);
+    var fortsetzen = false;
+    if (cpAktiv && cpStand) {
+        if (cpStand.sig !== cpSig) {
+            showError("Der vorhandene Zwischenstand geh&ouml;rt zu anderen Einstellungen oder Ordnern. " +
+                      "Bitte die im Abschnitt &bdquo;Zwischenstand&ldquo; genannten Ordner w&auml;hlen &ndash; " +
+                      "oder den Zwischenstand verwerfen und neu beginnen.");
+            return;
+        }
+        fortsetzen = true;
+    }
+    if (cpAktiv && !fortsetzen) cpLoeschen();
+
     document.getElementById('btnStart').disabled = true;
-    showProgress("Ordner werden ge&ouml;ffnet &hellip;");
+    showProgress(fortsetzen ? "Zwischenstand wird eingelesen &hellip;" : "Ordner werden ge&ouml;ffnet &hellip;");
 
     /* Kanal-Zaehler vorbelegen (Reihenfolge = Eingabe) */
     var kanaele = {}, kanalOrder = [];
@@ -952,14 +1013,58 @@ function startAnalysis() {
         erstByVnr: {},      // VNR -> { first: Date, count: n, kanal }
         totalAll: 0,
         startedAt: new Date().getTime(),   // fuer die Restzeitschaetzung
+        etaBase: 0,         // schon vor diesem Lauf geprueft (Zwischenstand) - zaehlt nicht ins Tempo
         doneBefore: 0,      // Mails der bereits abgeschlossenen Ordner
         table: null,        // Outlook-Tabelle des aktuellen Ordners (Tabellenmodus)
         mode: '',           // 'tabelle' oder 'einzeln'
         allCount: 0,        // Mails im Ordner insgesamt (zur Anzeige der Filterwirkung)
         dateCalib: null,    // Korrektur der Tabellen-Zeitstempel (UTC -> lokal), einmal ermittelt
         senderCache: {},    // Rohadresse -> SMTP (Adressbuch nur einmal je Absender)
-        channelCache: {}    // An/CC-Zeile -> Kanal (Empfaenger-Objekte nur einmal je Kombination)
+        channelCache: {},   // An/CC-Zeile -> Kanal (Empfaenger-Objekte nur einmal je Kombination)
+
+        /* Zwischenstand */
+        cpAktiv: cpAktiv, cpEvery: cpEvery, cpSig: cpSig, cpEinst: cpEinst, cpOrdner: cpOrdner,
+        cpBuf: [],          // noch nicht gesicherte CSV-Zeilen
+        cpZeilen: 0,        // bereits in der CSV stehende Datenzeilen
+        cpSeen: [],         // zuletzt gelesene EntryIDs
+        cpLastAt: 0, cpFehler: '',
+        seenSet: null, seenGuard: 0,   // gegen Doppelzaehlung nach dem Vorspulen
+        skipTo: 0, skipJob: -1         // Vorspulen bis zur gespeicherten Stelle
     };
+
+    if (fortsetzen) {
+        /* Zaehlerstaende aus der JSON, Detailzeilen aus der CSV */
+        var stand = cpStand;
+        scanState.jobIdx = stand.jobIdx || 0;
+        scanState.doneBefore = stand.doneBefore || 0;
+        scanState.totalAll = stand.totalAll || 0;
+        scanState.sharedTotal = stand.sharedTotal || 0;
+        scanState.sharedChecked = stand.sharedChecked || 0;
+        scanState.sharedSkipped = stand.sharedSkipped || 0;
+        scanState.mailsDropped = 0;             // wird beim Einlesen neu gezaehlt
+        scanState.dateCalib = (typeof stand.dateCalib === 'number') ? stand.dateCalib : null;
+        if (stand.kanaele) scanState.kanaele = stand.kanaele;
+        if (stand.kanalOrder && stand.kanalOrder.length) scanState.kanalOrder = stand.kanalOrder;
+        for (var jj = 0; jj < jobs.length && stand.jobs && jj < stand.jobs.length; jj++) {
+            var alt = stand.jobs[jj];
+            jobs[jj].total = alt.total || 0; jobs[jj].reminder = alt.reminder || 0;
+            jobs[jj].jdc = alt.jdc || 0; jobs[jj].shared = alt.shared || 0;
+            jobs[jj].weitergeleitet = alt.weitergeleitet || 0;
+            jobs[jj].scanned = alt.scanned || 0; jobs[jj].skippedErrors = alt.skippedErrors || 0;
+        }
+        scanState.cpZeilen = stand.zeilen || 0;
+        scanState.cpZielZeilen = stand.zeilen || 0;
+        scanState.etaBase = (stand.geprueft || 0);
+        scanState.skipJob = scanState.jobIdx;
+        scanState.skipTo = stand.itemIdx || 0;
+        scanState.cpSeen = stand.seen || [];
+        scanState.seenSet = {};
+        for (var sx = 0; sx < scanState.cpSeen.length; sx++) scanState.seenSet[scanState.cpSeen[sx]] = 1;
+        scanState.seenGuard = CP_SEEN_GUARD;
+        if (!cpLadenStart(scanState)) return;
+        window.setTimeout(cpLadenTick, 30);
+        return;
+    }
 
     window.setTimeout(scanTick, 60);
 }
@@ -987,6 +1092,392 @@ function inc(obj, key, n) { obj[key] = (obj[key] || 0) + (n || 1); }
    ihn umgebrochen oder eingerueckt hat. */
 function normText(s) {
     return String(s || '').substring(0, 20000).toLowerCase().replace(/[>|]/g, ' ').replace(/\s+/g, ' ');
+}
+
+
+/* =====================================================================
+   Zwischenstand: Wiederaufnahme nach einem Abbruch
+   ---------------------------------------------------------------------
+   Ein Lauf ueber ein grosses Postfach dauert Minuten. Faellt Outlook, die
+   HTA oder der Rechner dazwischen aus, war bisher alles verloren. Deshalb
+   wird waehrend des Scans mitgeschrieben, standardmaessig alle 1000
+   geprueften Mails:
+
+     Reminder-Zwischenstand.csv    die bisher erfassten Zeilen; die Datei
+                                   oeffnet sich per Doppelklick in Excel
+     Reminder-Zwischenstand.json   Zaehlerstaende, Einstellungen und die
+                                   Stelle im Ordner
+
+   Beide Dateien liegen neben der HTA. Die Reihenfolge beim Sichern ist
+   Absicht: erst die CSV anhaengen, dann die JSON schreiben - und die JSON
+   nennt die Zahl der Zeilen, die sie deckt. Bricht es zwischen beiden
+   Schritten ab, stehen in der CSV ein paar Zeilen zu viel; gelesen werden
+   nur die gedeckten. Zeilen und Zaehler passen damit immer zusammen.
+
+   Warum CSV und nicht direkt eine .xlsx? Eine Excel-Mappe mit zehntausenden
+   Zeilen alle 1000 Mails neu zu speichern kostet mehr Zeit als der ganze
+   Scan. Die CSV wird nur angehaengt (Millisekunden) und ist in Excel
+   trotzdem sofort lesbar. Die vollstaendige Mappe mit allen Blaettern
+   entsteht wie bisher am Ende des Laufs.
+   ===================================================================== */
+var CP_CSV = 'Reminder-Zwischenstand.csv';
+var CP_JSON = 'Reminder-Zwischenstand.json';
+var CP_FORMAT = 1;              // Aufbau der Zwischenstand-Dateien
+var CP_SEEN = 300;              // zuletzt gelesene EntryIDs (gegen Doppelzaehlung an der Nahtstelle)
+var CP_SEEN_GUARD = 5000;       // so viele Zeilen nach dem Vorspulen wird dagegen geprueft
+var CP_LOAD_CHUNK = 4000;       // CSV-Zeilen je Tick beim Einlesen
+var CP_SKIP_CHUNK = 3000;       // Tabellenzeilen je Tick beim Vorspulen
+var cpStand = null;             // beim Start gefundener Zwischenstand
+
+/* Einstellungen, die den Zwischenstand vergleichbar machen. Aendert sich
+   eines dieser Felder, passen alte und neue Zeilen nicht mehr zusammen. */
+var CP_FELDER = ['dateFrom', 'dateTo', 'channels', 'senders', 'keywords', 'focusSparte',
+                 'fwdCategory', 'sharedText', 'sharedSubject', 'sparten'];
+
+function neuesFso() { return new ActiveXObject('Scripting.FileSystemObject'); }
+
+/* Ordner, in dem diese HTA liegt - auch bei UNC-Pfaden (\\server\share) */
+function htaOrdner() {
+    try {
+        var href = decodeURIComponent(String(location.href));
+        if (href.toLowerCase().substring(0, 5) === 'file:') href = href.substring(5);
+        var slashes = 0;
+        while (slashes < href.length && href.charAt(slashes) === '/') slashes++;
+        href = href.substring(slashes).replace(/\//g, '\\');
+        var q = href.indexOf('?'); if (q >= 0) href = href.substring(0, q);
+        var h = href.indexOf('#'); if (h >= 0) href = href.substring(0, h);
+        var erstes = href.split('\\')[0];
+        if (slashes >= 4 || !/^[a-zA-Z]:$/.test(erstes)) href = '\\\\' + href;
+        var pos = href.lastIndexOf('\\');
+        return pos < 0 ? '' : href.substring(0, pos);
+    } catch (e) { return ''; }
+}
+function cpPfad(name) {
+    var dir = htaOrdner();
+    return dir ? dir + '\\' + name : '';
+}
+
+/* ---- CSV-Bausteine (Semikolon, deutsche Excel-Voreinstellung) ---- */
+function csvFeld(v) {
+    var t = (v === null || v === undefined) ? '' : String(v);
+    return '"' + t.replace(/\r\n|\r|\n/g, ' ').replace(/"/g, '""') + '"';
+}
+function csvZeile(werte) {
+    var out = [];
+    for (var i = 0; i < werte.length; i++) out.push(csvFeld(werte[i]));
+    return out.join(';');
+}
+function csvSplit(zeile) {
+    var out = [], cur = '', inQ = false;
+    for (var i = 0; i < zeile.length; i++) {
+        var c = zeile.charAt(i);
+        if (inQ) {
+            if (c !== '"') { cur += c; }
+            else if (zeile.charAt(i + 1) === '"') { cur += '"'; i++; }
+            else { inQ = false; }
+        } else if (c === '"') { inQ = true; }
+        else if (c === ';') { out.push(cur); cur = ''; }
+        else { cur += c; }
+    }
+    out.push(cur);
+    return out;
+}
+
+/* Zeitstempel als 'JJJJ-MM-TT HH:MM:SS' - in Excel ein Datum, hier
+   verlustfrei zurueckzulesen */
+function cpZeit(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' +
+           pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+function cpZeitLesen(t) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(trim(t));
+    if (!m) return null;
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+    return isNaN(d.getTime()) ? null : d;
+}
+
+/* ---- Zeilen der drei Satzarten ----
+   M = Detailzeile einer Mail, S = Hinweis-Mail, E = Erstvorgang zu einer
+   Vertragsnummer. E-Zeilen werden beim Einlesen genauso verrechnet wie im
+   Scan, deshalb reicht das Anhaengen - nichts muss neu geschrieben werden. */
+function cpMailZeile(r) {
+    return csvZeile(['M', cpZeit(r.datum), r.kw, r.wd, r.mailbox, r.folder, r.kanal,
+        r.senderName, r.senderAddr, r.senderDomain, r.to, r.subject, r.art,
+        r.istReminder ? '1' : '0', r.istErinnerungBUe ? '1' : '0', r.vonJDC ? '1' : '0', r.jdcVia,
+        r.hatAnhang, r.weitergeleitet, r.fwdStamp,
+        r.kunde, r.vnr, r.vk, r.sparte, r.sparteDetail, r.rangstufe, r.agentur, r.vermittler, r.att]);
+}
+function cpMailRow(f) {
+    var d = cpZeitLesen(f[1]);
+    if (!d) return null;
+    return {
+        datum: d, kw: f[2], wd: f[3], mailbox: f[4], folder: f[5], kanal: f[6],
+        senderName: f[7], senderAddr: f[8], senderDomain: f[9], to: f[10], subject: f[11], art: f[12],
+        istReminder: f[13] === '1', istErinnerungBUe: f[14] === '1', vonJDC: f[15] === '1', jdcVia: f[16],
+        hatAnhang: f[17], weitergeleitet: f[18], fwdStamp: f[19],
+        kunde: f[20], vnr: f[21], vk: f[22], sparte: f[23], sparteDetail: f[24],
+        rangstufe: f[25], agentur: f[26], vermittler: f[27],
+        att: /^[0-9]+$/.test(f[28] || '') ? Number(f[28]) : (f[28] || '')
+    };
+}
+function cpSharedZeile(r) {
+    return csvZeile(['S', cpZeit(r.datum), r.kw, r.kanal, r.mailbox, r.folder,
+        r.senderName, r.senderAddr, r.subject, r.lnr, r.dokart]);
+}
+function cpSharedRow(f) {
+    var d = cpZeitLesen(f[1]);
+    if (!d) return null;
+    return { datum: d, kw: f[2], kanal: f[3], mailbox: f[4], folder: f[5],
+             senderName: f[6], senderAddr: f[7], subject: f[8], lnr: f[9], dokart: f[10] };
+}
+function cpErstZeile(vk, rt, kanal, kunde) {
+    return csvZeile(['E', cpZeit(rt), vk, kanal, kunde]);
+}
+
+/* Kopfzeilen: 'sep=;' sagt Excel, dass Semikolon trennt - unabhaengig von
+   der Laendereinstellung. Die Spaltennamen beschreiben die M-Zeilen; S- und
+   E-Zeilen sind Hilfssaetze und in Spalte A als solche erkennbar. */
+function cpKopfzeilen() {
+    return ['sep=;', csvZeile(['Typ', 'Datum', 'KW', 'Wochentag', 'Postfach', 'Ordner', 'Kanal',
+        'Absender', 'Absender-Adresse', 'Absender-Domain', 'An', 'Betreff', 'Vorgangsart',
+        'Erinnerung', 'Erinnerung BÜ', 'von JDC', 'JDC erkannt über',
+        'Anhang', 'weitergeleitet', 'weitergeleitet am',
+        'Kunde', 'Vertragsnummer', 'VNR-Schlüssel', 'Sparte', 'Sparte-Detail',
+        'Rangstufe', 'Agentur-Nr', 'Vermittler-Nr', 'Anhänge'])];
+}
+
+function cpJsonText(o) {
+    if (typeof JSON !== 'undefined' && JSON.stringify) return JSON.stringify(o);
+    throw new Error('JSON steht nicht zur Verfügung');
+}
+function cpJsonLesen(t) {
+    if (typeof JSON !== 'undefined' && JSON.parse) return JSON.parse(t);
+    return eval('(' + t + ')');
+}
+
+/* Einstellungen als Text - Vergleich zwischen Zwischenstand und Formular */
+function cpEinstellungen() {
+    var e = { chkAll: document.getElementById('chkAll').checked ? '1' : '0',
+              chkAtt: document.getElementById('chkAtt').checked ? '1' : '0' };
+    for (var i = 0; i < CP_FELDER.length; i++) e[CP_FELDER[i]] = document.getElementById(CP_FELDER[i]).value;
+    return e;
+}
+function cpEinstellungenSetzen(e) {
+    if (!e) return;
+    for (var i = 0; i < CP_FELDER.length; i++) {
+        if (typeof e[CP_FELDER[i]] === 'string') document.getElementById(CP_FELDER[i]).value = e[CP_FELDER[i]];
+    }
+    if (typeof e.chkAll === 'string') document.getElementById('chkAll').checked = e.chkAll === '1';
+    if (typeof e.chkAtt === 'string') document.getElementById('chkAtt').checked = e.chkAtt === '1';
+    rebuildKanalSelects();
+}
+function cpSignatur(einst, ordner) {
+    var teile = [];
+    for (var i = 0; i < CP_FELDER.length; i++) teile.push(trim(einst[CP_FELDER[i]] || ''));
+    teile.push(einst.chkAll || '0', einst.chkAtt || '0');
+    for (var j = 0; j < ordner.length; j++) teile.push(ordner[j]);
+    return teile.join('|');
+}
+
+/* ---- Schreiben ---- */
+function cpSchreiben(st) {
+    if (!st.cpAktiv) return;
+    var pCsv = cpPfad(CP_CSV), pJson = cpPfad(CP_JSON);
+    if (!pCsv || !pJson) { st.cpAktiv = false; return; }
+    try {
+        var f = neuesFso();
+        var neu = !f.FileExists(pCsv);
+        var ts = neu ? f.CreateTextFile(pCsv, true, true) : f.OpenTextFile(pCsv, 8, true, -1);
+        if (neu) {
+            var kopf = cpKopfzeilen();
+            for (var h = 0; h < kopf.length; h++) ts.WriteLine(kopf[h]);
+        }
+        for (var i = 0; i < st.cpBuf.length; i++) ts.WriteLine(st.cpBuf[i]);
+        ts.Close();
+        st.cpZeilen += st.cpBuf.length;
+        st.cpBuf = [];
+
+        var jobs = [];
+        for (var j = 0; j < st.jobs.length; j++) {
+            var jb = st.jobs[j];
+            jobs.push({ total: jb.total, reminder: jb.reminder, jdc: jb.jdc, shared: jb.shared,
+                        weitergeleitet: jb.weitergeleitet, scanned: jb.scanned, skippedErrors: jb.skippedErrors });
+        }
+        var stand = {
+            v: CP_FORMAT, sig: st.cpSig, einst: st.cpEinst, ordner: st.cpOrdner,
+            zeit: cpZeit(new Date()), zeilen: st.cpZeilen,
+            geprueft: st.doneBefore + st.itemIdx,
+            jobIdx: st.jobIdx, itemIdx: st.itemIdx, doneBefore: st.doneBefore,
+            totalAll: st.totalAll, sharedTotal: st.sharedTotal,
+            sharedChecked: st.sharedChecked, sharedSkipped: st.sharedSkipped,
+            mailsDropped: st.mailsDropped, dateCalib: st.dateCalib,
+            kanaele: st.kanaele, kanalOrder: st.kanalOrder,
+            jobs: jobs, seen: st.cpSeen
+        };
+        var tj = f.CreateTextFile(pJson, true, true);
+        tj.Write(cpJsonText(stand));
+        tj.Close();
+        st.cpLastAt = st.doneBefore + st.itemIdx;
+    } catch (e) {
+        /* Kein Grund den Lauf abzubrechen - nur die Wiederaufnahme faellt weg */
+        st.cpAktiv = false;
+        st.cpFehler = e.message;
+    }
+}
+
+/* ---- Loeschen / Verwerfen ---- */
+function cpLoeschen() {
+    var weg = 0;
+    try {
+        var f = neuesFso();
+        var dateien = [cpPfad(CP_CSV), cpPfad(CP_JSON)];
+        for (var i = 0; i < dateien.length; i++) {
+            if (dateien[i] && f.FileExists(dateien[i])) { f.DeleteFile(dateien[i], true); weg++; }
+        }
+    } catch (e) {}
+    cpStand = null;
+    return weg;
+}
+function cpVerwerfen() {
+    var weg = cpLoeschen();
+    cpPruefen();
+    showInfo(weg > 0
+        ? 'Zwischenstand gel&ouml;scht &ndash; der n&auml;chste Lauf beginnt von vorn.'
+        : 'Es war kein Zwischenstand vorhanden.');
+}
+
+/* ---- Beim Start: gibt es einen Zwischenstand? ---- */
+function cpPruefen() {
+    var info = document.getElementById('resumeInfo');
+    var aktionen = document.getElementById('resumeActions');
+    cpStand = null;
+    aktionen.style.display = 'none';
+
+    var dir = htaOrdner();
+    var pJson = cpPfad(CP_JSON);
+    if (!pJson) {
+        info.innerHTML = 'Der Ordner dieser HTA ist nicht ermittelbar &ndash; es wird kein Zwischenstand geschrieben.';
+        return;
+    }
+    try {
+        var f = neuesFso();
+        if (!f.FileExists(pJson)) {
+            info.innerHTML = 'Kein Zwischenstand vorhanden &ndash; Ablage w&auml;re <code>' + esc(dir) + '</code>.';
+            return;
+        }
+        var ts = f.OpenTextFile(pJson, 1, false, -1);
+        var roh = ts.ReadAll();
+        ts.Close();
+        var stand = cpJsonLesen(roh);
+        if (!stand || stand.v !== CP_FORMAT) {
+            info.innerHTML = 'Ein Zwischenstand liegt vor, stammt aber aus einer anderen Fassung des Werkzeugs &ndash; bitte verwerfen.';
+            aktionen.style.display = 'block';
+            return;
+        }
+        cpStand = stand;
+        cpEinstellungenSetzen(stand.einst);
+        var namen = [];
+        for (var i = 0; i < (stand.ordner || []).length; i++) {
+            if (stand.ordner[i] && stand.ordner[i].name) namen.push(stand.ordner[i].name);
+        }
+        info.innerHTML = '<b>Zwischenstand vom ' + esc(stand.zeit) + ' gefunden:</b> ' + stand.geprueft +
+            ' Mails gepr&uuml;ft, davon ' + stand.totalAll + ' im Zeitraum. Die Einstellungen von damals sind oben bereits eingetragen; ' +
+            (namen.length ? 'bitte wieder ' + (namen.length > 1 ? 'die Ordner ' : 'den Ordner ') + '<b>' + esc(namen.join('</b> und <b>')) + '</b> w&auml;hlen. ' : '') +
+            'Der Start setzt den Lauf dann an dieser Stelle fort.';
+        aktionen.style.display = 'block';
+    } catch (e) {
+        info.innerHTML = 'Zwischenstand konnte nicht gelesen werden (' + esc(e.message) + ') &ndash; bitte verwerfen.';
+        aktionen.style.display = 'block';
+    }
+}
+
+/* Nach dem Vorspulen: die zuletzt gesicherten EntryIDs abfangen, damit eine
+   Mail an der Nahtstelle nicht doppelt zaehlt. Ein paar tausend Zeilen
+   spaeter ist die Stelle passiert und die Pruefung entfaellt wieder. */
+function cpSchonGelesen(st, eid) {
+    if (!st.seenSet) return false;
+    var doppelt = (eid !== '' && st.seenSet[eid] === 1);
+    if (--st.seenGuard <= 0) st.seenSet = null;
+    return doppelt;
+}
+
+/* ---- Einlesen: CSV-Zeilen in Bloecken, damit die HTA bedienbar bleibt ---- */
+function cpLadenStart(st) {
+    var pCsv = cpPfad(CP_CSV);
+    try {
+        var f = neuesFso();
+        if (!f.FileExists(pCsv)) throw new Error('Die Datei ' + CP_CSV + ' fehlt');
+        st.cpRead = f.OpenTextFile(pCsv, 1, false, -1);
+        st.cpGelesen = 0;
+    } catch (e) {
+        hideProgress();
+        document.getElementById('btnStart').disabled = false;
+        scanState = null;
+        showError('Zwischenstand konnte nicht gelesen werden: ' + esc(e.message) +
+                  ' &ndash; bitte verwerfen und neu starten.');
+        return false;
+    }
+    return true;
+}
+function cpLadenTick() {
+    var st = scanState;
+    if (!st) return;
+    try {
+        var n = 0;
+        while (n < CP_LOAD_CHUNK && st.cpGelesen < st.cpZielZeilen && !st.cpRead.AtEndOfStream) {
+            var zeile = String(st.cpRead.ReadLine());
+            n++;
+            if (zeile.length < 3) continue;
+            var art = zeile.charAt(0) === '"' ? zeile.charAt(1) : zeile.charAt(0);
+            if (art !== 'M' && art !== 'S' && art !== 'E') continue;   // sep=; und Kopfzeile
+            st.cpGelesen++;
+            var feld = csvSplit(zeile);
+            if (art === 'M') {
+                var row = cpMailRow(feld);
+                if (!row) continue;
+                if (row.istReminder) st.reminders.push(row);
+                if (st.mails.length < MAILS_MAX) st.mails.push(row); else st.mailsDropped++;
+            } else if (art === 'S') {
+                var srow = cpSharedRow(feld);
+                if (srow) st.shared.push(srow);
+            } else {
+                var rt = cpZeitLesen(feld[1]);
+                var vk = feld[2];
+                if (!rt || !vk) continue;
+                var e = st.erstByVnr[vk];
+                if (!e) st.erstByVnr[vk] = { first: rt, count: 1, kanal: feld[3], kunde: feld[4] };
+                else { e.count++; if (rt < e.first) e.first = rt; }
+            }
+        }
+        if (st.cpGelesen < st.cpZielZeilen && !st.cpRead.AtEndOfStream) {
+            setProgress(0, 'Zwischenstand wird eingelesen &hellip; ' + st.cpGelesen + ' / ' + st.cpZielZeilen + ' Zeilen');
+            window.setTimeout(cpLadenTick, 5);
+            return;
+        }
+        try { st.cpRead.Close(); } catch (eC) {}
+        st.cpRead = null;
+        if (st.cpGelesen < st.cpZielZeilen) {
+            /* Die CSV ist kuerzer als die JSON meldet - dann sind Zeilen und
+               Zaehler nicht mehr deckungsgleich, also lieber von vorn. */
+            hideProgress();
+            document.getElementById('btnStart').disabled = false;
+            scanState = null;
+            showError('Der Zwischenstand ist unvollst&auml;ndig (' + st.cpGelesen + ' von ' + st.cpZielZeilen +
+                      ' Zeilen gefunden) &ndash; bitte verwerfen und neu starten.');
+            return;
+        }
+        st.cpZeilen = st.cpGelesen;
+        renderKpis(st);
+        showInfo('Zwischenstand vom ' + esc(cpStand.zeit) + ' &uuml;bernommen: ' + cpStand.geprueft +
+                 ' Mails waren bereits gepr&uuml;ft. Der Lauf wird fortgesetzt.');
+        window.setTimeout(scanTick, 30);
+    } catch (e) {
+        try { if (st.cpRead) st.cpRead.Close(); } catch (eC2) {}
+        hideProgress();
+        document.getElementById('btnStart').disabled = false;
+        scanState = null;
+        showError('Zwischenstand konnte nicht eingelesen werden: ' + esc(e.message));
+    }
 }
 
 function scanTick() {
@@ -1040,7 +1531,38 @@ function scanTick() {
                 st.mode = 'einzeln';
             }
             st.itemIdx = 0;
+            /* Wiederaufnahme: bis zur gespeicherten Stelle vorspulen. Die
+               Tabelle ist nach Empfangszeit absteigend sortiert, also fuehrt
+               dieselbe Zahl uebersprungener Zeilen an dieselbe Stelle. Gegen
+               kleine Verschiebungen (neue Mail im Ordner) schuetzt zusaetzlich
+               die Liste der zuletzt gelesenen EntryIDs. */
+            if (st.skipJob === st.jobIdx && st.skipTo > 0) {
+                st.skipVon = st.skipTo;
+            } else {
+                st.skipTo = 0; st.skipVon = 0;
+            }
+            st.skipJob = -1;
             setProgress(jobPct(st), progressText(st, job));
+        }
+
+        if (st.skipTo > 0) {
+            if (st.table) {
+                var vor = 0;
+                while (vor < CP_SKIP_CHUNK && st.itemIdx < st.skipTo && !st.table.EndOfTable) {
+                    st.table.GetNextRow();
+                    st.itemIdx++; vor++;
+                }
+                if (st.itemIdx >= st.skipTo || st.table.EndOfTable) st.skipTo = 0;
+            } else {
+                st.itemIdx = Math.min(st.skipTo, st.itemCount);
+                st.skipTo = 0;
+            }
+            if (st.skipTo > 0) {
+                setProgress(jobPct(st), "Zwischenstand: " + st.itemIdx + " / " + st.skipVon +
+                    " bereits gepr&uuml;fte Mails werden &uuml;bersprungen &hellip;");
+                window.setTimeout(scanTick, 5);
+                return;
+            }
         }
 
         var job2 = st.jobs[st.jobIdx];
@@ -1059,6 +1581,7 @@ function scanTick() {
                     if (!rt) continue;
                     if (rt < st.fromDate) { jobDone = true; break; }   // absteigend sortiert
                     if (rt > st.toDate) continue;
+                    if (st.seenSet && cpSchonGelesen(st, String(row.Item("EntryID") || ''))) continue;
                     job2.scanned++;
                     processMail(st, job2, rowAsItem(st, row), rt);
                 } catch (eRow) {
@@ -1078,6 +1601,7 @@ function scanTick() {
                     if (isNaN(rt2.getTime())) continue;
                     if (rt2 < st.fromDate) { jobDone = true; break; }
                     if (rt2 > st.toDate) continue;
+                    if (st.seenSet && cpSchonGelesen(st, String(item.EntryID || ''))) continue;
                     job2.scanned++;
                     processMail(st, job2, item, rt2);
                 } catch (eItem) {
@@ -1095,6 +1619,10 @@ function scanTick() {
             st.jobIdx++;
             st.items = null;
             st.table = null;
+            st.itemIdx = 0;
+            cpSchreiben(st);
+        } else if (st.cpAktiv && (st.doneBefore + st.itemIdx) - st.cpLastAt >= st.cpEvery) {
+            cpSchreiben(st);
         }
         window.setTimeout(scanTick, 10);
     } catch (e) {
@@ -1114,14 +1642,14 @@ function progressText(st, job) {
     /* Restzeit aus dem bisherigen Tempo (alle Ordner zusammen) */
     var eta = '';
     var elapsed = (new Date().getTime() - st.startedAt) / 1000;
-    var done = st.doneBefore + st.itemIdx;
+    var done = st.doneBefore + st.itemIdx - st.etaBase;   // nur was dieser Lauf geschafft hat
     if (elapsed > 5 && done > 50) {
         var remaining = Math.max(0, st.itemCount - st.itemIdx);
         for (var j = st.jobIdx + 1; j < st.jobs.length; j++) remaining += st.itemCount; // grobe Annahme: gleich gross
         var secs = remaining / (done / elapsed);
         eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
     }
-    return "v1.9 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
+    return "v2.0 &middot; " + (st.mode === 'tabelle' ? "Tabellenmodus" : "Einzelmodus") +
         " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
         Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount + " Mails gepr&uuml;ft" + filt + eta +
         " &ndash; im Zeitraum: " + job.total + ", Erinnerungen: " + job.reminder + ", davon JDC: " + job.jdc +
@@ -1184,6 +1712,15 @@ function processMail(st, job, item, rt) {
     /* Teure Zugriffe (Sender, Empfaenger, Kopfzeilen, Text, Anhaenge)
        brauchen das komplett geoeffnete Element — im Tabellenmodus wird es
        erst hier und nur bei Bedarf ueber die EntryID geholt. */
+    if (st.cpAktiv) {
+        var eid = '';
+        try { eid = String(item.EntryID || ''); } catch (eEid) {}
+        if (eid) {
+            st.cpSeen.push(eid);
+            if (st.cpSeen.length > CP_SEEN + 100) st.cpSeen = st.cpSeen.slice(-CP_SEEN);
+        }
+    }
+
     var fullCache = null;
     var full = function () {
         if (fullCache === null) {
@@ -1320,12 +1857,14 @@ function processMail(st, job, item, rt) {
     if (istShared) {
         job.shared++; st.sharedTotal++;
         K.sm++; K.kw[kw].s++;
-        st.shared.push({
+        var srow = {
             datum: rt, kw: kw, kanal: kanal, mailbox: job.mailbox, folder: job.folder,
             senderName: senderName, senderAddr: senderAddr, subject: subject,
             lnr: (/\bLNR\s*([0-9]+)/i.exec(subject) || ['', ''])[1],
             dokart: (/DokArt[A-Za-z]*\s*=\s*([0-9]+)/i.exec(subject) || ['', ''])[1]
-        });
+        };
+        st.shared.push(srow);
+        if (st.cpAktiv) st.cpBuf.push(cpSharedZeile(srow));
     }
     if (istReminder) {
         job.reminder++;
@@ -1349,6 +1888,7 @@ function processMail(st, job, item, rt) {
         var e = st.erstByVnr[vk];
         if (!e) st.erstByVnr[vk] = { first: rt, count: 1, kanal: kanal, kunde: p.kunde };
         else { e.count++; if (rt < e.first) e.first = rt; }
+        if (st.cpAktiv) st.cpBuf.push(cpErstZeile(vk, rt, kanal, p.kunde));
     }
 
     if (!keep) return;
@@ -1369,6 +1909,7 @@ function processMail(st, job, item, rt) {
     if (istReminder) st.reminders.push(row);
     if (st.mails.length < MAILS_MAX) st.mails.push(row);
     else st.mailsDropped++;
+    if (st.cpAktiv) st.cpBuf.push(cpMailZeile(row));
 }
 
 function finishScan() {
@@ -1396,6 +1937,10 @@ function finishScan() {
             var skipped = 0;
             for (var j = 0; j < st.jobs.length; j++) skipped += st.jobs[j].skippedErrors;
             if (skipped > 0) msg += "<br><i>" + skipped + " Element(e) konnten nicht gelesen werden und wurden &uuml;bersprungen.</i>";
+            /* Die Mappe steht - der Zwischenstand hat seinen Zweck erfuellt */
+            if (cpLoeschen() > 0) msg += "<br><i>Der Zwischenstand wurde gel&ouml;scht, der n&auml;chste Lauf beginnt wieder von vorn.</i>";
+            cpPruefen();
+            if (st.cpFehler) msg += "<br><i>Hinweis: Der Zwischenstand konnte w&auml;hrend des Laufs nicht geschrieben werden (" + esc(st.cpFehler) + ").</i>";
             showSuccess(msg);
             document.getElementById('btnStart').disabled = false;
             });

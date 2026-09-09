@@ -112,7 +112,7 @@ Fuer das Reminder-Analyse-Tool analog (eigene Versionsnummer, nur die HTA im ZIP
 `reminder-analyse` in `downloads.html` auf die neue ZIP-Version ziehen):
 
 ```bash
-RA_VER=1.9
+RA_VER=2.0
 rm -f ERGO-Reminder-Analyse-v*.zip
 mkdir -p /tmp/ergo-ra-build
 cp ergo-reminder-analyse.hta /tmp/ergo-ra-build/ergo-reminder-analyse-v$RA_VER.hta
