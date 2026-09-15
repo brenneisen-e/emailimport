@@ -1,0 +1,1258 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=11">
+    <title>ERGO Hinweis-Mail-Suche (Gruppenpostfach-Hinweis im Mailtext)</title>
+    <HTA:APPLICATION
+        ID="ERGO_Hinweis_Suche"
+        APPLICATIONNAME="ERGO Hinweis-Mail-Suche"
+        BORDER="dialog"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="yes"
+        SYSMENU="yes"
+        VERSION="1.0"
+        WINDOWSTATE="normal"
+    />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .header { text-align: center; margin-bottom: 1.25rem; }
+        .logo { width: 40px; height: 40px; margin: 0 auto 6px; display: block; }
+        h2 { color: #f1f5f9; margin-bottom: 0.25rem; }
+        .subtitle { color: #94a3b8; font-size: 13px; }
+        .ver { color: #64748b; font-size: 11px; margin-top: 4px; }
+
+        .section {
+            background: rgba(0,0,0,0.22);
+            border: 1px solid rgba(148,163,184,0.15);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1rem;
+        }
+        .section-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 0.75rem; }
+        .section-title .tag {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            color: #94a3b8; border: 1px solid #475569; border-radius: 6px;
+            padding: 1px 7px; margin-left: 8px; vertical-align: 1px;
+        }
+
+        label { display: block; margin-bottom: 0.35rem; color: #cbd5e1; font-size: 12px; font-weight: 500; }
+        select, input[type="text"] {
+            width: 100%; padding: 9px 12px;
+            border: 1px solid #475569; border-radius: 8px;
+            background: #1e293b; color: #f1f5f9; font-size: 13px;
+            margin-bottom: 0.8rem;
+        }
+        select:focus, input:focus { outline: none; border-color: #ef4444; }
+        select:disabled { opacity: 0.5; }
+        .row { display: flex; gap: 0.75rem; }
+        .row > * { flex: 1; }
+        .hint { font-size: 11px; color: #94a3b8; margin-top: -0.4rem; margin-bottom: 0.6rem; line-height: 1.45; }
+
+        .quick { margin-bottom: 0.6rem; }
+        .quick button {
+            padding: 5px 11px; margin-right: 6px; border: 1px solid #475569;
+            border-radius: 7px; background: transparent; color: #cbd5e1;
+            font-size: 11.5px; cursor: pointer;
+        }
+        .quick button:hover { border-color: #ef4444; color: #fff; }
+
+        .chk { display: block; color: #cbd5e1; font-size: 12.5px; margin-bottom: 0.3rem; cursor: pointer; }
+        .chk input { margin-right: 7px; }
+
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 14px; font-weight: 600;
+            transition: all 0.2s; width: 100%;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); }
+        .btn-ghost {
+            width: auto; padding: 7px 14px; font-size: 12.5px; margin: 8px 0 0;
+            background: rgba(148, 163, 184, 0.16); color: #e2e8f0;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .btn-ghost:hover:not(:disabled) { background: rgba(148, 163, 184, 0.3); }
+
+        .progress-container { display: none; margin: 1rem 0 0.25rem; }
+        .progress-bar { height: 8px; background: #374151; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #ef4444, #f97316); width: 0%; transition: width 0.3s; }
+        .progress-text { font-size: 12px; color: #94a3b8; margin-top: 0.5rem; text-align: center; }
+
+        .kpis { display: none; margin-top: 0.75rem; }
+        .kpis table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .kpis th, .kpis td { padding: 5px 8px; border-bottom: 1px solid rgba(148,163,184,0.15); text-align: right; }
+        .kpis th { color: #94a3b8; font-weight: 600; }
+        .kpis td:first-child, .kpis th:first-child { text-align: left; color: #e2e8f0; }
+        .kpis td.hl { color: #fca5a5; font-weight: 600; }
+
+        .status { display: none; padding: 0.85rem 1rem; border-radius: 8px; margin: 0.85rem 0 0; font-size: 13px; line-height: 1.5; }
+        .status.success { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; }
+        .status.error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+        .status.info { background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #93c5fd; }
+
+        .foot { text-align: center; color: #64748b; font-size: 11px; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7"/>
+                    <path d="M21 21l-4.3-4.3"/>
+                </svg>
+                <h2>ERGO Hinweis-Mail-Suche</h2>
+                <div class="subtitle">Mails finden, in deren <b>Text</b> der Gruppenpostfach-Hinweis steht &ndash; je Ordner und Kalenderwoche</div>
+                <div class="ver">v1.0</div>
+            </div>
+
+            <!-- Ordner 1 -->
+            <div class="section">
+                <div class="section-title">Ordner 1 <span class="tag">Pflicht</span></div>
+                <div class="row">
+                    <div>
+                        <label for="mailbox1">Postfach</label>
+                        <select id="mailbox1" onchange="loadFoldersFor(1)">
+                            <option value="">-- Postfach w&auml;hlen --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="folder1">Ordner</label>
+                        <select id="folder1" disabled onchange="updateStartButton()">
+                            <option value="">-- Ordner w&auml;hlen --</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ordner 2 -->
+            <div class="section">
+                <div class="section-title">Ordner 2 <span class="tag">Optional</span></div>
+                <div class="row">
+                    <div>
+                        <label for="mailbox2">Postfach</label>
+                        <select id="mailbox2" onchange="loadFoldersFor(2)">
+                            <option value="">-- kein zweiter Ordner --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="folder2">Ordner</label>
+                        <select id="folder2" disabled onchange="updateStartButton()">
+                            <option value="">-- Ordner w&auml;hlen --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="hint">
+                    Das zweite Postfach wird automatisch auf das erste gesetzt. So lassen sich zwei Ordner in einem Lauf
+                    vergleichen &ndash; etwa der Posteingang von <b>bestandsuebertragungen@ergo.de</b> und der von
+                    <b>maklerauftraege@ergo.de</b>. Jeder Ordner bekommt in der Auswertung eine eigene Spalte.
+                </div>
+            </div>
+
+            <!-- Zeitraum -->
+            <div class="section">
+                <div class="section-title">Zeitraum</div>
+                <div class="quick">
+                    <button onclick="setQuickWeeks(4)">4 Wochen</button>
+                    <button onclick="setQuickWeeks(8)">8 Wochen</button>
+                    <button onclick="setQuickWeeks(12)">12 Wochen</button>
+                    <button onclick="setQuickWeeks(26)">26 Wochen</button>
+                    <button onclick="setYearStart()">seit Jahresanfang</button>
+                </div>
+                <div class="row">
+                    <div>
+                        <label for="dateFrom">Von (JJJJ-MM-TT)</label>
+                        <input type="text" id="dateFrom" placeholder="2026-07-01">
+                    </div>
+                    <div>
+                        <label for="dateTo">Bis (JJJJ-MM-TT)</label>
+                        <input type="text" id="dateTo" placeholder="2026-09-15">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suche -->
+            <div class="section">
+                <div class="section-title">Suche</div>
+
+                <label for="suchText">Gesuchter Satz im Mailtext</label>
+                <input type="text" id="suchText" value="attached message was sent by a member of this shared mailbox">
+                <div class="hint">
+                    Vor dem Vergleich werden Gro&szlig;-/Kleinschreibung, Zitatzeichen und <b>jeder Zeilenumbruch</b> vereinheitlicht.
+                    Das ist wichtig: Outlook bricht Klartext nach rund 76 Zeichen um, wodurch der Satz sonst mitten im Wort zerrissen w&uuml;rde
+                    und nicht gefunden werden k&ouml;nnte. Gefunden wird auch im HTML-Text, falls der Klartext leer ist.
+                </div>
+
+                <label for="indexWort">Stichwort f&uuml;r die schnelle Vorauswahl</label>
+                <input type="text" id="indexWort" value="shared mailbox">
+                <div class="hint">
+                    Kurz und ohne Sonderzeichen halten &ndash; damit fragt das Werkzeug den Windows-Suchindex ab (dieselbe Technik wie
+                    das Suchfeld in Outlook) und holt nur die Mails, die das Stichwort im Text haben. Jede dieser Mails wird danach
+                    noch auf den vollst&auml;ndigen Satz oben gepr&uuml;ft. Was das Stichwort enth&auml;lt, den Satz aber nicht, landet
+                    im Blatt &bdquo;Fast-Treffer&ldquo; &ndash; so wird sichtbar, ob der Satz vielleicht anders lautet.
+                </div>
+
+                <label class="chk">
+                    <input type="checkbox" id="chkIndex" checked>
+                    Windows-Suchindex nutzen (schnell &ndash; Sekunden statt Stunden)
+                </label>
+                <label class="chk">
+                    <input type="checkbox" id="chkAnhang" checked>
+                    Ohne Suchindex: nur Mails <b>mit Anhang</b> &ouml;ffnen (der Hinweis geh&ouml;rt immer zu einer angeh&auml;ngten Nachricht)
+                </label>
+                <div class="hint">
+                    Ohne Suchindex muss jede Mail des Zeitraums einzeln ge&ouml;ffnet werden &ndash; bei einem grossen Postfach dauert das
+                    lange. Der Haken &bdquo;nur Mails mit Anhang&ldquo; halbiert das ungef&auml;hr: Der Hinweis geh&ouml;rt zu einer
+                    <b>angeh&auml;ngten</b> Nachricht, sollte also nie ohne Anhang vorkommen &ndash; belegt ist das aber nicht.
+                    F&uuml;r eine garantiert l&uuml;ckenlose Suche den Haken entfernen. Die Auswertung nennt am Ende, wie viele Mails gepr&uuml;ft und
+                    wie viele dabei &uuml;bersprungen wurden.
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="btnStart" onclick="startSuche()" disabled>Suche starten &amp; Excel erstellen</button>
+            <button class="btn btn-ghost" id="btnStop" onclick="abbrechen()" style="display:none">Suche abbrechen und mit dem bisherigen Ergebnis auswerten</button>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText"></div>
+            </div>
+
+            <div class="kpis" id="kpis"></div>
+
+            <div class="status" id="status"></div>
+
+            <div class="foot">Ben&ouml;tigt Outlook (MAPI) und Excel &middot; l&auml;uft vollst&auml;ndig lokal, keine Daten verlassen den Arbeitsplatz</div>
+        </div>
+    </div>
+
+<script language="JScript">
+/* =====================================================================
+   ERGO Hinweis-Mail-Suche  (HTA / JScript / COM-Automation)
+   ---------------------------------------------------------------------
+   Eine Frage, ein Werkzeug: In wie vielen Mails steht der Hinweis aus
+   einem Gruppenpostfach ("The attached message was sent by a member of
+   this shared mailbox ...")? Dieser Hinweis loest auf ERGO-Seite jeweils
+   einen neuen Vorgang aus. Die Reminder-Analyse zaehlt ihn nebenbei mit;
+   hier geht es nur darum - dafuer ueber beliebige Ordner, also auch ueber
+   maklerauftraege@ergo.de und nicht nur ueber bestandsuebertragungen.
+
+   Warum ein eigenes Werkzeug: Der Satz steht ausschliesslich im MAILTEXT.
+   Den liefert Outlook nicht in der schnellen Tabellenansicht - jede Mail
+   muesste einzeln vom Server geholt werden, was bei zehntausenden Mails
+   Stunden dauert. Deshalb fragt dieses Werkzeug zuerst den WINDOWS-
+   SUCHINDEX ab (Items.Restrict mit ci_phrasematch, dieselbe Technik wie
+   Outlooks Suchfeld). Der liefert in Sekunden die Mails, die das Stichwort
+   im Text haben; erst diese wenigen werden geoeffnet und auf den genauen
+   Satz geprueft. Steht der Index nicht zur Verfuegung, wird ohne ihn
+   gesucht - dann wird jede Mail geoeffnet, und das sagt die Anzeige auch.
+
+   Zwei Fallstricke, an denen die Suche sonst scheitert, sind beruecksichtigt:
+     - Outlook bricht Klartext nach rund 76 Zeichen um. Ohne Vereinheit-
+       lichung des Leerraums zerreisst der Zeilenumbruch den gesuchten Satz.
+     - Manche dieser Mails haben einen leeren Klartext-Body; dann steht der
+       Hinweis nur im HTML-Text. Der wird als Rueckfall mitgeprueft.
+   ===================================================================== */
+
+var outlookApp = null;
+var outlookNS = null;
+var scanState = null;
+
+var CHUNK_INDEX = 40;           // Treffer je Tick im Indexmodus (jede Mail wird geoeffnet)
+var CHUNK_VOLL = 60;            // Mails je Tick im Volltextmodus
+var CHUNK_TABELLE = 400;        // Tabellenzeilen je Tick, solange nur gefiltert wird
+var TREFFER_MAX = 20000;        // Schutz gegen ueberlange Detaillisten
+var FAST_MAX = 1000;            // Fast-Treffer sind Diagnose, keine Vollstaendigkeit
+var TEXT_MAX = 400000;          // so viele Zeichen des Mailtexts werden durchsucht
+
+var COL_RECEIVED = "urn:schemas:httpmail:datereceived";
+var COL_SUBJECT  = "urn:schemas:httpmail:subject";
+var COL_TO       = "urn:schemas:httpmail:displayto";
+var COL_CC       = "urn:schemas:httpmail:displaycc";
+var COL_SENDER   = "urn:schemas:httpmail:sendername";
+var COL_SENDER_ADDR = "http://schemas.microsoft.com/mapi/proptag/0x0C1F001F";   // PR_SENDER_EMAIL_ADDRESS
+var COL_SENDER_TYPE = "http://schemas.microsoft.com/mapi/proptag/0x0C1E001F";   // PR_SENDER_ADDRTYPE (EX/SMTP)
+var COL_SENDER_SMTP = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";   // PR_SENDER_SMTP_ADDRESS
+var COL_HAS_ATTACH  = "http://schemas.microsoft.com/mapi/proptag/0x0E1B000B";   // PR_HASATTACH
+var PR_SENDER_SMTP  = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";
+/* Klartext-Body als DASL-Name - nur fuer die Index-Abfrage, nicht als Spalte */
+var DASL_BODY = "urn:schemas:httpmail:textdescription";
+
+var WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+/* ---------------- Init ---------------- */
+window.onload = function () {
+    try { window.resizeTo(940, 1000); } catch (e) {}
+    setQuickWeeks(8);
+    try {
+        outlookApp = new ActiveXObject("Outlook.Application");
+        outlookNS = outlookApp.GetNamespace("MAPI");
+        loadMailboxes();
+    } catch (e) {
+        showError("Outlook konnte nicht verbunden werden. Bitte stelle sicher, dass Outlook ge&ouml;ffnet ist. (" + esc(e.message) + ")");
+    }
+};
+
+/* ---------------- UI-Helfer ---------------- */
+function esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+function padTwo(n) { return (n < 10 ? '0' : '') + n; }
+function trim(s) { return String(s || '').replace(/^\s+|\s+$/g, ''); }
+
+function showStatus(cls, html) {
+    var el = document.getElementById('status');
+    el.className = 'status ' + cls;
+    el.innerHTML = html;
+    el.style.display = 'block';
+}
+function showError(html)   { showStatus('error', html); }
+function showInfo(html)    { showStatus('info', html); }
+function showSuccess(html) { showStatus('success', html); }
+function hideStatus() { document.getElementById('status').style.display = 'none'; }
+
+function showProgress(text) {
+    document.getElementById('progressContainer').style.display = 'block';
+    setProgress(0, text);
+}
+function setProgress(pct, text) {
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').innerHTML = text;
+}
+function hideProgress() {
+    document.getElementById('progressContainer').style.display = 'none';
+}
+function pct(a, b) { return b > 0 ? String(Math.round(a * 1000 / b) / 10).replace('.', ',') + ' %' : '-'; }
+function ratio(a, b) { return b > 0 ? Math.round(a * 10000 / b) / 10000 : ''; }
+function fmtPercent(sheet, r1, c1, r2, c2) {
+    try { sheet.Range(sheet.Cells(r1, c1), sheet.Cells(r2, c2)).NumberFormat = "0,0 %"; } catch (e) {}
+}
+
+function renderKpis(st) {
+    var el = document.getElementById('kpis');
+    if (!st) { el.style.display = 'none'; return; }
+    /* Die Quote sagt nur im Volltextmodus etwas aus: dort ist die Grundmenge
+       wirklich jede Mail des Zeitraums. Ueber den Suchindex sind es nur die
+       vorausgewaehlten Mails - eine Quote darauf waere Augenwischerei. */
+    var volltext = st.jobs[0].modus === 'voll';
+    var h = '<table><tr><th>Ordner</th><th>' + (volltext ? 'Mails im Zeitraum' : 'vom Index vorgeschlagen') +
+            '</th><th>Text gepr&uuml;ft</th><th>&uuml;bersprungen</th><th>Treffer</th>' +
+            (volltext ? '<th>Quote</th>' : '') + '</tr>';
+    var sg = 0, sp = 0, su = 0, str = 0;
+    for (var i = 0; i < st.jobs.length; i++) {
+        var j = st.jobs[i];
+        sg += j.gesamt; sp += j.geprueft; su += j.uebersprungen; str += j.treffer;
+        h += '<tr><td>' + esc(j.label) + '</td><td>' + j.gesamt + '</td><td>' + j.geprueft + '</td><td>' +
+             j.uebersprungen + '</td><td class="hl">' + j.treffer + '</td>' +
+             (volltext ? '<td>' + pct(j.treffer, j.gesamt) + '</td>' : '') + '</tr>';
+    }
+    if (st.jobs.length > 1) {
+        h += '<tr><td><b>Gesamt</b></td><td><b>' + sg + '</b></td><td><b>' + sp + '</b></td><td><b>' + su +
+             '</b></td><td class="hl"><b>' + str + '</b></td>' +
+             (volltext ? '<td><b>' + pct(str, sg) + '</b></td>' : '') + '</tr>';
+    }
+    h += '</table>';
+    el.innerHTML = h;
+    el.style.display = 'block';
+}
+
+/* ---------------- Datum / Kalenderwoche ---------------- */
+function isoDate(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+function parseIsoDate(s) {
+    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(trim(s));
+    if (!m) return null;
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return isNaN(d.getTime()) ? null : d;
+}
+function setQuickWeeks(weeks) {
+    var to = new Date();
+    var from = new Date();
+    from.setDate(from.getDate() - weeks * 7);
+    document.getElementById('dateFrom').value = isoDate(from);
+    document.getElementById('dateTo').value = isoDate(to);
+}
+function setYearStart() {
+    var to = new Date();
+    var from = new Date(to.getFullYear(), 0, 1);
+    document.getElementById('dateFrom').value = isoDate(from);
+    document.getElementById('dateTo').value = isoDate(to);
+}
+/* ISO-8601: Woche 1 ist die Woche mit dem ersten Donnerstag des Jahres */
+function isoWeek(d) {
+    var t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
+    var jan4 = new Date(t.getFullYear(), 0, 4);
+    var week = 1 + Math.round(((t.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getDay() + 6) % 7)) / 7);
+    return { jahr: t.getFullYear(), woche: week };
+}
+function kwKey(d) {
+    var w = isoWeek(d);
+    return w.jahr + '-KW' + pad(w.woche);
+}
+function mondayOf(d) {
+    var t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    t.setDate(t.getDate() - ((t.getDay() + 6) % 7));
+    return t;
+}
+function fmtDE(d) {
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear();
+}
+/* Datumsfilter fuer Items.Restrict / Folder.GetTable (deutsches Format) */
+function formatDateForRestrict(date) {
+    var d = new Date(date);
+    return padTwo(d.getDate()) + '.' + padTwo(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' +
+           padTwo(d.getHours()) + ':' + padTwo(d.getMinutes());
+}
+
+/* ---------------- Postfaecher + Ordner laden ---------------- */
+function loadMailboxes() {
+    try {
+        var stores = outlookNS.Stores;
+        var sel1 = document.getElementById('mailbox1');
+        var sel2 = document.getElementById('mailbox2');
+        sel1.innerHTML = '<option value="">-- Postfach w&auml;hlen --</option>';
+        sel2.innerHTML = '<option value="">-- kein zweiter Ordner --</option>';
+        for (var i = 1; i <= stores.Count; i++) {
+            try {
+                var store = stores.Item(i);
+                var o1 = document.createElement('option');
+                o1.value = i; o1.text = store.DisplayName;
+                sel1.appendChild(o1);
+                var o2 = document.createElement('option');
+                o2.value = i; o2.text = store.DisplayName;
+                sel2.appendChild(o2);
+            } catch (e) {}
+        }
+    } catch (e) {
+        showError("Postf&auml;cher konnten nicht geladen werden: " + esc(e.message));
+    }
+}
+function loadFoldersFor(nr) {
+    var mailboxSel = document.getElementById('mailbox' + nr);
+    var folderSel = document.getElementById('folder' + nr);
+    folderSel.innerHTML = '<option value="">-- Ordner w&auml;hlen --</option>';
+    folderSel.disabled = true;
+    updateStartButton();
+
+    if (!mailboxSel.value) return;
+    try {
+        var store = outlookNS.Stores.Item(parseInt(mailboxSel.value, 10));
+        var rootFolder = store.GetRootFolder();
+        var folders = rootFolder.Folders;
+        for (var i = 1; i <= folders.Count; i++) {
+            try {
+                var folder = folders.Item(i);
+                var opt = document.createElement('option');
+                opt.value = folder.EntryID;
+                opt.text = folder.Name;
+                folderSel.appendChild(opt);
+                addSubfolders(folder, folderSel, ' ');
+            } catch (e) {}
+        }
+        folderSel.disabled = false;
+    } catch (e) {
+        showError("Ordner konnten nicht geladen werden: " + esc(e.message));
+    }
+    if (nr === 1) {
+        var mb2 = document.getElementById('mailbox2');
+        if (!mb2.value) { mb2.value = mailboxSel.value; loadFoldersFor(2); }
+    }
+}
+function addSubfolders(parentFolder, select, indent) {
+    try {
+        var subFolders = parentFolder.Folders;
+        for (var i = 1; i <= subFolders.Count; i++) {
+            try {
+                var folder = subFolders.Item(i);
+                var opt = document.createElement('option');
+                opt.value = folder.EntryID;
+                opt.text = indent + folder.Name;
+                select.appendChild(opt);
+                addSubfolders(folder, select, indent + ' ');
+            } catch (e) {}
+        }
+    } catch (e) {}
+}
+function updateStartButton() {
+    document.getElementById('btnStart').disabled = !document.getElementById('folder1').value;
+}
+
+/* ---------------- Textvergleich ----------------
+   Kleinschreibung, Zitatzeichen weg, jede Folge von Leerraum (auch
+   Zeilenumbrueche) zu einem Leerzeichen. Sonst zerreisst der Zeilenumbruch,
+   den Outlook nach rund 76 Zeichen setzt, den gesuchten Satz. */
+function normText(s) {
+    return String(s || '').substring(0, TEXT_MAX).toLowerCase().replace(/[>|]/g, ' ').replace(/\s+/g, ' ');
+}
+function htmlZuText(h) {
+    return String(h || '').replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+}
+function ausschnitt(text, pos, laenge) {
+    var von = Math.max(0, pos - 90);
+    var bis = Math.min(text.length, pos + laenge + 90);
+    return (von > 0 ? '… ' : '') + text.substring(von, bis) + (bis < text.length ? ' …' : '');
+}
+/* Klartext zuerst, HTML als Rueckfall. Liefert Treffer, Fundort und einen
+   Textausschnitt - damit in der Excel nachvollziehbar ist, was gefunden wurde. */
+function pruefeMail(st, item) {
+    var erg = { treffer: false, fundort: '', ausschnitt: '', fast: false };
+    var klartext = '';
+    try { klartext = String(item.Body || ''); } catch (e0) {}
+    var n1 = normText(klartext);
+    var p1 = n1.indexOf(st.suchText);
+    if (p1 !== -1) {
+        erg.treffer = true; erg.fundort = 'Klartext'; erg.ausschnitt = ausschnitt(n1, p1, st.suchText.length);
+        return erg;
+    }
+    var html = '';
+    try { html = String(item.HTMLBody || ''); } catch (e1) {}
+    var n2 = html ? normText(htmlZuText(html)) : '';
+    if (n2) {
+        var p2 = n2.indexOf(st.suchText);
+        if (p2 !== -1) {
+            erg.treffer = true; erg.fundort = 'HTML-Text'; erg.ausschnitt = ausschnitt(n2, p2, st.suchText.length);
+            return erg;
+        }
+    }
+    /* Kein voller Satz - steht wenigstens das Stichwort drin? Dann ist die
+       Mail einen Blick wert: vielleicht lautet der Satz inzwischen anders. */
+    if (st.stichwort) {
+        var q1 = n1.indexOf(st.stichwort);
+        if (q1 !== -1) { erg.fast = true; erg.fundort = 'Klartext'; erg.ausschnitt = ausschnitt(n1, q1, st.stichwort.length); }
+        else if (n2) {
+            var q2 = n2.indexOf(st.stichwort);
+            if (q2 !== -1) { erg.fast = true; erg.fundort = 'HTML-Text'; erg.ausschnitt = ausschnitt(n2, q2, st.stichwort.length); }
+        }
+    }
+    return erg;
+}
+
+/* SMTP-Adresse des Absenders; bei Exchange-Adressen ueber das Adressbuch */
+function senderSmtp(item) {
+    var addr = '', type = '';
+    try { if (item.SmtpAddress) addr = String(item.SmtpAddress); } catch (eS0) {}
+    if (addr) return trim(addr);
+    try { type = String(item.SenderEmailType || ''); } catch (e0) {}
+    if (type === 'EX') {
+        try {
+            var s = item.Sender;
+            if (s) {
+                var eu = s.GetExchangeUser();
+                if (eu && eu.PrimarySmtpAddress) addr = String(eu.PrimarySmtpAddress);
+            }
+        } catch (e1) {}
+        if (!addr) { try { addr = String(item.PropertyAccessor.GetProperty(PR_SENDER_SMTP) || ''); } catch (e2) {} }
+    }
+    if (!addr) { try { addr = String(item.SenderEmailAddress || ''); } catch (e3) {} }
+    return trim(addr);
+}
+function domainOf(addr) {
+    var m = /@([^>\s;,]+)/.exec(String(addr || ''));
+    return m ? m[1].toLowerCase() : '';
+}
+function inc(obj, key, n) { obj[key] = (obj[key] || 0) + (n || 1); }
+
+/* ---------------- Suche ---------------- */
+function startSuche() {
+    hideStatus();
+    renderKpis(null);
+
+    var fromDate = parseIsoDate(document.getElementById('dateFrom').value);
+    var toDate = parseIsoDate(document.getElementById('dateTo').value);
+    if (!fromDate || !toDate) { showError("Bitte g&uuml;ltige Daten eingeben (Format JJJJ-MM-TT)."); return; }
+    if (fromDate > toDate) { showError("Datum &bdquo;Von&ldquo; muss vor &bdquo;Bis&ldquo; liegen."); return; }
+    var toEnd = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59);
+
+    var suchText = normText(document.getElementById('suchText').value);
+    if (!suchText) { showError("Bitte den gesuchten Satz eingeben."); return; }
+    var stichwort = normText(document.getElementById('indexWort').value);
+    var nutzeIndex = document.getElementById('chkIndex').checked;
+    if (nutzeIndex && !stichwort) {
+        showError("F&uuml;r die schnelle Vorauswahl wird ein Stichwort gebraucht &ndash; oder den Haken bei &bdquo;Windows-Suchindex nutzen&ldquo; entfernen.");
+        return;
+    }
+    var nurAnhang = document.getElementById('chkAnhang').checked;
+
+    var jobs = [];
+    for (var nr = 1; nr <= 2; nr++) {
+        var mbSel = document.getElementById('mailbox' + nr);
+        var fSel = document.getElementById('folder' + nr);
+        if (!mbSel.value || !fSel.value) continue;
+        jobs.push({
+            nr: nr,
+            entryId: fSel.value,
+            mailbox: mbSel.options[mbSel.selectedIndex].text,
+            folder: trim(fSel.options[fSel.selectedIndex].text),
+            label: '',
+            modus: '', imOrdner: 0,
+            gesamt: 0, geprueft: 0, uebersprungen: 0, treffer: 0, fast: 0, fehler: 0
+        });
+    }
+    if (jobs.length === 0) { showError("Bitte mindestens Ordner 1 ausw&auml;hlen."); return; }
+    if (jobs.length === 2 && jobs[0].entryId === jobs[1].entryId) {
+        showError("Ordner 1 und Ordner 2 sind identisch &ndash; bitte zwei verschiedene Ordner w&auml;hlen oder Ordner 2 leer lassen.");
+        return;
+    }
+    /* Spaltenname je Ordner: nur dann mit Postfach, wenn der Ordnername doppelt vorkommt */
+    for (var a = 0; a < jobs.length; a++) {
+        var doppelt = false;
+        for (var b = 0; b < jobs.length; b++) if (b !== a && jobs[b].folder === jobs[a].folder) doppelt = true;
+        jobs[a].label = doppelt ? jobs[a].mailbox + ' / ' + jobs[a].folder : jobs[a].folder;
+    }
+
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').style.display = 'block';
+    showProgress("Ordner wird ge&ouml;ffnet &hellip;");
+
+    scanState = {
+        jobs: jobs, jobIdx: 0,
+        fromDate: fromDate, toDate: toEnd,
+        suchText: suchText, stichwort: stichwort,
+        nutzeIndex: nutzeIndex, nurAnhang: nurAnhang,
+        items: null, table: null, itemIdx: 0, itemCount: 0, imOrdner: 0,
+        modus: '', indexFehler: '',
+        treffer: [], trefferMehr: 0,
+        fast: [], fastMehr: 0,
+        kw: {},                 // KW -> { gesamt, je Ordner-Index }
+        absender: {}, empfaenger: {},
+        abbruch: false,
+        startedAt: new Date().getTime()
+    };
+    window.setTimeout(suchTick, 60);
+}
+
+function abbrechen() {
+    if (scanState) {
+        scanState.abbruch = true;
+        setProgress(100, "Suche wird abgebrochen &hellip;");
+    }
+}
+
+function suchTick() {
+    var st = scanState;
+    if (!st) return;
+    try {
+        if (st.abbruch) { finishSuche(true); return; }
+
+        /* ---- naechsten Ordner oeffnen ---- */
+        if (st.items === null && st.table === null) {
+            if (st.jobIdx >= st.jobs.length) { finishSuche(false); return; }
+            var job = st.jobs[st.jobIdx];
+            var folder = outlookNS.GetFolderFromID(job.entryId);
+            try { st.imOrdner = folder.Items.Count; } catch (eC) { st.imOrdner = 0; }
+            job.imOrdner = st.imOrdner;
+            st.items = null; st.table = null; st.itemIdx = 0; st.modus = '';
+
+            /* Weg 1: Windows-Suchindex. Liefert in Sekunden die Mails, die das
+               Stichwort im Text haben - ohne dass eine einzige Mail geoeffnet
+               werden muss. Der Zeitraum wird danach in JScript geprueft; die
+               Trefferliste ist klein genug dafuer. */
+            if (st.nutzeIndex) {
+                try {
+                    var dasl = '@SQL=' + '"' + DASL_BODY + '"' + ' ci_phrasematch ' +
+                               "'" + st.stichwort.replace(/'/g, "''") + "'";
+                    var gefunden = folder.Items.Restrict(dasl);
+                    st.itemCount = gefunden.Count;        // wirft, wenn der Store das nicht kann
+                    try { gefunden.Sort("[ReceivedTime]", true); } catch (eSo) {}
+                    st.items = gefunden;
+                    st.modus = 'index';
+                } catch (eIdx) {
+                    st.items = null;
+                    if (!st.indexFehler) st.indexFehler = eIdx.message;
+                }
+            }
+
+            /* Weg 2: ohne Index. Tabelle mit Zeitraumfilter holen (billig) und
+               jede Mail einzeln oeffnen (teuer) - optional nur die mit Anhang. */
+            if (!st.items) {
+                var toPlus = new Date(st.toDate.getTime() + 60000);
+                var dateFilter = "[ReceivedTime] >= '" + formatDateForRestrict(st.fromDate) + "' AND " +
+                                 "[ReceivedTime] <= '" + formatDateForRestrict(toPlus) + "'";
+                try {
+                    var tbl = folder.GetTable(dateFilter);
+                    tbl.Columns.RemoveAll();
+                    tbl.Columns.Add("EntryID");
+                    tbl.Columns.Add("MessageClass");
+                    tbl.Columns.Add(COL_RECEIVED);
+                    try { tbl.Columns.Add(COL_HAS_ATTACH); st.hasAttachCol = true; } catch (eHa) { st.hasAttachCol = false; }
+                    try { tbl.Sort(COL_RECEIVED, true); } catch (eSort) {}
+                    st.itemCount = tbl.GetRowCount();
+                    st.table = tbl;
+                } catch (eTable) { st.table = null; }
+                if (!st.table) {
+                    var alle = folder.Items;
+                    try { st.items = alle.Restrict(dateFilter); } catch (eR) { st.items = null; }
+                    if (!st.items) st.items = alle;
+                    try { st.items.Sort("[ReceivedTime]", true); } catch (eS2) {}
+                    st.itemCount = st.items.Count;
+                }
+                st.modus = 'voll';
+            }
+            job.modus = st.modus;
+            setProgress(jobPct(st), progressText(st, job));
+        }
+
+        var job2 = st.jobs[st.jobIdx];
+        var fertig = false;
+
+        if (st.modus === 'index') {
+            /* Indexmodus: wenige Treffer, jeder wird geoeffnet und genau geprueft */
+            var ende = Math.min(st.itemIdx + CHUNK_INDEX, st.itemCount);
+            for (var i = st.itemIdx + 1; i <= ende; i++) {
+                st.itemIdx = i;
+                try {
+                    var mail = st.items.Item(i);
+                    var rt;
+                    try { rt = new Date(mail.ReceivedTime); } catch (eRt) { continue; }
+                    if (isNaN(rt.getTime())) continue;
+                    if (rt < st.fromDate || rt > st.toDate) continue;
+                    job2.gesamt++;
+                    job2.geprueft++;
+                    bewerte(st, job2, mail, rt, null);
+                } catch (eI) { job2.fehler++; }
+            }
+            if (st.itemIdx >= st.itemCount) fertig = true;
+
+        } else if (st.table) {
+            /* Ohne Index: Tabellenzeile ist billig, das Oeffnen ist teuer.
+               Deshalb erst filtern, dann nur die verbliebenen oeffnen. */
+            var geoeffnet = 0, gelesen = 0;
+            while (geoeffnet < CHUNK_VOLL && gelesen < CHUNK_TABELLE) {
+                if (st.table.EndOfTable) { fertig = true; break; }
+                var row = st.table.GetNextRow();
+                st.itemIdx++; gelesen++;
+                try {
+                    var mc = String(row.Item("MessageClass") || '');
+                    if (mc && mc.indexOf('IPM.Note') !== 0) continue;
+                    var rt2 = new Date(row.Item(COL_RECEIVED));
+                    if (isNaN(rt2.getTime())) continue;
+                    /* Tabellenzeit ist UTC; der Zeitraum wird nach dem Oeffnen
+                       an der echten Empfangszeit noch einmal geprueft. */
+                    job2.gesamt++;
+                    if (st.nurAnhang && st.hasAttachCol) {
+                        var ha = String(row.Item(COL_HAS_ATTACH) || '').toLowerCase();
+                        if (ha === 'false' || ha === '0') { job2.uebersprungen++; continue; }
+                    }
+                    var voll = outlookNS.GetItemFromID(String(row.Item("EntryID")));
+                    var rt3;
+                    try { rt3 = new Date(voll.ReceivedTime); } catch (eR3) { rt3 = rt2; }
+                    if (isNaN(rt3.getTime())) rt3 = rt2;
+                    if (rt3 < st.fromDate || rt3 > st.toDate) { job2.gesamt--; continue; }
+                    geoeffnet++;
+                    job2.geprueft++;
+                    bewerte(st, job2, voll, rt3, null);
+                } catch (eRow) { job2.fehler++; }
+            }
+            if (st.table.EndOfTable) fertig = true;
+
+        } else {
+            /* Weder Index noch Tabelle: Items einzeln durchgehen */
+            var ende2 = Math.min(st.itemIdx + CHUNK_VOLL, st.itemCount);
+            for (var k = st.itemIdx + 1; k <= ende2; k++) {
+                st.itemIdx = k;
+                try {
+                    var it = st.items.Item(k);
+                    if (it.Class !== 43) continue;
+                    var rt4;
+                    try { rt4 = new Date(it.ReceivedTime); } catch (eR4) { continue; }
+                    if (isNaN(rt4.getTime())) continue;
+                    if (rt4 < st.fromDate) { fertig = true; break; }
+                    if (rt4 > st.toDate) continue;
+                    job2.gesamt++;
+                    if (st.nurAnhang) {
+                        var anz = 0;
+                        try { anz = it.Attachments.Count; } catch (eA) { anz = 1; }
+                        if (anz === 0) { job2.uebersprungen++; continue; }
+                    }
+                    job2.geprueft++;
+                    bewerte(st, job2, it, rt4, null);
+                } catch (eK) { job2.fehler++; }
+            }
+            if (st.itemIdx >= st.itemCount) fertig = true;
+        }
+
+        setProgress(jobPct(st), progressText(st, job2));
+        renderKpis(st);
+
+        if (fertig) {
+            st.jobIdx++;
+            st.items = null;
+            st.table = null;
+            st.itemIdx = 0;
+        }
+        window.setTimeout(suchTick, 10);
+    } catch (e) {
+        hideProgress();
+        document.getElementById('btnStart').disabled = false;
+        document.getElementById('btnStop').style.display = 'none';
+        scanState = null;
+        showError("Fehler bei der Suche: " + esc(e.message));
+    }
+}
+
+/* Eine geoeffnete Mail bewerten und - bei Treffer - in die Listen eintragen */
+function bewerte(st, job, mail, rt, vorab) {
+    var erg = vorab || pruefeMail(st, mail);
+    if (!erg.treffer && !erg.fast) return;
+
+    var betreff = '', an = '', cc = '', senderName = '';
+    try { betreff = String(mail.Subject || ''); } catch (e0) {}
+    try { an = String(mail.To || ''); } catch (e1) {}
+    try { cc = String(mail.CC || ''); } catch (e2) {}
+    try { senderName = String(mail.SenderName || ''); } catch (e3) {}
+    var adresse = senderSmtp(mail);
+    var anhaenge = '';
+    try { anhaenge = mail.Attachments.Count; } catch (e4) {}
+
+    var zeile = {
+        datum: rt, kw: kwKey(rt), wd: WEEKDAYS[(rt.getDay() + 6) % 7],
+        mailbox: job.mailbox, folder: job.folder, label: job.label, jobIdx: st.jobIdx,
+        senderName: senderName, senderAddr: adresse, senderDomain: domainOf(adresse),
+        an: an, cc: cc, betreff: betreff,
+        lnr: (/\bLNR\s*([0-9]+)/i.exec(betreff) || ['', ''])[1],
+        dokart: (/DokArt[A-Za-z]*\s*=\s*([0-9]+)/i.exec(betreff) || ['', ''])[1],
+        anhaenge: anhaenge, fundort: erg.fundort, ausschnitt: erg.ausschnitt
+    };
+
+    if (erg.treffer) {
+        job.treffer++;
+        if (st.treffer.length < TREFFER_MAX) st.treffer.push(zeile); else st.trefferMehr++;
+        var k = st.kw[zeile.kw];
+        if (!k) { k = st.kw[zeile.kw] = { gesamt: 0, je: [] }; }
+        k.gesamt++;
+        k.je[st.jobIdx] = (k.je[st.jobIdx] || 0) + 1;
+        inc(st.absender, adresse || senderName || '(unbekannt)');
+        inc(st.empfaenger, trim(an) || '(kein Empfaenger)');
+    } else {
+        job.fast++;
+        if (st.fast.length < FAST_MAX) st.fast.push(zeile); else st.fastMehr++;
+    }
+}
+
+function jobPct(st) {
+    var perJob = 100 / st.jobs.length;
+    var inner = st.itemCount > 0 ? Math.min(1, st.itemIdx / st.itemCount) : 0;
+    return Math.round(st.jobIdx * perJob + inner * perJob);
+}
+
+function progressText(st, job) {
+    var wie = st.modus === 'index'
+        ? "Suchindex"
+        : "ohne Suchindex &ndash; jede Mail wird ge&ouml;ffnet" + (st.nurAnhang ? ", nur mit Anhang" : "");
+    var eta = '';
+    var elapsed = (new Date().getTime() - st.startedAt) / 1000;
+    if (elapsed > 5 && st.itemIdx > 30 && st.itemCount > 0) {
+        var rest = Math.max(0, st.itemCount - st.itemIdx);
+        for (var j = st.jobIdx + 1; j < st.jobs.length; j++) rest += st.itemCount;
+        var secs = rest / (st.itemIdx / elapsed);
+        eta = " &middot; ca. " + (secs < 90 ? Math.round(secs) + " s" : Math.round(secs / 60) + " min") + " verbleibend";
+    }
+    return "v1.0 &middot; " + wie + " &middot; Ordner " + job.nr + " (" + esc(job.folder) + "): " +
+        Math.min(st.itemIdx, st.itemCount) + " / " + st.itemCount +
+        (st.modus === 'index' ? " Index-Treffer gepr&uuml;ft" : " Mails durchgesehen") + eta +
+        " &ndash; gefunden: " + job.treffer + (job.fast > 0 ? ", Fast-Treffer: " + job.fast : "");
+}
+
+function finishSuche(abgebrochen) {
+    var st = scanState;
+    scanState = null;
+    document.getElementById('btnStop').style.display = 'none';
+    setProgress(100, abgebrochen ? "Abgebrochen &ndash; Excel wird erstellt &hellip;" : "Suche fertig &ndash; Excel wird erstellt &hellip;");
+    renderKpis(st);
+
+    window.setTimeout(function () {
+        try {
+            buildExcel(st, abgebrochen, function () {
+                hideProgress();
+                var gesamt = 0, geprueft = 0, uebersprungen = 0, treffer = 0, fast = 0, fehler = 0;
+                for (var i = 0; i < st.jobs.length; i++) {
+                    gesamt += st.jobs[i].gesamt; geprueft += st.jobs[i].geprueft;
+                    uebersprungen += st.jobs[i].uebersprungen; treffer += st.jobs[i].treffer;
+                    fast += st.jobs[i].fast; fehler += st.jobs[i].fehler;
+                }
+                var msg = "<b>" + (abgebrochen ? "Abgebrochen." : "Fertig!") + "</b><br><b>" + treffer +
+                          " Hinweis-Mails</b> gefunden &ndash; aus " + geprueft + " gepr&uuml;ften Mails" +
+                          (st.jobs.length > 1 ? " in " + st.jobs.length + " Ordnern" : "") + ".";
+                for (var j = 0; j < st.jobs.length; j++) {
+                    msg += "<br>&bull; " + esc(st.jobs[j].label) + ": <b>" + st.jobs[j].treffer + "</b> von " +
+                           st.jobs[j].geprueft + " gepr&uuml;ften" +
+                           (st.jobs[j].uebersprungen > 0 ? " (" + st.jobs[j].uebersprungen + " ohne Anhang &uuml;bersprungen)" : "") +
+                           (st.jobs[j].modus === 'index' ? " &ndash; &uuml;ber den Suchindex" : " &ndash; ohne Suchindex");
+                }
+                msg += "<br>Die Excel-Mappe ist ge&ouml;ffnet. Bitte manuell speichern.";
+                if (fast > 0) {
+                    msg += "<br><b>" + fast + " Fast-Treffer</b>: Dort steht das Stichwort, aber nicht der gesuchte Satz &ndash; " +
+                           "Blatt &bdquo;Fast-Treffer&ldquo; zeigt den Textausschnitt. Lautet der Satz dort anders, " +
+                           "diesen oben eintragen und neu suchen.";
+                }
+                if (treffer === 0 && st.indexFehler === '' && st.jobs[0].modus === 'index') {
+                    msg += "<br><i>Keine Treffer &uuml;ber den Suchindex. Zur Gegenprobe den Haken bei &bdquo;Windows-Suchindex nutzen&ldquo; " +
+                           "entfernen &ndash; dann wird jede Mail selbst gelesen (dauert deutlich l&auml;nger, findet aber auch, was der Index nicht kennt).</i>";
+                }
+                if (st.indexFehler) {
+                    msg += "<br><i>Hinweis: Der Suchindex stand nicht zur Verf&uuml;gung (" + esc(st.indexFehler) +
+                           "), es wurde ohne ihn gesucht.</i>";
+                }
+                if (st.trefferMehr > 0) msg += "<br><i>Die Detailliste ist auf " + TREFFER_MAX + " Zeilen begrenzt, " + st.trefferMehr + " weitere Treffer sind nur in den Z&auml;hlungen enthalten.</i>";
+                if (fehler > 0) msg += "<br><i>" + fehler + " Element(e) konnten nicht gelesen werden und wurden &uuml;bersprungen.</i>";
+                showSuccess(msg);
+                document.getElementById('btnStart').disabled = false;
+            });
+        } catch (e) {
+            hideProgress();
+            try { if (xlApp) { xlApp.ScreenUpdating = true; xlApp.DisplayAlerts = true; } } catch (eX) {}
+            showError("Excel-Export fehlgeschlagen: " + esc(e.message));
+            document.getElementById('btnStart').disabled = false;
+        }
+    }, 60);
+}
+
+/* ---------------- Excel-Ausgabe ---------------- */
+function rgb(r, g, b) { return r + g * 256 + b * 65536; }
+
+var xlApp = null;
+var useArrayRows = true;
+var EXCEL_CHUNK = 400;
+
+function normVal(v) {
+    if (v === null || v === undefined) return "";
+    if (typeof v === 'boolean') return v ? 'ja' : 'nein';
+    return v;
+}
+/* Eine ganze Zeile mit EINEM COM-Aufruf schreiben (Scripting.Dictionary -> SAFEARRAY);
+   Rueckfall: Zelle fuer Zelle. */
+function putRow(sheet, row, vals) {
+    var n = vals.length;
+    if (n === 0) return;
+    if (useArrayRows) {
+        try {
+            var d = new ActiveXObject("Scripting.Dictionary");
+            for (var i = 0; i < n; i++) d.Add(i, normVal(vals[i]));
+            sheet.Range(sheet.Cells(row, 1), sheet.Cells(row, n)).Value = d.Items();
+            return;
+        } catch (e) { useArrayRows = false; }
+    }
+    for (var j = 0; j < n; j++) {
+        try { sheet.Cells(row, j + 1).Value = normVal(vals[j]); } catch (e2) {}
+    }
+}
+/* Selbsttest der Array-Schreibweise: letzter Header muss in der letzten Spalte stehen */
+function verifyArrayRows(sheet, row, vals) {
+    if (!useArrayRows) return;
+    try {
+        var got = String(sheet.Cells(row, vals.length).Value || '');
+        if (got !== String(vals[vals.length - 1])) throw new Error('mismatch');
+    } catch (e) {
+        useArrayRows = false;
+        putRow(sheet, row, vals);
+    }
+}
+function styleHeaderRow(sheet, rowNr, colCount) {
+    try {
+        var hr = sheet.Range(sheet.Cells(rowNr, 1), sheet.Cells(rowNr, colCount));
+        hr.Font.Bold = true;
+        hr.Interior.Color = rgb(185, 28, 28);   // ERGO-Rot
+        hr.Font.Color = rgb(255, 255, 255);
+    } catch (e) {}
+}
+function styleSubHeader(sheet, rowNr, colCount) {
+    try {
+        var hr = sheet.Range(sheet.Cells(rowNr, 1), sheet.Cells(rowNr, colCount));
+        hr.Font.Bold = true;
+        hr.Interior.Color = rgb(229, 231, 235);
+    } catch (e) {}
+}
+function styleTitle(sheet, rowNr, size) {
+    try { sheet.Cells(rowNr, 1).Font.Bold = true; sheet.Cells(rowNr, 1).Font.Size = size || 12; } catch (e) {}
+}
+function freezeBelow(sheet, excel, rowNr) {
+    try {
+        sheet.Activate();
+        sheet.Range("A1").Select();
+        excel.ActiveWindow.FreezePanes = false;
+        sheet.Cells(rowNr + 1, 1).Select();
+        excel.ActiveWindow.FreezePanes = true;
+    } catch (e) {}
+}
+/* Viele Zeilen in Bloecken schreiben. Zehntausende Zeilen am Stueck lassen
+   Windows das Skript fuer haengengeblieben halten; zwischen den Bloecken
+   gibt setTimeout die Kontrolle kurz zurueck. */
+function writeRowsChunked(sheet, startRow, rows, label, done) {
+    var idx = 0;
+    function step() {
+        var end = Math.min(idx + EXCEL_CHUNK, rows.length);
+        for (; idx < end; idx++) putRow(sheet, startRow + idx, rows[idx]);
+        if (idx < rows.length) {
+            setProgress(100, "Excel wird erstellt &hellip; " + label + ": " + idx + " / " + rows.length + " Zeilen");
+            window.setTimeout(step, 1);
+        } else { done(); }
+    }
+    step();
+}
+function autoFilter(sheet, headRow, lastRow, colCount) {
+    try { if (lastRow > headRow) sheet.Range(sheet.Cells(headRow, 1), sheet.Cells(lastRow, colCount)).AutoFilter(); } catch (e) {}
+}
+function colLetter(n) {
+    var s = '';
+    while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+    return s;
+}
+function sortedKeys(obj, byValueDesc) {
+    var keys = [];
+    for (var k in obj) if (obj.hasOwnProperty(k)) keys.push(k);
+    if (byValueDesc) keys.sort(function (a, b) { return (obj[b] - obj[a]) || (a < b ? -1 : a > b ? 1 : 0); });
+    else keys.sort();
+    return keys;
+}
+/* Montag zur KW-Bezeichnung "JJJJ-KWnn" - fuer die Spalte "Woche ab" */
+function mondayOfKw(key) {
+    var m = /^(\d{4})-KW(\d{1,2})$/.exec(key);
+    if (!m) return null;
+    var jan4 = new Date(Number(m[1]), 0, 4);
+    var montagKw1 = mondayOf(jan4);
+    var d = new Date(montagKw1.getTime());
+    d.setDate(d.getDate() + (Number(m[2]) - 1) * 7);
+    return d;
+}
+
+function detailZeilen(liste) {
+    var rows = [];
+    for (var i = 0; i < liste.length; i++) {
+        var t = liste[i];
+        rows.push([
+            i + 1, t.datum, pad(t.datum.getHours()) + ':' + pad(t.datum.getMinutes()), t.wd, t.kw,
+            t.mailbox, t.folder, t.senderName, t.senderAddr, t.senderDomain,
+            t.an, t.cc, t.betreff, t.lnr, t.dokart, t.anhaenge, t.fundort, t.ausschnitt
+        ]);
+    }
+    return rows;
+}
+var DETAIL_HEAD = ["Nr", "Datum", "Uhrzeit", "Wochentag", "KW", "Postfach", "Ordner",
+                   "Absender Name", "Absender E-Mail", "Absender Domain", "Empfänger (An)", "Kopie (Cc)",
+                   "Betreff", "LNR", "DokArt", "Anhänge", "Fundort", "Textausschnitt"];
+
+function buildExcel(st, abgebrochen, done) {
+    var excel = new ActiveXObject("Excel.Application");
+    xlApp = excel;
+    excel.Visible = true;
+    excel.DisplayAlerts = false;
+    try { excel.ScreenUpdating = false; } catch (eSU) {}
+
+    var wb = excel.Workbooks.Add();
+    /* Worksheets.Add() legt VOR dem aktiven Blatt an -> umgekehrt anlegen */
+    var shFast = null, shTreffer;
+    if (st.fast.length > 0) {
+        shFast = wb.ActiveSheet;
+        try { shFast.Name = "Fast-Treffer"; } catch (e) {}
+        shTreffer = wb.Worksheets.Add();
+    } else {
+        shTreffer = wb.ActiveSheet;
+    }
+    try { shTreffer.Name = "Hinweis-Mails"; } catch (e) {}
+    var shKW = wb.Worksheets.Add();
+    try { shKW.Name = "KW-Verlauf"; } catch (e) {}
+    var shUeb = wb.Worksheets.Add();
+    try { shUeb.Name = "Uebersicht"; } catch (e) {}
+    try { wb.Styles("Normal").Font.Name = "Open Sans"; } catch (eF) {}
+
+    var summe = { gesamt: 0, geprueft: 0, uebersprungen: 0, treffer: 0, fast: 0, fehler: 0 };
+    for (var s0 = 0; s0 < st.jobs.length; s0++) {
+        var j0 = st.jobs[s0];
+        summe.gesamt += j0.gesamt; summe.geprueft += j0.geprueft; summe.uebersprungen += j0.uebersprungen;
+        summe.treffer += j0.treffer; summe.fast += j0.fast; summe.fehler += j0.fehler;
+    }
+
+    /* ========== Blatt 3: Hinweis-Mails ========== */
+    st.treffer.sort(function (a, b) { return a.datum.getTime() - b.datum.getTime(); });
+    putRow(shTreffer, 1, DETAIL_HEAD);
+    verifyArrayRows(shTreffer, 1, DETAIL_HEAD);
+    styleHeaderRow(shTreffer, 1, DETAIL_HEAD.length);
+    try { shTreffer.Columns("B:B").NumberFormat = "TT.MM.JJJJ"; } catch (eNF) {}
+    var trefferRows = detailZeilen(st.treffer);
+
+    /* ========== Blatt 4: Fast-Treffer ========== */
+    var fastRows = [];
+    if (shFast) {
+        st.fast.sort(function (a, b) { return a.datum.getTime() - b.datum.getTime(); });
+        putRow(shFast, 1, DETAIL_HEAD);
+        verifyArrayRows(shFast, 1, DETAIL_HEAD);
+        styleHeaderRow(shFast, 1, DETAIL_HEAD.length);
+        try { shFast.Columns("B:B").NumberFormat = "TT.MM.JJJJ"; } catch (eNF2) {}
+        fastRows = detailZeilen(st.fast);
+    }
+
+    /* ========== Blatt 2: KW-Verlauf ========== */
+    var kwHead = ["Kalenderwoche", "Woche ab", "Treffer gesamt"];
+    for (var h1 = 0; h1 < st.jobs.length; h1++) kwHead.push(st.jobs[h1].label);
+    putRow(shKW, 1, kwHead);
+    verifyArrayRows(shKW, 1, kwHead);
+    styleHeaderRow(shKW, 1, kwHead.length);
+    try { shKW.Columns("B:B").NumberFormat = "TT.MM.JJJJ"; } catch (eNF3) {}
+
+    var kwKeys = sortedKeys(st.kw, false);
+    var kwRow = 2;
+    for (var w = 0; w < kwKeys.length; w++) {
+        var k = st.kw[kwKeys[w]];
+        var mo = mondayOfKw(kwKeys[w]);
+        var zeile = [kwKeys[w], mo ? mo : '', k.gesamt];
+        for (var jz = 0; jz < st.jobs.length; jz++) zeile.push(k.je[jz] || 0);
+        putRow(shKW, kwRow++, zeile);
+    }
+    if (kwKeys.length > 0) {
+        var sumZeile = ["Gesamt", "", summe.treffer];
+        for (var jz2 = 0; jz2 < st.jobs.length; jz2++) sumZeile.push(st.jobs[jz2].treffer);
+        putRow(shKW, kwRow, sumZeile);
+        styleSubHeader(shKW, kwRow, kwHead.length);
+    } else {
+        putRow(shKW, 2, ["(keine Treffer im Zeitraum)"]);
+    }
+    freezeBelow(shKW, excel, 1);
+    autoFilter(shKW, 1, kwRow - 1, kwHead.length);
+
+    /* ========== Blatt 1: Uebersicht ========== */
+    var r = 1;
+    putRow(shUeb, r, ["Hinweis-Mail-Suche" + (abgebrochen ? " (Suche abgebrochen)" : "")]); styleTitle(shUeb, r, 14); r += 2;
+    putRow(shUeb, r++, ["Zeitraum", fmtDE(st.fromDate) + " bis " + fmtDE(st.toDate)]);
+    putRow(shUeb, r++, ["Gesuchter Satz", document.getElementById('suchText').value]);
+    putRow(shUeb, r++, ["Stichwort Vorauswahl", document.getElementById('indexWort').value]);
+    putRow(shUeb, r++, ["Suchverfahren", st.jobs[0].modus === 'index'
+        ? "Windows-Suchindex; jeder Index-Treffer wurde zusätzlich auf den vollständigen Satz geprüft"
+        : "ohne Suchindex – jede Mail einzeln geöffnet" + (st.nurAnhang ? ", nur Mails mit Anhang" : "")]);
+    if (st.indexFehler) putRow(shUeb, r++, ["Hinweis zum Suchindex", "nicht verfügbar (" + st.indexFehler + ") – es wurde ohne ihn gesucht"]);
+    putRow(shUeb, r++, ["Erstellt am", fmtDE(new Date()) + " " + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes())]);
+    r++;
+
+    var volltext = st.jobs[0].modus === 'voll';
+    putRow(shUeb, r, ["Kernzahlen"]); styleTitle(shUeb, r, 12); r++;
+    putRow(shUeb, r++, ["Hinweis-Mails gefunden", summe.treffer]);
+    putRow(shUeb, r++, ["Mails, deren Text geprüft wurde", summe.geprueft]);
+    putRow(shUeb, r++, [volltext ? "Mails im Zeitraum gesichtet" : "vom Suchindex vorgeschlagen (im Zeitraum)", summe.gesamt]);
+    if (summe.uebersprungen > 0) putRow(shUeb, r++, ["davon ohne Anhang übersprungen", summe.uebersprungen]);
+    if (volltext) {
+        putRow(shUeb, r++, ["Anteil Hinweis-Mails an allen Mails des Zeitraums", ratio(summe.treffer, summe.gesamt)]);
+        fmtPercent(shUeb, r - 1, 2, r - 1, 2);
+    }
+    if (summe.fast > 0) putRow(shUeb, r++, ["Fast-Treffer (Stichwort ja, Satz nein)", summe.fast]);
+    if (kwKeys.length > 0) {
+        putRow(shUeb, r++, ["Wochen mit Treffern", kwKeys.length]);
+        putRow(shUeb, r++, ["Durchschnitt je Woche mit Treffern", Math.round(summe.treffer * 10 / kwKeys.length) / 10]);
+        putRow(shUeb, r++, ["Erste Fundstelle", st.treffer.length ? fmtDE(st.treffer[0].datum) : ""]);
+        putRow(shUeb, r++, ["Letzte Fundstelle", st.treffer.length ? fmtDE(st.treffer[st.treffer.length - 1].datum) : ""]);
+    }
+    if (summe.fehler > 0) putRow(shUeb, r++, ["Nicht lesbare Elemente", summe.fehler]);
+    r++;
+
+    putRow(shUeb, r, ["Je Ordner"]); styleTitle(shUeb, r, 12); r++;
+    var oHead = ["Ordner", "Postfach", "Verfahren", "Mails im Ordner",
+                 volltext ? "im Zeitraum gesichtet" : "vom Index vorgeschlagen",
+                 "Text geprüft", "übersprungen", "Hinweis-Mails",
+                 volltext ? "Anteil am Zeitraum" : "", "Fast-Treffer", "Lesefehler"];
+    putRow(shUeb, r, oHead); styleSubHeader(shUeb, r, oHead.length); var oHeadRow = r; r++;
+    for (var o = 0; o < st.jobs.length; o++) {
+        var jo = st.jobs[o];
+        putRow(shUeb, r++, [jo.label, jo.mailbox, jo.modus === 'index' ? 'Suchindex' : 'ohne Suchindex',
+            jo.imOrdner, jo.gesamt, jo.geprueft, jo.uebersprungen, jo.treffer,
+            volltext ? ratio(jo.treffer, jo.gesamt) : '', jo.fast, jo.fehler]);
+    }
+    if (st.jobs.length > 1) {
+        putRow(shUeb, r, ["Gesamt", "", "", "", summe.gesamt, summe.geprueft, summe.uebersprungen,
+            summe.treffer, volltext ? ratio(summe.treffer, summe.gesamt) : '', summe.fast, summe.fehler]);
+        styleSubHeader(shUeb, r, oHead.length); r++;
+    }
+    if (volltext) fmtPercent(shUeb, oHeadRow + 1, 9, r - 1, 9);
+    else putRow(shUeb, r++, ["Über den Suchindex wird nur geöffnet, was das Stichwort im Text hat – „vom Index vorgeschlagen“ ist deshalb keine Grundmenge für eine Quote."]);
+    r++;
+
+    putRow(shUeb, r, ["Treffer je Kalenderwoche"]); styleTitle(shUeb, r, 12); r++;
+    putRow(shUeb, r, kwHead); styleSubHeader(shUeb, r, kwHead.length); r++;
+    for (var w2 = 0; w2 < kwKeys.length; w2++) {
+        var k2 = st.kw[kwKeys[w2]];
+        var mo2 = mondayOfKw(kwKeys[w2]);
+        var z2 = [kwKeys[w2], mo2 ? fmtDE(mo2) : '', k2.gesamt];
+        for (var jz3 = 0; jz3 < st.jobs.length; jz3++) z2.push(k2.je[jz3] || 0);
+        putRow(shUeb, r++, z2);
+    }
+    if (kwKeys.length === 0) putRow(shUeb, r++, ["(keine Treffer im Zeitraum)"]);
+    r++;
+
+    var absKeys = sortedKeys(st.absender, true);
+    putRow(shUeb, r, ["Absender der Hinweis-Mails"]); styleTitle(shUeb, r, 12); r++;
+    putRow(shUeb, r, ["Absender", "Hinweis-Mails", "Anteil"]); styleSubHeader(shUeb, r, 3); var aHeadRow = r; r++;
+    for (var a2 = 0; a2 < Math.min(absKeys.length, 30); a2++) {
+        putRow(shUeb, r++, [absKeys[a2], st.absender[absKeys[a2]], ratio(st.absender[absKeys[a2]], summe.treffer)]);
+    }
+    if (absKeys.length === 0) putRow(shUeb, r++, ["(keine)"]);
+    fmtPercent(shUeb, aHeadRow + 1, 3, r - 1, 3);
+    r++;
+
+    var empKeys = sortedKeys(st.empfaenger, true);
+    putRow(shUeb, r, ["Empfänger (An) der Hinweis-Mails"]); styleTitle(shUeb, r, 12); r++;
+    putRow(shUeb, r, ["Empfänger", "Hinweis-Mails", "Anteil"]); styleSubHeader(shUeb, r, 3); var eHeadRow = r; r++;
+    for (var e2 = 0; e2 < Math.min(empKeys.length, 30); e2++) {
+        putRow(shUeb, r++, [empKeys[e2], st.empfaenger[empKeys[e2]], ratio(st.empfaenger[empKeys[e2]], summe.treffer)]);
+    }
+    if (empKeys.length === 0) putRow(shUeb, r++, ["(keine)"]);
+    fmtPercent(shUeb, eHeadRow + 1, 3, r - 1, 3);
+
+    /* ---- Detailblaetter in Bloecken schreiben, dann aufraeumen ---- */
+    writeRowsChunked(shTreffer, 2, trefferRows, "Hinweis-Mails", function () {
+        autoFilter(shTreffer, 1, 1 + trefferRows.length, DETAIL_HEAD.length);
+        freezeBelow(shTreffer, excel, 1);
+        if (shFast) {
+            writeRowsChunked(shFast, 2, fastRows, "Fast-Treffer", function () {
+                autoFilter(shFast, 1, 1 + fastRows.length, DETAIL_HEAD.length);
+                freezeBelow(shFast, excel, 1);
+                fertigstellen();
+            });
+        } else { fertigstellen(); }
+    });
+
+    function fertigstellen() {
+        var blaetter = [shUeb, shKW, shTreffer];
+        if (shFast) blaetter.push(shFast);
+        for (var b = 0; b < blaetter.length; b++) {
+            try {
+                blaetter[b].Columns.AutoFit();
+                /* Betreff und Textausschnitt sonst absurd breit */
+                if (blaetter[b] === shTreffer || blaetter[b] === shFast) {
+                    blaetter[b].Columns("M:M").ColumnWidth = 60;
+                    blaetter[b].Columns("R:R").ColumnWidth = 80;
+                    blaetter[b].Columns("K:L").ColumnWidth = 28;
+                }
+                if (blaetter[b] === shUeb) {
+                    blaetter[b].Columns("A:A").ColumnWidth = 42;
+                    blaetter[b].Columns("B:B").ColumnWidth = 34;
+                }
+            } catch (eW) {}
+        }
+        try { shUeb.Activate(); shUeb.Range("A1").Select(); } catch (eA) {}
+        try { excel.ScreenUpdating = true; } catch (eS) {}
+        try { excel.DisplayAlerts = true; } catch (eD) {}
+        done();
+    }
+}
+</script>
+</body>
+</html>

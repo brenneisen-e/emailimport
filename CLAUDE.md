@@ -47,6 +47,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-mail-statistik.hta` | `ERGO-Mail-Statistik-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `outlook-regeln-visualisierung.hta` | `Outlook-Regeln-Visualisierung-v<VER>.zip` + `outlook-regeln-source.html` | siehe unten (versionierte Inhalte) + `./build-regeln-source.sh` |
 | `ergo-reminder-analyse.hta` | `ERGO-Reminder-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
+| `ergo-hinweis-suche.hta` | `ERGO-Hinweis-Suche-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-jdc-weiterleitung.hta` | `ERGO-JDC-Weiterleitung-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 
 > **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
@@ -118,6 +119,18 @@ mkdir -p /tmp/ergo-ra-build
 cp ergo-reminder-analyse.hta /tmp/ergo-ra-build/ergo-reminder-analyse-v$RA_VER.hta
 (cd /tmp/ergo-ra-build && \
    zip -j "$OLDPWD/ERGO-Reminder-Analyse-v$RA_VER.zip" ergo-reminder-analyse-v$RA_VER.hta)
+```
+
+Fuer die Hinweis-Mail-Suche analog (eigene Versionsnummer, nur die HTA im ZIP; Eintrag
+`hinweis-suche` in `downloads.html` auf die neue ZIP-Version ziehen):
+
+```bash
+HS_VER=1.0
+rm -f ERGO-Hinweis-Suche-v*.zip
+mkdir -p /tmp/ergo-hs-build
+cp ergo-hinweis-suche.hta /tmp/ergo-hs-build/ergo-hinweis-suche-v$HS_VER.hta
+(cd /tmp/ergo-hs-build && \
+   zip -j "$OLDPWD/ERGO-Hinweis-Suche-v$HS_VER.zip" ergo-hinweis-suche-v$HS_VER.hta)
 ```
 
 Fuer das JDC-Weiterleitungs-Tool analog (eigene Versionsnummer, nur die HTA im ZIP):
