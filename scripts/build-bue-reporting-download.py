@@ -7,7 +7,7 @@ Datei vom Server kommen. Wie bei den HTA-Quellcodeseiten steckt die Datei deshal
 als Base64 in der Seite selbst; ein Klick setzt sie im Browser zusammen und
 speichert sie per Blob (der Netzwerk-Request ist nur die HTML-Seite).
 Drei Knoepfe: als .xlsm, als .xlsx (gleicher Inhalt, danach von Hand in .xlsm umbenennen - fuer Netze,
-die .xlsm nach Endung blocken) und als .zip.
+die .xlsm nach Endung blocken), als .zip und als .zip mit der .xlsx darin.
 
 Aufruf:   python3 scripts/build-bue-reporting-download.py
 Nach JEDEM Austausch von bue-reporting/BUE_Reporting_Master.xlsm ausfuehren.
@@ -24,12 +24,19 @@ ZIEL = os.path.join(HIER, 'bue-reporting-download.html')
 NAME = 'BUE_Reporting_Master.xlsm'
 
 daten = open(QUELLE, 'rb').read()
-puffer = io.BytesIO()
-with zipfile.ZipFile(puffer, 'w', zipfile.ZIP_DEFLATED) as z:
-    z.writestr(NAME, daten)
-    for ordner in ('Rohdaten/', 'Anwesenheit/'):
-        z.writestr(zipfile.ZipInfo(ordner), '')
-zip_daten = puffer.getvalue()
+
+
+def als_zip(name):
+    puffer = io.BytesIO()
+    with zipfile.ZipFile(puffer, 'w', zipfile.ZIP_DEFLATED) as z:
+        z.writestr(name, daten)
+        for ordner in ('Rohdaten/', 'Anwesenheit/'):
+            z.writestr(zipfile.ZipInfo(ordner), '')
+    return puffer.getvalue()
+
+
+zip_daten = als_zip(NAME)
+zip_xlsx_daten = als_zip(NAME.replace('.xlsm', '.xlsx'))        # Variante fuer Netze, die .xlsm auch im ZIP pruefen
 
 
 def b64(b):
@@ -73,10 +80,12 @@ seite = """<!DOCTYPE html>
       <button class="prim" onclick="speichern('xlsm')">Als .xlsm speichern</button>
       <button class="sek" onclick="speichern('xlsx')">Als .xlsx speichern</button>
       <button class="sek" onclick="speichern('zip')">Als ZIP speichern</button>
+      <button class="sek" onclick="speichern('zipx')">ZIP mit .xlsx</button>
     </div>
     <div class="hinweis" style="margin-top:4px">„Als .xlsx speichern“ ist derselbe Inhalt unter anderer Endung – für Netze, die .xlsm blocken.
       Danach die Datei im Explorer von <b>BUE_Reporting_Master.xlsx</b> in <b>BUE_Reporting_Master.xlsm</b> umbenennen
-      (Dateiendungen einblenden: Explorer → Ansicht → „Dateinamenerweiterungen“). Mit der Endung .xlsx öffnet Excel die Datei nicht.</div>
+      (Dateiendungen einblenden: Explorer → Ansicht → „Dateinamenerweiterungen“). Mit der Endung .xlsx öffnet Excel die Datei nicht.
+      „ZIP mit .xlsx“ enthält dieselbe .xlsx samt Ordnern Rohdaten und Anwesenheit – nach dem Entpacken ebenso umbenennen.</div>
     <div id="status"></div>
     <ol>
       <li>Datei in einen eigenen Ordner legen, z.&nbsp;B. „BÜ-Reporting“ (bei der ZIP: dorthin entpacken).</li>
@@ -94,12 +103,17 @@ __XLSM__
 <script type="text/plain" id="daten-zip">
 __ZIP__
 </script>
+<script type="text/plain" id="daten-zipx">
+__ZIPX__
+</script>
 <script>
 var TYPEN = {
   xlsm: { id: 'daten-xlsm', name: 'BUE_Reporting_Master.xlsm', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12' },
   xlsx: { id: 'daten-xlsm', name: 'BUE_Reporting_Master.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           nachher: ' – jetzt im Explorer in BUE_Reporting_Master.xlsm umbenennen.' },
-  zip:  { id: 'daten-zip',  name: 'BUE_Reporting_Master.zip',  mime: 'application/zip' }
+  zip:  { id: 'daten-zip',  name: 'BUE_Reporting_Master.zip',  mime: 'application/zip' },
+  zipx: { id: 'daten-zipx', name: 'BUE_Reporting_Master_xlsx.zip', mime: 'application/zip',
+          nachher: ' – entpacken und BUE_Reporting_Master.xlsx in BUE_Reporting_Master.xlsm umbenennen.' }
 };
 function speichern(art) {
   var t = TYPEN[art], status = document.getElementById('status');
@@ -126,6 +140,6 @@ function speichern(art) {
 </html>
 """
 seite = (seite.replace('__GROESSE__', groesse).replace('__STAND__', stand)
-         .replace('__XLSM__', b64(daten)).replace('__ZIP__', b64(zip_daten)))
+         .replace('__XLSM__', b64(daten)).replace('__ZIPX__', b64(zip_xlsx_daten)).replace('__ZIP__', b64(zip_daten)))
 open(ZIEL, 'w', encoding='utf-8').write(seite)
 print('geschrieben:', ZIEL, '%.1f MB' % (len(seite) / 1024 / 1024))
