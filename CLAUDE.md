@@ -19,7 +19,7 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
-(aktuell **12.12**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
+(aktuell **12.13**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
 damit auf der Homepage sofort sichtbar ist, dass es eine neue Version gibt.
 Schema: Major.Minor — bei kleinen Aenderungen Minor +1, bei groesseren Major +1.
 
@@ -49,7 +49,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-reminder-analyse.hta` | `ERGO-Reminder-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-hinweis-suche.hta` | `ERGO-Hinweis-Suche-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-jdc-weiterleitung.hta` | `ERGO-JDC-Weiterleitung-v<VER>.zip` | siehe unten (versionierte Inhalte) |
-| `bue-reporting/BUE_Reporting_Master.xlsm` | `bue-reporting-download.html` (Datei als Base64 eingebettet, Knöpfe .xlsm und ZIP per Blob) | `python3 scripts/build-bue-reporting-download.py` – nach jedem Austausch der xlsm (Quelle: Repo kiarbeitsplatz, `Bestandsuebertragung/kontextdokumente/reporting/bue_reporting`); direkte .xlsm-/.zip-Downloads scheitern im Firmennetz mit „Keine Berechtigungen“ |
+| `bue-reporting/BUE_Reporting_Master.xlsm` | `bue-reporting-download.html` (Datei als Base64 eingebettet, Knöpfe .xlsm, .xlsx (zum Umbenennen) und ZIP per Blob) | `python3 scripts/build-bue-reporting-download.py` – nach jedem Austausch der xlsm (Quelle: Repo kiarbeitsplatz, `Bestandsuebertragung/kontextdokumente/reporting/bue_reporting`); direkte .xlsm-/.zip-Downloads scheitern im Firmennetz mit „Keine Berechtigungen“ |
 
 > **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
 > „Quellcode kopieren"-Buttons kopieren den HTA-Code aus einer **Inline-Base64-Kopie**

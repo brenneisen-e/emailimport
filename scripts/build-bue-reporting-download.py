@@ -6,7 +6,8 @@ Berechtigungen" - der Proxy bzw. die Browser-Richtlinie blockt Dateien, die als
 Datei vom Server kommen. Wie bei den HTA-Quellcodeseiten steckt die Datei deshalb
 als Base64 in der Seite selbst; ein Klick setzt sie im Browser zusammen und
 speichert sie per Blob (der Netzwerk-Request ist nur die HTML-Seite).
-Zwei Knoepfe: als .xlsm und als .zip (falls der Browser .xlsm lokal verweigert).
+Drei Knoepfe: als .xlsm, als .xlsx (gleicher Inhalt, danach von Hand in .xlsm umbenennen - fuer Netze,
+die .xlsm nach Endung blocken) und als .zip.
 
 Aufruf:   python3 scripts/build-bue-reporting-download.py
 Nach JEDEM Austausch von bue-reporting/BUE_Reporting_Master.xlsm ausfuehren.
@@ -70,8 +71,12 @@ seite = """<!DOCTYPE html>
     <div class="sub">BUE_Reporting_Master.xlsm · Excel mit Makros · __GROESSE__ · Stand __STAND__</div>
     <div class="btns">
       <button class="prim" onclick="speichern('xlsm')">Als .xlsm speichern</button>
+      <button class="sek" onclick="speichern('xlsx')">Als .xlsx speichern</button>
       <button class="sek" onclick="speichern('zip')">Als ZIP speichern</button>
     </div>
+    <div class="hinweis" style="margin-top:4px">„Als .xlsx speichern“ ist derselbe Inhalt unter anderer Endung – für Netze, die .xlsm blocken.
+      Danach die Datei im Explorer von <b>BUE_Reporting_Master.xlsx</b> in <b>BUE_Reporting_Master.xlsm</b> umbenennen
+      (Dateiendungen einblenden: Explorer → Ansicht → „Dateinamenerweiterungen“). Mit der Endung .xlsx öffnet Excel die Datei nicht.</div>
     <div id="status"></div>
     <ol>
       <li>Datei in einen eigenen Ordner legen, z.&nbsp;B. „BÜ-Reporting“ (bei der ZIP: dorthin entpacken).</li>
@@ -92,6 +97,8 @@ __ZIP__
 <script>
 var TYPEN = {
   xlsm: { id: 'daten-xlsm', name: 'BUE_Reporting_Master.xlsm', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12' },
+  xlsx: { id: 'daten-xlsm', name: 'BUE_Reporting_Master.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          nachher: ' – jetzt im Explorer in BUE_Reporting_Master.xlsm umbenennen.' },
   zip:  { id: 'daten-zip',  name: 'BUE_Reporting_Master.zip',  mime: 'application/zip' }
 };
 function speichern(art) {
@@ -108,7 +115,7 @@ function speichern(art) {
       setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
     }
     status.style.color = '#1e7f4f';
-    status.textContent = t.name + ' erzeugt (' + Math.round(n / 1024) + ' KB). Klappt es nicht, den anderen Knopf versuchen.';
+    status.textContent = t.name + ' erzeugt (' + Math.round(n / 1024) + ' KB)' + (t.nachher || '. Klappt es nicht, einen anderen Knopf versuchen.');
   } catch (e) {
     status.style.color = '#bf1528';
     status.textContent = 'Fehler beim Erzeugen: ' + e.message;
