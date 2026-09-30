@@ -19,7 +19,7 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 
 **b) Globale Page-Version** der Homepage (`index.html`, Footer):
 Im `<div class="version-info">` ganz am Ende (Zeile ~1550) steht die Page-Version
-(aktuell **12.08**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
+(aktuell **12.11**). **Bei JEDER Aenderung im Repo MUSS diese hochgezaehlt werden**,
 damit auf der Homepage sofort sichtbar ist, dass es eine neue Version gibt.
 Schema: Major.Minor — bei kleinen Aenderungen Minor +1, bei groesseren Major +1.
 
@@ -49,6 +49,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-reminder-analyse.hta` | `ERGO-Reminder-Analyse-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-hinweis-suche.hta` | `ERGO-Hinweis-Suche-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-jdc-weiterleitung.hta` | `ERGO-JDC-Weiterleitung-v<VER>.zip` | siehe unten (versionierte Inhalte) |
+| `bue-reporting/BUE_Reporting_Master.xlsm` | – (kein ZIP) | direkt verlinkt in `downloads.html` (Eintrag `bue-reporting`); Quelle der xlsm: Repo kiarbeitsplatz, `Bestandsuebertragung/kontextdokumente/reporting/bue_reporting` – neue Fassung einfach ersetzen |
 
 > **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
 > „Quellcode kopieren"-Buttons kopieren den HTA-Code aus einer **Inline-Base64-Kopie**

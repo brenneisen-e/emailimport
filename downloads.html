@@ -429,6 +429,17 @@
                 actionNote: '„Quellcode kopieren“ legt den kompletten HTA-Code in die Zwischenablage – in eine neue Textdatei einfügen und als un-laenderliste-excel.hta speichern (Dateiendung .hta, nicht .txt), dann per Doppelklick starten.',
                 meta: 'Enthält: HTA',
             },
+            {
+                id: 'bue-reporting', group: 'daten', icon: Icon.grid,
+                title: 'BÜ-Reporting (Master-Excel)',
+                tags: ['XLSM', 'VBA', 'Excel'],
+                whatsNew: 'neu',
+                summary: 'Tagesreporting der Makler-Bestandsübertragung: liest die Rückstandsabzüge OPAG und Verbund aus einem Ordner, führt Rückstand, Eingänge, Abgänge und Produktivität fort und zeigt alles im Cockpit.',
+                action: { kind: 'download', href: 'bue-reporting/BUE_Reporting_Master.xlsm', as: 'BUE_Reporting_Master.xlsm' },
+                requires: 'Excel mit aktivierten Makros',
+                details: 'Die Datei in einen eigenen Ordner legen und daneben die Ordner „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste) anlegen, Datei öffnen, Makros aktivieren und „Neue Daten laden“ klicken. Beim Laden werden die Rohdateien einheitlich benannt (JJJJMMTT_Rueckstand_OPAG_HSB4K.xlsx bzw. …_Verbund_…). Das Cockpit filtert nach Sparte, Themenpostkorb und GeVo-Typ, zeigt Tages- oder Wochensicht und Eingänge/Abgänge je Sparte mit Delta; die Bookmark-Chips schalten zwischen Verbund und OPAG um. „PowerPoint-Folie erzeugen“ legt die Kacheln auf eine Folie.',
+                meta: 'Datei: BUE_Reporting_Master.xlsm (Excel mit Makros) · Anleitung im Blatt „Anleitung“',
+            },
         ];
 
         /* ---------- Eingebettete HTA-Quellcodes (Base64, UTF-8) ----------
