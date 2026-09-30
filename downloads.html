@@ -105,7 +105,9 @@
             padding: 9px 15px; border-radius: 999px;
             border: 1px solid var(--line-2); background: #fff; color: var(--ink-2);
             transition: .15s; display: inline-flex; align-items: center; gap: 7px;
+            white-space: nowrap;
         }
+        .pill svg { width: 15px; height: 15px; flex: none; }   /* ohne feste Groesse wachsen die Symbole und brechen den Text um */
         .pill:hover { border-color: var(--accent); color: var(--accent); }
         .pill.active { background: var(--ink); border-color: var(--ink); color: #fff; }
         .pill .count {
@@ -439,7 +441,7 @@
                 actionNote: 'Öffnet eine Seite, in der die Datei eingebettet ist: „Als .xlsm speichern“, „Als .xlsx speichern“ (danach von Hand in .xlsm umbenennen) „Als ZIP speichern“ oder „ZIP mit .xlsx“ erzeugt sie im Browser (umgeht Proxy-Filter, die direkte .xlsm-/.zip-Downloads mit „Keine Berechtigungen“ blocken).',
                 requires: 'Excel mit aktivierten Makros',
                 details: 'Die Datei in einen eigenen Ordner legen und daneben die Ordner „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste) anlegen, Datei öffnen, Makros aktivieren und „Neue Daten laden“ klicken. Beim Laden werden die Rohdateien einheitlich benannt (JJJJMMTT_Rueckstand_OPAG_HSB4K.xlsx bzw. …_Verbund_…). Das Cockpit filtert nach Sparte, Themenpostkorb und GeVo-Typ, zeigt Tages- oder Wochensicht und Eingänge/Abgänge je Sparte mit Delta; die Bookmark-Chips schalten zwischen Verbund und OPAG um. „PowerPoint-Folie erzeugen“ legt die Kacheln auf eine Folie.',
-                meta: 'Datei: BUE_Reporting_Master.xlsm (Excel mit Makros), wahlweise als ZIP mit den Ordnern Rohdaten und Anwesenheit',
+                meta: 'Datei: BUE_Reporting_Master.xlsm (Excel mit Makros), wahlweise als .xlsx oder ZIP',
             },
         ];
 

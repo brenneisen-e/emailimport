@@ -29,9 +29,7 @@ daten = open(QUELLE, 'rb').read()
 def als_zip(name):
     puffer = io.BytesIO()
     with zipfile.ZipFile(puffer, 'w', zipfile.ZIP_DEFLATED) as z:
-        z.writestr(name, daten)
-        for ordner in ('Rohdaten/', 'Anwesenheit/'):
-            z.writestr(zipfile.ZipInfo(ordner), '')
+        z.writestr(name, daten)                                    # nur die Master-Datei (Ordner hat der Anwender)
     return puffer.getvalue()
 
 
@@ -85,11 +83,10 @@ seite = """<!DOCTYPE html>
     <div class="hinweis" style="margin-top:4px">„Als .xlsx speichern“ ist derselbe Inhalt unter anderer Endung – für Netze, die .xlsm blocken.
       Danach die Datei im Explorer von <b>BUE_Reporting_Master.xlsx</b> in <b>BUE_Reporting_Master.xlsm</b> umbenennen
       (Dateiendungen einblenden: Explorer → Ansicht → „Dateinamenerweiterungen“). Mit der Endung .xlsx öffnet Excel die Datei nicht.
-      „ZIP mit .xlsx“ enthält dieselbe .xlsx samt Ordnern Rohdaten und Anwesenheit – nach dem Entpacken ebenso umbenennen.</div>
+      „ZIP mit .xlsx“ enthält dieselbe .xlsx – nach dem Entpacken ebenso umbenennen.</div>
     <div id="status"></div>
     <ol>
-      <li>Datei in einen eigenen Ordner legen, z.&nbsp;B. „BÜ-Reporting“ (bei der ZIP: dorthin entpacken).</li>
-      <li>Daneben die Ordner „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste) anlegen – in der ZIP sind sie schon dabei.</li>
+      <li>Datei in den Ordner legen, in dem „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste) liegen (bei der ZIP: dorthin entpacken).</li>
       <li>Datei öffnen, „Inhalt aktivieren“ klicken, im Cockpit „Neue Daten laden“.</li>
     </ol>
     <div class="hinweis">Die Datei steckt vollständig in dieser Seite und wird beim Klick im Browser erzeugt – es wird keine
