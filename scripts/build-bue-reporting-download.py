@@ -42,7 +42,8 @@ def b64(b):
     return '\n'.join(s[i:i + 120] for i in range(0, len(s), 120))
 
 
-stand = dt.datetime.fromtimestamp(os.path.getmtime(QUELLE)).strftime('%d.%m.%Y')
+from zoneinfo import ZoneInfo
+stand = dt.datetime.fromtimestamp(os.path.getmtime(QUELLE), ZoneInfo('Europe/Berlin')).strftime('%d.%m.%Y, %H:%M Uhr')   # deutsche Zeit
 groesse = ('%.1f MB' % (len(daten) / 1024 / 1024)).replace('.', ',')
 
 seite = """<!DOCTYPE html>
