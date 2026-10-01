@@ -443,6 +443,18 @@
                 details: 'Die Datei in einen eigenen Ordner legen und daneben die Ordner „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste) anlegen, Datei öffnen, Makros aktivieren und „Neue Daten laden“ klicken. Beim Laden werden die Rohdateien einheitlich benannt und nach Monat abgelegt (Rohdaten\\2026\\09_September\\20260916_BUe_OPAG.xlsx bzw. …_BUe_Verbund.xlsx). Das Cockpit filtert nach Sparte, Themenpostkorb und GeVo-Typ, zeigt Tages- oder Wochensicht und Eingänge/Abgänge je Sparte mit Delta; die Bookmark-Chips schalten zwischen Verbund und OPAG um. „PowerPoint-Folie erzeugen“ legt die Kacheln auf eine Folie. Dazu: SLA-Linien im Rückstand, Verhältnis Verbund zu OPAG, Produktivität je Tag oder KW mit tagesgenauer Abwesenheitsliste und das Blatt „Wochenwerte“ zum Nachschlagen per XVERWEIS.',
                 meta: 'Datei: BUE_Reporting_Master.xlsm (Excel mit Makros), wahlweise als .xlsx oder ZIP',
             },
+            {
+                id: 'hr-sales-dashboard', group: 'daten', icon: Icon.grid,
+                title: 'HR Sales Dashboard',
+                tags: ['XLSM', 'VBA', 'Excel', 'PowerPoint'],
+                whatsNew: 'neu',
+                summary: 'Wöchentliches Kennzahlen-Reporting HR Sales: Startassistent führt jede Person zu ihren offenen Werten, Kacheln und Diagramme rechnen sich aus den Rohdaten, PowerPoint-Export auf die ERGO-Vorlage.',
+                action: { kind: 'open', href: 'hr-sales-dashboard-download.html', label: 'Download-Seite öffnen' },
+                actionNote: 'Öffnet eine Seite, in der Datei und Folienvorlage eingebettet sind: .xlsm, .xlsx (danach in .xlsm umbenennen), ZIP mit Ordner „Vorlage“ oder nur die Vorlage – im Browser erzeugt, ohne Datei-Download vom Server.',
+                requires: 'Excel mit aktivierten Makros, PowerPoint für den Export',
+                details: 'ZIP entpacken (Ordner HR_Sales_Dashboard mit der Datei und dem Ordner „Vorlage“), Datei öffnen, Makros aktivieren. „Start · Werte eintragen“ fragt „Wer bist du?“ und fragt die offenen Pflichtwerte zum Berichtstag im Fenster ab (mit Vorwochenwert). Im Blatt Zuständigkeiten (gesperrt, „Zuständigkeiten bearbeiten“ schaltet frei) wird festgelegt, wer welchen Wert liefert; Personen lassen sich hinzufügen und entfernen. „BÜ-Reporting verknüpfen“ holt die BÜ-Werte aus der BUE_Reporting_Master.xlsm. Kommentare je Kachel im Fenster pflegen, „PowerPoint erzeugen“ mit Folienauswahl.',
+                meta: 'Datei: HR_Sales_Dashboard.xlsm (Excel mit Makros) und Vorlage/ERGO_Vorlage.pptx',
+            },
         ];
 
         /* ---------- Eingebettete HTA-Quellcodes (Base64, UTF-8) ----------
