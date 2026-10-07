@@ -9,19 +9,26 @@ speichert sie per Blob (der Netzwerk-Request ist nur die HTML-Seite).
 Drei Knoepfe: als .xlsm, als .xlsx (gleicher Inhalt, danach von Hand in .xlsm umbenennen - fuer Netze,
 die .xlsm nach Endung blocken), als .zip und als .zip mit der .xlsx darin.
 
-Aufruf:   python3 scripts/build-bue-reporting-download.py
-Nach JEDEM Austausch von bue-reporting/BUE_Reporting_Master.xlsm ausfuehren.
+Aufruf:   python3 scripts/build-bue-reporting-download.py            (HS: BUE_Reporting_Master.xlsm)
+          python3 scripts/build-bue-reporting-download.py makler     (Makler: BUE_Reporting_Master_Makler.xlsm)
+Nach JEDEM Austausch der Master-Datei ausfuehren.
 """
 import base64
 import datetime as dt
 import io
 import os
+import sys
 import zipfile
 
 HIER = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-QUELLE = os.path.join(HIER, 'bue-reporting', 'BUE_Reporting_Master.xlsm')
-ZIEL = os.path.join(HIER, 'bue-reporting-download.html')
-NAME = 'BUE_Reporting_Master.xlsm'
+MAKLER = len(sys.argv) > 1 and sys.argv[1].lower() == 'makler'
+NAME = 'BUE_Reporting_Master_Makler.xlsm' if MAKLER else 'BUE_Reporting_Master.xlsm'
+QUELLE = os.path.join(HIER, 'bue-reporting', NAME)
+ZIEL = os.path.join(HIER, 'bue-reporting-makler-download.html' if MAKLER else 'bue-reporting-download.html')
+BASIS = NAME[:-5]                                               # Dateiname ohne .xlsm
+TITEL = 'BÜ-Reporting Makler – Master-Datei' if MAKLER else 'BÜ-Reporting HS – Master-Datei'
+ANDERE = ('<a href="bue-reporting-download.html">Zur Fassung HS (HSB4 K)</a>' if MAKLER
+          else '<a href="bue-reporting-makler-download.html">Zur Fassung Makler (ODPB, ODPP, KBI …)</a>')
 
 daten = open(QUELLE, 'rb').read()
 
@@ -52,7 +59,7 @@ seite = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>BÜ-Reporting – Master-Datei herunterladen</title>
+<title>__TITEL__ herunterladen</title>
 <style>
   body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: #f5f6f8; color: #1a1a1a; }
   .wrap { max-width: 760px; margin: 48px auto; padding: 0 16px; }
@@ -71,10 +78,10 @@ seite = """<!DOCTYPE html>
 </head>
 <body>
 <div class="wrap">
-  <p><a href="downloads.html">← Zur Tool-Bibliothek</a></p>
+  <p><a href="downloads.html">← Zur Tool-Bibliothek</a> · __ANDERE__</p>
   <div class="card">
-    <h1>BÜ-Reporting – Master-Datei</h1>
-    <div class="sub">BUE_Reporting_Master.xlsm · Excel mit Makros · __GROESSE__ · Stand __STAND__</div>
+    <h1>__TITEL__</h1>
+    <div class="sub">__BASIS__.xlsm · Excel mit Makros · __GROESSE__ · Stand __STAND__</div>
     <div class="btns">
       <button class="prim" onclick="speichern('xlsm')">Als .xlsm speichern</button>
       <button class="sek" onclick="speichern('xlsx')">Als .xlsx speichern</button>
@@ -82,7 +89,7 @@ seite = """<!DOCTYPE html>
       <button class="sek" onclick="speichern('zipx')">ZIP mit .xlsx</button>
     </div>
     <div class="hinweis" style="margin-top:4px">„Als .xlsx speichern“ ist derselbe Inhalt unter anderer Endung – für Netze, die .xlsm blocken.
-      Danach die Datei im Explorer von <b>BUE_Reporting_Master.xlsx</b> in <b>BUE_Reporting_Master.xlsm</b> umbenennen
+      Danach die Datei im Explorer von <b>__BASIS__.xlsx</b> in <b>__BASIS__.xlsm</b> umbenennen
       (Dateiendungen einblenden: Explorer → Ansicht → „Dateinamenerweiterungen“). Mit der Endung .xlsx öffnet Excel die Datei nicht.
       „ZIP mit .xlsx“ enthält dieselbe .xlsx – nach dem Entpacken ebenso umbenennen.</div>
     <div id="status"></div>
@@ -106,12 +113,12 @@ __ZIPX__
 </script>
 <script>
 var TYPEN = {
-  xlsm: { id: 'daten-xlsm', name: 'BUE_Reporting_Master.xlsm', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12' },
-  xlsx: { id: 'daten-xlsm', name: 'BUE_Reporting_Master.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          nachher: ' – jetzt im Explorer in BUE_Reporting_Master.xlsm umbenennen.' },
-  zip:  { id: 'daten-zip',  name: 'BUE_Reporting_Master.zip',  mime: 'application/zip' },
-  zipx: { id: 'daten-zipx', name: 'BUE_Reporting_Master_xlsx.zip', mime: 'application/zip',
-          nachher: ' – entpacken und BUE_Reporting_Master.xlsx in BUE_Reporting_Master.xlsm umbenennen.' }
+  xlsm: { id: 'daten-xlsm', name: '__BASIS__.xlsm', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12' },
+  xlsx: { id: 'daten-xlsm', name: '__BASIS__.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          nachher: ' – jetzt im Explorer in __BASIS__.xlsm umbenennen.' },
+  zip:  { id: 'daten-zip',  name: '__BASIS__.zip',  mime: 'application/zip' },
+  zipx: { id: 'daten-zipx', name: '__BASIS___xlsx.zip', mime: 'application/zip',
+          nachher: ' – entpacken und __BASIS__.xlsx in __BASIS__.xlsm umbenennen.' }
 };
 function speichern(art) {
   var t = TYPEN[art], status = document.getElementById('status');
@@ -137,7 +144,7 @@ function speichern(art) {
 </body>
 </html>
 """
-seite = (seite.replace('__GROESSE__', groesse).replace('__STAND__', stand)
+seite = (seite.replace('__TITEL__', TITEL).replace('__ANDERE__', ANDERE).replace('__BASIS__', BASIS).replace('__GROESSE__', groesse).replace('__STAND__', stand)
          .replace('__XLSM__', b64(daten)).replace('__ZIPX__', b64(zip_xlsx_daten)).replace('__ZIP__', b64(zip_daten)))
 open(ZIEL, 'w', encoding='utf-8').write(seite)
 print('geschrieben:', ZIEL, '%.1f MB' % (len(seite) / 1024 / 1024))

@@ -433,7 +433,7 @@
             },
             {
                 id: 'bue-reporting', group: 'daten', icon: Icon.grid,
-                title: 'BÜ-Reporting (Master-Excel)',
+                title: 'BÜ-Reporting HS (Master-Excel)',
                 tags: ['XLSM', 'VBA', 'Excel'],
                 whatsNew: 'neu',
                 summary: 'Tagesreporting der Makler-Bestandsübertragung: liest die Rückstandsabzüge OPAG und Verbund aus einem Ordner, führt Rückstand, Eingänge, Abgänge und Produktivität fort und zeigt alles im Cockpit.',
@@ -442,6 +442,18 @@
                 requires: 'Excel mit aktivierten Makros',
                 details: 'Die Datei in einen eigenen Ordner legen und daneben die Ordner „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste) anlegen, Datei öffnen, Makros aktivieren und „Neue Daten laden“ klicken. Beim Laden werden die Rohdateien einheitlich benannt und nach Monat abgelegt (Rohdaten\\2026\\09_September\\20260916_BUe_OPAG.xlsx bzw. …_BUe_Verbund.xlsx). Das Cockpit filtert nach Sparte, Themenpostkorb und GeVo-Typ, zeigt Tages- oder Wochensicht und Eingänge/Abgänge je Sparte mit Delta; die Bookmark-Chips schalten zwischen Verbund und OPAG um. „PowerPoint-Folie erzeugen“ legt die Kacheln auf eine Folie. Dazu: SLA-Linien im Rückstand, Verhältnis Verbund zu OPAG, Produktivität je Tag oder KW mit tagesgenauer Abwesenheitsliste und das Blatt „Wochenwerte“ zum Nachschlagen per XVERWEIS. Jede geladene Rohdatei geht automatisch als Kopie an Celonis, auch beim ersten Laden (H:\\Process-Mining-Sync\\Upload, einstellbar in der Konfiguration).',
                 meta: 'Datei: BUE_Reporting_Master.xlsm (Excel mit Makros), wahlweise als .xlsx oder ZIP',
+            },
+            {
+                id: 'bue-reporting-makler', group: 'daten', icon: Icon.grid,
+                title: 'BÜ-Reporting Makler (Master-Excel)',
+                tags: ['XLSM', 'VBA', 'Excel'],
+                whatsNew: 'neu',
+                summary: 'Dasselbe Tagesreporting für den Bereich Makler: mehrere Einheiten (ODPB, ODPP, KBI …) liefern je Tag eigene Abzüge, das Cockpit zeigt sie zusammen und wechselt auf Knopfdruck auf eine Einheit.',
+                action: { kind: 'open', href: 'bue-reporting-makler-download.html', label: 'Download-Seite öffnen' },
+                actionNote: 'Öffnet eine Seite, in der die Datei eingebettet ist: „Als .xlsm speichern“, „Als .xlsx speichern“ (danach von Hand in .xlsm umbenennen), „Als ZIP speichern“ oder „ZIP mit .xlsx“.',
+                requires: 'Excel mit aktivierten Makros',
+                details: 'Wie die HS-Fassung, aber ohne HS-Bezüge (keine HS-Themenpostkörbe, kein Wochenreport für das HS-Dashboard, keine SLA-Vorgabe). Mehrere Abzüge am selben Tag werden je Einheit geladen und verglichen (Einheit aus der Kopfzeile oe_nr); angezeigt wird die Summe („Einheit: Gesamt“), der Knopf „Einheit“ wechselt auf eine einzelne Einheit. Im Cockpit: „SLA anpassen …“, „Rohdaten löschen …“ (Dateien auswählen und löschen, auf Wunsch mit Neuaufbau) und „Zurücksetzen …“ (Tool leeren).',
+                meta: 'Datei: BUE_Reporting_Master_Makler.xlsm (Excel mit Makros), wahlweise als .xlsx oder ZIP',
             },
             {
                 id: 'hr-sales-dashboard', group: 'daten', icon: Icon.grid,
