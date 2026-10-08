@@ -690,7 +690,8 @@ function toList(v) {
         return out;
     } catch (e) {}
     /* 2) Typisiertes Array (VT_ARRAY|VT_BSTR, so liefert Outlook die Werte von
-          "Betreff enthaelt", "Absenderadresse enthaelt" usw.) ueber VBScript.
+          "Betreff enthaelt", "Absenderadresse enthaelt" usw.) ueber VBScript,
+          falls die HTA VBScript ausfuehrt (im IE11-Modus nicht – dann Schritt 3).
           Bis v1.1 brach das Lesen hier mit "Zeichenfolge erwartet" ab. */
     try {
         var j = VbsListe(v);
@@ -707,7 +708,24 @@ function toList(v) {
             return out;
         }
     } catch (e2) {}
-    /* 3) JavaScript-Array */
+    /* 3) Ueber Excel: WorksheetFunction.Transpose wandelt jedes 1D-Array in ein
+          Variant-Array, das VBArray lesen kann. Noetig, weil die HTA im IE11-Modus
+          laeuft und VBScript dort nicht ausgefuehrt wird. Excel braucht das Tool
+          ohnehin; die Hilfsinstanz wird in finishRead wieder beendet. */
+    try {
+        var xl = xlHilfe();
+        if (xl) {
+            var tr = xl.WorksheetFunction.Transpose(v);
+            var flach = null;
+            try { flach = new VBArray(tr).toArray(); } catch (eT) { flach = [tr]; }
+            for (i = 0; i < flach.length; i++) {
+                s = safeStr(flach[i]);
+                if (s !== '') out.push(s);
+            }
+            if (out.length > 0) return out;
+        }
+    } catch (e4) {}
+    /* 4) JavaScript-Array */
     try {
         if (typeof v === 'object' && typeof v.length === 'number') {
             for (i = 0; i < v.length; i++) {
@@ -717,10 +735,30 @@ function toList(v) {
             return out;
         }
     } catch (e3) {}
-    /* 4) Einzelwert */
+    /* 5) Einzelwert */
     s = safeStr(v);
     if (s !== '') out.push(s);
     return out;
+}
+
+/* Unsichtbare Excel-Hilfsinstanz fuer toList (einmal je Lauf, wird in finishRead beendet). */
+var XL_HILFE = null, XL_HILFE_FEHLT = false;
+function xlHilfe() {
+    if (XL_HILFE) return XL_HILFE;
+    if (XL_HILFE_FEHLT) return null;
+    try {
+        XL_HILFE = new ActiveXObject("Excel.Application");
+        try { XL_HILFE.Visible = false; XL_HILFE.DisplayAlerts = false; } catch (e1) {}
+    } catch (e) {
+        XL_HILFE = null;
+        XL_HILFE_FEHLT = true;
+    }
+    return XL_HILFE;
+}
+function xlHilfeBeenden() {
+    if (!XL_HILFE) return;
+    try { XL_HILFE.Quit(); } catch (e) {}
+    XL_HILFE = null;
 }
 
 /* Wert als Text, ohne Ausnahme: nicht wandelbare COM-Werte ergeben einen Hinweis. */
@@ -1153,6 +1191,7 @@ function readTick() {
         hideProgress();
         document.getElementById('btnStart').disabled = false;
         readState = null;
+        xlHilfeBeenden();
         showError("Fehler beim Auslesen der Regeln: " + esc(e.message));
     }
 }
@@ -1387,6 +1426,7 @@ function fmtNow() {
 function finishRead() {
     var st = readState;
     readState = null;
+    xlHilfeBeenden();
 
     setProgress(100, "Regeln gelesen &ndash; Excel wird erstellt &hellip;");
     log('Insgesamt ' + st.rows.length + ' Regel(n) übernommen. Excel-Mappe wird aufgebaut …', 'head');
