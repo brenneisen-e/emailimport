@@ -11,6 +11,7 @@ die .xlsm nach Endung blocken), als .zip und als .zip mit der .xlsx darin.
 
 Aufruf:   python3 scripts/build-bue-reporting-download.py            (HS: BUE_Reporting_Master.xlsm)
           python3 scripts/build-bue-reporting-download.py makler     (Makler: BUE_Reporting_Master_Makler.xlsm)
+          python3 scripts/build-bue-reporting-download.py pruefbot   (Prüfbot-Testing: pruefbot-testing/Pruefbot_Testing.xlsm)
 Nach JEDEM Austausch der Master-Datei ausfuehren.
 """
 import base64
@@ -21,14 +22,28 @@ import sys
 import zipfile
 
 HIER = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAKLER = len(sys.argv) > 1 and sys.argv[1].lower() == 'makler'
-NAME = 'BUE_Reporting_Master_Makler.xlsm' if MAKLER else 'BUE_Reporting_Master.xlsm'
-QUELLE = os.path.join(HIER, 'bue-reporting', NAME)
-ZIEL = os.path.join(HIER, 'bue-reporting-makler-download.html' if MAKLER else 'bue-reporting-download.html')
+MODUS = sys.argv[1].lower() if len(sys.argv) > 1 else ''
+MAKLER = MODUS == 'makler'
+SCHRITTE = ('<li>Datei in den Ordner legen, in dem „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste oder '
+            'Telefonie- und Abwesenheitsplan) liegen (bei der ZIP: dorthin entpacken).</li>\n'
+            '      <li>Datei öffnen, „Inhalt aktivieren“ klicken, im Cockpit „Neue Daten laden“.</li>')
+if MODUS == 'pruefbot':
+    NAME = 'Pruefbot_Testing.xlsm'
+    QUELLE = os.path.join(HIER, 'pruefbot-testing', NAME)
+    ZIEL = os.path.join(HIER, 'pruefbot-testing-download.html')
+    TITEL = 'Prüfbot-Testing – Arbeitsmappe'
+    ANDERE = '<a href="hr-sales-dashboard-download.html">HR Sales Dashboard</a>'
+    SCHRITTE = ('<li>Datei speichern (bei der ZIP: entpacken), öffnen, „Inhalt aktivieren“ klicken.</li>\n'
+                '      <li>Im Blatt „Testmail-Generator“ Startpostkorb und Testpostfächer P-01 bis P-04 eintragen, dann „Testmail erstellen“: '
+                'die Mail entsteht als EML mit ausgefüllter, unterschriebener Vollmacht als PDF-Anhang im Ordner „Pruefbot_Testmails“.</li>')
+else:
+    NAME = 'BUE_Reporting_Master_Makler.xlsm' if MAKLER else 'BUE_Reporting_Master.xlsm'
+    QUELLE = os.path.join(HIER, 'bue-reporting', NAME)
+    ZIEL = os.path.join(HIER, 'bue-reporting-makler-download.html' if MAKLER else 'bue-reporting-download.html')
+    TITEL = 'BÜ-Reporting Makler – Master-Datei' if MAKLER else 'BÜ-Reporting HS – Master-Datei'
+    ANDERE = ('<a href="bue-reporting-download.html">Zur Fassung HS (HSB4 K)</a>' if MAKLER
+              else '<a href="bue-reporting-makler-download.html">Zur Fassung Makler (ODPB, ODPP, KBI …)</a>')
 BASIS = NAME[:-5]                                               # Dateiname ohne .xlsm
-TITEL = 'BÜ-Reporting Makler – Master-Datei' if MAKLER else 'BÜ-Reporting HS – Master-Datei'
-ANDERE = ('<a href="bue-reporting-download.html">Zur Fassung HS (HSB4 K)</a>' if MAKLER
-          else '<a href="bue-reporting-makler-download.html">Zur Fassung Makler (ODPB, ODPP, KBI …)</a>')
 
 daten = open(QUELLE, 'rb').read()
 
@@ -94,12 +109,11 @@ seite = """<!DOCTYPE html>
       „ZIP mit .xlsx“ enthält dieselbe .xlsx – nach dem Entpacken ebenso umbenennen.</div>
     <div id="status"></div>
     <ol>
-      <li>Datei in den Ordner legen, in dem „Rohdaten“ (MIS-O-Abzüge OPAG und Verbund) und „Anwesenheit“ (MAK-Liste) liegen (bei der ZIP: dorthin entpacken).</li>
-      <li>Datei öffnen, „Inhalt aktivieren“ klicken, im Cockpit „Neue Daten laden“.</li>
+      __SCHRITTE__
     </ol>
     <div class="hinweis">Die Datei steckt vollständig in dieser Seite und wird beim Klick im Browser erzeugt – es wird keine
       Datei vom Server geladen. Zeigt Excel beim Öffnen „Makros wurden blockiert“: Datei rechts anklicken → Eigenschaften →
-      „Zulassen“ ankreuzen → OK, dann erneut öffnen. Ausführliche Anleitung im Blatt „Anleitung“ der Datei.</div>
+      „Zulassen“ ankreuzen → OK, dann erneut öffnen. __ANLEITUNG__</div>
   </div>
 </div>
 <script type="text/plain" id="daten-xlsm">
@@ -144,7 +158,7 @@ function speichern(art) {
 </body>
 </html>
 """
-seite = (seite.replace('__TITEL__', TITEL).replace('__ANDERE__', ANDERE).replace('__BASIS__', BASIS).replace('__GROESSE__', groesse).replace('__STAND__', stand)
+seite = (seite.replace('__ANLEITUNG__', 'Bedienung und Ablauf stehen auf der Startseite der Datei.' if MODUS == 'pruefbot' else 'Ausführliche Anleitung im Blatt „Anleitung“ der Datei.').replace('__SCHRITTE__', SCHRITTE).replace('__TITEL__', TITEL).replace('__ANDERE__', ANDERE).replace('__BASIS__', BASIS).replace('__GROESSE__', groesse).replace('__STAND__', stand)
          .replace('__XLSM__', b64(daten)).replace('__ZIPX__', b64(zip_xlsx_daten)).replace('__ZIP__', b64(zip_daten)))
 open(ZIEL, 'w', encoding='utf-8').write(seite)
 print('geschrieben:', ZIEL, '%.1f MB' % (len(seite) / 1024 / 1024))

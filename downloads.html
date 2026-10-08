@@ -448,11 +448,11 @@
                 title: 'BÜ-Reporting Makler (Master-Excel)',
                 tags: ['XLSM', 'VBA', 'Excel'],
                 whatsNew: 'neu',
-                summary: 'Dasselbe Tagesreporting für den Bereich Makler: mehrere Einheiten (ODPB, ODPP, KBI …) liefern je Tag eigene Abzüge, das Cockpit zeigt sie zusammen und wechselt auf Knopfdruck auf eine Einheit.',
+                summary: 'Dasselbe Tagesreporting für den Bereich Makler: mehrere Einheiten (ODPB, ODPP, KBI …) liefern je Tag eigene Abzüge, das Cockpit zeigt sie zusammen; die Anwesenheit kommt bei jedem Laden aus dem Telefonie- und Abwesenheitsplan.',
                 action: { kind: 'open', href: 'bue-reporting-makler-download.html', label: 'Download-Seite öffnen' },
                 actionNote: 'Öffnet eine Seite, in der die Datei eingebettet ist: „Als .xlsm speichern“, „Als .xlsx speichern“ (danach von Hand in .xlsm umbenennen), „Als ZIP speichern“ oder „ZIP mit .xlsx“.',
                 requires: 'Excel mit aktivierten Makros',
-                details: 'Wie die HS-Fassung, aber ohne HS-Bezüge (keine HS-Themenpostkörbe, kein Wochenreport für das HS-Dashboard, keine SLA-Vorgabe). Mehrere Abzüge am selben Tag werden je Einheit geladen und verglichen (Einheit aus der Kopfzeile oe_nr); angezeigt wird die Summe („Einheit: Gesamt“), der Knopf „Einheit“ wechselt auf eine einzelne Einheit. Im Cockpit: „SLA anpassen …“, „Rohdaten löschen …“ (Dateien auswählen und löschen, auf Wunsch mit Neuaufbau) und „Zurücksetzen …“ (Tool leeren).',
+                details: 'Wie die HS-Fassung, aber ohne HS-Bezüge (keine HS-Themenpostkörbe, kein Wochenreport für das HS-Dashboard, keine SLA-Vorgabe). Mehrere Abzüge am selben Tag werden je Einheit geladen und verglichen (Einheit aus der Kopfzeile oe_nr); angezeigt wird die Summe, die Chips „Sparte | Einheit“ stapeln die Rückstandsdiagramme nach Einheit. Liegt im Ordner „Anwesenheit“ der Telefonie- und Abwesenheitsplan, übernimmt jedes „Neue Daten laden“ ihn neu; der Tagesablauf zeigt, wer heute laut Plan fehlt. Im Cockpit: „SLA anpassen …“, „Rohdaten löschen …“ (Dateien auswählen und löschen, auf Wunsch mit Neuaufbau) und „Zurücksetzen …“ (Tool leeren).',
                 meta: 'Datei: BUE_Reporting_Master_Makler.xlsm (Excel mit Makros), wahlweise als .xlsx oder ZIP',
             },
             {
@@ -466,6 +466,18 @@
                 requires: 'Excel mit aktivierten Makros, PowerPoint für den Export',
                 details: 'ZIP entpacken (Ordner HR_Sales_Dashboard mit der Datei und dem Ordner „Vorlage“), Datei öffnen, Makros aktivieren. „Start · Werte eintragen“ fragt „Wer bist du?“ und fragt die offenen Pflichtwerte zum Berichtstag im Fenster ab (mit Vorwochenwert). Im Blatt Zuständigkeiten (gesperrt, „Zuständigkeiten bearbeiten“ schaltet frei) wird festgelegt, wer welchen Wert liefert; Personen lassen sich hinzufügen und entfernen. „BÜ-Reporting verknüpfen“ holt die BÜ-Werte aus der BUE_Reporting_Master.xlsm. Kommentare je Kachel im Fenster pflegen, „PowerPoint erzeugen“ mit Folienauswahl.',
                 meta: 'Datei: HR_Sales_Dashboard.xlsm (Excel mit Makros) und Vorlage/ERGO_Vorlage.pptx',
+            },
+            {
+                id: 'pruefbot-testing', group: 'daten', icon: Icon.grid,
+                title: 'Prüfbot-Testing',
+                tags: ['XLSM', 'VBA', 'Excel', 'EML', 'PDF'],
+                whatsNew: 'neu',
+                summary: 'Testvorbereitung für den BÜ-Prüfbot: Fortschritt je Prozessschritt (Stammdaten, Vertragsmapping, Mailerstellung, Testfall-Tracking) und ein Testmail-Generator, der je Auftrag die Mail samt ausgefüllter, unterschriebener Vollmacht erzeugt.',
+                action: { kind: 'open', href: 'pruefbot-testing-download.html', label: 'Download-Seite öffnen' },
+                actionNote: 'Öffnet eine Seite, in der die Datei eingebettet ist: „Als .xlsm speichern“, „Als .xlsx speichern“ (danach von Hand in .xlsm umbenennen), „Als ZIP speichern“ oder „ZIP mit .xlsx“.',
+                requires: 'Excel mit aktivierten Makros, Outlook zum Öffnen der Testmails',
+                details: 'Alle Daten der bisherigen Test-Excel sind erhalten. „Testmail erstellen“: Auftrag wählen, fehlende Angaben zeigt eine Karte mit Sprung zur Zelle (oder „trotzdem erstellen“, dann mit Platzhaltern). Ergebnis ist eine EML (öffnet in Outlook als Entwurf mit Senden-Knopf) mit Mailtext und Vollmacht als PDF-Anhang, abgelegt im Ordner „Pruefbot_Testmails“. Vorher im Blatt „Testmail-Generator“ Startpostkorb und Testpostfächer P-01 bis P-04 eintragen.',
+                meta: 'Datei: Pruefbot_Testing.xlsm (Excel mit Makros)',
             },
         ];
 
