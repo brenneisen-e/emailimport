@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Outlook-Regeln visualisieren v1.0 &ndash; Quellcode</title>
+<title>Outlook-Regeln visualisieren v1.1 &ndash; Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -106,7 +106,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <div class="container">
 <div class="card">
 <a class="back" href="index.html">&larr; Zur Startseite</a>
-<h1 style="margin-top:8px;">Outlook-Regeln visualisieren <strong>v1.0</strong> &ndash; Quellcode</h1>
+<h1 style="margin-top:8px;">Outlook-Regeln visualisieren <strong>v1.1</strong> &ndash; Quellcode</h1>
 <p class="subtitle">Regeln ausgew&auml;hlter (Gruppen-)Postf&auml;cher auslesen und die Logik als Excel-Mappe darstellen &middot; kein Download-ZIP n&ouml;tig</p>
 
 <div class="info">
@@ -127,7 +127,7 @@ fertig. Nichts wird nachgeladen, die .hta l&auml;uft danach komplett offline auf
 Arbeitsplatz (Outlook + Excel per COM).
 </div>
 
-<div class="meta">HTA-Version: <strong>v1.0</strong> &middot; Dateigr&ouml;&szlig;e: <strong id="meta-size">&hellip;</strong> &middot; Zeilen: <strong id="meta-lines">&hellip;</strong></div>
+<div class="meta">HTA-Version: <strong>v1.1</strong> &middot; Dateigr&ouml;&szlig;e: <strong id="meta-size">&hellip;</strong> &middot; Zeilen: <strong id="meta-lines">&hellip;</strong></div>
 
 <div class="actions">
 <button class="btn-copy" id="btnCopy" onclick="copyCode()">
@@ -163,7 +163,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.0"
+        VERSION="1.1"
         WINDOWSTATE="normal"
     />
     &lt;style>
@@ -183,7 +183,7 @@ Alles markieren
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
         }
         .header { text-align: center; margin-bottom: 1.25rem; }
-        .logo { font-size: 42px; margin-bottom: 0.25rem; }
+        .logo { width: 40px; height: 40px; margin: 0 auto 6px; display: block; }
         h2 { color: #f1f5f9; margin-bottom: 0.25rem; }
         .subtitle { color: #94a3b8; font-size: 13px; }
         .ver { color: #64748b; font-size: 11px; margin-top: 4px; }
@@ -282,10 +282,14 @@ Alles markieren
     &lt;div class="container">
         &lt;div class="card">
             &lt;div class="header">
-                &lt;div class="logo">&amp;#128203;&lt;/div>
+                &lt;svg class="logo" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    &lt;rect x="8" y="2" width="8" height="4" rx="1"/>
+                    &lt;path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                    &lt;path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/>
+                &lt;/svg>
                 &lt;h2>Outlook-Regeln visualisieren&lt;/h2>
                 &lt;div class="subtitle">Alle Regeln ausgew&amp;auml;hlter (Gruppen-)Postf&amp;auml;cher auslesen und die Logik als Excel-Mappe darstellen&lt;/div>
-                &lt;div class="ver">v1.0&lt;/div>
+                &lt;div class="ver">v1.1&lt;/div>
             &lt;/div>
 
             &lt;!-- Postfaecher -->
@@ -330,6 +334,14 @@ Alles markieren
                     &lt;input type="checkbox" id="chkChecks" checked>
                     Blatt &amp;bdquo;Pr&amp;uuml;fhinweise&amp;ldquo; erzeugen (Konflikte, toter Code, Datenabfluss)
                 &lt;/label>
+                &lt;div class="hint">
+                    &lt;b>Neu in v1.1:&lt;/b> Regeln, die in Outlook im Web angelegt wurden (z.&amp;nbsp;B. mit der Bedingung
+                    &amp;bdquo;Nachrichtentyp: automatische Antwort&amp;ldquo;), kann Outlook oft nicht lesen. Solche Regeln erscheinen
+                    jetzt als &amp;bdquo;keine Bedingung sichtbar&amp;ldquo; bzw. &amp;bdquo;Bedingung nicht lesbar&amp;ldquo; statt als
+                    &amp;bdquo;jede eingehende Mail&amp;ldquo;; ist nur ein Teil lesbar, steht in der Spalte &amp;bdquo;Bedingung lesbar&amp;ldquo;
+                    &amp;bdquo;teilweise&amp;ldquo;. Das Blatt &amp;bdquo;Diagnose&amp;ldquo; zeigt je Regel, was Outlook liefert;
+                    die echte Bedingung steht in Outlook im Web unter Einstellungen &amp;rsaquo; E-Mail &amp;rsaquo; Regeln.
+                &lt;/div>
             &lt;/div>
 
             &lt;button class="btn btn-primary" id="btnStart" onclick="startRead()" disabled>Regeln auslesen &amp;amp; Excel erstellen&lt;/button>
@@ -354,12 +366,24 @@ Alles markieren
       werden als Mehrfachauswahl angeboten (Gruppenpostfaecher inklusive).
    2) Fuer jedes angekreuzte Postfach wird Store.GetRules() gelesen und
       jede Regel in Bedingungen / Ausnahmen / Aktionen zerlegt.
-   3) Excel-Mappe mit 5 Blaettern:
+   3) Excel-Mappe mit 6 Blaettern:
         Uebersicht     - eine Zeile pro Regel + Logik in Kurzform
         Regel-Logik    - WENN / UND / AUSSER WENN / DANN je Regel, farbig
         Elemente       - flache Liste aller Bedingungen/Ausnahmen/Aktionen
         Zielordner     - wohin die Regeln Mails schreiben (Mengengeruest)
         Pruefhinweise  - Konflikte, tote Regeln, Datenabfluss, Doppelungen
+        Diagnose       - was das Outlook-Objektmodell je Regel liefert
+
+   v1.1: Bedingungen/Ausnahmen haben je Regel einen von drei Zustaenden
+        a = Bedingung(en) gelesen
+        b = keine Bedingung sichtbar (Objektmodell liefert keine aktive
+            Bedingung, kein Fehler) - typisch fuer Regeln aus Outlook im
+            Web, deren Bedingung Outlook nicht abbilden kann
+        c = Bedingung nicht lesbar (Fehler beim Zugriff)
+        b und c werden nicht mehr als "jede eingehende Mail" dargestellt.
+        "teilweise" = a, aber ein weiterer Eintrag war nicht lesbar oder
+        Outlook meldet eine Bedingung unbekannten Typs (OlRuleConditionType 0).
+        Ausnahmen und Aktionen werden genauso gelesen (readRuleBlock).
 
    JScript + ActiveXObject wie in ergo-mail-statistik.hta. Das Auslesen
    laeuft in kleinen Bloecken pro setTimeout-Tick, damit die HTA nicht
@@ -434,6 +458,92 @@ var ACTION_DEFS = [
 
 var IMPORTANCE_TEXT  = ['Niedrig', 'Normal', 'Hoch'];
 var SENSITIVITY_TEXT = ['Normal', 'Persönlich', 'Privat', 'Vertraulich'];
+
+/* ---------------- Typ-Tabellen (Microsoft Learn) ----------------
+   OlRuleConditionType bzw. OlRuleActionType -> deutsches Label. Genutzt fuer
+   Eintraege, die nur ueber den Index (Item(k)) gefunden werden, und fuer das
+   Blatt "Diagnose". Labels der benannten Eigenschaften (COND_DEFS /
+   ACTION_DEFS) sind hier gleich lautend uebernommen. */
+var COND_TYPE_LABELS = {
+    0:  'Unbekannte Bedingung (für Outlook nicht lesbar)',
+    1:  'Absender ist',
+    2:  'Betreff enthält',
+    3:  'Über Konto empfangen',
+    4:  'Nur an mich adressiert',
+    5:  'Direkt an mich adressiert',
+    6:  'Priorität ist',
+    7:  'Vertraulichkeit ist',
+    8:  'Zur Nachverfolgung gekennzeichnet',
+    9:  'Ich stehe in Cc',
+    10: 'Ich stehe in An oder Cc',
+    11: 'NICHT gesendet an',
+    12: 'Gesendet an',
+    13: 'Mailtext enthält',
+    14: 'Betreff oder Mailtext enthält',
+    15: 'Nachrichtenkopf enthält',
+    16: 'Empfängeradresse enthält',
+    17: 'Absenderadresse enthält',
+    18: 'Kategorie zugewiesen',
+    19: 'Ist eine Abwesenheitsnotiz (automatische Antwort)',
+    20: 'Hat Anhang',
+    21: 'Größe im Bereich (Werte nicht lesbar)',
+    22: 'Empfangen im Zeitraum (Werte nicht lesbar)',
+    23: 'Formular / Nachrichtenklasse',
+    24: 'Eigenschaft hat bestimmten Wert (Werte nicht lesbar)',
+    25: 'Absender steht in Adressbuch',
+    26: 'Ist Besprechungsanfrage / -aktualisierung',
+    27: 'Nur auf diesem Computer',
+    28: 'Nur auf einem anderen Computer',
+    29: 'Irgendeine Kategorie zugewiesen',
+    30: 'Aus RSS-Feed',
+    31: 'Aus irgendeinem RSS-Feed'
+};
+
+/* Bedingungstypen, deren Werte Outlook nicht herausgibt. Zwei solche
+   Bedingungen sehen gleich aus, koennen aber Verschiedenes pruefen - sie
+   zaehlen deshalb nie als "gleiche Bedingung" (Doppelungen, toter Code). */
+var COND_TYPES_OPAQUE = { 0: true, 8: true, 21: true, 22: true, 24: true };
+
+var ACTION_TYPE_LABELS = {
+    0:  'Unbekannte Aktion (für Outlook nicht lesbar)',
+    1:  'In Ordner verschieben',
+    2:  'Kategorie zuweisen',
+    3:  'Löschen (Gelöschte Elemente)',
+    4:  'Endgültig löschen',
+    5:  'In Ordner kopieren',
+    6:  'Weiterleiten an',
+    7:  'Als Anhang weiterleiten an',
+    8:  'Umleiten an',
+    9:  'Vom Server mit bestimmter Nachricht antworten',
+    10: 'Mit Vorlage antworten',
+    11: 'Zur Nachverfolgung in Tagen kennzeichnen',
+    12: 'Mit farbiger Kennzeichnung markieren',
+    13: 'Kennzeichnung entfernen',
+    14: 'Priorität setzen',
+    15: 'Vertraulichkeit setzen',
+    16: 'Drucken',
+    17: 'Sound abspielen',
+    18: 'Anwendung starten',
+    19: 'Als gelesen markieren',
+    20: 'Skript ausführen',
+    21: 'Keine weiteren Regeln anwenden',
+    22: 'Benutzerdefinierte Aktion',
+    23: 'Hinweisfenster anzeigen',
+    24: 'Desktopbenachrichtigung anzeigen',
+    25: 'Lesebestätigung anfordern',
+    26: 'Übermittlungsbestätigung anfordern',
+    27: 'Kopie senden an (Cc)',
+    28: 'Übermittlung verzögern',
+    30: 'Kategorien entfernen',
+    41: 'Zur Nachverfolgung markieren'
+};
+
+/* Zustaende der Bedingungen einer Regel (v1.1) */
+var COND_READ    = 'a';       // Bedingung(en) gelesen
+var COND_NONE    = 'b';       // keine Bedingung sichtbar (kein Fehler)
+var COND_ERROR   = 'c';       // Bedingung nicht lesbar (Fehler beim Zugriff)
+
+var OWA_HINT = 'in Outlook im Web unter Einstellungen › E-Mail › Regeln nachsehen';
 
 /* ---------------- Init ---------------- */
 window.onload = function () {
@@ -799,49 +909,214 @@ function itemType(obj) {
     return '?';
 }
 
+/* Deutsches Label zu einer Typ-Kennung ('C19' / 'A20'), '' wenn unbekannt. */
+function typeLabel(key) {
+    var s = String(key);
+    var n = parseInt(s.substring(1), 10);
+    if (isNaN(n)) return '';
+    var tbl = null;
+    if (s.charAt(0) === 'C') tbl = COND_TYPE_LABELS;
+    else if (s.charAt(0) === 'A') tbl = ACTION_TYPE_LABELS;
+    if (!tbl || !tbl.hasOwnProperty(n)) return '';
+    return tbl[n];
+}
+
+/* Kennung + Label fuer das Blatt "Diagnose", z. B. "C19 Ist eine Abwesenheitsnotiz ..." */
+function typeWithLabel(key) {
+    var l = typeLabel(key);
+    return l !== '' ? (key + ' ' + l) : String(key);
+}
+
+/* Werte der Bedingung fuer Outlook nicht lesbar? (nur Index-Nachlese) */
+function isOpaqueType(key) {
+    var s = String(key);
+    if (s.charAt(0) !== 'C') return true;          // Typ unbekannt: nicht vergleichbar
+    var n = parseInt(s.substring(1), 10);
+    if (isNaN(n) || !COND_TYPE_LABELS.hasOwnProperty(n)) return true;
+    return COND_TYPES_OPAQUE[n] === true;
+}
+
+/* Fehlermeldung eines COM-/Script-Fehlers als Text, mit HRESULT falls vorhanden. */
+function errText(e) {
+    var msg = '';
+    try { msg = trim(e &amp;&amp; e.message ? e.message : (e &amp;&amp; e.description ? e.description : '')); } catch (x) {}
+    var code = '';
+    try {
+        if (e &amp;&amp; typeof e.number === 'number' &amp;&amp; e.number !== 0) {
+            var n = e.number &lt; 0 ? e.number + 4294967296 : e.number;
+            code = '0x' + n.toString(16).toUpperCase();
+        }
+    } catch (x2) {}
+    if (msg === '' &amp;&amp; code === '') {
+        try { msg = trim(e); } catch (x3) {}
+        if (msg === '' || msg === '[object Error]' || msg === 'Error') msg = 'unbekannter Fehler';
+    }
+    if (code === '') return msg;
+    if (msg === '') return 'Fehler ' + code;
+    return msg + ' (' + code + ')';
+}
+
+/* Leeres Diagnose-Objekt fuer einen Bedingungs-/Ausnahmen-/Aktionen-Container. */
+function newDiag() {
+    return {
+        count: -1,          // Anzahl Eintraege laut Outlook (Count), -1 = nicht lesbar
+        active: [],         // Typ-Kennungen aktiver Eintraege (Enabled = true)
+        inactive: [],       // Typ-Kennungen inaktiver Eintraege
+        errors: [],         // Fehlertexte beim Lesen
+        countFailed: false, // Count nicht lesbar -> Nachlese ueber den Index unmoeglich
+        itemFailed: 0,      // Anzahl Item(k), die beim Lesen geworfen haben
+        propsFailed: false  // keine einzige benannte Eigenschaft lesbar
+    };
+}
+
 /* Alle aktiven Eintraege eines RuleConditions-/RuleActions-Containers lesen.
    Erst die benannten Eigenschaften (mit deutschem Label), danach ueber den
-   Index alles, was nicht ueber einen Namen erfasst wurde. */
-function collectRuleItems(container, defs) {
+   Index alles, was nicht ueber einen Namen erfasst wurde. Optional fuellt
+   diag (siehe newDiag) die Diagnose: Count, aktive/inaktive Typen, Fehler. */
+function collectRuleItems(container, defs, diag) {
     var out = [];
     var seen = {};
+    if (!diag) diag = newDiag();
     if (!container) return out;
 
+    var propFailed = 0, firstPropErr = '';
     for (var i = 0; i &lt; defs.length; i++) {
         var def = defs[i];
-        var obj = tryGet(container, def.prop);
+        var obj = null;
+        try {
+            obj = container[def.prop];
+        } catch (eP) {
+            propFailed++;
+            if (firstPropErr === '') firstPropErr = errText(eP);
+            continue;
+        }
         if (!obj) continue;
         var enabled = tryGet(obj, 'Enabled');
         if (enabled !== true) continue;
-        seen[itemType(obj)] = true;
+        var t = itemType(obj);
+        seen[t] = true;
         out.push({
             label: def.label,
             detail: describeRuleItem(obj),
-            def: def
+            def: def,
+            type: t,
+            opaque: false
         });
     }
+    /* Keine einzige benannte Eigenschaft lesbar: Zugriff gestoert */
+    if (defs.length > 0 &amp;&amp; propFailed === defs.length) {
+        diag.propsFailed = true;
+        diag.errors.push('benannte Eigenschaften nicht lesbar: ' + firstPropErr);
+    }
 
-    /* Nachlese: Aktionen/Bedingungen ohne benannte Eigenschaft (z. B.
-       "Skript ausfuehren" oder neue Outlook-Versionen). */
+    /* Nachlese ueber den Index: Eintraege ohne benannte Eigenschaft (z. B.
+       "Ist eine Abwesenheitsnotiz", "Skript ausfuehren"). Dabei werden fuer
+       die Diagnose ALLE Eintraege mit Typ und Enabled erfasst. */
+    var cnt = null;
     try {
-        var cnt = container.Count;
-        for (var k = 1; k &lt;= cnt; k++) {
-            try {
-                var it = container.Item(k);
-                if (tryGet(it, 'Enabled') !== true) continue;
-                var key = itemType(it);
-                if (seen[key]) continue;
-                seen[key] = true;
-                out.push({
-                    label: 'Sonstiges (Typ ' + key + ')',
-                    detail: describeRuleItem(it),
-                    def: {}
-                });
-            } catch (eIt) {}
+        cnt = container.Count;
+    } catch (eC) {
+        diag.countFailed = true;
+        diag.errors.push('Anzahl der Einträge nicht lesbar: ' + errText(eC));
+    }
+    if (typeof cnt === 'number') diag.count = cnt;
+    else if (!diag.countFailed) {
+        diag.countFailed = true;
+        diag.errors.push('Anzahl der Einträge nicht lesbar');
+    }
+
+    var itemFailed = 0, firstItemErr = '';
+    for (var k = 1; typeof cnt === 'number' &amp;&amp; k &lt;= cnt; k++) {
+        try {
+            var it = container.Item(k);
+            var key = itemType(it);
+            if (tryGet(it, 'Enabled') !== true) {
+                diag.inactive.push(key);
+                continue;
+            }
+            diag.active.push(key);
+            if (seen[key]) continue;
+            seen[key] = true;
+            var lbl = typeLabel(key);
+            out.push({
+                label: lbl !== '' ? lbl : 'Sonstiges (Typ ' + key + ')',
+                detail: describeRuleItem(it),
+                def: {},
+                type: key,
+                opaque: isOpaqueType(key)
+            });
+        } catch (eIt) {
+            itemFailed++;
+            if (firstItemErr === '') firstItemErr = errText(eIt);
         }
-    } catch (e) {}
+    }
+    if (itemFailed > 0) {
+        diag.itemFailed = itemFailed;
+        diag.errors.push(itemFailed + ' von ' + cnt + ' Einträgen nicht lesbar: ' + firstItemErr);
+    }
 
     return out;
+}
+
+/* Bedingungen, Ausnahmen oder Aktionen einer Regel lesen und den Zustand
+   bestimmen: COND_READ (a), COND_NONE (b) oder COND_ERROR (c). Der Zugriff
+   auf rule.Conditions / rule.Exceptions / rule.Actions hat ein eigenes try,
+   damit ein Fehler nicht mehr still als "keine Bedingung" erscheint.
+
+   Fehler werden in zwei Stufen gewertet:
+     schwer  - Container nicht lesbar, Count nicht lesbar, alle Item(k)
+               werfen oder gar nichts lesbar: der Inhalt ist unbekannt.
+     einzeln - nur einzelne Item(k) werfen, der Rest ist lesbar.
+   strict = true (Bedingungen, Aktionen): jeder Fehler zaehlt. Eine Regel
+   ohne Bedingung bzw. ohne Aktion ist unplausibel, ein nicht lesbarer
+   Eintrag ist dann sehr wahrscheinlich genau die fehlende Bedingung/Aktion.
+   strict = false (Ausnahmen): nur schwere Fehler zaehlen. Ohne Ausnahme ist
+   der Normalfall; ein einzelner nicht lesbarer Eintrag aendert die Ausgabe
+   einer sonst lesbaren Regel nicht und steht nur im Blatt "Diagnose".
+
+   Ergebnis:
+     state   - a / b / c
+     partial - a, aber ein zaehlender Fehler: weitere Eintraege koennen fehlen
+     soft    - Fehler aufgetreten, die nach obiger Regel nicht zaehlen
+     error   - alle Fehlertexte (fuer Diagnose und Hinweise) */
+function readRuleBlock(rule, prop, defs, strict) {
+    var res = { items: [], state: COND_NONE, partial: false, soft: false, error: '', diag: newDiag() };
+    var d = res.diag;
+    var container = null;
+    var hard = false;
+    try {
+        container = rule[prop];
+    } catch (e) {
+        d.errors.push('Zugriff fehlgeschlagen: ' + errText(e));
+        hard = true;
+    }
+    if (!hard &amp;&amp; !container) {
+        d.errors.push('Outlook liefert kein Objekt');
+        hard = true;
+    }
+    if (container) {
+        try {
+            res.items = collectRuleItems(container, defs, d);
+        } catch (e2) {
+            d.errors.push('Lesefehler: ' + errText(e2));
+            hard = true;
+        }
+    }
+    /* Ueber den Index nicht vollstaendig nachlesbar = schwerer Fehler */
+    if (d.countFailed) hard = true;
+    if (d.count > 0 &amp;&amp; d.itemFailed >= d.count) hard = true;
+    if (d.propsFailed &amp;&amp; d.count &lt;= 0) hard = true;
+
+    var counts = hard || (strict &amp;&amp; d.itemFailed > 0);
+    if (res.items.length > 0) {
+        res.state = COND_READ;
+        res.partial = counts;
+    } else {
+        res.state = counts ? COND_ERROR : COND_NONE;
+    }
+    res.soft = (d.errors.length > 0 &amp;&amp; !counts);
+    res.error = d.errors.join('; ');
+    return res;
 }
 
 /* ---------------- Regeln auslesen (in Bloecken) ---------------- */
@@ -868,6 +1143,7 @@ function startRead() {
         rows: [],                 // ein Eintrag pro Regel
         storeStats: [],           // { name, rules, read, error }
         skipped: 0,
+        uidSeq: 0,                // laufende Nummer je Regel (readRule)
         includeDisabled: document.getElementById('chkDisabled').checked,
         includeLocal: document.getElementById('chkLocal').checked,
         includeSend: document.getElementById('chkSend').checked,
@@ -920,7 +1196,25 @@ function readTick() {
         for (var r = st.rIdx; r &lt;= end; r++) {
             try {
                 var rec = readRule(st.rules.Item(r), st.storeName, st);
-                if (rec) { st.rows.push(rec); stat.read++; }
+                if (rec) {
+                    st.rows.push(rec);
+                    stat.read++;
+                    if (rec.condState === COND_ERROR) {
+                        log('Regel "' + rec.name + '": Bedingung nicht lesbar – ' + rec.condError, 'err');
+                    } else if (rec.condPartial) {
+                        log('Regel "' + rec.name + '": Bedingung nur teilweise lesbar – ' + rec.condError, 'err');
+                    }
+                    if (rec.excState === COND_ERROR) {
+                        log('Regel "' + rec.name + '": Ausnahmen nicht lesbar – ' + rec.excError, 'err');
+                    } else if (rec.excPartial) {
+                        log('Regel "' + rec.name + '": Ausnahmen nur teilweise lesbar – ' + rec.excError, 'err');
+                    }
+                    if (rec.actState === COND_ERROR) {
+                        log('Regel "' + rec.name + '": Aktionen nicht lesbar – ' + rec.actError, 'err');
+                    } else if (rec.actPartial) {
+                        log('Regel "' + rec.name + '": Aktionen nur teilweise lesbar – ' + rec.actError, 'err');
+                    }
+                }
             } catch (eR) {
                 st.skipped++;
             }
@@ -971,10 +1265,21 @@ function readRule(rule, mailbox, st) {
     if (isLocal &amp;&amp; !st.includeLocal) return null;
     if (ruleType === OL_RULE_SEND &amp;&amp; !st.includeSend) return null;
 
-    var conditions = [], exceptions = [], actions = [];
-    try { conditions = collectRuleItems(rule.Conditions, COND_DEFS); } catch (e) {}
-    try { exceptions = collectRuleItems(rule.Exceptions, COND_DEFS); } catch (e) {}
-    try { actions    = collectRuleItems(rule.Actions, ACTION_DEFS); } catch (e) {}
+    var condBlock = readRuleBlock(rule, 'Conditions', COND_DEFS, true);
+    var excBlock  = readRuleBlock(rule, 'Exceptions', COND_DEFS, false);
+    var actBlock  = readRuleBlock(rule, 'Actions', ACTION_DEFS, true);
+    var conditions = condBlock.items, exceptions = excBlock.items, actions = actBlock.items;
+    /* Bei Ausnahmen ist "keine sichtbar" (b) der Normalfall: Regel ohne Ausnahme. */
+
+    /* Aktive Bedingung unbekannten Typs (OlRuleConditionType 0 bzw. Typ nicht
+       lesbar): die Regel hat eine Bedingung, deren Inhalt Outlook nicht kennt. */
+    var condUnknown = false;
+    for (var u = 0; u &lt; conditions.length; u++) {
+        if (conditions[u].type === 'C0' || conditions[u].type === '?') condUnknown = true;
+    }
+
+    /* Laufende Nummer: macht nicht vergleichbare Bedingungen eindeutig */
+    st.uidSeq = (st.uidSeq || 0) + 1;
 
     /* Kennzahlen fuer Uebersicht und Pruefhinweise */
     var stop = false, targets = [], outbound = [], hardDelete = false;
@@ -990,6 +1295,7 @@ function readRule(rule, mailbox, st) {
     }
 
     return {
+        uid: st.uidSeq,
         mailbox: mailbox,
         name: name,
         enabled: enabled,
@@ -999,6 +1305,20 @@ function readRule(rule, mailbox, st) {
         conditions: conditions,
         exceptions: exceptions,
         actions: actions,
+        condState: condBlock.state,
+        condPartial: condBlock.partial,
+        condUnknown: condUnknown,
+        condError: condBlock.error,
+        condDiag: condBlock.diag,
+        excState: excBlock.state,
+        excPartial: excBlock.partial,
+        excSoft: excBlock.soft,
+        excError: excBlock.error,
+        excDiag: excBlock.diag,
+        actState: actBlock.state,
+        actPartial: actBlock.partial,
+        actError: actBlock.error,
+        actDiag: actBlock.diag,
         stop: stop,
         realActions: realActions,
         targets: targets,
@@ -1017,30 +1337,115 @@ function itemTexts(list, sep) {
     return out.join(sep);
 }
 
+/* Zustand der Bedingungen (a/b/c). Regeln mit gelesener Bedingung sind
+   immer COND_READ, auch wenn ein Datensatz kein condState traegt. */
+function condStateOf(rec) {
+    if (rec.conditions.length > 0) return COND_READ;
+    return rec.condState === COND_ERROR ? COND_ERROR : COND_NONE;
+}
+/* Bedingung gelesen (a), aber unvollstaendig: ein weiterer Eintrag war nicht
+   lesbar (condPartial) oder Outlook meldet eine Bedingung unbekannten Typs. */
+function condIncomplete(rec) {
+    return condStateOf(rec) === COND_READ &amp;&amp; (rec.condPartial === true || rec.condUnknown === true);
+}
+/* Bedingung gelesen und vollstaendig (a ohne Einschraenkung) */
+function condComplete(rec) {
+    return condStateOf(rec) === COND_READ &amp;&amp; !condIncomplete(rec);
+}
+/* Spalte "Bedingung lesbar" in der Uebersicht */
+function condStateShort(rec) {
+    var s = condStateOf(rec);
+    if (s === COND_READ) return condIncomplete(rec) ? 'teilweise' : 'Ja';
+    if (s === COND_ERROR) return 'Fehler';
+    return 'keine sichtbar';
+}
+/* Spalte "Zustand" im Blatt Diagnose */
+function condStateLong(rec) {
+    var state = condStateOf(rec);
+    if (state === COND_READ) {
+        if (rec.condPartial) return 'a – teilweise gelesen (weitere Bedingung nicht lesbar)';
+        if (rec.condUnknown) return 'a – gelesen, aber Bedingung unbekannten Typs';
+        return 'a – Bedingung(en) gelesen';
+    }
+    if (state === COND_ERROR) return 'c – Bedingung nicht lesbar';
+    return 'b – keine Bedingung sichtbar';
+}
+
+/* Wo die echte Regel nachzusehen ist. Senden-Regeln gibt es in Outlook im
+   Web nicht - dort auf die Regelverwaltung von Outlook verweisen. */
+var OUTLOOK_HINT = 'in Outlook unter Datei › Regeln und Benachrichtigungen verwalten nachsehen';
+function whereToCheck(rec) {
+    return rec.ruleType === OL_RULE_SEND ? OUTLOOK_HINT : OWA_HINT;
+}
+
 /* Logik in einer Zeile: WENN ... DANN ... AUSSER WENN ... */
 function logicText(rec) {
-    var s = 'WENN ' + (rec.conditions.length > 0
-        ? itemTexts(rec.conditions, ' UND ')
-        : 'jede eingehende Mail (keine Bedingung)');
-    s += '  DANN ' + (rec.actions.length > 0 ? itemTexts(rec.actions, ' + ') : 'keine Aktion');
+    var state = condStateOf(rec);
+    var s;
+    if (state === COND_READ) {
+        s = 'WENN ' + itemTexts(rec.conditions, ' UND ');
+        if (rec.condPartial) s += ' UND ? (weitere Bedingung nicht lesbar: ' + rec.condError + ')';
+    } else if (state === COND_ERROR) {
+        s = 'WENN Bedingung nicht lesbar (' + rec.condError + ')';
+    } else if (rec.ruleType === OL_RULE_SEND) {
+        s = 'WENN keine Bedingung sichtbar (gilt für alle gesendeten Mails oder für Outlook nicht lesbar – in Outlook prüfen)';
+    } else {
+        s = 'WENN keine Bedingung sichtbar (gilt für alle Mails oder in Outlook im Web angelegt – dort prüfen)';
+    }
+    if (rec.actions.length > 0) {
+        s += '  DANN ' + itemTexts(rec.actions, ' + ');
+        if (rec.actPartial) s += ' + ? (weitere Aktion nicht lesbar: ' + rec.actError + ')';
+    } else if (rec.actState === COND_ERROR) {
+        s += '  DANN ? (Aktionen nicht lesbar: ' + rec.actError + ')';
+    } else {
+        s += '  DANN keine Aktion';
+    }
     if (rec.exceptions.length > 0) {
         s += '  AUSSER WENN ' + itemTexts(rec.exceptions, ' ODER ');
+        if (rec.excPartial) s += ' ODER ? (weitere Ausnahme nicht lesbar: ' + rec.excError + ')';
+    } else if (rec.excState === COND_ERROR) {
+        s += '  AUSSER WENN ? (Ausnahmen nicht lesbar: ' + rec.excError + ')';
     }
     if (s.length > 900) s = s.substring(0, 897) + '...';
     return s;
 }
 
+/* Vergleichsschluessel einer Bedingung. Bedingungen, deren Werte Outlook
+   nicht herausgibt (opaque), bekommen die Regelnummer angehaengt und sind
+   damit nie "gleich" mit der Bedingung einer anderen Regel. */
+function condKey(rec, it) {
+    var k = itemText(it);
+    if (it.opaque) k += ' #' + rec.uid;
+    return k;
+}
+
 /* Signatur der Bedingungen - fuer Doppelungs- und Konfliktpruefung. */
 function condSignature(rec) {
     var parts = [];
-    for (var i = 0; i &lt; rec.conditions.length; i++) parts.push(itemText(rec.conditions[i]));
+    for (var i = 0; i &lt; rec.conditions.length; i++) parts.push(condKey(rec, rec.conditions[i]));
     parts.sort();
     return parts.join(' &amp;&amp; ');
 }
 function condSet(rec) {
     var set = {};
-    for (var i = 0; i &lt; rec.conditions.length; i++) set[itemText(rec.conditions[i])] = true;
+    for (var i = 0; i &lt; rec.conditions.length; i++) set[condKey(rec, rec.conditions[i])] = true;
     return set;
+}
+
+/* Zusammenfassung fuer Protokoll und Statusmeldung */
+function condSummary(rows) {
+    var res = { none: 0, error: 0, partial: 0, exc: 0, act: 0 };
+    for (var i = 0; i &lt; rows.length; i++) {
+        var r = rows[i];
+        var s = condStateOf(r);
+        if (s === COND_NONE) res.none++;
+        else if (s === COND_ERROR) res.error++;
+        else if (condIncomplete(r)) res.partial++;
+        /* Ausnahmen/Aktionen mit irgendeinem Lesefehler (auch einzelne Eintraege) */
+        if (r.excState === COND_ERROR || r.excPartial || r.excSoft) res.exc++;
+        if (r.actState === COND_ERROR || r.actPartial) res.act++;
+    }
+    return res;
 }
 function isSubset(small, big) {
     var any = false;
@@ -1083,10 +1488,17 @@ function finishRead() {
             buildExcel(st);
             hideProgress();
 
-            var sheets = st.withChecks ? 5 : 4;
+            var sheets = st.withChecks ? 6 : 5;
             var msg = "&lt;b>Fertig!&lt;/b>&lt;br>" + st.rows.length + " Regel(n) aus " + st.storeStats.length +
                       " Postfach/Postf&amp;auml;chern ausgelesen. Die Excel-Mappe ist ge&amp;ouml;ffnet (" + sheets +
                       " Bl&amp;auml;tter). Bitte manuell speichern.";
+            var sum = condSummary(st.rows);
+            if (sum.none + sum.error + sum.partial > 0) {
+                msg += "&lt;br>&lt;i>" + sum.none + " Regel(n) ohne sichtbare Bedingung, " + sum.error + " nicht lesbar" +
+                       (sum.partial > 0 ? ", " + sum.partial + " nur teilweise lesbar" : "") +
+                       " &amp;ndash; Bedingungen aus Outlook im Web kann Outlook oft nicht lesen. Bitte in Outlook im Web unter " +
+                       "Einstellungen &amp;rsaquo; E-Mail &amp;rsaquo; Regeln pr&amp;uuml;fen (Details im Blatt &amp;bdquo;Diagnose&amp;ldquo;).&lt;/i>";
+            }
             var errs = 0;
             for (var i = 0; i &lt; st.storeStats.length; i++) if (st.storeStats[i].error !== '') errs++;
             if (errs > 0) {
@@ -1102,8 +1514,42 @@ function finishRead() {
             showError("Excel-Export fehlgeschlagen: " + esc(e.message));
             log('Excel-Export fehlgeschlagen: ' + e.message, 'err');
         }
+        if (st.rows.length > 0) logCondSummary(st.rows);
         document.getElementById('btnStart').disabled = false;
     }, 60);
+}
+
+/* Zusammenfassung am Ende des Protokolls: Regeln ohne sichtbare / lesbare Bedingung */
+function logCondSummary(rows) {
+    var sum = condSummary(rows);
+    var line = 'Bedingungen: ' + sum.none + ' Regel(n) ohne sichtbare Bedingung, ' +
+               sum.error + ' nicht lesbar' +
+               (sum.partial > 0 ? ', ' + sum.partial + ' nur teilweise lesbar' : '') + '.';
+    if (sum.none + sum.error + sum.partial === 0) {
+        log(line + ' Alle Bedingungen gelesen.', 'ok');
+    } else {
+        log(line, 'head');
+        if (sum.none > 0) {
+            log(sum.none + ' Regel(n) ohne sichtbare Bedingung: Entweder greifen sie wirklich bei allen Mails, oder die ' +
+                'Bedingung wurde in Outlook im Web angelegt (z. B. Nachrichtentyp „automatische Antwort“) und ist für ' +
+                'Outlook nicht lesbar.', 'info');
+        }
+        if (sum.error > 0) {
+            log(sum.error + ' Regel(n) nicht lesbar: Outlook meldete beim Lesen der Bedingung einen Fehler – ' +
+                'welche Bedingung gilt, ist unbekannt.', 'info');
+        }
+        if (sum.partial > 0) {
+            log(sum.partial + ' Regel(n) nur teilweise lesbar: Mindestens eine Bedingung ist unbekannt oder ' +
+                'konnte nicht gelesen werden.', 'info');
+        }
+        log('Bitte ' + OWA_HINT + '. Details im Blatt „Diagnose“.', 'info');
+    }
+    if (sum.exc > 0) {
+        log('Ausnahmen: bei ' + sum.exc + ' Regel(n) nicht vollständig lesbar – Details im Blatt „Diagnose“.', 'info');
+    }
+    if (sum.act > 0) {
+        log('Aktionen: bei ' + sum.act + ' Regel(n) nicht vollständig lesbar – Details im Blatt „Diagnose“.', 'info');
+    }
 }
 
 /* ---------------- Excel-Ausgabe ---------------- */
@@ -1158,16 +1604,16 @@ function buildExcel(st) {
 
     /* Worksheets.Add() legt VOR dem aktiven Blatt an -> in umgekehrter
        Reihenfolge anlegen. Zielreihenfolge:
-       Übersicht | Regel-Logik | Elemente | Zielordner | Prüfhinweise */
-    var shChecks = null, shFolders = null, shFlat = null, shLogic = null, shOverview = null;
+       Übersicht | Regel-Logik | Elemente | Zielordner | Prüfhinweise | Diagnose */
+    var shDiag = null, shChecks = null, shFolders = null, shFlat = null, shLogic = null, shOverview = null;
 
+    shDiag = wb.ActiveSheet;
+    try { shDiag.Name = "Diagnose"; } catch (e) {}
     if (st.withChecks) {
-        shChecks = wb.ActiveSheet;
+        shChecks = wb.Worksheets.Add();
         try { shChecks.Name = "Prüfhinweise"; } catch (e) {}
-        shFolders = wb.Worksheets.Add();
-    } else {
-        shFolders = wb.ActiveSheet;
     }
+    shFolders = wb.Worksheets.Add();
     try { shFolders.Name = "Zielordner"; } catch (e) {}
     shFlat = wb.Worksheets.Add();
     try { shFlat.Name = "Elemente"; } catch (e) {}
@@ -1182,6 +1628,7 @@ function buildExcel(st) {
         buildFlat(shFlat, excel, st);
         buildFolders(shFolders, excel, st);
         if (shChecks) buildChecks(shChecks, excel, st);
+        buildDiag(shDiag, excel, st);
     } finally {
         try { excel.ScreenUpdating = true; } catch (e) {}
         excel.DisplayAlerts = true;
@@ -1222,8 +1669,12 @@ function buildOverview(sh, excel, st) {
     for (var m = 2; m &lt; metaRow; m++) { try { sh.Cells(m, 1).Font.Bold = true; } catch (e) {} }
 
     var headRow = metaRow + 1;
+    /* Spalten: A Nr | B Postfach | C Reihenfolge | D Regelname | E Aktiv | F Regeltyp |
+       G Gültigkeit | H Bedingungen | I Bedingung lesbar | J Ausnahmen | K Aktionen |
+       L Stopp danach | M Zielordner | N Logik */
     var headers = ["Nr", "Postfach", "Reihenfolge", "Regelname", "Aktiv", "Regeltyp", "Gültigkeit",
-                   "Bedingungen", "Ausnahmen", "Aktionen", "Stopp danach", "Zielordner", "Logik (WENN / DANN / AUSSER WENN)"];
+                   "Bedingungen", "Bedingung lesbar", "Ausnahmen", "Aktionen", "Stopp danach", "Zielordner",
+                   "Logik (WENN / DANN / AUSSER WENN)"];
     writeRow(sh, headRow, headers);
     styleHeaderRow(sh, headRow, headers.length);
 
@@ -1247,6 +1698,7 @@ function buildOverview(sh, excel, st) {
             ruleTypeText(rec.ruleType),
             rec.isLocal ? "Nur auf diesem Client" : "Server (immer)",
             rec.conditions.length,
+            condStateShort(rec),
             rec.exceptions.length,
             rec.realActions,
             jaNein(rec.stop),
@@ -1257,15 +1709,17 @@ function buildOverview(sh, excel, st) {
             fillRange(sh, row, 1, row, headers.length, C_GREY);
             try { sh.Range(sh.Cells(row, 1), sh.Cells(row, headers.length)).Font.Italic = true; } catch (e) {}
         }
+        /* Spalte I "Bedingung lesbar": teilweise / keine sichtbar / Fehler hervorheben */
+        if (!condComplete(rec)) fillRange(sh, row, 9, row, 9, C_EXCEPT);
         row++;
     }
 
     try { sh.Range(sh.Cells(headRow, 1), sh.Cells(row - 1, headers.length)).AutoFilter(); } catch (e) {}
     try {
-        sh.Columns("A:K").AutoFit();
+        sh.Columns("A:L").AutoFit();
         sh.Columns("D:D").ColumnWidth = 34;
-        sh.Columns("L:L").ColumnWidth = 32;
-        sh.Columns("M:M").ColumnWidth = 90;
+        sh.Columns("M:M").ColumnWidth = 32;
+        sh.Columns("N:N").ColumnWidth = 90;
         sh.Cells(3, 2).ColumnWidth = 30;
     } catch (e) {}
     freezeBelow(sh, excel, headRow);
@@ -1285,7 +1739,10 @@ function buildLogic(sh, excel, st) {
     sh.Cells(2, 1).Value = "Legende:";
     sh.Cells(2, 2).Value = "Bedingungen sind UND-verknüpft (alle müssen zutreffen). " +
                            "Jede einzelne Ausnahme verhindert die Regel. " +
-                           "Aktionen laufen von oben nach unten; \"Keine weiteren Regeln anwenden\" beendet die Kette.";
+                           "Aktionen laufen von oben nach unten; \"Keine weiteren Regeln anwenden\" beendet die Kette. " +
+                           "\"Keine Bedingung sichtbar\" / \"Bedingung nicht lesbar\" / \"weitere Bedingung nicht lesbar\": " +
+                           "Outlook liefert die Bedingung nicht oder nicht vollständig (oft in Outlook im Web angelegt) – " +
+                           "dort prüfen, Details im Blatt \"Diagnose\". Gelbe Bezeichnung in WENN-/UND-/DANN-Zeilen = nicht (vollständig) lesbar.";
     try { sh.Cells(2, 1).Font.Bold = true; } catch (e) {}
 
     var headRow = 4;
@@ -1330,19 +1787,44 @@ function buildLogic(sh, excel, st) {
         } catch (e) {}
         row++;
 
-        /* WENN / UND */
+        /* WENN / UND. Nicht (vollstaendig) lesbare Bedingungen: Bezeichnung
+           gelb markiert wie Spalte "Bedingung lesbar" in der Uebersicht. */
+        var where = whereToCheck(rec);
         if (rec.conditions.length === 0) {
             sh.Cells(row, 3).Value = "WENN";
-            sh.Cells(row, 4).Value = "jede eingehende Mail";
-            sh.Cells(row, 5).Value = "keine Bedingung gesetzt – die Regel greift bei ALLEN Mails";
+            if (condStateOf(rec) === COND_ERROR) {
+                sh.Cells(row, 4).Value = "Bedingung nicht lesbar";
+                sh.Cells(row, 5).Value = "Fehler beim Lesen: " + rec.condError +
+                                         " – die Regel-Logik ist unvollständig, bitte " + where;
+            } else if (rec.ruleType === OL_RULE_SEND) {
+                sh.Cells(row, 4).Value = "keine Bedingung sichtbar";
+                sh.Cells(row, 5).Value = "Outlook zeigt keine Bedingung – entweder greift die Senden-Regel bei ALLEN ausgehenden Mails, " +
+                                         "oder Outlook kann ihre Bedingung nicht lesen (bitte " + where + ")";
+            } else {
+                sh.Cells(row, 4).Value = "keine Bedingung sichtbar";
+                sh.Cells(row, 5).Value = "Outlook zeigt keine Bedingung – entweder greift die Regel bei ALLEN Mails, " +
+                                         "oder die Bedingung wurde in Outlook im Web angelegt und ist für Outlook nicht lesbar (dort prüfen)";
+            }
             fillRange(sh, row, 3, row, 5, C_COND);
+            fillRange(sh, row, 4, row, 4, C_EXCEPT);
             row++;
         } else {
             for (var c = 0; c &lt; rec.conditions.length; c++) {
+                var cIt = rec.conditions[c];
                 sh.Cells(row, 3).Value = (c === 0) ? "WENN" : "UND";
-                sh.Cells(row, 4).Value = rec.conditions[c].label;
-                sh.Cells(row, 5).Value = rec.conditions[c].detail;
+                sh.Cells(row, 4).Value = cIt.label;
+                sh.Cells(row, 5).Value = cIt.detail;
                 fillRange(sh, row, 3, row, 5, C_COND);
+                if (cIt.type === 'C0' || cIt.type === '?') fillRange(sh, row, 4, row, 4, C_EXCEPT);
+                row++;
+            }
+            if (rec.condPartial) {
+                sh.Cells(row, 3).Value = "UND";
+                sh.Cells(row, 4).Value = "weitere Bedingung nicht lesbar";
+                sh.Cells(row, 5).Value = "Fehler beim Lesen: " + rec.condError +
+                                         " – die Regel-Logik ist unvollständig, bitte " + where;
+                fillRange(sh, row, 3, row, 5, C_COND);
+                fillRange(sh, row, 4, row, 4, C_EXCEPT);
                 row++;
             }
         }
@@ -1355,13 +1837,35 @@ function buildLogic(sh, excel, st) {
             fillRange(sh, row, 3, row, 5, C_EXCEPT);
             row++;
         }
+        if (rec.exceptions.length > 0 &amp;&amp; rec.excPartial) {
+            sh.Cells(row, 3).Value = "ODER";
+            sh.Cells(row, 4).Value = "weitere Ausnahme nicht lesbar";
+            sh.Cells(row, 5).Value = "Fehler beim Lesen: " + rec.excError + " – bitte " + where;
+            fillRange(sh, row, 3, row, 5, C_EXCEPT);
+            row++;
+        }
+        if (rec.exceptions.length === 0 &amp;&amp; rec.excState === COND_ERROR) {
+            sh.Cells(row, 3).Value = "AUSSER WENN";
+            sh.Cells(row, 4).Value = "Ausnahmen nicht lesbar";
+            sh.Cells(row, 5).Value = "Fehler beim Lesen: " + rec.excError + " – bitte " + where;
+            fillRange(sh, row, 3, row, 5, C_EXCEPT);
+            row++;
+        }
 
         /* DANN */
         if (rec.actions.length === 0) {
             sh.Cells(row, 3).Value = "DANN";
-            sh.Cells(row, 4).Value = "keine Aktion";
-            sh.Cells(row, 5).Value = "Regel ohne Aktion – sie tut nichts";
-            fillRange(sh, row, 3, row, 5, C_ACTION);
+            if (rec.actState === COND_ERROR) {
+                sh.Cells(row, 4).Value = "Aktionen nicht lesbar";
+                sh.Cells(row, 5).Value = "Fehler beim Lesen: " + rec.actError +
+                                         " – was die Regel tut, ist offen, bitte " + where;
+                fillRange(sh, row, 3, row, 5, C_ACTION);
+                fillRange(sh, row, 4, row, 4, C_EXCEPT);
+            } else {
+                sh.Cells(row, 4).Value = "keine Aktion";
+                sh.Cells(row, 5).Value = "Regel ohne Aktion – sie tut nichts";
+                fillRange(sh, row, 3, row, 5, C_ACTION);
+            }
             row++;
         } else {
             for (var a = 0; a &lt; rec.actions.length; a++) {
@@ -1369,6 +1873,14 @@ function buildLogic(sh, excel, st) {
                 sh.Cells(row, 4).Value = rec.actions[a].label;
                 sh.Cells(row, 5).Value = rec.actions[a].detail;
                 fillRange(sh, row, 3, row, 5, C_ACTION);
+                row++;
+            }
+            if (rec.actPartial) {
+                sh.Cells(row, 3).Value = "UND DANN";
+                sh.Cells(row, 4).Value = "weitere Aktion nicht lesbar";
+                sh.Cells(row, 5).Value = "Fehler beim Lesen: " + rec.actError + " – bitte " + where;
+                fillRange(sh, row, 3, row, 5, C_ACTION);
+                fillRange(sh, row, 4, row, 4, C_EXCEPT);
                 row++;
             }
         }
@@ -1396,9 +1908,30 @@ function buildFlat(sh, excel, st) {
     var row = 2;
     for (var r = 0; r &lt; rows.length; r++) {
         var rec = rows[r];
+        var where = whereToCheck(rec);
         row = flatBlock(sh, row, rec, "Bedingung", rec.conditions, C_COND);
+        /* Zustaende b / c / teilweise als eigene Zeile, damit ein Filter auf
+           Art = Bedingung auch diese Regeln zeigt */
+        if (rec.conditions.length === 0 &amp;&amp; condStateOf(rec) === COND_ERROR) {
+            row = flatNote(sh, row, rec, "Bedingung", "Bedingung nicht lesbar", "Fehler beim Lesen: " + rec.condError, C_COND);
+        } else if (rec.conditions.length === 0) {
+            row = flatNote(sh, row, rec, "Bedingung", "keine Bedingung sichtbar",
+                           "Outlook liefert keine aktive Bedingung – " + where, C_COND);
+        } else if (rec.condPartial) {
+            row = flatNote(sh, row, rec, "Bedingung", "weitere Bedingung nicht lesbar", "Fehler beim Lesen: " + rec.condError, C_COND);
+        }
         row = flatBlock(sh, row, rec, "Ausnahme", rec.exceptions, C_EXCEPT);
+        if (rec.exceptions.length === 0 &amp;&amp; rec.excState === COND_ERROR) {
+            row = flatNote(sh, row, rec, "Ausnahme", "Ausnahmen nicht lesbar", "Fehler beim Lesen: " + rec.excError, C_EXCEPT);
+        } else if (rec.exceptions.length > 0 &amp;&amp; rec.excPartial) {
+            row = flatNote(sh, row, rec, "Ausnahme", "weitere Ausnahme nicht lesbar", "Fehler beim Lesen: " + rec.excError, C_EXCEPT);
+        }
         row = flatBlock(sh, row, rec, "Aktion", rec.actions, C_ACTION);
+        if (rec.actions.length === 0 &amp;&amp; rec.actState === COND_ERROR) {
+            row = flatNote(sh, row, rec, "Aktion", "Aktionen nicht lesbar", "Fehler beim Lesen: " + rec.actError, C_ACTION);
+        } else if (rec.actions.length > 0 &amp;&amp; rec.actPartial) {
+            row = flatNote(sh, row, rec, "Aktion", "weitere Aktion nicht lesbar", "Fehler beim Lesen: " + rec.actError, C_ACTION);
+        }
     }
     if (row === 2) {
         sh.Cells(2, 1).Value = "Keine Bedingungen/Aktionen gefunden.";
@@ -1421,9 +1954,21 @@ function flatBlock(sh, row, rec, art, list, col) {
             art, list[i].label, list[i].detail
         ]);
         fillRange(sh, row, 5, row, 5, col);
+        if (list[i].type === 'C0' || list[i].type === '?') fillRange(sh, row, 6, row, 6, C_EXCEPT);
         row++;
     }
     return row;
+}
+
+/* Zeile fuer einen nicht (vollstaendig) lesbaren Block, Bezeichnung gelb */
+function flatNote(sh, row, rec, art, label, detail, col) {
+    writeRow(sh, row, [
+        rec.mailbox, rec.order, rec.name, jaNein(rec.enabled),
+        art, label, detail
+    ]);
+    fillRange(sh, row, 5, row, 5, col);
+    fillRange(sh, row, 6, row, 6, C_EXCEPT);
+    return row + 1;
 }
 
 /* ---------- Blatt 4: Zielordner (Mengengerüst) ---------- */
@@ -1513,9 +2058,37 @@ function buildChecks(sh, excel, st) {
 
     var rows = st.rows;
 
+    /* Anzahl aktiver Regeln, die im selben Postfach NACH rec laufen. Nur
+       Regeln desselben Typs: "Keine weiteren Regeln anwenden" einer
+       Empfangen-Regel haelt keine Senden-Regel an und umgekehrt. */
+    function laterActiveCount(rec) {
+        var n = 0;
+        for (var j = 0; j &lt; rows.length; j++) {
+            var o = rows[j];
+            if (o === rec || o.mailbox !== rec.mailbox || !o.enabled) continue;
+            if (o.ruleType !== rec.ruleType) continue;
+            if (o.order > rec.order) n++;
+        }
+        return n;
+    }
+
+    /* Satz zu "Keine weiteren Regeln anwenden" bei einer Regel ohne sichtbare
+       Bedingung: Einzahl/Mehrzahl und Ausnahmen beruecksichtigen. */
+    function stopSentence(rec, n) {
+        var who = (n === 1)
+            ? "greift die danach laufende aktive Regel dieses Postfachs nie"
+            : "greift keine der " + n + " danach laufenden aktiven Regeln dieses Postfachs";
+        var exc = "";
+        if (rec.exceptions.length > 0) exc = " – außer bei Mails, auf die eine ihrer Ausnahmen zutrifft";
+        else if (rec.excState === COND_ERROR || rec.excPartial) exc = " – außer womöglich bei Mails, auf die eine nicht lesbare Ausnahme zutrifft";
+        return " Die Regel beendet außerdem die Regelkette („Keine weiteren Regeln anwenden“): Falls sie wirklich keine Bedingung hat, " +
+               who + exc + ". Das wäre unplausibel und spricht für eine nicht lesbare Bedingung.";
+    }
+
     /* Einzelregel-Prüfungen */
     for (var i = 0; i &lt; rows.length; i++) {
         var rec = rows[i];
+        var cState = condStateOf(rec);
         if (!rec.enabled) {
             note("Inaktiv", rec.mailbox, rec.name,
                  "Regel ist deaktiviert und greift derzeit nicht.");
@@ -1524,11 +2097,62 @@ function buildChecks(sh, excel, st) {
             note("Nur-lokale Regel", rec.mailbox, rec.name,
                  "Client-Regel: läuft nur, wenn genau dieses Outlook geöffnet ist. Für ein Gruppenpostfach mit mehreren Bearbeitern meist unerwünscht – serverseitige Regel bevorzugen.");
         }
-        if (rec.conditions.length === 0 &amp;&amp; rec.realActions > 0) {
-            note("Sehr breit", rec.mailbox, rec.name,
-                 "Keine Bedingung gesetzt: die Regel greift bei ALLEN eingehenden Mails.");
+        var where = whereToCheck(rec);
+        var stopsOthers = (rec.enabled &amp;&amp; rec.stop) ? laterActiveCount(rec) : 0;
+        /* Ohne sichtbare Bedingung ist offen, ob die Regel wirklich alle Mails
+           trifft - deshalb kein "Sehr breit" mehr, sondern ein Prüfauftrag. */
+        if (cState === COND_NONE) {
+            var txtNone;
+            if (rec.ruleType === OL_RULE_SEND) {
+                txtNone = "Outlook zeigt keine Bedingung. Entweder greift die Senden-Regel bei allen ausgehenden Mails, oder Outlook kann ihre Bedingung nicht lesen – " + where + ".";
+            } else {
+                txtNone = "Outlook zeigt keine Bedingung. Entweder greift die Regel bei allen Mails, oder die Bedingung wurde in Outlook im Web angelegt (z. B. Nachrichtentyp automatische Antwort) und ist für Outlook nicht lesbar – " + where + ".";
+            }
+            if (stopsOthers > 0) txtNone += stopSentence(rec, stopsOthers);
+            note("Keine Bedingung sichtbar", rec.mailbox, rec.name, txtNone);
+        } else if (cState === COND_ERROR) {
+            var txtErr = "Outlook konnte die Bedingung nicht lesen (" + rec.condError + "). Die Regel-Logik ist deshalb unvollständig – " + where + ".";
+            if (stopsOthers > 0) {
+                txtErr += " Die Regel beendet die Regelkette („Keine weiteren Regeln anwenden“); welche späteren Regeln sie verdeckt, lässt sich ohne lesbare Bedingung nicht prüfen.";
+            }
+            note("Bedingung nicht lesbar", rec.mailbox, rec.name, txtErr);
+        } else if (condIncomplete(rec)) {
+            /* Bedingung gelesen, aber unvollstaendig (Lesefehler oder unbekannter Typ) */
+            var txtPart = "";
+            if (rec.condUnknown) {
+                txtPart = "Outlook meldet eine Bedingung unbekannten Typs (OlRuleConditionType 0); ihr Inhalt ist für Outlook nicht lesbar" +
+                          (rec.ruleType === OL_RULE_SEND ? "" : ", typisch für Bedingungen aus Outlook im Web") + ".";
+            }
+            if (rec.condPartial) {
+                txtPart += (txtPart !== "" ? " " : "") +
+                           "Outlook konnte nur einen Teil der Bedingungen lesen (teilweise: " + rec.condError + "). " +
+                           "Gelesen: " + itemTexts(rec.conditions, " UND ") + ". Weitere Bedingungen können fehlen.";
+            }
+            txtPart += " Bitte " + where + ".";
+            if (stopsOthers > 0) {
+                txtPart += " Die Regel beendet die Regelkette („Keine weiteren Regeln anwenden“); welche späteren Regeln sie verdeckt, lässt sich ohne vollständig lesbare Bedingung nicht sicher prüfen.";
+            }
+            note("Bedingung nicht lesbar", rec.mailbox, rec.name, txtPart);
         }
-        if (rec.realActions === 0) {
+        /* Ausnahmen: nur schwere Lesefehler (excState c bzw. excPartial) als
+           Hinweis; einzelne nicht lesbare Eintraege stehen nur in "Diagnose". */
+        if (rec.exceptions.length === 0 &amp;&amp; rec.excState === COND_ERROR) {
+            note("Ausnahmen nicht lesbar", rec.mailbox, rec.name,
+                 "Outlook konnte die Ausnahmen nicht lesen (" + rec.excError + "). Möglicherweise fehlen Ausnahmen in der Darstellung – " + where + ".");
+        } else if (rec.exceptions.length > 0 &amp;&amp; rec.excPartial) {
+            note("Ausnahmen nicht lesbar", rec.mailbox, rec.name,
+                 "Outlook konnte nur einen Teil der Ausnahmen lesen (teilweise: " + rec.excError + "). Weitere Ausnahmen können fehlen – " + where + ".");
+        }
+        /* Aktionen nicht (vollstaendig) lesbar: dann ist auch "Ohne Wirkung" nicht sicher */
+        var actUnreadable = (rec.actState === COND_ERROR || rec.actPartial === true);
+        if (rec.actions.length === 0 &amp;&amp; rec.actState === COND_ERROR) {
+            note("Aktionen nicht lesbar", rec.mailbox, rec.name,
+                 "Outlook konnte die Aktionen nicht lesen (" + rec.actError + "). Was die Regel tut, ist deshalb offen – " + where + ".");
+        } else if (rec.actPartial) {
+            note("Aktionen nicht lesbar", rec.mailbox, rec.name,
+                 "Outlook konnte nur einen Teil der Aktionen lesen (teilweise: " + rec.actError + "). Weitere Aktionen können fehlen – " + where + ".");
+        }
+        if (rec.realActions === 0 &amp;&amp; !actUnreadable) {
             note("Ohne Wirkung", rec.mailbox, rec.name,
                  "Regel hat keine Aktion" + (rec.stop ? " ausser \"keine weiteren Regeln anwenden\"" : "") + " – sie bewirkt nichts.");
         }
@@ -1552,11 +2176,14 @@ function buildChecks(sh, excel, st) {
         }
     }
 
-    /* Doppelungen: gleiche Bedingungs-Signatur im selben Postfach */
+    /* Doppelungen: gleiche Bedingungs-Signatur im selben Postfach.
+       Nur Regeln mit vollstaendig gelesener Bedingung (a, nicht teilweise):
+       eine nicht lesbare weitere Bedingung koennte die Regeln unterscheiden.
+       Nicht lesbare Bedingungswerte sind ueber condKey ohnehin nie gleich. */
     var sigMap = {};
     for (var s = 0; s &lt; rows.length; s++) {
         var r2 = rows[s];
-        if (r2.conditions.length === 0) continue;
+        if (condStateOf(r2) !== COND_READ || r2.condPartial) continue;
         var key = r2.mailbox + '' + condSignature(r2);
         if (!sigMap[key]) sigMap[key] = [];
         sigMap[key].push(r2);
@@ -1571,20 +2198,46 @@ function buildChecks(sh, excel, st) {
              group.length + " Regeln haben genau dieselben Bedingungen. Reihenfolge und Aktionen prüfen – vermutlich zusammenfassbar.");
     }
 
-    /* Toter Code: fruehere Regel mit "Stopp" und Teilmenge der Bedingungen */
+    /* Toter Code: fruehere Regel mit "Stopp" und Teilmenge der Bedingungen.
+       Nur Regeln mit GELESENER Bedingung (a) werden verglichen. Eine Regel
+       ohne sichtbare (b) oder ohne lesbare (c) Bedingung wird hier bewusst
+       nicht gewertet - dafuer gibt es die vorsichtig formulierten Hinweise
+       "Keine Bedingung sichtbar" / "Bedingung nicht lesbar" oben. (isSubset
+       liefert fuer eine leere Menge ohnehin false.)
+       Sicherer Blocker ist die fruehe Regel nur, wenn ihre Bedingungen und
+       Ausnahmen vollstaendig gelesen sind. Fehlt dort etwas (weitere Bedingung
+       oder Ausnahmen nicht lesbar), koennte sie seltener greifen als gelesen -
+       dann nur der vorsichtige Hinweis "Evtl. nie erreicht". Die spaete Regel
+       darf teilweise gelesen sein: eine nicht lesbare weitere Bedingung macht
+       sie nur enger, sie bleibt verdeckt. Stopp wirkt nur auf Regeln desselben
+       Typs (Empfangen/Senden). */
     for (var a = 0; a &lt; rows.length; a++) {
         var early = rows[a];
         if (!early.enabled || !early.stop) continue;
+        if (condStateOf(early) !== COND_READ) continue;
+        var earlyExcOpen = (early.excState === COND_ERROR || early.excPartial === true);
+        var earlyUnsure = (early.condPartial === true || earlyExcOpen);
         var setEarly = condSet(early);
         for (var b = 0; b &lt; rows.length; b++) {
             var later = rows[b];
             if (later === early) continue;
             if (later.mailbox !== early.mailbox) continue;
+            if (later.ruleType !== early.ruleType) continue;
             if (!later.enabled) continue;
             if (later.order &lt;= early.order) continue;
-            if (isSubset(setEarly, condSet(later))) {
+            if (condStateOf(later) !== COND_READ) continue;
+            if (!isSubset(setEarly, condSet(later))) continue;
+            if (!earlyUnsure) {
                 note("Wird nie erreicht", later.mailbox, later.name,
                      "Die früher laufende Regel #" + early.order + " (\"" + early.name + "\") hat dieselben oder weniger Bedingungen und beendet die Regelkette (\"keine weiteren Regeln anwenden\"). Sobald sie greift, läuft diese Regel nicht mehr.");
+            } else {
+                var why;
+                if (early.condPartial &amp;&amp; earlyExcOpen) why = "sind aber eine weitere Bedingung und die Ausnahmen nicht (vollständig) lesbar";
+                else if (early.condPartial) why = "ist aber eine weitere Bedingung nicht lesbar";
+                else why = "sind aber die Ausnahmen nicht (vollständig) lesbar";
+                note("Evtl. nie erreicht", later.mailbox, later.name,
+                     "Die früher laufende Regel #" + early.order + " (\"" + early.name + "\") hat nach dem, was Outlook lesen kann, dieselben oder weniger Bedingungen und beendet die Regelkette (\"keine weiteren Regeln anwenden\"). " +
+                     "Bei Regel #" + early.order + " " + why + " – ob diese Regel erreicht wird, ist offen. Bitte " + whereToCheck(early) + ".");
             }
         }
     }
@@ -1606,7 +2259,12 @@ function buildChecks(sh, excel, st) {
         "Datenabfluss prüfen": C_EXCEPT,
         "Endgültiges Löschen": C_EXCEPT,
         "Wird nie erreicht": C_EXCEPT,
-        "Nicht lesbar": C_EXCEPT
+        "Evtl. nie erreicht": C_EXCEPT,
+        "Nicht lesbar": C_EXCEPT,
+        "Keine Bedingung sichtbar": C_EXCEPT,
+        "Bedingung nicht lesbar": C_EXCEPT,
+        "Ausnahmen nicht lesbar": C_EXCEPT,
+        "Aktionen nicht lesbar": C_EXCEPT
     };
 
     var row = headRow + 1;
@@ -1624,10 +2282,99 @@ function buildChecks(sh, excel, st) {
 
     try { sh.Range(sh.Cells(headRow, 1), sh.Cells(row - 1, headers.length)).AutoFilter(); } catch (e) {}
     try {
-        sh.Columns("A:A").ColumnWidth = 22;
+        sh.Columns("A:A").ColumnWidth = 26;
         sh.Columns("B:B").ColumnWidth = 26;
         sh.Columns("C:C").ColumnWidth = 40;
         sh.Columns("D:D").ColumnWidth = 95;
+    } catch (e) {}
+    freezeBelow(sh, excel, headRow);
+}
+
+/* ---------- Blatt 6: Diagnose ---------- */
+/* Typ-Kennungen als Text: aktive mit Label, inaktive nur als Kennung. */
+function diagTypes(list, withLabel) {
+    var out = [];
+    for (var i = 0; i &lt; list.length; i++) out.push(withLabel ? typeWithLabel(list[i]) : String(list[i]));
+    return out.join(withLabel ? ' | ' : ', ');
+}
+function diagCount(d) {
+    return (d &amp;&amp; d.count >= 0) ? d.count : 'nicht lesbar';
+}
+
+function buildDiag(sh, excel, st) {
+    sh.Cells(1, 1).Value = "Diagnose: Bedingungen und Ausnahmen laut Outlook";
+    try { sh.Cells(1, 1).Font.Bold = true; sh.Cells(1, 1).Font.Size = 14; } catch (e) {}
+    sh.Cells(2, 1).Value = "Zustand a = Bedingung(en) gelesen (\"teilweise\": ein weiterer Eintrag nicht lesbar oder Bedingung unbekannten Typs), " +
+                           "b = keine Bedingung sichtbar (Outlook liefert keine aktive Bedingung, kein Fehler), " +
+                           "c = Bedingung nicht lesbar (Fehler beim Zugriff). Bei b, c und teilweise: " + OWA_HINT + ". " +
+                           "Typ-Kennung C&lt;Zahl> = OlRuleConditionType. Der Fehlertext nennt auch Lesefehler bei Ausnahmen und Aktionen.";
+
+    var headRow = 4;
+    var headers = ["Postfach", "Reihenfolge", "Regelname", "Aktiv", "Nur lokal", "Zustand",
+                   "Bedingungen: Anzahl laut Outlook", "Bedingungen: aktive Typen", "Bedingungen: inaktive Typen",
+                   "Ausnahmen: Anzahl laut Outlook", "Ausnahmen: aktive Typen", "Ausnahmen: inaktive Typen",
+                   "Fehlertext"];
+    writeRow(sh, headRow, headers);
+    styleHeaderRow(sh, headRow, headers.length);
+
+    var rows = st.rows.slice(0);
+    rows.sort(function (a, b) {
+        if (a.mailbox &lt; b.mailbox) return -1;
+        if (a.mailbox > b.mailbox) return 1;
+        return a.order - b.order;
+    });
+
+    var row = headRow + 1;
+    for (var r = 0; r &lt; rows.length; r++) {
+        var rec = rows[r];
+        var cd = rec.condDiag || newDiag();
+        var xd = rec.excDiag || newDiag();
+        var errs = [];
+        if (rec.condError) errs.push('Bedingungen: ' + rec.condError);
+        if (rec.excError) errs.push('Ausnahmen: ' + rec.excError);
+        if (rec.actError) errs.push('Aktionen: ' + rec.actError);
+        writeRow(sh, row, [
+            rec.mailbox,
+            rec.order,
+            rec.name,
+            jaNein(rec.enabled),
+            jaNein(rec.isLocal),
+            condStateLong(rec),
+            diagCount(cd),
+            diagTypes(cd.active, true),
+            diagTypes(cd.inactive, false),
+            diagCount(xd),
+            diagTypes(xd.active, true),
+            diagTypes(xd.inactive, false),
+            errs.join(' | ')
+        ]);
+        if (!condComplete(rec)) fillRange(sh, row, 6, row, 6, C_EXCEPT);
+        if (errs.length > 0) fillRange(sh, row, headers.length, row, headers.length, C_EXCEPT);
+        if (!rec.enabled) {
+            try { sh.Range(sh.Cells(row, 1), sh.Cells(row, headers.length)).Font.Italic = true; } catch (e) {}
+        }
+        row++;
+    }
+    if (rows.length === 0) {
+        sh.Cells(row, 1).Value = "Keine Regeln ausgegeben.";
+        row++;
+    }
+
+    try { sh.Range(sh.Cells(headRow, 1), sh.Cells(row - 1, headers.length)).AutoFilter(); } catch (e) {}
+    try {
+        sh.Columns("A:A").ColumnWidth = 26;
+        sh.Columns("B:B").ColumnWidth = 12;
+        sh.Columns("C:C").ColumnWidth = 34;
+        sh.Columns("D:E").ColumnWidth = 10;
+        sh.Columns("F:F").ColumnWidth = 30;
+        sh.Columns("G:G").ColumnWidth = 14;
+        sh.Columns("H:H").ColumnWidth = 50;
+        sh.Columns("I:I").ColumnWidth = 30;
+        sh.Columns("J:J").ColumnWidth = 14;
+        sh.Columns("K:K").ColumnWidth = 40;
+        sh.Columns("L:L").ColumnWidth = 30;
+        sh.Columns("M:M").ColumnWidth = 60;
+        sh.Range(sh.Cells(headRow, 1), sh.Cells(headRow, headers.length)).WrapText = true;
     } catch (e) {}
     freezeBelow(sh, excel, headRow);
 }
