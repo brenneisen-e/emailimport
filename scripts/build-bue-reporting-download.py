@@ -34,7 +34,7 @@ if MODUS == 'pruefbot':
     TITEL = 'Prüfbot-Testing – Arbeitsmappe'
     ANDERE = '<a href="hr-sales-dashboard-download.html">HR Sales Dashboard</a>'
     SCHRITTE = ('<li>Datei speichern (bei der ZIP: entpacken), öffnen, „Inhalt aktivieren“ klicken.</li>\n'
-                '      <li>Im Blatt „Testmail-Generator“ Startpostkorb und Testpostfächer P-01 bis P-04 eintragen, dann „Testmail erstellen“: '
+                '      <li>„Testmail erstellen“ (Empfänger und Absender sind im Blatt „Testmail-Generator“ vorbelegt): '
                 'die Mail entsteht als EML mit ausgefüllter, unterschriebener Vollmacht als PDF-Anhang im Ordner „Pruefbot_Testmails“.</li>')
 else:
     NAME = 'BUE_Reporting_Master_Makler.xlsm' if MAKLER else 'BUE_Reporting_Master.xlsm'
