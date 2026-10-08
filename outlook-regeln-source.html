@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Outlook-Regeln visualisieren v1.2 &ndash; Quellcode</title>
+<title>Outlook-Regeln visualisieren v1.3 &ndash; Quellcode</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -106,7 +106,7 @@ svg.ico { width: 18px; height: 18px; vertical-align: -3px; }
 <div class="container">
 <div class="card">
 <a class="back" href="index.html">&larr; Zur Startseite</a>
-<h1 style="margin-top:8px;">Outlook-Regeln visualisieren <strong>v1.2</strong> &ndash; Quellcode</h1>
+<h1 style="margin-top:8px;">Outlook-Regeln visualisieren <strong>v1.3</strong> &ndash; Quellcode</h1>
 <p class="subtitle">Regeln ausgew&auml;hlter (Gruppen-)Postf&auml;cher auslesen und die Logik als Excel-Mappe darstellen &middot; kein Download-ZIP n&ouml;tig</p>
 
 <div class="info">
@@ -127,7 +127,7 @@ fertig. Nichts wird nachgeladen, die .hta l&auml;uft danach komplett offline auf
 Arbeitsplatz (Outlook + Excel per COM).
 </div>
 
-<div class="meta">HTA-Version: <strong>v1.2</strong> &middot; Dateigr&ouml;&szlig;e: <strong id="meta-size">&hellip;</strong> &middot; Zeilen: <strong id="meta-lines">&hellip;</strong></div>
+<div class="meta">HTA-Version: <strong>v1.3</strong> &middot; Dateigr&ouml;&szlig;e: <strong id="meta-size">&hellip;</strong> &middot; Zeilen: <strong id="meta-lines">&hellip;</strong></div>
 
 <div class="actions">
 <button class="btn-copy" id="btnCopy" onclick="copyCode()">
@@ -163,7 +163,7 @@ Alles markieren
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.2"
+        VERSION="1.3"
         WINDOWSTATE="normal"
     />
     &lt;style>
@@ -289,7 +289,7 @@ Alles markieren
                 &lt;/svg>
                 &lt;h2>Outlook-Regeln visualisieren&lt;/h2>
                 &lt;div class="subtitle">Alle Regeln ausgew&amp;auml;hlter (Gruppen-)Postf&amp;auml;cher auslesen und die Logik als Excel-Mappe darstellen&lt;/div>
-                &lt;div class="ver">v1.2&lt;/div>
+                &lt;div class="ver">v1.3&lt;/div>
             &lt;/div>
 
             &lt;!-- Postfaecher -->
@@ -335,8 +335,8 @@ Alles markieren
                     Blatt &amp;bdquo;Pr&amp;uuml;fhinweise&amp;ldquo; erzeugen (Konflikte, toter Code, Datenabfluss)
                 &lt;/label>
                 &lt;div class="hint">
-                    &lt;b>Neu in v1.2:&lt;/b> Die Werte von Bedingungen wie &amp;bdquo;Betreff enth&amp;auml;lt&amp;ldquo;, &amp;bdquo;Absenderadresse enth&amp;auml;lt&amp;ldquo;
-                    oder &amp;bdquo;Text enth&amp;auml;lt&amp;ldquo; werden jetzt gelesen. Bis v1.1 brach das Lesen dort ab (&amp;bdquo;Zeichenfolge erwartet&amp;ldquo;),
+                    &lt;b>Neu in v1.3:&lt;/b> Die Werte von Bedingungen wie &amp;bdquo;Betreff enth&amp;auml;lt&amp;ldquo;, &amp;bdquo;Absenderadresse enth&amp;auml;lt&amp;ldquo;
+                    oder &amp;bdquo;Text enth&amp;auml;lt&amp;ldquo; werden jetzt &amp;uuml;ber Excel gelesen. Bis v1.2 brach das Lesen dort ab bzw. blieb leer (&amp;bdquo;Zeichenfolge erwartet&amp;ldquo;),
                     und die Regel erschien ohne Bedingung. Bleibt eine Bedingung trotzdem unlesbar, steht das in der Spalte
                     &amp;bdquo;Bedingung lesbar&amp;ldquo; und im Blatt &amp;bdquo;Diagnose&amp;ldquo;.
                 &lt;/div>
@@ -356,55 +356,6 @@ Alles markieren
         &lt;/div>
     &lt;/div>
 
-&lt;script language="VBScript">
-' Hilfe fuer JScript (v1.2): Outlook liefert die Werte einer Bedingung (z. B. TextRuleCondition.Text,
-' AddressRuleCondition.Address) als typisiertes String-Array. JScripts VBArray kann das nicht lesen,
-' VBScript schon. Rueckgabe: Werte durch Chr(1) getrennt; Chr(2) + Hinweis, wenn nichts lesbar war.
-Function VbsListe(v)
-    Dim s, i, x, ok
-    VbsListe = ""
-    On Error Resume Next
-    If IsArray(v) Then
-        Err.Clear
-        s = Join(v, Chr(1))
-        If Err.Number = 0 Then
-            VbsListe = s
-            Exit Function
-        End If
-        Err.Clear
-        s = ""
-        ok = True
-        For Each x In v
-            s = s &amp; CStr(x) &amp; Chr(1)
-            If Err.Number &lt;> 0 Then ok = False
-        Next
-        If ok And Err.Number = 0 Then
-            VbsListe = s
-            Exit Function
-        End If
-        Err.Clear
-        s = ""
-        ok = True
-        For i = LBound(v) To UBound(v)
-            s = s &amp; CStr(v(i)) &amp; Chr(1)
-            If Err.Number &lt;> 0 Then ok = False
-        Next
-        If ok And Err.Number = 0 Then
-            VbsListe = s
-            Exit Function
-        End If
-        VbsListe = Chr(2) &amp; "VarType " &amp; VarType(v)
-    Else
-        Err.Clear
-        s = CStr(v)
-        If Err.Number = 0 Then
-            VbsListe = s
-        Else
-            VbsListe = Chr(2) &amp; "VarType " &amp; VarType(v)
-        End If
-    End If
-End Function
-&lt;/script>
 &lt;script language="JScript">
 /* =====================================================================
    Outlook-Regeln visualisieren  (HTA / JScript / COM-Automation)
@@ -828,66 +779,79 @@ function toList(v) {
     if (v === null || typeof v === 'undefined') return [];
     var out = [];
     var i, s;
-    /* 1) Variant-Array (VT_ARRAY|VT_VARIANT) */
-    try {
-        var arr = new VBArray(v).toArray();
-        for (i = 0; i &lt; arr.length; i++) {
-            s = safeStr(arr[i]);
-            if (s !== '') out.push(s);
-        }
-        return out;
-    } catch (e) {}
-    /* 2) Typisiertes Array (VT_ARRAY|VT_BSTR, so liefert Outlook die Werte von
-          "Betreff enthaelt", "Absenderadresse enthaelt" usw.) ueber VBScript,
-          falls die HTA VBScript ausfuehrt (im IE11-Modus nicht – dann Schritt 3).
-          Bis v1.1 brach das Lesen hier mit "Zeichenfolge erwartet" ab. */
-    try {
-        var j = VbsListe(v);
-        if (typeof j === 'string') {
-            if (j.charAt(0) === '\x02') {
-                out.push('(Werte nicht lesbar, ' + j.substring(1) + ')');
-                return out;
-            }
-            var teile = j.split('\x01');
-            for (i = 0; i &lt; teile.length; i++) {
-                s = trim(teile[i]);
+    /* 1) VBArray (gibt es nur in Dokumentmodi bis IE10; die HTA laeuft im
+          IE11-Modus, dort fehlt VBArray - bis v1.1 brach das Lesen hier ab) */
+    if (typeof VBArray !== 'undefined') {
+        try {
+            var arr = new VBArray(v).toArray();
+            for (i = 0; i &lt; arr.length; i++) {
+                s = safeStr(arr[i]);
                 if (s !== '') out.push(s);
             }
             return out;
-        }
-    } catch (e2) {}
-    /* 3) Ueber Excel: WorksheetFunction.Transpose wandelt jedes 1D-Array in ein
-          Variant-Array, das VBArray lesen kann. Noetig, weil die HTA im IE11-Modus
-          laeuft und VBScript dort nicht ausgefuehrt wird. Excel braucht das Tool
-          ohnehin; die Hilfsinstanz wird in finishRead wieder beendet. */
+        } catch (e) {}
+    }
+    /* 2) JavaScript-Array (Testumgebung) */
     try {
-        var xl = xlHilfe();
-        if (xl) {
-            var tr = xl.WorksheetFunction.Transpose(v);
-            var flach = null;
-            try { flach = new VBArray(tr).toArray(); } catch (eT) { flach = [tr]; }
-            for (i = 0; i &lt; flach.length; i++) {
-                s = safeStr(flach[i]);
-                if (s !== '') out.push(s);
-            }
-            if (out.length > 0) return out;
-        }
-    } catch (e4) {}
-    /* 4) JavaScript-Array */
-    try {
-        if (typeof v === 'object' &amp;&amp; typeof v.length === 'number') {
+        if (typeof v === 'object' &amp;&amp; v !== null &amp;&amp; typeof v.length === 'number') {
             for (i = 0; i &lt; v.length; i++) {
                 s = safeStr(v[i]);
                 if (s !== '') out.push(s);
             }
             return out;
         }
-    } catch (e3) {}
-    /* 5) Einzelwert */
-    s = safeStr(v);
-    if (s !== '') out.push(s);
+    } catch (e2) {}
+    /* 3) Einfacher Text */
+    if (typeof v === 'string') {
+        s = trim(v);
+        if (s !== '') out.push(s);
+        return out;
+    }
+    if (typeof v === 'number' || typeof v === 'boolean') {
+        out.push(String(v));
+        return out;
+    }
+    /* 4) SAFEARRAY (typeof "unknown") ueber Excel lesen - nur Aufrufe, die
+          einzelne Texte zurueckgeben, damit kein VBArray noetig ist. */
+    var xl = xlHilfe();
+    if (xl) {
+        var wf = null;
+        try { wf = xl.WorksheetFunction; } catch (eW) {}
+        if (wf) {
+            try {
+                var tj = wf.TextJoin('\x01', false, v);      /* TEXTVERKETTEN, Excel 2019/365 */
+                if (typeof tj === 'string') {
+                    var teile = tj.split('\x01');
+                    for (i = 0; i &lt; teile.length; i++) {
+                        s = trim(teile[i]);
+                        if (s !== '') out.push(s);
+                    }
+                    return out;
+                }
+            } catch (eT) {}
+            /* aeltere Excel-Versionen: Element fuer Element ueber INDEX */
+            var gelesen = 0;
+            for (i = 1; i &lt;= 500; i++) {
+                var el = null;
+                try { el = wf.Index(v, i); } catch (eI) { break; }
+                gelesen++;
+                if (typeof el === 'string' || typeof el === 'number' || typeof el === 'boolean') {
+                    s = trim(el);
+                    if (s !== '') out.push(s);
+                } else {
+                    break;
+                }
+            }
+            if (gelesen > 0) return out;
+        }
+    }
+    /* 5) Nicht lesbar: Hinweis statt Absturz */
+    out.push(WERT_NICHT_LESBAR + ', Typ ' + typeOfSafe(v) + (xl ? '' : ', Excel nicht verfügbar') + ')');
     return out;
 }
+
+var WERT_NICHT_LESBAR = '(Werte nicht lesbar';
+function typeOfSafe(v) { try { return typeof v; } catch (e) { return '?'; } }
 
 /* Unsichtbare Excel-Hilfsinstanz fuer toList (einmal je Lauf, wird in finishRead beendet). */
 var XL_HILFE = null, XL_HILFE_FEHLT = false;
@@ -904,9 +868,12 @@ function xlHilfe() {
     return XL_HILFE;
 }
 function xlHilfeBeenden() {
-    if (!XL_HILFE) return;
-    try { XL_HILFE.Quit(); } catch (e) {}
-    XL_HILFE = null;
+    if (XL_HILFE) {
+        try { XL_HILFE.Quit(); } catch (e) {}
+        XL_HILFE = null;
+        try { CollectGarbage(); } catch (e2) {}
+    }
+    XL_HILFE_FEHLT = false;
 }
 
 /* Wert als Text, ohne Ausnahme: nicht wandelbare COM-Werte ergeben einen Hinweis. */
@@ -914,7 +881,7 @@ function safeStr(x) {
     try { return trim(x); } catch (e) {}
     var t = '';
     try { t = typeof x; } catch (e2) {}
-    return '(Wert nicht lesbar' + (t !== '' ? ', Typ ' + t : '') + ')';
+    return WERT_NICHT_LESBAR + (t !== '' ? ', Typ ' + t : '') + ')';
 }
 
 /* Recipients-Collection als Namensliste. */
@@ -944,7 +911,11 @@ function recipientList(recs) {
 
 function quoteList(list) {
     var out = [];
-    for (var i = 0; i &lt; list.length; i++) out.push('"' + list[i] + '"');
+    for (var i = 0; i &lt; list.length; i++) {
+        var w = String(list[i]);
+        /* Hinweise (nicht lesbare Werte) nicht in Anfuehrungszeichen - sie sind kein Suchbegriff */
+        out.push(w.indexOf(WERT_NICHT_LESBAR) === 0 ? w : '"' + w + '"');
+    }
     return out.join(', ');
 }
 
@@ -1062,7 +1033,8 @@ function newDiag() {
         errors: [],         // Fehlertexte beim Lesen
         countFailed: false, // Count nicht lesbar -> Nachlese ueber den Index unmoeglich
         itemFailed: 0,      // Anzahl Item(k), die beim Lesen geworfen haben
-        propsFailed: false  // keine einzige benannte Eigenschaft lesbar
+        propsFailed: false, // keine einzige benannte Eigenschaft lesbar
+        valueFailed: 0      // Eintraege, deren Werte (Text, Adressen ...) nicht lesbar waren
     };
 }
 
@@ -1095,7 +1067,7 @@ function collectRuleItems(container, defs, diag) {
         var det = '', detFehler = false;
         try { det = describeRuleItem(obj); } catch (eD) { det = '(Werte nicht lesbar: ' + errText(eD) + ')'; detFehler = true; }
         if (det.indexOf('nicht lesbar') !== -1) detFehler = true;
-        if (detFehler) diag.errors.push(def.label + ': Werte nicht vollständig lesbar');
+        if (detFehler) { diag.errors.push(def.label + ': Werte nicht vollständig lesbar'); diag.valueFailed++; }
         out.push({
             label: def.label,
             detail: det,
@@ -1142,6 +1114,7 @@ function collectRuleItems(container, defs, diag) {
             var det2 = '', det2Fehler = false;
             try { det2 = describeRuleItem(it); } catch (eD2) { det2 = '(Werte nicht lesbar: ' + errText(eD2) + ')'; det2Fehler = true; }
             if (det2.indexOf('nicht lesbar') !== -1) det2Fehler = true;
+            if (det2Fehler) { diag.errors.push(lbl + ': Werte nicht vollständig lesbar'); diag.valueFailed++; }
             out.push({
                 label: lbl !== '' ? lbl : 'Sonstiges (Typ ' + key + ')',
                 detail: det2,
@@ -1214,7 +1187,7 @@ function readRuleBlock(rule, prop, defs, strict) {
     var counts = hard || (strict &amp;&amp; d.itemFailed > 0);
     if (res.items.length > 0) {
         res.state = COND_READ;
-        res.partial = counts;
+        res.partial = counts || d.valueFailed > 0;
     } else {
         res.state = counts ? COND_ERROR : COND_NONE;
     }
@@ -1255,6 +1228,10 @@ function startRead() {
     };
 
     log('Auslesen gestartet für ' + stores.length + ' Postfach/Postfächer.', 'head');
+    var dm = '?';
+    try { dm = String(document.documentMode); } catch (eDm) {}
+    log('Umgebung: Dokumentmodus ' + dm + ', VBArray ' + (typeof VBArray !== 'undefined' ? 'ja' : 'nein') +
+        ' – Werte von Text-Bedingungen werden ' + (typeof VBArray !== 'undefined' ? 'direkt' : 'über Excel') + ' gelesen.', 'info');
     window.setTimeout(readTick, 60);
 }
 

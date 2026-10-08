@@ -13,7 +13,7 @@ Bei jeder Aenderung an einem Tool MUESSEN folgende Versionsnummern hochgesetzt w
 - `ergo-email-batch.hta` → VERSION in Zeile ~19 (aktuell **1.1**)
 - `un-laenderliste-excel.hta` → VERSION in Zeile ~19 (aktuell **1.2**, JScript-COM wie die uebrigen Module)
 - `ergo-mail-statistik.hta` → VERSION in Zeile ~18 (aktuell **1.0**, JScript-COM; KW-Statistik fuer bis zu 2 Postfaecher mit Stichwort-Flagging)
-- `outlook-regeln-visualisierung.hta` → VERSION in Zeile ~18 (aktuell **1.2**, JScript-COM; liest Outlook-Regeln mehrerer (Gruppen-)Postfaecher und visualisiert die Logik in Excel; ab 1.1 drei Zustaende je Regel: Bedingung gelesen / keine sichtbar / nicht lesbar, Blatt „Diagnose“; ab 1.2 Werte typisierter Arrays (TextRuleCondition.Text) ueber VBScript-Helfer VbsListe)
+- `outlook-regeln-visualisierung.hta` → VERSION in Zeile ~18 (aktuell **1.3**, JScript-COM; liest Outlook-Regeln mehrerer (Gruppen-)Postfaecher und visualisiert die Logik in Excel; ab 1.1 drei Zustaende je Regel: Bedingung gelesen / keine sichtbar / nicht lesbar, Blatt „Diagnose“; ab 1.3 Werte von Array-Eigenschaften (TextRuleCondition.Text usw.) ueber Excel TextJoin/Index, weil im IE11-Modus VBArray und VBScript fehlen)
 - `ergo-jdc-weiterleitung.hta` → VERSION in Zeile ~18 (aktuell **1.1**, JScript-COM; sucht JDC-Mails mit Anhang und leitet sie getaktet an eine Zieladresse weiter, mit Kategorie-Marker gegen Doppelversand)
 - `ergo-reminder-analyse.hta` → VERSION in Zeile ~18 (aktuell **1.9**, JScript-COM; zaehlt Erinnerungs-Mails von JDC/Jung DMS aus bis zu 2 Ordnern je Eingangskanal, mit Sparte aus VNR-Praefix)
 
@@ -148,7 +148,7 @@ cp ergo-jdc-weiterleitung.hta /tmp/ergo-fw-build/ergo-jdc-weiterleitung-v$FW_VER
 Fuer das Regel-Visualisierungs-Tool analog (eigene Versionsnummer, nur die HTA im ZIP):
 
 ```bash
-RV_VER=1.2
+RV_VER=1.3
 rm -f Outlook-Regeln-Visualisierung-v*.zip
 mkdir -p /tmp/ergo-rv-build
 cp outlook-regeln-visualisierung.hta /tmp/ergo-rv-build/outlook-regeln-visualisierung-v$RV_VER.hta
