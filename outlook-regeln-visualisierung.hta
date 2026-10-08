@@ -15,7 +15,7 @@
         SHOWINTASKBAR="yes"
         SINGLEINSTANCE="yes"
         SYSMENU="yes"
-        VERSION="1.1"
+        VERSION="1.2"
         WINDOWSTATE="normal"
     />
     <style>
@@ -141,7 +141,7 @@
                 </svg>
                 <h2>Outlook-Regeln visualisieren</h2>
                 <div class="subtitle">Alle Regeln ausgew&auml;hlter (Gruppen-)Postf&auml;cher auslesen und die Logik als Excel-Mappe darstellen</div>
-                <div class="ver">v1.1</div>
+                <div class="ver">v1.2</div>
             </div>
 
             <!-- Postfaecher -->
@@ -187,12 +187,10 @@
                     Blatt &bdquo;Pr&uuml;fhinweise&ldquo; erzeugen (Konflikte, toter Code, Datenabfluss)
                 </label>
                 <div class="hint">
-                    <b>Neu in v1.1:</b> Regeln, die in Outlook im Web angelegt wurden (z.&nbsp;B. mit der Bedingung
-                    &bdquo;Nachrichtentyp: automatische Antwort&ldquo;), kann Outlook oft nicht lesen. Solche Regeln erscheinen
-                    jetzt als &bdquo;keine Bedingung sichtbar&ldquo; bzw. &bdquo;Bedingung nicht lesbar&ldquo; statt als
-                    &bdquo;jede eingehende Mail&ldquo;; ist nur ein Teil lesbar, steht in der Spalte &bdquo;Bedingung lesbar&ldquo;
-                    &bdquo;teilweise&ldquo;. Das Blatt &bdquo;Diagnose&ldquo; zeigt je Regel, was Outlook liefert;
-                    die echte Bedingung steht in Outlook im Web unter Einstellungen &rsaquo; E-Mail &rsaquo; Regeln.
+                    <b>Neu in v1.2:</b> Die Werte von Bedingungen wie &bdquo;Betreff enth&auml;lt&ldquo;, &bdquo;Absenderadresse enth&auml;lt&ldquo;
+                    oder &bdquo;Text enth&auml;lt&ldquo; werden jetzt gelesen. Bis v1.1 brach das Lesen dort ab (&bdquo;Zeichenfolge erwartet&ldquo;),
+                    und die Regel erschien ohne Bedingung. Bleibt eine Bedingung trotzdem unlesbar, steht das in der Spalte
+                    &bdquo;Bedingung lesbar&ldquo; und im Blatt &bdquo;Diagnose&ldquo;.
                 </div>
             </div>
 
@@ -210,6 +208,55 @@
         </div>
     </div>
 
+<script language="VBScript">
+' Hilfe fuer JScript (v1.2): Outlook liefert die Werte einer Bedingung (z. B. TextRuleCondition.Text,
+' AddressRuleCondition.Address) als typisiertes String-Array. JScripts VBArray kann das nicht lesen,
+' VBScript schon. Rueckgabe: Werte durch Chr(1) getrennt; Chr(2) + Hinweis, wenn nichts lesbar war.
+Function VbsListe(v)
+    Dim s, i, x, ok
+    VbsListe = ""
+    On Error Resume Next
+    If IsArray(v) Then
+        Err.Clear
+        s = Join(v, Chr(1))
+        If Err.Number = 0 Then
+            VbsListe = s
+            Exit Function
+        End If
+        Err.Clear
+        s = ""
+        ok = True
+        For Each x In v
+            s = s & CStr(x) & Chr(1)
+            If Err.Number <> 0 Then ok = False
+        Next
+        If ok And Err.Number = 0 Then
+            VbsListe = s
+            Exit Function
+        End If
+        Err.Clear
+        s = ""
+        ok = True
+        For i = LBound(v) To UBound(v)
+            s = s & CStr(v(i)) & Chr(1)
+            If Err.Number <> 0 Then ok = False
+        Next
+        If ok And Err.Number = 0 Then
+            VbsListe = s
+            Exit Function
+        End If
+        VbsListe = Chr(2) & "VarType " & VarType(v)
+    Else
+        Err.Clear
+        s = CStr(v)
+        If Err.Number = 0 Then
+            VbsListe = s
+        Else
+            VbsListe = Chr(2) & "VarType " & VarType(v)
+        End If
+    End If
+End Function
+</script>
 <script language="JScript">
 /* =====================================================================
    Outlook-Regeln visualisieren  (HTA / JScript / COM-Automation)
@@ -632,26 +679,56 @@ function tryGet(obj, prop) {
 function toList(v) {
     if (v === null || typeof v === 'undefined') return [];
     var out = [];
+    var i, s;
+    /* 1) Variant-Array (VT_ARRAY|VT_VARIANT) */
     try {
         var arr = new VBArray(v).toArray();
-        for (var i = 0; i < arr.length; i++) {
-            var s = trim(arr[i]);
+        for (i = 0; i < arr.length; i++) {
+            s = safeStr(arr[i]);
             if (s !== '') out.push(s);
         }
         return out;
     } catch (e) {}
+    /* 2) Typisiertes Array (VT_ARRAY|VT_BSTR, so liefert Outlook die Werte von
+          "Betreff enthaelt", "Absenderadresse enthaelt" usw.) ueber VBScript.
+          Bis v1.1 brach das Lesen hier mit "Zeichenfolge erwartet" ab. */
     try {
-        if (typeof v === 'object' && typeof v.length === 'number') {
-            for (var j = 0; j < v.length; j++) {
-                var s2 = trim(v[j]);
-                if (s2 !== '') out.push(s2);
+        var j = VbsListe(v);
+        if (typeof j === 'string') {
+            if (j.charAt(0) === '\x02') {
+                out.push('(Werte nicht lesbar, ' + j.substring(1) + ')');
+                return out;
+            }
+            var teile = j.split('\x01');
+            for (i = 0; i < teile.length; i++) {
+                s = trim(teile[i]);
+                if (s !== '') out.push(s);
             }
             return out;
         }
     } catch (e2) {}
-    var s3 = trim(v);
-    if (s3 !== '') out.push(s3);
+    /* 3) JavaScript-Array */
+    try {
+        if (typeof v === 'object' && typeof v.length === 'number') {
+            for (i = 0; i < v.length; i++) {
+                s = safeStr(v[i]);
+                if (s !== '') out.push(s);
+            }
+            return out;
+        }
+    } catch (e3) {}
+    /* 4) Einzelwert */
+    s = safeStr(v);
+    if (s !== '') out.push(s);
     return out;
+}
+
+/* Wert als Text, ohne Ausnahme: nicht wandelbare COM-Werte ergeben einen Hinweis. */
+function safeStr(x) {
+    try { return trim(x); } catch (e) {}
+    var t = '';
+    try { t = typeof x; } catch (e2) {}
+    return '(Wert nicht lesbar' + (t !== '' ? ', Typ ' + t : '') + ')';
 }
 
 /* Recipients-Collection als Namensliste. */
@@ -689,53 +766,35 @@ function quoteList(list) {
    Eigenschaften gefragt, die die Outlook-Subtypen anbieten koennen. */
 function describeRuleItem(obj) {
     var parts = [];
-
-    var texts = toList(tryGet(obj, 'Text'));
-    if (texts.length > 0) parts.push(quoteList(texts));
-
-    var addr = toList(tryGet(obj, 'Address'));
-    if (addr.length > 0) parts.push(quoteList(addr));
-
-    var forms = toList(tryGet(obj, 'FormName'));
-    if (forms.length > 0) parts.push(quoteList(forms));
-
-    var cats = toList(tryGet(obj, 'Categories'));
-    if (cats.length > 0) parts.push(cats.join(', '));
-
-    var recs = recipientList(tryGet(obj, 'Recipients'));
-    if (recs.length > 0) parts.push(recs.join('; '));
-
-    var folder = tryGet(obj, 'Folder');
-    if (folder) {
-        var fp = folderPath(folder);
-        if (fp !== '') parts.push(fp);
+    /* v1.2: jeder Teil einzeln abgesichert - ein nicht lesbarer Wert verdirbt
+       nicht mehr die ganze Bedingung (bis v1.1 fiel dann der ganze Block weg). */
+    var schritte = [
+        function () { var t = toList(tryGet(obj, 'Text')); if (t.length > 0) parts.push(quoteList(t)); },
+        function () { var a = toList(tryGet(obj, 'Address')); if (a.length > 0) parts.push(quoteList(a)); },
+        function () { var f = toList(tryGet(obj, 'FormName')); if (f.length > 0) parts.push(quoteList(f)); },
+        function () { var c = toList(tryGet(obj, 'Categories')); if (c.length > 0) parts.push(c.join(', ')); },
+        function () { var r = recipientList(tryGet(obj, 'Recipients')); if (r.length > 0) parts.push(r.join('; ')); },
+        function () {
+            var folder = tryGet(obj, 'Folder');
+            if (folder) { var fp = folderPath(folder); if (fp !== '') parts.push(fp); }
+        },
+        function () { var acc = tryGet(obj, 'Account'); if (acc) parts.push(safeStr(acc.DisplayName)); },
+        function () { var al = tryGet(obj, 'AddressList'); if (al) parts.push(safeStr(al.Name)); },
+        function () {
+            var imp = tryGet(obj, 'Importance');
+            if (typeof imp === 'number' && imp >= 0 && imp <= 2) parts.push(IMPORTANCE_TEXT[imp]);
+        },
+        function () {
+            var sens = tryGet(obj, 'Sensitivity');
+            if (typeof sens === 'number' && sens >= 0 && sens <= 3) parts.push(SENSITIVITY_TEXT[sens]);
+        },
+        function () { var ft = tryGet(obj, 'FlagTo'); if (ft !== null && safeStr(ft) !== '') parts.push(safeStr(ft)); },
+        function () { var mi = tryGet(obj, 'MarkInterval'); if (typeof mi === 'number') parts.push('Frist-Code ' + mi); },
+        function () { var fi = tryGet(obj, 'FilePath'); if (fi !== null && safeStr(fi) !== '') parts.push(safeStr(fi)); }
+    ];
+    for (var i = 0; i < schritte.length; i++) {
+        try { schritte[i](); } catch (e) { parts.push('(Wert nicht lesbar: ' + errText(e) + ')'); }
     }
-
-    var acc = tryGet(obj, 'Account');
-    if (acc) {
-        try { parts.push(trim(acc.DisplayName)); } catch (e) {}
-    }
-
-    var al = tryGet(obj, 'AddressList');
-    if (al) {
-        try { parts.push(trim(al.Name)); } catch (e) {}
-    }
-
-    var imp = tryGet(obj, 'Importance');
-    if (typeof imp === 'number' && imp >= 0 && imp <= 2) parts.push(IMPORTANCE_TEXT[imp]);
-
-    var sens = tryGet(obj, 'Sensitivity');
-    if (typeof sens === 'number' && sens >= 0 && sens <= 3) parts.push(SENSITIVITY_TEXT[sens]);
-
-    var flagTo = tryGet(obj, 'FlagTo');
-    if (flagTo !== null && trim(flagTo) !== '') parts.push(trim(flagTo));
-
-    var interval = tryGet(obj, 'MarkInterval');
-    if (typeof interval === 'number') parts.push('Frist-Code ' + interval);
-
-    var file = tryGet(obj, 'FilePath');
-    if (file !== null && trim(file) !== '') parts.push(trim(file));
-
     return parts.join(' | ');
 }
 
@@ -847,12 +906,16 @@ function collectRuleItems(container, defs, diag) {
         if (enabled !== true) continue;
         var t = itemType(obj);
         seen[t] = true;
+        var det = '', detFehler = false;
+        try { det = describeRuleItem(obj); } catch (eD) { det = '(Werte nicht lesbar: ' + errText(eD) + ')'; detFehler = true; }
+        if (det.indexOf('nicht lesbar') !== -1) detFehler = true;
+        if (detFehler) diag.errors.push(def.label + ': Werte nicht vollständig lesbar');
         out.push({
             label: def.label,
-            detail: describeRuleItem(obj),
+            detail: det,
             def: def,
             type: t,
-            opaque: false
+            opaque: detFehler
         });
     }
     /* Keine einzige benannte Eigenschaft lesbar: Zugriff gestoert */
@@ -890,12 +953,15 @@ function collectRuleItems(container, defs, diag) {
             if (seen[key]) continue;
             seen[key] = true;
             var lbl = typeLabel(key);
+            var det2 = '', det2Fehler = false;
+            try { det2 = describeRuleItem(it); } catch (eD2) { det2 = '(Werte nicht lesbar: ' + errText(eD2) + ')'; det2Fehler = true; }
+            if (det2.indexOf('nicht lesbar') !== -1) det2Fehler = true;
             out.push({
                 label: lbl !== '' ? lbl : 'Sonstiges (Typ ' + key + ')',
-                detail: describeRuleItem(it),
+                detail: det2,
                 def: {},
                 type: key,
-                opaque: isOpaqueType(key)
+                opaque: det2Fehler || isOpaqueType(key)
             });
         } catch (eIt) {
             itemFailed++;
