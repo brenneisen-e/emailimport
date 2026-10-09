@@ -55,7 +55,7 @@ else:
     NAME = 'BUE_Reporting_Master_Makler.xlsm' if MAKLER else 'BUE_Reporting_Master.xlsm'
     QUELLE = os.path.join(HIER, 'bue-reporting', NAME)
     ZIEL = os.path.join(HIER, 'bue-reporting-makler-download.html' if MAKLER else 'bue-reporting-download.html')
-    TITEL = 'BÜ-Reporting Makler – Master-Datei (12.80)' if MAKLER else 'BÜ-Reporting HS – Master-Datei (12.80)'
+    TITEL = 'BÜ-Reporting Makler – Master-Datei (12.81)' if MAKLER else 'BÜ-Reporting HS – Master-Datei (12.81)'
     ANDERE = ('<a href="bue-reporting-download.html">Zur Fassung HS (HSB4 K)</a>' if MAKLER
               else '<a href="bue-reporting-makler-download.html">Zur Fassung Makler (ODPB, ODPP, KBI …)</a>')
 BASIS = NAME[:-5]                                               # Dateiname ohne .xlsm
