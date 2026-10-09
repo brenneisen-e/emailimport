@@ -41,7 +41,7 @@ elif MODUS == 'regeln-umbau':
     NAME = 'Regeln_Umbau.xlsm'
     QUELLE = os.path.join(HIER, 'outlook-regeln-umbau', NAME)
     ZIEL = os.path.join(HIER, 'outlook-regeln-umbau-download.html')
-    TITEL = 'Outlook-Regeln anpassen – Excel-Makro (Plan 2.2)'
+    TITEL = 'Outlook-Regeln anpassen – Excel-Makro (Plan 2.3)'
     ANDERE = '<a href="outlook-regeln-source.html">Outlook-Regeln visualisieren</a>'
     SCHRITTE = ('<li>In Outlook die Regeln exportieren (Regeln und Benachrichtigungen → Optionen → Regeln exportieren, .rwz) '
                 'und danach den Dialog „Regeln und Benachrichtigungen“ schließen.</li>\n'
