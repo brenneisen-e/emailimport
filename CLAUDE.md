@@ -50,6 +50,7 @@ ZIP-Umbenennungen ebenfalls angepasst werden.
 | `ergo-hinweis-suche.hta` | `ERGO-Hinweis-Suche-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `ergo-jdc-weiterleitung.hta` | `ERGO-JDC-Weiterleitung-v<VER>.zip` | siehe unten (versionierte Inhalte) |
 | `bue-reporting/BUE_Reporting_Master.xlsm` | `bue-reporting-download.html` (Datei als Base64 eingebettet, Knöpfe .xlsm, .xlsx (zum Umbenennen), ZIP und ZIP mit .xlsx per Blob) | `python3 scripts/build-bue-reporting-download.py` – nach jedem Austausch der xlsm (Quelle: Repo kiarbeitsplatz, `Bestandsuebertragung/kontextdokumente/reporting/bue_reporting`); direkte .xlsm-/.zip-Downloads scheitern im Firmennetz mit „Keine Berechtigungen“ |
+| `outlook-regeln-umbau/Regeln_Umbau.xlsm` | `outlook-regeln-umbau-download.html` (Base64 wie oben; zusaetzlich direkt verlinkt in `index.html`) | `python3 scripts/build-bue-reporting-download.py regeln-umbau` – nach jedem Austausch der xlsm (Excel-Makro: Regeln von Bestandsuebertragungen@ergo.de nach Vorbild Maklerauftraege@ergo.de, aktuell Plan 2.1) |
 
 > **Eingebettete Quellcodes (`EMBEDDED_SOURCES` in `downloads.html`):** Die
 > „Quellcode kopieren"-Buttons kopieren den HTA-Code aus einer **Inline-Base64-Kopie**

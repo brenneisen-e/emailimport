@@ -366,6 +366,18 @@
                 meta: 'Quelle: HTA (auch als ZIP: Outlook-Regeln-Visualisierung-v1.3.zip)',
             },
             {
+                id: 'regeln-umbau', group: 'export', icon: Icon.grid,
+                title: 'Outlook-Regeln anpassen (Excel-Makro)',
+                tags: ['XLSM', 'VBA', 'Outlook'],
+                whatsNew: 'neu Plan 2.1',
+                summary: 'Passt die Outlook-Regeln des Postfachs Bestandsuebertragungen@ergo.de automatisch nach Vorbild Maklerauftraege@ergo.de an – erst Vorschau, dann Ausführen mit Sicherung.',
+                action: { kind: 'open', href: 'outlook-regeln-umbau-download.html', label: 'Download-Seite öffnen' },
+                actionNote: 'Öffnet eine Seite, in der die Datei eingebettet ist: „Als .xlsm speichern“, „Als .xlsx speichern“ (danach von Hand in .xlsm umbenennen), „Als ZIP speichern“ oder „ZIP mit .xlsx“.',
+                requires: 'Excel mit aktivierten Makros, Outlook (läuft), beide Postfächer als vollwertige Postfächer im Profil',
+                details: 'Schritt 1: Regeln in Outlook exportieren (.rwz) und den Dialog „Regeln und Benachrichtigungen“ schließen. Schritt 2: „Vorschau“ – zeigt die geplanten Änderungen und schreibt nichts. Schritt 3: erst nach Kontrolle „Ausführen“ – legt eine Sicherung an, fragt vor dem Schreiben nach und prüft das Ergebnis nach. Hinweis: Makros aktivieren; Outlook muss laufen; beide Postfächer müssen als vollwertige Postfächer im Outlook-Profil hängen (nicht über „Ordner eines anderen Benutzers öffnen“).',
+                meta: 'Datei: Regeln_Umbau.xlsm (Excel mit Makros), wahlweise als .xlsx oder ZIP',
+            },
+            {
                 id: 'extraktion', group: 'process', icon: Icon.box,
                 title: 'Mail-Extraktion & Zuordnung',
                 tags: ['HTA'],

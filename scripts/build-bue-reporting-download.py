@@ -12,6 +12,7 @@ die .xlsm nach Endung blocken), als .zip und als .zip mit der .xlsx darin.
 Aufruf:   python3 scripts/build-bue-reporting-download.py            (HS: BUE_Reporting_Master.xlsm)
           python3 scripts/build-bue-reporting-download.py makler     (Makler: BUE_Reporting_Master_Makler.xlsm)
           python3 scripts/build-bue-reporting-download.py pruefbot   (Prüfbot-Testing: pruefbot-testing/Pruefbot_Testing.xlsm)
+          python3 scripts/build-bue-reporting-download.py regeln-umbau (Outlook-Regeln anpassen: outlook-regeln-umbau/Regeln_Umbau.xlsm)
 Nach JEDEM Austausch der Master-Datei ausfuehren.
 """
 import base64
@@ -36,6 +37,20 @@ if MODUS == 'pruefbot':
     SCHRITTE = ('<li>Datei speichern (bei der ZIP: entpacken), öffnen, „Inhalt aktivieren“ klicken.</li>\n'
                 '      <li>„Testmail erstellen“ (Empfänger und Absender sind im Blatt „Testmail-Generator“ vorbelegt): '
                 'die Mail entsteht als EML mit ausgefüllter, unterschriebener Vollmacht als PDF-Anhang im Ordner „Pruefbot_Testmails“.</li>')
+elif MODUS == 'regeln-umbau':
+    NAME = 'Regeln_Umbau.xlsm'
+    QUELLE = os.path.join(HIER, 'outlook-regeln-umbau', NAME)
+    ZIEL = os.path.join(HIER, 'outlook-regeln-umbau-download.html')
+    TITEL = 'Outlook-Regeln anpassen – Excel-Makro (Plan 2.1)'
+    ANDERE = '<a href="outlook-regeln-source.html">Outlook-Regeln visualisieren</a>'
+    SCHRITTE = ('<li>In Outlook die Regeln exportieren (Regeln und Benachrichtigungen → Optionen → Regeln exportieren, .rwz) '
+                'und danach den Dialog „Regeln und Benachrichtigungen“ schließen.</li>\n'
+                '      <li>Datei öffnen, „Inhalt aktivieren“ klicken, dann „Vorschau“: zeigt die geplanten Änderungen an den Regeln von '
+                'Bestandsuebertragungen@ergo.de nach Vorbild Maklerauftraege@ergo.de – es wird nichts geschrieben.</li>\n'
+                '      <li>Erst nach Kontrolle der Vorschau „Ausführen“: legt eine Sicherung an, fragt vor dem Schreiben nach und prüft '
+                'das Ergebnis anschließend nach.</li>\n'
+                '      <li>Voraussetzungen: Makros aktiviert, Outlook läuft, beide Postfächer hängen als vollwertige Postfächer im '
+                'Outlook-Profil (nicht über „Ordner eines anderen Benutzers öffnen“).</li>')
 else:
     NAME = 'BUE_Reporting_Master_Makler.xlsm' if MAKLER else 'BUE_Reporting_Master.xlsm'
     QUELLE = os.path.join(HIER, 'bue-reporting', NAME)
@@ -158,7 +173,7 @@ function speichern(art) {
 </body>
 </html>
 """
-seite = (seite.replace('__ANLEITUNG__', 'Bedienung und Ablauf stehen auf der Startseite der Datei.' if MODUS == 'pruefbot' else 'Ausführliche Anleitung im Blatt „Anleitung“ der Datei.').replace('__SCHRITTE__', SCHRITTE).replace('__TITEL__', TITEL).replace('__ANDERE__', ANDERE).replace('__BASIS__', BASIS).replace('__GROESSE__', groesse).replace('__STAND__', stand)
+seite = (seite.replace('__ANLEITUNG__', 'Bedienung und Ablauf stehen auf der Startseite der Datei.' if MODUS in ('pruefbot', 'regeln-umbau') else 'Ausführliche Anleitung im Blatt „Anleitung“ der Datei.').replace('__SCHRITTE__', SCHRITTE).replace('__TITEL__', TITEL).replace('__ANDERE__', ANDERE).replace('__BASIS__', BASIS).replace('__GROESSE__', groesse).replace('__STAND__', stand)
          .replace('__XLSM__', b64(daten)).replace('__ZIPX__', b64(zip_xlsx_daten)).replace('__ZIP__', b64(zip_daten)))
 open(ZIEL, 'w', encoding='utf-8').write(seite)
 print('geschrieben:', ZIEL, '%.1f MB' % (len(seite) / 1024 / 1024))
