@@ -154,6 +154,12 @@
             margin-left: auto; font-size: 11px; font-weight: 700;
             color: var(--ok); background: var(--ok-soft);
             padding: 3px 9px; border-radius: 999px; flex: none;
+            min-width: 0; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .neu-text {
+            margin-top: 10px; font-size: 12px; color: var(--ok); line-height: 1.45;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+            overflow-wrap: anywhere;
         }
         .summary { margin-top: 14px; font-size: 14px; color: var(--ink-2); }
         .requires {
@@ -447,7 +453,7 @@
                 id: 'bue-reporting', group: 'daten', icon: Icon.grid,
                 title: 'BÜ-Reporting HS (Master-Excel)',
                 tags: ['XLSM', 'VBA', 'Excel'],
-                whatsNew: '12.89: Produktivität der laufenden KW wird auf die ganze Woche hochgerechnet, Kachel zeigt die Vorwoche zum Vergleich; kleine Säulen mit Wert darüber. 12.88: Makler: jede Einheit wird einzeln mit ihrem Vortag verglichen, egal wie MIS-O die Einheiten auf die Dateien verteilt; nachgereichte Einheiten werden eingefügt; Blatt „Dateiinhalt“; Bearbeiter MSUED ergänzt (einmal Zurücksetzen nötig). 12.87: Neue Master-Datei übernimmt beim ersten Laden Mitarbeiter und Kalender aus der bisherigen Version im selben Ordner; Knopf „nur“ bei den Einheiten. 12.86: Makler: Einheiten-Chips links filtern alle Kennzahlen, MAK und Produktivität. 12.85: Zahlen kleiner Segmente überlagern sich nicht mehr. 12.84: Kachel und Verlauf „Ø Alter“; Stand mit KW; über 90 Tage schwarz; GR und AZ nicht mehr im Standard; Rohdatei-Öffnen auf SharePoint mit Wiederholung. 12.83: Stand groß neben der Version; KPI-Kacheln folgen der Ansicht',
+                whatsNew: '12.90: Textdateien des Tools (Sperrdatei, Celonis-Protokoll, Ladelog) im Ordner „Protokolle“. 12.89: Produktivität der laufenden KW wird auf die ganze Woche hochgerechnet, Kachel zeigt die Vorwoche zum Vergleich; kleine Säulen mit Wert darüber. 12.88: Makler: jede Einheit wird einzeln mit ihrem Vortag verglichen, egal wie MIS-O die Einheiten auf die Dateien verteilt; nachgereichte Einheiten werden eingefügt; Blatt „Dateiinhalt“; Bearbeiter MSUED ergänzt (einmal Zurücksetzen nötig). 12.87: Neue Master-Datei übernimmt beim ersten Laden Mitarbeiter und Kalender aus der bisherigen Version im selben Ordner; Knopf „nur“ bei den Einheiten. 12.86: Makler: Einheiten-Chips links filtern alle Kennzahlen, MAK und Produktivität. 12.85: Zahlen kleiner Segmente überlagern sich nicht mehr. 12.84: Kachel und Verlauf „Ø Alter“; Stand mit KW; über 90 Tage schwarz; GR und AZ nicht mehr im Standard; Rohdatei-Öffnen auf SharePoint mit Wiederholung. 12.83: Stand groß neben der Version; KPI-Kacheln folgen der Ansicht',
                 summary: 'Tagesreporting der Makler-Bestandsübertragung: liest die Rückstandsabzüge OPAG und Verbund aus einem Ordner, führt Rückstand, Eingänge, Abgänge und Produktivität fort und zeigt alles im Cockpit.',
                 action: { kind: 'open', href: 'bue-reporting-download.html', label: 'Download-Seite öffnen' },
                 actionNote: 'Öffnet eine Seite, in der die Datei eingebettet ist: „Als .xlsm speichern“, „Als .xlsx speichern“ (danach von Hand in .xlsm umbenennen) „Als ZIP speichern“ oder „ZIP mit .xlsx“ erzeugt sie im Browser (umgeht Proxy-Filter, die direkte .xlsm-/.zip-Downloads mit „Keine Berechtigungen“ blocken).',
@@ -459,7 +465,7 @@
                 id: 'bue-reporting-makler', group: 'daten', icon: Icon.grid,
                 title: 'BÜ-Reporting Makler (Master-Excel)',
                 tags: ['XLSM', 'VBA', 'Excel'],
-                whatsNew: '12.89: Produktivität der laufenden KW wird auf die ganze Woche hochgerechnet, Kachel zeigt die Vorwoche zum Vergleich; kleine Säulen mit Wert darüber. 12.88: Makler: jede Einheit wird einzeln mit ihrem Vortag verglichen, egal wie MIS-O die Einheiten auf die Dateien verteilt; nachgereichte Einheiten werden eingefügt; Blatt „Dateiinhalt“; Bearbeiter MSUED ergänzt (einmal Zurücksetzen nötig). 12.87: Neue Master-Datei übernimmt beim ersten Laden Mitarbeiter und Kalender aus der bisherigen Version im selben Ordner; Knopf „nur“ bei den Einheiten. 12.86: Makler: Einheiten-Chips links filtern alle Kennzahlen, MAK und Produktivität. 12.85: Zahlen kleiner Segmente überlagern sich nicht mehr. 12.84: Kachel und Verlauf „Ø Alter“; Stand mit KW; über 90 Tage schwarz; GR und AZ nicht mehr im Standard; Rohdatei-Öffnen auf SharePoint mit Wiederholung. 12.83: Stand groß neben der Version; KPI-Kacheln folgen der Ansicht',
+                whatsNew: '12.90: Textdateien des Tools (Sperrdatei, Celonis-Protokoll, Ladelog) im Ordner „Protokolle“. 12.89: Produktivität der laufenden KW wird auf die ganze Woche hochgerechnet, Kachel zeigt die Vorwoche zum Vergleich; kleine Säulen mit Wert darüber. 12.88: Makler: jede Einheit wird einzeln mit ihrem Vortag verglichen, egal wie MIS-O die Einheiten auf die Dateien verteilt; nachgereichte Einheiten werden eingefügt; Blatt „Dateiinhalt“; Bearbeiter MSUED ergänzt (einmal Zurücksetzen nötig). 12.87: Neue Master-Datei übernimmt beim ersten Laden Mitarbeiter und Kalender aus der bisherigen Version im selben Ordner; Knopf „nur“ bei den Einheiten. 12.86: Makler: Einheiten-Chips links filtern alle Kennzahlen, MAK und Produktivität. 12.85: Zahlen kleiner Segmente überlagern sich nicht mehr. 12.84: Kachel und Verlauf „Ø Alter“; Stand mit KW; über 90 Tage schwarz; GR und AZ nicht mehr im Standard; Rohdatei-Öffnen auf SharePoint mit Wiederholung. 12.83: Stand groß neben der Version; KPI-Kacheln folgen der Ansicht',
                 summary: 'Dasselbe Tagesreporting für den Bereich Makler: mehrere Einheiten (ODPB, ODPP, KBI …) liefern je Tag eigene Abzüge, das Cockpit zeigt sie zusammen; die Anwesenheit kommt bei jedem Laden aus dem Telefonie- und Abwesenheitsplan.',
                 action: { kind: 'open', href: 'bue-reporting-makler-download.html', label: 'Download-Seite öffnen' },
                 actionNote: 'Öffnet eine Seite, in der die Datei eingebettet ist: „Als .xlsm speichern“, „Als .xlsx speichern“ (danach von Hand in .xlsm umbenennen), „Als ZIP speichern“ oder „ZIP mit .xlsx“.',
@@ -542,6 +548,9 @@
         }
 
         /* ---------- Components ---------- */
+        // Kurzform fuer das Abzeichen (Versionsnummer vor dem ersten Doppelpunkt), Langtext darunter (hoechstens 3 Zeilen, voll im Tooltip)
+        function neuKurz(t) { const p = String(t).indexOf(':'); return p > 0 && p <= 24 ? String(t).slice(0, p) : String(t); }
+        function neuLang(t) { if (!t) return ''; const p = String(t).indexOf(':'); return p > 0 && p <= 24 ? String(t).slice(p + 1).trim() : ''; }
         function Tag({ children }) {
             return html`<span class="tag">${children}</span>`;
         }
@@ -589,11 +598,12 @@
                         <div style=${{ flex: 1, minWidth: 0 }}>
                             <div style=${{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div class="card-title">${tool.title}</div>
-                                ${tool.whatsNew && html`<span class="badge-new">${tool.whatsNew}</span>`}
+                                ${tool.whatsNew && html`<span class="badge-new" title=${tool.whatsNew}>${neuKurz(tool.whatsNew)}</span>`}
                             </div>
                             <div class="tags">
                                 ${tool.tags.map((t) => html`<${Tag} key=${t}>${t}<//>`)}
                             </div>
+                            ${neuLang(tool.whatsNew) && html`<div class="neu-text" title=${tool.whatsNew}>${neuLang(tool.whatsNew)}</div>`}
                         </div>
                     </div>
 
@@ -728,7 +738,7 @@
 
                     <footer class="footer">
                         Interne Werkzeugsammlung · alle Tools laufen lokal · keine Daten verlassen den Arbeitsplatz
-                        <div style=${{ marginTop: '6px', opacity: .8 }}>Version 11.62</div>
+                        <div style=${{ marginTop: '6px', opacity: .8 }}>Version 13.04</div>
                     </footer>
                 </div>`;
         }
