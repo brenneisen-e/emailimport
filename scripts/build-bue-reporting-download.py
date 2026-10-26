@@ -19,6 +19,7 @@ import base64
 import datetime as dt
 import io
 import os
+import re
 import sys
 import zipfile
 
@@ -55,10 +56,19 @@ else:
     NAME = 'BUE_Reporting_Master_Makler.xlsm' if MAKLER else 'BUE_Reporting_Master.xlsm'
     QUELLE = os.path.join(HIER, 'bue-reporting', NAME)
     ZIEL = os.path.join(HIER, 'bue-reporting-makler-download.html' if MAKLER else 'bue-reporting-download.html')
-    TITEL = 'BÜ-Reporting Makler – Master-Datei (12.91)' if MAKLER else 'BÜ-Reporting HS – Master-Datei (12.91)'
     ANDERE = ('<a href="bue-reporting-download.html">Zur Fassung HS (HSB4 K)</a>' if MAKLER
               else '<a href="bue-reporting-makler-download.html">Zur Fassung Makler (ODPB, ODPP, KBI …)</a>')
+    # Version aus dem Kopf des Cockpits („Version 12.93 vom …“, sharedStrings) – fuer Titel und Dateinamen
+    with zipfile.ZipFile(QUELLE) as zq:
+        _m = re.search(r'Version (\d+\.\d+) vom', zq.read('xl/sharedStrings.xml').decode('utf-8'))
+    VERSION = _m.group(1) if _m else ''
+    TITEL = ('BÜ-Reporting Makler' if MAKLER else 'BÜ-Reporting HS') + ' – Master-Datei' + (' (%s)' % VERSION if VERSION else '')
+    SCHRITTE += ('\n      <li><b>Ältere Version schon in Benutzung?</b> Nicht neu laden: die bisherige Datei am gewohnten Ort öffnen '
+                 '(„Bearbeitung aktivieren“), zusätzlich diese Datei öffnen und im Cockpit unter WERKZEUGE „Ältere Datei aktualisieren …“ '
+                 'klicken. Die neue Version übernimmt alle Daten und ersetzt die alte unter demselben Namen – Verknüpfungen bleiben (ab Version 12.80).</li>')
 BASIS = NAME[:-5]                                               # Dateiname ohne .xlsm
+if MODUS not in ('pruefbot', 'regeln-umbau') and VERSION:
+    BASIS += '_' + VERSION                                      # Version im Namen: Excel oeffnet alte und neue Datei gleichzeitig
 
 daten = open(QUELLE, 'rb').read()
 
@@ -70,8 +80,8 @@ def als_zip(name):
     return puffer.getvalue()
 
 
-zip_daten = als_zip(NAME)
-zip_xlsx_daten = als_zip(NAME.replace('.xlsm', '.xlsx'))        # Variante fuer Netze, die .xlsm auch im ZIP pruefen
+zip_daten = als_zip(BASIS + '.xlsm')
+zip_xlsx_daten = als_zip(BASIS + '.xlsx')        # Variante fuer Netze, die .xlsm auch im ZIP pruefen
 
 
 def b64(b):
